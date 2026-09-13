@@ -7,7 +7,8 @@ import { InvalidArgumentError } from "commander";
 import { z } from "zod";
 import { ref, kindOf } from "../domain/report";
 import type { AnyRef } from "../domain/report";
-import type { CitedBasis } from "../domain/commands";
+import { GATE_CLOSURES, type CitedBasis } from "../domain/commands";
+import { GATE_STATES, WORK_STATES } from "../domain/report";
 import type { AnalysisRef, ClaimRef, EvidenceRef, ObservationsRef, Ref } from "../domain";
 
 /**
@@ -141,16 +142,23 @@ function oneOf<T extends string>(values: readonly T[], flag: string) {
 }
 
 /** `labkit gates --state ...` */
-export const gateState = oneOf(
-  ["never-evaluated", "incomplete", "blocked", "satisfied", "sidestepped", "retired"] as const,
-  "--state",
-);
+export const gateState = oneOf(GATE_STATES, "--state");
 
 /** `labkit close gate GATE --as ...` */
-export const gateClosure = oneOf(["sidestepped", "retired"] as const, "--as");
+export const gateClosure = oneOf(GATE_CLOSURES, "--as");
 
 /** `labkit work --state ...` */
-export const workState = oneOf(
-  ["planned", "waiting", "blocked", "carried-out", "abandoned"] as const,
-  "--state",
-);
+export const workState = oneOf(WORK_STATES, "--state");
+
+/**
+ * Brand and validate a write payload with the domain command schema.
+ * Throws before `run` opens a database.
+ */
+export function parseCommand<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new InvalidArgumentError(issue?.message ?? parsed.error.message);
+  }
+  return parsed.data;
+}

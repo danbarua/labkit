@@ -3,32 +3,40 @@
  */
 
 import { createdIn } from "../../domain";
+import type { DomainEvent, WriteSurface } from "../../domain";
 import type { Command } from "commander";
-import {
-  anyRef,
-  bearing,
-  citedBasis,
-  collect,
-  gateClosure,
-  handle,
-  inputRef,
-  standing,
-  supersededRef,
-  whole,
-} from "../args";
+import type { z } from "zod";
+import { bearing, collect, gateClosure, parseCommand, standing, whole } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
-import type {
-  ClaimRef,
-  DomainEvent,
-  EnquiryRef,
-  EvidenceRef,
-  GateRef,
-  NoteRef,
-  QuestionRef,
-} from "../../domain";
-import type { Prose } from "../../db/domain";
-import type { CitedBasis } from "../../domain/commands";
+import {
+  acceptAsUnresolvedCommand,
+  amendDesignCommand,
+  claimIsConfirmedCommand,
+  claimIsUndecidedCommand,
+  closeEnquiryCommand,
+  closeGateCommand,
+  concludeCommand,
+  declareGateCommand,
+  evaluateCriterionCommand,
+  keepCommand,
+  noteCommand,
+  openEnquiryCommand,
+  planWorkCommand,
+  poseCommand,
+  pursueCommand,
+  recordAnalysisCommand,
+  recordObservationsCommand,
+  recordReviewCommand,
+  reinterpretCommand,
+  replaceAnalysisCommand,
+  reverifyCommand,
+  sharpenCommand,
+  stateCriterionCommand,
+  stopWorkCommand,
+  synthesiseCommand,
+  undoCommand,
+} from "../../domain/commands";
 
 /**
  * Every handle an act minted, across however many events it recorded — in practice one per act.
@@ -47,21 +55,28 @@ const mintedView =
     asHandles(mintedHandles(r.events), p);
 
 export function registerWrites(program: Command, run: Run): void {
+  const parsed = <S extends z.ZodType>(
+    schema: S,
+    value: unknown,
+    act: (write: WriteSurface, input: z.output<S>) => Promise<{ events: readonly DomainEvent[] }>,
+  ) => {
+    const input = parseCommand(schema, value);
+    return run(async ({ write }) => answer(await act(write, input), mintedView()));
+  };
   program
     .command("pose")
     .helpGroup("Asking")
     .summary("put a question on the record")
     .description("A question, without starting work on it. `open` does both at once.")
     .argument("<question>", "the question, as worded")
-    .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3", handle("note"))
-    .action(async (question: string, opts: { from?: NoteRef }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.pose({ question, ...(opts.from ? { from: opts.from } : {}) }),
-          mintedView(),
-        ),
-      ),
-    );
+    .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3")
+    .action(async (question: string, opts: { from?: string }) => {
+      const input = parseCommand(poseCommand, {
+        question,
+        ...(opts.from === undefined ? {} : { from: opts.from }),
+      });
+      return run(async ({ write }) => answer(await write.pose(input), mintedView()));
+    });
   program
     .command("open")
     .helpGroup("Asking")
@@ -72,18 +87,24 @@ export function registerWrites(program: Command, run: Run): void {
         "did one thing.",
     )
     .argument("<question>", "the question, as worded")
-    .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3", handle("note"))
-    .action(async (question: string, opts: { from?: NoteRef }) =>
-      run(async ({ write }) => answer(await write.openEnquiry(question, opts.from), mintedView())),
-    );
+    .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3")
+    .action(async (question: string, opts: { from?: string }) => {
+      const input = parseCommand(openEnquiryCommand, {
+        question,
+        ...(opts.from === undefined ? {} : { from: opts.from }),
+      });
+      return run(async ({ write }) =>
+        answer(await write.openEnquiry(input.question, input.from), mintedView()),
+      );
+    });
   program
     .command("pursue")
     .helpGroup("Asking")
     .summary("open a line of enquiry against a question already on the record")
-    .argument("<question-id>", "e.g. Q_12", handle("question"))
+    .argument("<question-id>", "e.g. Q_12")
     .requiredOption("--approach <text>", "how this line of enquiry will go about it")
     .action(async (question, { approach }: { approach: string }) =>
-      run(async ({ write }) => answer(await write.pursue({ question, approach }), mintedView())),
+      parsed(pursueCommand, { question, approach }, (write, input) => write.pursue(input)),
     );
   program
     .command("sharpen")
@@ -94,11 +115,11 @@ export function registerWrites(program: Command, run: Run): void {
         "recomputed — so a later reader sees the evidence the sharpening was taken in light of, " +
         "not everything that has arrived since.",
     )
-    .argument("<question-id>", "the question being narrowed", handle("question"))
+    .argument("<question-id>", "the question being narrowed")
     .requiredOption("--into <question>", "the sharper question")
     .requiredOption("--because <text>", "what prompted the narrowing")
     .action(async (from, { into, because }: { into: string; because: string }) =>
-      run(async ({ write }) => answer(await write.sharpen({ from, into, because }), mintedView())),
+      parsed(sharpenCommand, { from, into, because }, (write, input) => write.sharpen(input)),
     );
   program
     .command("note")
@@ -110,44 +131,40 @@ export function registerWrites(program: Command, run: Run): void {
         "costs nothing, since attaching is the part this verb exists to make optional.",
     )
     .argument("<text>", "the note, in your own words")
-    .option("--on <handle>", "what this note concerns, if anything", anyRef)
+    .option("--on <handle>", "what this note concerns, if anything")
     .option(
       "--prompted <question-id>",
       "a question this note is the reason for — why it was asked, not what it is about",
-      handle("question"),
     )
-    .action(
-      async (text: string, opts: { on?: ReturnType<typeof anyRef>; prompted?: QuestionRef }) =>
-        run(async ({ write }) =>
-          answer(
-            await write.note({
-              text,
-              ...(opts.on === undefined ? {} : { on: opts.on }),
-              ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
-            }),
-            mintedView(),
-          ),
-        ),
+    .action(async (text: string, opts: { on?: string; prompted?: string }) =>
+      parsed(
+        noteCommand,
+        {
+          text,
+          ...(opts.on === undefined ? {} : { on: opts.on }),
+          ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
+        },
+        (write, input) => write.note(input),
+      ),
     );
   program
     .command("observe")
     .helpGroup("Doing the work")
     .summary("put measurement on the record without analysing it")
-    .argument("<enquiry-id>", "the line of enquiry this belongs to", handle("enquiry"))
+    .argument("<enquiry-id>", "the line of enquiry this belongs to")
     .requiredOption("--name <text>", "the artefact's logical name")
     .requiredOption("--finding <text>", "what was observed, in the observer's words")
     .option("--hash <text>", "a content hash, if there is one")
     .action(async (enquiry, opts: { name: string; finding: string; hash?: string }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.recordObservations({
-            enquiry,
-            name: opts.name,
-            finding: opts.finding,
-            ...(opts.hash === undefined ? {} : { contentHash: opts.hash }),
-          }),
-          mintedView(),
-        ),
+      parsed(
+        recordObservationsCommand,
+        {
+          enquiry,
+          name: opts.name,
+          finding: opts.finding,
+          ...(opts.hash === undefined ? {} : { contentHash: opts.hash }),
+        },
+        (write, input) => write.recordObservations(input),
       ),
     );
   program
@@ -159,31 +176,30 @@ export function registerWrites(program: Command, run: Run): void {
         "the analysis handle, which is what `labkit conclude` takes to add each finding. With `--json`, " +
         "the answer also names the `heldTo` criteria actually bound to the run.",
     )
-    .argument("<enquiry-id>", "the line of enquiry this belongs to", handle("enquiry"))
+    .argument("<enquiry-id>", "the line of enquiry this belongs to")
     .requiredOption("--method <text>", "what was done")
     .requiredOption(
       "--from <id>",
       "an input: ART_… observations or an earlier COMP_… analysis (repeatable)",
-      collect(inputRef),
+      collect(String),
     )
-    .option("--implementing <work-id>", "the planned work this carries out", handle("work"))
+    .option("--implementing <work-id>", "the planned work this carries out")
     .option(
       "--held-to <criterion-id>",
       "a prespecified condition its conclusions answer to (repeatable)",
-      collect(handle("criterion")),
+      collect(String),
     )
     .action(async (enquiry, opts) =>
-      run(async ({ write }) =>
-        answer(
-          await write.recordAnalysis({
-            enquiry,
-            method: opts.method,
-            from: opts.from,
-            ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
-            ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
-          }),
-          mintedView(),
-        ),
+      parsed(
+        recordAnalysisCommand,
+        {
+          enquiry,
+          method: opts.method,
+          from: opts.from,
+          ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
+          ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
+        },
+        (write, input) => write.recordAnalysis(input),
       ),
     );
   program
@@ -194,25 +210,24 @@ export function registerWrites(program: Command, run: Run): void {
       "One conclusion per call. --replacing supersedes exactly one earlier finding and " +
         "inherits its proposition and bearing; a finding nothing names goes on standing.",
     )
-    .argument("<analysis-id>", "the analysis this conclusion belongs to", handle("analysis"))
+    .argument("<analysis-id>", "the analysis this conclusion belongs to")
     .requiredOption("--finding <text>", "what was found, in this analysis's own words")
     .option("--proposition <text>", "what the finding bears on (required unless --replacing)")
-    .option("--replacing <id>", "the CLM_… claim or EV_… finding this supersedes", supersededRef)
+    .option("--replacing <id>", "the CLM_… claim or EV_… finding this supersedes")
     .option("--bearing <supports|challenges>", "which way it cuts (default supports)", bearing)
     .option("--standing <exploratory|confirmatory>", "confirmatory standing", standing)
     .action(async (analysis, opts) =>
-      run(async ({ write }) =>
-        answer(
-          await write.conclude({
-            analysis,
-            finding: opts.finding,
-            ...(opts.proposition === undefined ? {} : { proposition: opts.proposition }),
-            ...(opts.replacing === undefined ? {} : { replacing: opts.replacing }),
-            ...(opts.bearing === undefined ? {} : { bearing: opts.bearing }),
-            ...(opts.standing === undefined ? {} : { standing: opts.standing }),
-          }),
-          mintedView(),
-        ),
+      parsed(
+        concludeCommand,
+        {
+          analysis,
+          finding: opts.finding,
+          ...(opts.proposition === undefined ? {} : { proposition: opts.proposition }),
+          ...(opts.replacing === undefined ? {} : { replacing: opts.replacing }),
+          ...(opts.bearing === undefined ? {} : { bearing: opts.bearing }),
+          ...(opts.standing === undefined ? {} : { standing: opts.standing }),
+        },
+        (write, input) => write.conclude(input),
       ),
     );
   program
@@ -229,11 +244,11 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption(
       "--resting-on <claim-id>",
       "a finding it is drawn across (repeatable)",
-      collect(handle("claim")),
+      collect(String),
     )
     .action(async (proposition, opts) =>
-      run(async ({ write }) =>
-        answer(await write.synthesise({ proposition, restingOn: opts.restingOn }), mintedView()),
+      parsed(synthesiseCommand, { proposition, restingOn: opts.restingOn }, (write, input) =>
+        write.synthesise(input),
       ),
     );
   program
@@ -241,10 +256,10 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Doing the work")
     .summary("record a verdict on an analysis")
     .description("A later retraction can rest on this, which is why it is a record of its own.")
-    .argument("<analysis-id>", "the analysis being reviewed", handle("analysis"))
+    .argument("<analysis-id>", "the analysis being reviewed")
     .requiredOption("--verdict <text>", "what the review found")
     .action(async (of, { verdict }: { verdict: string }) =>
-      run(async ({ write }) => answer(await write.recordReview({ of, verdict }), mintedView())),
+      parsed(recordReviewCommand, { of, verdict }, (write, input) => write.recordReview(input)),
     );
   program
     .command("plan")
@@ -257,24 +272,23 @@ export function registerWrites(program: Command, run: Run): void {
       "what this work is permitted to read (repeatable)",
       collect(String),
     )
-    .option("--enquiry <id>", "the line of enquiry this work exists to advance", handle("enquiry"))
+    .option("--enquiry <id>", "the line of enquiry this work exists to advance")
     .action(
       async (opts: {
         objective: string;
         acceptance: string;
         mayRead?: string[];
-        enquiry?: EnquiryRef;
+        enquiry?: string;
       }) =>
-        run(async ({ write }) =>
-          answer(
-            await write.planWork({
-              objective: opts.objective,
-              acceptance: opts.acceptance,
-              ...(opts.mayRead === undefined ? {} : { mayRead: opts.mayRead }),
-              ...(opts.enquiry === undefined ? {} : { addressing: opts.enquiry }),
-            }),
-            mintedView(),
-          ),
+        parsed(
+          planWorkCommand,
+          {
+            objective: opts.objective,
+            acceptance: opts.acceptance,
+            ...(opts.mayRead === undefined ? {} : { mayRead: opts.mayRead }),
+            ...(opts.enquiry === undefined ? {} : { addressing: opts.enquiry }),
+          },
+          (write, input) => write.planWork(input),
         ),
     );
   program
@@ -287,9 +301,12 @@ export function registerWrites(program: Command, run: Run): void {
         "finding it qualifies.",
     )
     .argument("<proposition>", "what must hold")
-    .action(async (proposition: string) =>
-      run(async ({ write }) => answer(await write.stateCriterion(proposition), mintedView())),
-    );
+    .action(async (proposition: string) => {
+      const input = parseCommand(stateCriterionCommand, { proposition });
+      return run(async ({ write }) =>
+        answer(await write.stateCriterion(input.proposition), mintedView()),
+      );
+    });
   program
     .command("declare")
     .helpGroup("Saying in advance what counts")
@@ -297,24 +314,23 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption(
       "--governed-by <criterion-id>",
       "a condition this gate is bound to (repeatable)",
-      collect(handle("criterion")),
+      collect(String),
     )
     .requiredOption("--consequence <text>", "what not passing means")
     .requiredOption(
       "--protecting <work-id>",
       "planned work this gate protects (repeatable)",
-      collect(handle("work")),
+      collect(String),
     )
     .action(async (opts) =>
-      run(async ({ write }) =>
-        answer(
-          await write.declareGate({
-            governedBy: opts.governedBy,
-            consequence: opts.consequence,
-            protecting: opts.protecting,
-          }),
-          mintedView(),
-        ),
+      parsed(
+        declareGateCommand,
+        {
+          governedBy: opts.governedBy,
+          consequence: opts.consequence,
+          protecting: opts.protecting,
+        },
+        (write, input) => write.declareGate(input),
       ),
     );
   program
@@ -325,7 +341,7 @@ export function registerWrites(program: Command, run: Run): void {
       "--gate is optional on purpose: a condition can qualify a finding and gate no work, and " +
         "requiring a gate there would force the caller to mint one protecting nothing.",
     )
-    .argument("<criterion-id>", "the condition being checked", handle("criterion"))
+    .argument("<criterion-id>", "the condition being checked")
     .requiredOption("--value <text>", "what was measured")
     .addOption(
       program
@@ -333,16 +349,15 @@ export function registerWrites(program: Command, run: Run): void {
         .choices(["pass", "fail"])
         .makeOptionMandatory(),
     )
-    .option("--gate <gate-id>", "the gate this verdict is reached for", handle("gate"))
+    .option("--gate <gate-id>", "the gate this verdict is reached for")
     .option(
       "--about <claim-id>",
       "the finding this verdict judges, when one criterion is applied to several",
-      handle("claim"),
     )
     .option(
       "--citing <id>",
       "what decided it — a CLM_… claim, an ART_… observations record, or an EV_… finding (repeatable)",
-      collect(citedBasis),
+      collect(String),
     )
     .action(
       async (
@@ -350,23 +365,22 @@ export function registerWrites(program: Command, run: Run): void {
         opts: {
           value: string;
           outcome: "pass" | "fail";
-          gate?: GateRef;
-          about?: ClaimRef;
-          citing?: CitedBasis[];
+          gate?: string;
+          about?: string;
+          citing?: string[];
         },
       ) =>
-        run(async ({ write }) =>
-          answer(
-            await write.evaluateCriterion({
-              criterion,
-              value: opts.value,
-              outcome: opts.outcome,
-              ...(opts.gate === undefined ? {} : { gate: opts.gate }),
-              ...(opts.about === undefined ? {} : { about: opts.about }),
-              ...(opts.citing === undefined ? {} : { citing: opts.citing }),
-            }),
-            mintedView(),
-          ),
+        parsed(
+          evaluateCriterionCommand,
+          {
+            criterion,
+            value: opts.value,
+            outcome: opts.outcome,
+            ...(opts.gate === undefined ? {} : { gate: opts.gate }),
+            ...(opts.about === undefined ? {} : { about: opts.about }),
+            ...(opts.citing === undefined ? {} : { citing: opts.citing }),
+          },
+          (write, input) => write.evaluateCriterion(input),
         ),
     );
   program
@@ -378,25 +392,23 @@ export function registerWrites(program: Command, run: Run): void {
         "and one amendment is orderable against another. The report says whether the change was " +
         "mechanical or scientific, and what needs re-running.",
     )
-    .argument("<criterion-id>", "the condition being amended", handle("criterion"))
+    .argument("<criterion-id>", "the condition being amended")
     .requiredOption("--now-requires <text>", "the replacement condition")
     .requiredOption("--because <text>", "what prompted the amendment")
     .option(
       "--citing <claim-id>",
       "the diagnosis it rests on — required once the condition has been evaluated, omitted for a fix made before the first run",
-      handle("claim"),
     )
-    .action(async (criterion, opts: { nowRequires: string; because: string; citing?: ClaimRef }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.amendDesign({
-            criterion,
-            nowRequires: opts.nowRequires,
-            because: opts.because,
-            ...(opts.citing === undefined ? {} : { citing: opts.citing }),
-          }),
-          mintedView(),
-        ),
+    .action(async (criterion, opts: { nowRequires: string; because: string; citing?: string }) =>
+      parsed(
+        amendDesignCommand,
+        {
+          criterion,
+          nowRequires: opts.nowRequires,
+          because: opts.because,
+          ...(opts.citing === undefined ? {} : { citing: opts.citing }),
+        },
+        (write, input) => write.amendDesign(input),
       ),
     );
   const is = program
@@ -408,18 +420,22 @@ export function registerWrites(program: Command, run: Run): void {
   is.command("undecided")
     .helpGroup("Revising")
     .summary("record that a finding settles the proposition neither way")
-    .argument("<claim-id>", "the claim", handle("claim"))
-    .requiredOption("--because <evidence-id>", "the finding that left it open", handle("evidence"))
-    .action(async (claim, { because }: { because: EvidenceRef }) =>
-      run(async ({ write }) => answer(await write.isUndecided({ claim, because }), mintedView())),
+    .argument("<claim-id>", "the claim")
+    .requiredOption("--because <evidence-id>", "the finding that left it open")
+    .action(async (claim, { because }: { because: string }) =>
+      parsed(claimIsUndecidedCommand, { claim, because }, (write, input) =>
+        write.isUndecided(input),
+      ),
     );
   is.command("confirmed")
     .helpGroup("Revising")
     .summary("record that a finding is something others may build on")
-    .argument("<claim-id>", "the claim", handle("claim"))
+    .argument("<claim-id>", "the claim")
     .requiredOption("--because <text>", "what justifies vouching for it")
     .action(async (claim, { because }: { because: string }) =>
-      run(async ({ write }) => answer(await write.isConfirmed({ claim, because }), mintedView())),
+      parsed(claimIsConfirmedCommand, { claim, because }, (write, input) =>
+        write.isConfirmed(input),
+      ),
     );
   program
     .command("undo")
@@ -435,13 +451,12 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<event>", "the act's seq, from 'labkit happened'", whole)
     .requiredOption("--because <text>", "why this is being taken back")
-    .action(async (event: number, opts: { because: string }) =>
-      run(async ({ write }) =>
-        answer(await write.undo({ event, because: opts.because }), (r, p) =>
-          asHandles(r.retracted, p),
-        ),
-      ),
-    );
+    .action(async (event: number, opts: { because: string }) => {
+      const input = parseCommand(undoCommand, { event, because: opts.because });
+      return run(async ({ write }) =>
+        answer(await write.undo(input), (r, p) => asHandles(r.retracted, p)),
+      );
+    });
   program
     .command("keep")
     .helpGroup("Revising")
@@ -457,19 +472,20 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<claim-id...>", "the conclusions that survive", (v, prev: string[] = []) => [
       ...prev,
-      handle("claim")(v),
+      v,
     ])
-    .requiredOption("--because <review-id>", "the review that found it wanting", handle("review"))
+    .requiredOption("--because <review-id>", "the review that found it wanting")
     .requiredOption("--method <text>", "what the revision did differently")
-    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
-    .action(async (keeping, opts) =>
-      run(async ({ write }) => {
-        const report = await write.keep({
-          keeping,
-          because: opts.because,
-          method: opts.method,
-          ...(opts.from === undefined ? {} : { from: opts.from }),
-        });
+    .option("--from <id>", "an input the successor read as well (repeatable)", collect(String))
+    .action(async (keeping, opts) => {
+      const input = parseCommand(keepCommand, {
+        keeping,
+        because: opts.because,
+        method: opts.method,
+        ...(opts.from === undefined ? {} : { from: opts.from }),
+      });
+      return run(async ({ write }) => {
+        const report = await write.keep(input);
         // **What was superseded is the complement of what the caller typed**,
         // over a set they may not have had in front of them, so the act says
         // out loud what it did. stderr, because stdout is the handles.
@@ -479,8 +495,8 @@ export function registerWrites(program: Command, run: Run): void {
             `conclusions; keeping ${report.kept.join(", ")}\n`,
         );
         return answer(report, mintedView());
-      }),
-    );
+      });
+    });
   program
     .command("replace")
     .helpGroup("Revising")
@@ -492,21 +508,20 @@ export function registerWrites(program: Command, run: Run): void {
         "Use `--replacing <claim-id>` when two fallen findings answer the same proposition. " +
         "It reads what its predecessor read; --from adds to that.",
     )
-    .argument("<analysis-id>", "the analysis being superseded", handle("analysis"))
-    .requiredOption("--because <review-id>", "the review that found it defective", handle("review"))
+    .argument("<analysis-id>", "the analysis being superseded")
+    .requiredOption("--because <review-id>", "the review that found it defective")
     .requiredOption("--method <text>", "what the replacement did")
-    .option("--from <id>", "an input the successor read as well (repeatable)", collect(inputRef))
+    .option("--from <id>", "an input the successor read as well (repeatable)", collect(String))
     .action(async (supersedes, opts) =>
-      run(async ({ write }) =>
-        answer(
-          await write.replaceAnalysis({
-            supersedes,
-            because: opts.because,
-            method: opts.method,
-            ...(opts.from === undefined ? {} : { from: opts.from }),
-          }),
-          mintedView(),
-        ),
+      parsed(
+        replaceAnalysisCommand,
+        {
+          supersedes,
+          because: opts.because,
+          method: opts.method,
+          ...(opts.from === undefined ? {} : { from: opts.from }),
+        },
+        (write, input) => write.replaceAnalysis(input),
       ),
     );
   program
@@ -517,38 +532,33 @@ export function registerWrites(program: Command, run: Run): void {
       "One conclusion, not a list: a re-check reaches one verdict about the thing it " +
         "re-checked. It does not claim reproduction — see `labkit reproduction`.",
     )
-    .argument("<analysis-id>", "the analysis being re-checked", handle("analysis"))
-    .option(
-      "--enquiry <id>",
-      "the line of enquiry this belongs to (default: the analysis's own)",
-      handle("enquiry"),
-    )
+    .argument("<analysis-id>", "the analysis being re-checked")
+    .option("--enquiry <id>", "the line of enquiry this belongs to (default: the analysis's own)")
     .requiredOption("--method <text>", "what the re-check did")
-    .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(inputRef))
+    .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(String))
     .requiredOption("--proposition <text>", "what the re-check reached a verdict about")
     .requiredOption("--finding <text>", "what it found this time")
     .option("--bearing <supports|challenges>", "which way it cuts (default supports)", bearing)
     .option("--standing <exploratory|confirmatory>", "confirmatory standing", standing)
     .action(async (historical, opts) =>
-      run(async ({ write }) =>
-        answer(
-          await write.reverify({
-            historical,
-            ...(opts.enquiry === undefined ? {} : { enquiry: opts.enquiry }),
-            method: opts.method,
-            under: opts.under,
-            // Flat flags rather than JSON, and this one stays on the verb: a
-            // re-check reaches exactly one verdict about the thing it
-            // re-checked, so there is no list to serialise.
-            concludes: {
-              proposition: opts.proposition,
-              finding: opts.finding,
-              ...(opts.bearing === undefined ? {} : { bearing: opts.bearing }),
-              ...(opts.standing === undefined ? {} : { standing: opts.standing }),
-            },
-          }),
-          mintedView(),
-        ),
+      parsed(
+        reverifyCommand,
+        {
+          historical,
+          ...(opts.enquiry === undefined ? {} : { enquiry: opts.enquiry }),
+          method: opts.method,
+          under: opts.under,
+          // Flat flags rather than JSON, and this one stays on the verb: a
+          // re-check reaches exactly one verdict about the thing it
+          // re-checked, so there is no list to serialise.
+          concludes: {
+            proposition: opts.proposition,
+            finding: opts.finding,
+            ...(opts.bearing === undefined ? {} : { bearing: opts.bearing }),
+            ...(opts.standing === undefined ? {} : { standing: opts.standing }),
+          },
+        },
+        (write, input) => write.reverify(input),
       ),
     );
   program
@@ -560,19 +570,18 @@ export function registerWrites(program: Command, run: Run): void {
         "claims — two analyses reaching one reading are withdrawn together — so the report names " +
         "records rather than a sentence.",
     )
-    .argument("<claim-id>", "the claim being narrowed", handle("claim"))
+    .argument("<claim-id>", "the claim being narrowed")
     .requiredOption("--as <text>", "the narrower reading")
     .requiredOption("--because <text>", "what prompted the narrowing")
     .action(async (of, opts: { as: string; because: string }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.reinterpret({
-            of,
-            as: opts.as,
-            because: opts.because,
-          }),
-          mintedView(),
-        ),
+      parsed(
+        reinterpretCommand,
+        {
+          of,
+          as: opts.as,
+          because: opts.because,
+        },
+        (write, input) => write.reinterpret(input),
       ),
     );
   const close = program
@@ -585,44 +594,44 @@ export function registerWrites(program: Command, run: Run): void {
     .command("enquiry")
     .helpGroup("Stopping")
     .summary("close a line of enquiry, answered or abandoned")
-    .argument("<enquiry-id>", "the line of enquiry", handle("enquiry"))
-    .option("--answered-by <claim-id>", "the claim that answers it", handle("claim"))
-    .action(async (enquiry, { answeredBy }: { answeredBy?: ClaimRef }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.closeEnquiry({
-            enquiry,
-            ...(answeredBy === undefined ? {} : { answeredBy }),
-          }),
-          mintedView(),
-        ),
+    .argument("<enquiry-id>", "the line of enquiry")
+    .option("--answered-by <claim-id>", "the claim that answers it")
+    .action(async (enquiry, { answeredBy }: { answeredBy?: string }) =>
+      parsed(
+        closeEnquiryCommand,
+        {
+          enquiry,
+          ...(answeredBy === undefined ? {} : { answeredBy }),
+        },
+        (write, input) => write.closeEnquiry(input),
       ),
     );
   close
     .command("gate")
     .helpGroup("Stopping")
     .summary("close a gate without passing it")
-    .argument("<gate-id>", "the gate", handle("gate"))
+    .argument("<gate-id>", "the gate")
     .requiredOption("--as <closure>", "sidestepped | retired", gateClosure)
     .requiredOption("--because <text>", "why the gate no longer governs work")
     .action(
       async (
         gate,
-        { as: closure, because }: { as: "sidestepped" | "retired" | undefined; because: Prose },
-      ) =>
-        run(async ({ write }) => {
-          if (closure === undefined) throw new Error("--as is required");
-          return answer(await write.closeGate({ gate, closure, because }), mintedView());
-        }),
+        { as: closure, because }: { as: "sidestepped" | "retired" | undefined; because: string },
+      ) => {
+        if (closure === undefined) throw new Error("--as is required");
+        return parsed(closeGateCommand, { gate, closure, because }, (write, input) =>
+          write.closeGate(input),
+        );
+      },
     );
   close
     .command("work")
     .helpGroup("Stopping")
     .summary("stop a piece of planned work")
-    .argument("<work-id>", "the task", handle("work"))
+    .argument("<work-id>", "the task")
     .requiredOption("--because <text>", "why it is not being done")
-    .action(async (work, { because }: { because: Prose }) =>
-      run(async ({ write }) => answer(await write.stopWork({ work, because }), mintedView())),
+    .action(async (work, { because }: { because: string }) =>
+      parsed(stopWorkCommand, { work, because }, (write, input) => write.stopWork(input)),
     );
   program
     .command("accept")
@@ -633,25 +642,20 @@ export function registerWrites(program: Command, run: Run): void {
         "enquiry still reports itself open — deliberately — with the reason and the reopening " +
         "condition beside it.",
     )
-    .argument("<enquiry-id>", "the line of enquiry", handle("enquiry"))
+    .argument("<enquiry-id>", "the line of enquiry")
     .requiredOption("--because <text>", "why it is being left open")
     .requiredOption("--until <text>", "what would reopen it")
-    .requiredOption(
-      "--in-light-of <claim-id>",
-      "the finding this is taken in light of",
-      handle("claim"),
-    )
-    .action(async (enquiry, opts: { because: string; until: string; inLightOf: ClaimRef }) =>
-      run(async ({ write }) =>
-        answer(
-          await write.acceptAsUnresolved({
-            enquiry,
-            because: opts.because,
-            until: opts.until,
-            inLightOf: opts.inLightOf,
-          }),
-          mintedView(),
-        ),
+    .requiredOption("--in-light-of <claim-id>", "the finding this is taken in light of")
+    .action(async (enquiry, opts: { because: string; until: string; inLightOf: string }) =>
+      parsed(
+        acceptAsUnresolvedCommand,
+        {
+          enquiry,
+          because: opts.because,
+          until: opts.until,
+          inLightOf: opts.inLightOf,
+        },
+        (write, input) => write.acceptAsUnresolved(input),
       ),
     );
 }

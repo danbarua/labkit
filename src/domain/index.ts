@@ -43,6 +43,7 @@ export type {
   EdgeCreated,
   PropsChanged,
 } from "./events";
+export { GATE_STATES, WORK_STATES } from "./report";
 export type {
   Ref,
   ObservationsRef,
@@ -115,6 +116,7 @@ export type {
 // The write half's command shapes. `report.ts` above is what a read returns;
 // these are what an act takes. Exported so an adapter can hold one -- which is
 // what an MCP write tool will need and what inline anonymous shapes prevented.
+export { GATE_CLOSURES } from "./commands";
 export type {
   Command,
   PursueCommand,

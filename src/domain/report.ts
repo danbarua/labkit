@@ -1,82 +1,22 @@
-import { labelForNaturalId, type NodeLabel } from "../db/domain";
-import type { ResolutionKind } from "../db/domain";
+import type { NodeLabel, ResolutionKind } from "../db/domain";
 import type { DomainEvent } from "./events";
 
 export type { ResolutionKind } from "../db/domain";
+export {
+  LABEL_BY_KIND,
+  KIND_BY_LABEL,
+  ref,
+  kindOf,
+  isRefOfKind,
+  type Ref,
+  type Kind,
+  type AnyRef,
+} from "./ref";
+import type { AnyRef, Kind, Ref } from "./ref";
 
 /**
  * What the domain layer hands back — research answers, not graph rows.
  */
-
-declare const KIND: unique symbol;
-
-/**
- * A handle a caller passes back in — LabKit's short natural id, and nothing else. Never AGE's
- * internal graphid.
- */
-export type Ref<K extends string> = string & { readonly [KIND]: K };
-
-/**
- * Which node label each handle kind names.
- */
-export const LABEL_BY_KIND = {
-  question: "Question",
-  enquiry: "LineOfEnquiry",
-  unit: "EvidenceUnit",
-  evidence: "Evidence",
-  claim: "Claim",
-  decision: "Decision",
-  criterion: "Criterion",
-  evaluation: "CriterionEvaluation",
-  gate: "Gate",
-  review: "Review",
-  observations: "Artefact",
-  analysis: "Computation",
-  work: "Task",
-  note: "Note",
-} satisfies Record<string, NodeLabel>;
-
-/**
- * Every kind a handle can name — the closed union `why` dispatches on.
- */
-export type Kind = keyof typeof LABEL_BY_KIND;
-
-/**
- * A handle of any kind — every {@link Ref} this record can mint, in one type.
- */
-export type AnyRef = Ref<Kind>;
-
-/**
- * Builds a handle, and **refuses one whose id does not match its kind**.
- */
-export function isRefOfKind(kind: string, id: string): boolean {
-  // Widened, not narrowed: `LABEL_BY_KIND`'s literal keys (needed so `Kind` is
-  // closed, see above) would otherwise refuse to be indexed by the caller's
-  // plain `string`. This assignment is sound in a way a cast to `Kind` would
-  // not be -- it is not claiming `kind` IS one of the closed keys, only asking
-  // an object typed for arbitrary string keys, same runtime lookup either way.
-  const table: Record<string, NodeLabel> = LABEL_BY_KIND;
-  const expected = table[kind];
-  if (!expected) return true;
-  try {
-    return labelForNaturalId(id) === expected;
-  } catch {
-    // An unrecognised prefix is not this kind either, and at the MCP boundary
-    // that has to be a `false` rather than a throw -- zod turns a `false` into
-    // a message naming the field, and a throw into a crash.
-    return false;
-  }
-}
-
-export const ref = <K extends string>(kind: K, id: string): Ref<K> => {
-  if (!isRefOfKind(kind, id)) {
-    const table: Record<string, NodeLabel> = LABEL_BY_KIND;
-    throw new Error(
-      `${kind} handle expected a ${table[kind]} id, got "${id}" — pass the handle the act that minted it returned`,
-    );
-  }
-  return id as Ref<K>;
-};
 
 export type ObservationsRef = Ref<"observations">;
 export type QuestionRef = Ref<"question">;
@@ -254,27 +194,6 @@ export interface Undone {
 }
 
 /**
- * The inverse of {@link LABEL_BY_KIND} — a label's research-concept kind, where one exists. Not
- * every label has one (`EvidenceUnit` and `Computation` do not name a kind a caller would type
- * a verb argument as), so this is partial, not total.
- */
-export const KIND_BY_LABEL: { readonly [L in NodeLabel]?: Kind } = Object.fromEntries(
-  Object.entries(LABEL_BY_KIND).map(([kind, label]) => [label, kind]),
-);
-
-/**
- * The kind a handle's own prefix names, or `null` for text that is not shaped like one of this
- * record's ~97 mintable ids at all.
- */
-export function kindOf(id: string): Kind | null {
-  try {
-    return KIND_BY_LABEL[labelForNaturalId(id)] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * One record `search()` found containing the wording, and the text it matched on — not
  * necessarily the record's only `Prose` property, so a caller who wants to know *why* it
  * matched needs this, not just the handle.
@@ -406,10 +325,18 @@ export interface UnaffectedRecord {
 }
 
 /** Whether a gate may be relied on. */
+export const GATE_STATES = [
+  "never-evaluated",
+  "incomplete",
+  "blocked",
+  "satisfied",
+  "sidestepped",
+  "retired",
+] as const;
 export interface GateStatus {
   gate: GateRef;
   consequence: string;
-  state: "never-evaluated" | "incomplete" | "blocked" | "satisfied" | "sidestepped" | "retired";
+  state: (typeof GATE_STATES)[number];
   /** The closing act. Check verdicts remain visible below. */
   closure?: {
     decision: DecisionRef;
@@ -1053,7 +980,8 @@ export interface StoppedReason {
 /**
  * What a task's state can be, computed from the graph and never stored.
  */
-export type WorkState = "planned" | "waiting" | "blocked" | "carried-out" | "abandoned";
+export const WORK_STATES = ["planned", "waiting", "blocked", "carried-out", "abandoned"] as const;
+export type WorkState = (typeof WORK_STATES)[number];
 
 /**
  * One task in a list of them.

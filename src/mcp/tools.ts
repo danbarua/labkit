@@ -7,8 +7,36 @@ import { createdIn } from "../domain";
 import { z } from "zod";
 import type { ReadGroup, ReadSurface, WriteGroup, WriteSurface } from "../domain";
 import type { SessionRegistry } from "../attribution";
-import { ref, kindOf } from "../domain/report";
-import type { AnalysisRef, ObservationsRef } from "../domain";
+import { ref } from "../domain/report";
+import {
+  acceptAsUnresolvedCommand,
+  amendDesignCommand,
+  claimIsConfirmedCommand,
+  claimIsUndecidedCommand,
+  closeEnquiryCommand,
+  closeGateCommand,
+  concludeCommand,
+  declareGateCommand,
+  evaluateCriterionCommand,
+  keepCommand,
+  noteCommand,
+  openEnquiryCommand,
+  planWorkCommand,
+  poseCommand,
+  pursueCommand,
+  recordAnalysisCommand,
+  recordObservationsCommand,
+  recordReviewCommand,
+  reinterpretCommand,
+  replaceAnalysisCommand,
+  reverifyCommand,
+  sharpenCommand,
+  stateCriterionCommand,
+  stopWorkCommand,
+  synthesiseCommand,
+  undoCommand,
+} from "../domain/commands";
+
 import {
   claimsAssertingSchema,
   searchSchema,
@@ -566,15 +594,6 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
 // from the ref's name, which says "observations" and would have suggested EU_.
 const OBSERVATIONS_PREFIX = ARTEFACT_PREFIX;
 
-/** One id from the wire, resolved to the ref kind its prefix names. */
-function inputRef(id: string): ObservationsRef | AnalysisRef {
-  if (id.startsWith(ANALYSIS_PREFIX)) return ref("analysis", id);
-  if (id.startsWith(OBSERVATIONS_PREFIX)) return ref("observations", id);
-  throw new Error(
-    `\`${id}\` is neither observations (${OBSERVATIONS_PREFIX}\u2026) nor an analysis (${ANALYSIS_PREFIX}\u2026)`,
-  );
-}
-
 export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
   writeTool({
     name: "pose",
@@ -596,7 +615,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: posedSchema,
     handler: (write, { question, from }) =>
-      write.pose({ question, ...(from ? { from: ref("note", from) } : {}) }),
+      write.pose(poseCommand.parse({ question, ...(from ? { from: from } : {}) })),
   }),
 
   writeTool({
@@ -616,8 +635,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         ),
     },
     outputSchema: openedEnquirySchema,
-    handler: (write, { question, from }) =>
-      write.openEnquiry(question, from ? ref("note", from) : undefined),
+    handler: (write, { question, from }) => {
+      const input = openEnquiryCommand.parse({
+        question,
+        ...(from === undefined ? {} : { from }),
+      });
+      return write.openEnquiry(input.question, input.from);
+    },
   }),
 
   writeTool({
@@ -633,7 +657,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: pursuedSchema,
     handler: (write, { question, approach }) =>
-      write.pursue({ question: ref("question", question), approach }),
+      write.pursue(pursueCommand.parse({ question: question, approach })),
   }),
 
   writeTool({
@@ -652,7 +676,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: sharpenedQuestionSchema,
     handler: (write, { from, into, because }) =>
-      write.sharpen({ from: ref("question", from), into, because }),
+      write.sharpen(sharpenCommand.parse({ from, into, because })),
   }),
 
   writeTool({
@@ -679,14 +703,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
         ),
     },
     outputSchema: notedSchema,
-    handler: (write, { text, on, prompted }) => {
-      const kind = on ? kindOf(on) : null;
-      return write.note({
-        text,
-        ...(on && kind ? { on: ref(kind, on) } : {}),
-        ...(prompted ? { prompted: ref("question", prompted) } : {}),
-      });
-    },
+    handler: (write, { text, on, prompted }) =>
+      write.note(
+        noteCommand.parse({
+          text,
+          ...(on === undefined ? {} : { on }),
+          ...(prompted === undefined ? {} : { prompted }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -709,12 +733,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: recordedObservationsSchema,
     handler: (write, { enquiry, name, finding, content_hash }) =>
-      write.recordObservations({
-        enquiry: ref("enquiry", enquiry),
-        name,
-        finding,
-        ...(content_hash === undefined ? {} : { contentHash: content_hash }),
-      }),
+      write.recordObservations(
+        recordObservationsCommand.parse({
+          enquiry: enquiry,
+          name,
+          finding,
+          ...(content_hash === undefined ? {} : { contentHash: content_hash }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -743,17 +769,19 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: recordedAnalysisSchema,
     handler: (write, { enquiry, method, from, implementing, held_to }) =>
-      write.recordAnalysis({
-        enquiry: ref("enquiry", enquiry),
-        method,
-        from: (from as string[]).map(inputRef),
-        ...(implementing === undefined ? {} : { implementing: ref("work", implementing) }),
-        ...(held_to === undefined
-          ? {}
-          : {
-              heldTo: (held_to as string[]).map((id) => ref("criterion", id)),
-            }),
-      }),
+      write.recordAnalysis(
+        recordAnalysisCommand.parse({
+          enquiry: enquiry,
+          method,
+          from: from,
+          ...(implementing === undefined ? {} : { implementing: implementing }),
+          ...(held_to === undefined
+            ? {}
+            : {
+                heldTo: held_to,
+              }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -791,22 +819,24 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: recordedAnalysisSchema,
     handler: (write, { analysis, finding, proposition, replacing, bearing, standing }) =>
-      write.conclude({
-        analysis: ref("analysis", analysis),
-        finding,
-        ...(proposition === undefined ? {} : { proposition }),
-        // Prefix, never `typeof`: both arms of the union are "string" at
-        // runtime, which is the defect `isRefOfKind` exists for.
-        ...(replacing === undefined
-          ? {}
-          : {
-              replacing: (replacing as string).startsWith(CLAIM_PREFIX)
-                ? ref("claim", replacing)
-                : ref("evidence", replacing),
-            }),
-        ...(bearing === undefined ? {} : { bearing: bearing as "supports" | "challenges" }),
-        ...(standing === undefined ? {} : { standing: standing as "exploratory" | "confirmatory" }),
-      }),
+      write.conclude(
+        concludeCommand.parse({
+          analysis: analysis,
+          finding,
+          ...(proposition === undefined ? {} : { proposition }),
+          // Prefix, never `typeof`: both arms of the union are "string" at
+          // runtime, which is the defect `isRefOfKind` exists for.
+          ...(replacing === undefined
+            ? {}
+            : {
+                replacing,
+              }),
+          ...(bearing === undefined ? {} : { bearing: bearing as "supports" | "challenges" }),
+          ...(standing === undefined
+            ? {}
+            : { standing: standing as "exploratory" | "confirmatory" }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -826,10 +856,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: synthesisedSchema,
     handler: (write, { proposition, resting_on }) =>
-      write.synthesise({
-        proposition,
-        restingOn: (resting_on as string[]).map((c) => ref("claim", c)),
-      }),
+      write.synthesise(
+        synthesiseCommand.parse({
+          proposition,
+          restingOn: resting_on,
+        }),
+      ),
   }),
 
   writeTool({
@@ -844,7 +876,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       verdict: z.string().describe("what the review found"),
     },
     outputSchema: recordedReviewSchema,
-    handler: (write, { of, verdict }) => write.recordReview({ of: ref("analysis", of), verdict }),
+    handler: (write, { of, verdict }) =>
+      write.recordReview(recordReviewCommand.parse({ of: of, verdict })),
   }),
 
   writeTool({
@@ -871,12 +904,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: plannedWorkSchema,
     handler: (write, { objective, acceptance, may_read, enquiry }) =>
-      write.planWork({
-        objective,
-        acceptance,
-        ...(may_read === undefined ? {} : { mayRead: may_read as string[] }),
-        ...(enquiry === undefined ? {} : { addressing: ref("enquiry", enquiry) }),
-      }),
+      write.planWork(
+        planWorkCommand.parse({
+          objective,
+          acceptance,
+          ...(may_read === undefined ? {} : { mayRead: may_read as string[] }),
+          ...(enquiry === undefined ? {} : { addressing: enquiry }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -891,7 +926,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       proposition: z.string().describe("the condition, as a sentence"),
     },
     outputSchema: statedCriterionSchema,
-    handler: (write, { proposition }) => write.stateCriterion(proposition),
+    handler: (write, { proposition }) => {
+      const input = stateCriterionCommand.parse({ proposition });
+      return write.stateCriterion(input.proposition);
+    },
   }),
 
   writeTool({
@@ -918,11 +956,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: declaredGateSchema,
     handler: (write, { governed_by, consequence, protecting }) =>
-      write.declareGate({
-        governedBy: (governed_by as string[]).map((id) => ref("criterion", id)),
-        consequence,
-        protecting: (protecting as string[]).map((id) => ref("work", id)),
-      }),
+      write.declareGate(
+        declareGateCommand.parse({
+          governedBy: (governed_by as string[]).map((id) => id),
+          consequence,
+          protecting: (protecting as string[]).map((id) => id),
+        }),
+      ),
   }),
 
   writeTool({
@@ -955,25 +995,21 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: evaluatedCriterionSchema,
     handler: (write, { criterion, value, outcome, gate, citing, about }) =>
-      write.evaluateCriterion({
-        criterion: ref("criterion", criterion),
-        value,
-        outcome: outcome as "pass" | "fail",
-        ...(gate === undefined ? {} : { gate: ref("gate", gate) }),
-        // Prefix, never `typeof`: all three arms are "string" at runtime.
-        ...(about === undefined ? {} : { about: ref("claim", about) }),
-        ...(citing === undefined
-          ? {}
-          : {
-              citing: (citing as string[]).map((id) =>
-                id.startsWith(CLAIM_PREFIX)
-                  ? ref("claim", id)
-                  : id.startsWith(OBSERVATIONS_PREFIX)
-                    ? ref("observations", id)
-                    : ref("evidence", id),
-              ),
-            }),
-      }),
+      write.evaluateCriterion(
+        evaluateCriterionCommand.parse({
+          criterion: criterion,
+          value,
+          outcome: outcome as "pass" | "fail",
+          ...(gate === undefined ? {} : { gate: gate }),
+          // Prefix, never `typeof`: all three arms are "string" at runtime.
+          ...(about === undefined ? {} : { about: about }),
+          ...(citing === undefined
+            ? {}
+            : {
+                citing,
+              }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -1001,12 +1037,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: amendmentReportSchema,
     handler: (write, { criterion, now_requires, because, citing }) =>
-      write.amendDesign({
-        criterion: ref("criterion", criterion),
-        nowRequires: now_requires,
-        because,
-        ...(citing ? { citing: ref("claim", citing) } : {}),
-      }),
+      write.amendDesign(
+        amendDesignCommand.parse({
+          criterion: criterion,
+          nowRequires: now_requires,
+          because,
+          ...(citing ? { citing: citing } : {}),
+        }),
+      ),
   }),
 
   writeTool({
@@ -1024,10 +1062,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: restatedSchema,
     handler: (write, { claim, because }) =>
-      write.isUndecided({
-        claim: ref("claim", claim),
-        because: ref("evidence", because),
-      }),
+      write.isUndecided(
+        claimIsUndecidedCommand.parse({
+          claim: claim,
+          because: because,
+        }),
+      ),
   }),
 
   writeTool({
@@ -1043,7 +1083,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: restatedSchema,
     handler: (write, { claim, because }) =>
-      write.isConfirmed({ claim: ref("claim", claim), because }),
+      write.isConfirmed(claimIsConfirmedCommand.parse({ claim: claim, because })),
   }),
 
   writeTool({
@@ -1061,7 +1101,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       because: z.string().describe("why this is being taken back"),
     },
     outputSchema: undoneSchema,
-    handler: (write, { event, because }) => write.undo({ event, because }),
+    handler: (write, { event, because }) => write.undo(undoCommand.parse({ event, because })),
   }),
 
   writeTool({
@@ -1095,12 +1135,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: replacementReportSchema,
     handler: (write, { keeping, because, method, from }) =>
-      write.keep({
-        keeping: (keeping as string[]).map((id) => ref("claim", id)),
-        because: ref("review", because),
-        method,
-        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
-      }),
+      write.keep(
+        keepCommand.parse({
+          keeping: (keeping as string[]).map((id) => id),
+          because: because,
+          method,
+          ...(from === undefined ? {} : { from: from }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -1129,12 +1171,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: replacementReportSchema,
     handler: (write, { supersedes, because, method, from }) =>
-      write.replaceAnalysis({
-        supersedes: ref("analysis", supersedes),
-        because: ref("review", because),
-        method,
-        ...(from === undefined ? {} : { from: (from as string[]).map(inputRef) }),
-      }),
+      write.replaceAnalysis(
+        replaceAnalysisCommand.parse({
+          supersedes: supersedes,
+          because: because,
+          method,
+          ...(from === undefined ? {} : { from: from }),
+        }),
+      ),
   }),
 
   writeTool({
@@ -1177,20 +1221,22 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       write,
       { historical, enquiry, method, under, proposition, finding, bearing, standing },
     ) =>
-      write.reverify({
-        historical: ref("analysis", historical),
-        enquiry: ref("enquiry", enquiry),
-        method,
-        under: (under as string[]).map(inputRef),
-        concludes: {
-          proposition: proposition as string,
-          finding: finding as string,
-          ...(bearing === undefined ? {} : { bearing: bearing as "supports" | "challenges" }),
-          ...(standing === undefined
-            ? {}
-            : { standing: standing as "exploratory" | "confirmatory" }),
-        },
-      }),
+      write.reverify(
+        reverifyCommand.parse({
+          historical: historical,
+          enquiry: enquiry,
+          method,
+          under,
+          concludes: {
+            proposition: proposition as string,
+            finding: finding as string,
+            ...(bearing === undefined ? {} : { bearing: bearing as "supports" | "challenges" }),
+            ...(standing === undefined
+              ? {}
+              : { standing: standing as "exploratory" | "confirmatory" }),
+          },
+        }),
+      ),
   }),
 
   writeTool({
@@ -1209,11 +1255,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: reinterpretationReportSchema,
     handler: (write, { claim, as: narrower, because }) =>
-      write.reinterpret({
-        of: ref("claim", claim),
-        as: narrower,
-        because,
-      }),
+      write.reinterpret(
+        reinterpretCommand.parse({
+          of: claim,
+          as: narrower,
+          because,
+        }),
+      ),
   }),
 
   writeTool({
@@ -1234,10 +1282,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: closedEnquirySchema,
     handler: (write, { enquiry, answered_by }) =>
-      write.closeEnquiry({
-        enquiry: ref("enquiry", enquiry),
-        ...(answered_by === undefined ? {} : { answeredBy: ref("claim", answered_by) }),
-      }),
+      write.closeEnquiry(
+        closeEnquiryCommand.parse({
+          enquiry: enquiry,
+          ...(answered_by === undefined ? {} : { answeredBy: answered_by }),
+        }),
+      ),
   }),
   writeTool({
     name: "close_gate",
@@ -1253,7 +1303,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: closedGateSchema,
     handler: (write, { gate, closure, because }) =>
-      write.closeGate({ gate: ref("gate", gate), closure, because }),
+      write.closeGate(closeGateCommand.parse({ gate: gate, closure, because })),
   }),
   writeTool({
     name: "stop_work",
@@ -1270,7 +1320,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       because: z.string().describe("why it is not being done"),
     },
     outputSchema: stoppedWorkSchema,
-    handler: (write, { work, because }) => write.stopWork({ work: ref("work", work), because }),
+    handler: (write, { work, because }) =>
+      write.stopWork(stopWorkCommand.parse({ work: work, because })),
   }),
 
   writeTool({
@@ -1289,12 +1340,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: acceptedAsUnresolvedSchema,
     handler: (write, { enquiry, because, until, in_light_of }) =>
-      write.acceptAsUnresolved({
-        enquiry: ref("enquiry", enquiry),
-        because,
-        until,
-        inLightOf: ref("claim", in_light_of),
-      }),
+      write.acceptAsUnresolved(
+        acceptAsUnresolvedCommand.parse({
+          enquiry: enquiry,
+          because,
+          until,
+          inLightOf: in_light_of,
+        }),
+      ),
   }),
 ] as ReadonlyArray<WriteToolDefinition<z.ZodRawShape>>;
 
