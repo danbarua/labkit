@@ -9,6 +9,7 @@ import type {
   ConflictSide,
   ConflictVerdict,
   Explanation,
+  How,
   HistoricalSurvey,
   KnowledgeSurvey,
   QuestionStanding,
@@ -342,4 +343,20 @@ export function renderConflict(verdict: ConflictVerdict, p: Palette): string {
     corroboration: p.settled("Corroboration — these agree."),
   };
   return [verdictLine[verdict.relation], "", verdict.sides.map(side).join("\n\n")].join("\n");
+}
+
+export function renderHow(how: How, p: Palette): string {
+  if (how.steps.length === 0) return p.untested("No steps.");
+  const lines = how.steps.map((s: How["steps"][number]) => {
+    let line = `${p.handle(s.handle)}  ${s.what}`;
+    if (s.superseded) {
+      line += p.contested(" (superseded");
+      if (s.successor) line += ` → ${p.handle(s.successor)}`;
+      line += ")";
+    }
+    if (s.because) line += ` — ${s.because}`;
+    if (s.seq !== undefined) line += ` [seq ${s.seq}]`;
+    return line;
+  });
+  return [p.heading(`How ${p.handle(how.subject)} — ${how.steps.length}`), ...lines].join("\n");
 }

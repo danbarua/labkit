@@ -88,8 +88,7 @@ export class Asking extends SessionCore {
       if (input.prompted) unitOfWork.edge(noted, "MOTIVATES", input.prompted);
       for (const old of input.supersedes ?? []) {
         // Mint first: a target equal to this note's new id is self, not "missing".
-        if (old === noted)
-          throw new Error(`a note cannot supersede itself (${noted})`);
+        if (old === noted) throw new Error(`a note cannot supersede itself (${noted})`);
         await this.noteExistsToSupersede(old);
         unitOfWork.edge(noted, "SUPERSEDES", old);
       }

@@ -72,9 +72,7 @@ test("supersedes writes SUPERSEDES edges (repeatable) and why walks both directi
   // why on old includes the newer as replacement
   const whyOld1 = await session.reads.why({ subject: old1 });
   expect(
-    whyOld1.because.some(
-      (b) => b.handle === newer && /was replaced by/.test(b.wording ?? ""),
-    ),
+    whyOld1.because.some((b) => b.handle === newer && /was replaced by/.test(b.wording ?? "")),
   ).toBe(true);
 
   const whyNew = await session.reads.why({ subject: newer });
@@ -100,9 +98,9 @@ test("note --supersedes refuses missing target", async () => {
 
 test("note --supersedes refuses non-note handle (treated as missing note target)", async () => {
   const { question } = await session.writes.pose({ question: "some q" });
-  await expect(
-    session.writes.note({ text: "x", supersedes: [question] as never }),
-  ).rejects.toThrow(/no note .* for this note to supersede/);
+  await expect(session.writes.note({ text: "x", supersedes: [question] as never })).rejects.toThrow(
+    /no note .* for this note to supersede/,
+  );
 });
 
 test("note --supersedes refuses self", async () => {

@@ -69,6 +69,7 @@ export {
   reproducibilityOfQuery,
   criterionStandingQuery,
   whyQuery,
+  howQuery,
   whatDependsOnQuery,
   neighboursOfQuery,
   proseForQuery,
@@ -100,6 +101,7 @@ export type {
   ReproducibilityOfQuery,
   CriterionStandingQuery,
   WhyQuery,
+  HowQuery,
   WhatDependsOnQuery,
   NeighboursOfQuery,
   ProseForQuery,
@@ -174,12 +176,16 @@ export type {
   EnquiryExplanation,
   GateExplanation,
   Standing,
+  How,
+  HowStep,
 } from "./report";
 // Report codecs are the single runtime source for MCP and CLI output.
 export {
   claimsAsserting,
   search,
   notes,
+  how,
+  howStep,
   whatHappened,
   knowledgeSurvey,
   historicalSurvey,

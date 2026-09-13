@@ -141,21 +141,17 @@ export function registerWrites(program: Command, run: Run): void {
       "a note this one replaces — both stay readable; the edge is what a read walks (repeatable)",
       collect(String),
     )
-    .action(
-      async (
-        text: string,
-        opts: { on?: string; prompted?: string; supersedes?: string[] },
-      ) =>
-        parsed(
-          noteCommand,
-          {
-            text,
-            ...(opts.on === undefined ? {} : { on: opts.on }),
-            ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
-            ...(opts.supersedes === undefined ? {} : { supersedes: opts.supersedes }),
-          },
-          (write, input) => write.note(input),
-        ),
+    .action(async (text: string, opts: { on?: string; prompted?: string; supersedes?: string[] }) =>
+      parsed(
+        noteCommand,
+        {
+          text,
+          ...(opts.on === undefined ? {} : { on: opts.on }),
+          ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
+          ...(opts.supersedes === undefined ? {} : { supersedes: opts.supersedes }),
+        },
+        (write, input) => write.note(input),
+      ),
     );
   program
     .command("observe")
