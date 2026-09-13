@@ -6,7 +6,7 @@ import { createdIn } from "../../domain";
 import type { DomainEvent, WriteSurface } from "../../domain";
 import type { Command } from "commander";
 import type { z } from "zod";
-import { bearing, collect, gateClosure, parseCommand, standing, whole } from "../args";
+import { collect, parseCommand, whole } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
 import {
@@ -214,8 +214,8 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--finding <text>", "what was found, in this analysis's own words")
     .option("--proposition <text>", "what the finding bears on (required unless --replacing)")
     .option("--replacing <id>", "the CLM_… claim or EV_… finding this supersedes")
-    .option("--bearing <supports|challenges>", "which way it cuts (default supports)", bearing)
-    .option("--standing <exploratory|confirmatory>", "confirmatory standing", standing)
+    .option("--bearing <supports|challenges>", "which way it cuts (default supports)")
+    .option("--standing <exploratory|confirmatory>", "confirmatory standing")
     .action(async (analysis, opts) =>
       parsed(
         concludeCommand,
@@ -343,12 +343,7 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<criterion-id>", "the condition being checked")
     .requiredOption("--value <text>", "what was measured")
-    .addOption(
-      program
-        .createOption("--outcome <pass|fail>", "the verdict")
-        .choices(["pass", "fail"])
-        .makeOptionMandatory(),
-    )
+    .requiredOption("--outcome <pass|fail>", "the verdict")
     .option("--gate <gate-id>", "the gate this verdict is reached for")
     .option(
       "--about <claim-id>",
@@ -364,7 +359,7 @@ export function registerWrites(program: Command, run: Run): void {
         criterion,
         opts: {
           value: string;
-          outcome: "pass" | "fail";
+          outcome: string;
           gate?: string;
           about?: string;
           citing?: string[];
@@ -538,8 +533,8 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(String))
     .requiredOption("--proposition <text>", "what the re-check reached a verdict about")
     .requiredOption("--finding <text>", "what it found this time")
-    .option("--bearing <supports|challenges>", "which way it cuts (default supports)", bearing)
-    .option("--standing <exploratory|confirmatory>", "confirmatory standing", standing)
+    .option("--bearing <supports|challenges>", "which way it cuts (default supports)")
+    .option("--standing <exploratory|confirmatory>", "confirmatory standing")
     .action(async (historical, opts) =>
       parsed(
         reverifyCommand,
@@ -611,18 +606,12 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Stopping")
     .summary("close a gate without passing it")
     .argument("<gate-id>", "the gate")
-    .requiredOption("--as <closure>", "sidestepped | retired", gateClosure)
+    .requiredOption("--as <closure>", "sidestepped | retired")
     .requiredOption("--because <text>", "why the gate no longer governs work")
-    .action(
-      async (
-        gate,
-        { as: closure, because }: { as: "sidestepped" | "retired" | undefined; because: string },
-      ) => {
-        if (closure === undefined) throw new Error("--as is required");
-        return parsed(closeGateCommand, { gate, closure, because }, (write, input) =>
-          write.closeGate(input),
-        );
-      },
+    .action(async (gate, { as, because }: { as: string; because: string }) =>
+      parsed(closeGateCommand, { gate, closure: as, because }, (write, input) =>
+        write.closeGate(input),
+      ),
     );
   close
     .command("work")

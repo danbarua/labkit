@@ -86,7 +86,9 @@ test("a non-numeric --since or --limit is refused, not coerced", async () => {
 test("a handle of the wrong kind is refused at the boundary", async () => {
   // The query schema brands the handle. A claim where a gate belongs is refused
   // before `run` opens a database, the same way a write command is.
-  expect(await refusal(["gate", "CLM_1"])).toContain("gate handle expected");
+  expect(await refusal(["gate", "CLM_1"])).toContain(
+    'gate handle expected a Gate id, got "CLM_1"',
+  );
 });
 
 test("happened touching a non-handle is refused at the boundary", async () => {
@@ -95,7 +97,7 @@ test("happened touching a non-handle is refused at the boundary", async () => {
 
 test("a write handle of the wrong kind is refused at the boundary", async () => {
   expect(await refusal(["is", "confirmed", "GATE_1", "--because", "x"])).toContain(
-    "claim handle expected",
+    'claim handle expected a Claim id, got "GATE_1"',
   );
 });
 
@@ -111,6 +113,12 @@ test("a bad --state names the values it would have accepted", async () => {
   expect(await refusal(["gates", "--state", "blockd"])).toContain("sidestepped");
   expect(await refusal(["gates", "--state", "blockd"])).toContain("retired");
   expect(await refusal(["work", "--state", "carriedout"])).toContain("carried-out");
+});
+
+test("a bad gate closure names the schema values", async () => {
+  const message = await refusal(["close", "gate", "GATE_1", "--as", "passed", "--because", "x"]);
+  expect(message).toContain("sidestepped");
+  expect(message).toContain("retired");
 });
 
 test("a non-ISO --date is refused, not stamped into the record", async () => {
