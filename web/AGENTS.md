@@ -32,9 +32,9 @@ The overseer image is **built**, not a pulled `postgres` tag. `docker/postgres/D
 | **5432** | Docker `labkit-web-db-1` | Overseer. API, ingest, and Playwright use this. |
 | **5433** | pg0 instance `labkit` (`~/.pg0/instances/labkit`) | Native Postgres 18.1.0 with AGE 1.7.0 installed. Not the overseer default. |
 
-pg0 is not a failed install. AGE 1.7.0 is present, and `bootstrapSession()` always runs `LOAD 'age'` plus `SET search_path`. Docker won because it is the compose / `test:pg` / default `LABKIT_DB_URL` path, and it avoids a one-time native AGE build. pg0 already holds the same graph. Do not retarget the overseer to 5433 unless the operator says so.
+pg0 is not a failed install. AGE 1.7.0 is present, and `bootstrapSession()` always runs `LOAD 'age'` plus `SET search_path`. Docker won because it is this package's default `LABKIT_DB_URL` and skips a one-time native AGE build. pg0 already holds the same graph. Do not retarget the overseer to 5433 unless the operator says so.
 
-The image also creates `labkit_tests`. Root `bun run test:pg` truncates that database. **Never** give `test:pg` URL `.../labkit`. `reset()` would empty the overseer copy.
+Ingest refuses destination databases named `labkit_tests` or `postgres`.
 
 ## Hypermedia
 
@@ -89,7 +89,7 @@ Lint and format from `web/`: `bun run check:lint`, `bun run check:format`. Root 
 - Port architecture from `~/Code/AI/labkit-notebook`.
 - Add write verbs on this surface.
 - Use `MERGE` for edges. AGE can create an edge with `start_id` and `end_id` both 0. Ingest uses MATCH then CREATE.
-- Point ingest or the API at `labkit_tests`.
+- Point ingest or the API at `labkit_tests` or `postgres`.
 - Hide or strip explorer colour, layout, or 2D/3D chrome to "simplify" the UI.
 
 v1 is read-only graph exploration. `known` → `learned`, criterion → evaluation as a first-class view, and an agent harness around this module are later work.
