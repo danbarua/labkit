@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 /**
- * One-shot copy of the overlap_bench PGlite graph into the overseer Postgres.
+ * One-shot copy of the overlap_bench PGlite graph into this package's Postgres.
  *
  * The live source holds an exclusive PGlite lock, so this copies `.labkit` to a
  * temp dir and opens that. Dest nodes are minted with the stored natural_id so
  * Q_1 and NOTE_68 survive. Edges are raw MATCH-then-CREATE: TenantGraph.createEdge
- * refuses pairs EDGE_SCHEMA no longer allows, and the overseer copies what was
+ * refuses pairs EDGE_SCHEMA no longer allows, and this package copies what was
  * stored, not what current verbs permit. MERGE is not used; AGE would create an
  * edge whose start_id and end_id are both 0.
  */

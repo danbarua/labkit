@@ -1,8 +1,8 @@
-# Overseer architecture
+# labkit-web architecture
 
 Audience: a developer or coding agent opening this package on GitHub with no chat history.
 
-The overseer is a read-only HTTP module in front of one LabKit AGE graph. It is not the CLI. It is not MCP. LabKit domain writes stay in `../src/domain`.
+labkit-web is a read-only HTTP module in front of one LabKit AGE graph. It is not the CLI. It is not MCP. LabKit domain writes stay in `../src/domain`.
 
 ## Surfaces
 
@@ -54,7 +54,7 @@ That is the first `labkit pose` question on overlap_bench, then the enquiry it m
 
 - Persistence: `../src/db` (`TenantGraph`, migrations, AGE session bootstrap).
 - Node/edge vocabulary: `../src/db/domain.ts`.
-- Ingest copies stored edges even when current `EDGE_SCHEMA` would refuse them. The overseer shows what was recorded.
+- Ingest copies stored edges even when current `EDGE_SCHEMA` would refuse them. The web app shows what was recorded.
 - Shared CLI/MCP/web contracts live under GitHub issue 393 (`danbarua/labkit`). This package reads the graph. It does not wait on those children.
 
 ## Out of scope
