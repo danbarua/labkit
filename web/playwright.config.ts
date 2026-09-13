@@ -1,10 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const apiPort = process.env.LABKIT_PORT_WEB ?? "8899";
-const uiPort = process.env.LABKIT_PORT_UI ?? "5173";
+const explorerPort = process.env.LABKIT_PORT_EXPLORER ?? "8850";
 const dbPort = process.env.LABKIT_PORT_DB ?? "5432";
 const api = `http://127.0.0.1:${apiPort}`;
-const ui = `http://127.0.0.1:${uiPort}`;
+const ui = `http://127.0.0.1:${explorerPort}`;
 
 export default defineConfig({
   testDir: "tests",
@@ -24,14 +24,14 @@ export default defineConfig({
         LABKIT_TENANT: process.env.LABKIT_TENANT ?? "overlap-bench",
         LABKIT_PORT_WEB: apiPort,
         LABKIT_PORT_DB: dbPort,
-        LABKIT_PORT_UI: uiPort,
+        LABKIT_PORT_EXPLORER: explorerPort,
       },
     },
     {
       command: "bunx vite --host 127.0.0.1",
       env: {
         LABKIT_PORT_WEB: apiPort,
-        LABKIT_PORT_UI: uiPort,
+        LABKIT_PORT_EXPLORER: explorerPort,
       },
       url: ui,
       reuseExistingServer: true,

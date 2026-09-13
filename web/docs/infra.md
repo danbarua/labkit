@@ -18,7 +18,7 @@ That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` f
 
 A native Postgres 18.1.0 lives at `~/.pg0/instances/labkit` on **5433**. AGE 1.7.0 is installed there (`age.dylib`, `CREATE EXTENSION age`).
 
-pg0 did not fail as a database. A connection that does not `LOAD 'age'` and set `search_path` to include `ag_catalog` errors with `type "agtype" does not exist`. The Docker image sets `shared_preload_libraries=age`, so every backend has the type. That is why the overseer defaults to Docker.
+pg0 is compatible. `bootstrapSession()` in `src/db/backend.ts` always runs `LOAD 'age'` and `SET search_path = ag_catalog, "$user", public` on every direct connection. Docker won because it is the compose / `test:pg` / default URL path, and it skips the one-time native AGE compile. This pg0 instance already holds the same 290/452 graph.
 
 Leave 5433 alone unless an operator names it.
 
@@ -30,15 +30,14 @@ Leave 5433 alone unless an operator names it.
 |-----|------|-----|
 | `LABKIT_PORT_DB` | 5432 | Docker Postgres host port |
 | `LABKIT_PORT_WEB` | 8899 | Overseer API |
-| `LABKIT_PORT_UI` | 5173 | Vite explorer |
-| `LABKIT_PORT_EXPLORER` | 8850 | Retired static explorer. Do not bind the new UI here. |
+| `LABKIT_PORT_EXPLORER` | 8850 | Vite explorer |
 
 `web/scripts/with-ports.sh` exports these, then execs. `bun run server`, `dev`, `ingest`, and `test:walk` all go through it.
 
-Vite `strictPort` is on. If 5173 (or the worktree UI port) is taken, Vite exits. Playwright `reuseExistingServer` will keep a **stale** Vite that was started without the current proxy. Symptom: UI banner `404: Not Found`, `.current-handle` empty, `GET /questions/1` through Vite returns `index.html`. Restart Vite. Confirm JSON:
+Vite `strictPort` is on. If 8850 (or the worktree explorer port) is taken, Vite exits. Playwright `reuseExistingServer` will keep a **stale** Vite that was started without the current proxy. Symptom: UI banner `404: Not Found`, `.current-handle` empty, `GET /questions/1` through Vite returns `index.html`. Restart Vite. Confirm JSON:
 
 ```
-curl -H 'accept: application/json' http://127.0.0.1:$LABKIT_PORT_UI/questions/1
+curl -H 'accept: application/json' http://127.0.0.1:$LABKIT_PORT_EXPLORER/questions/1
 ```
 
 Two API processes on one port: the second exits 1. If `/healthz` on that port already returns `ok`, ignore the failed duplicate.

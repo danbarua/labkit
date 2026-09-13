@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const apiPort = process.env.LABKIT_PORT_WEB ?? "8899";
-const uiPort = Number(process.env.LABKIT_PORT_UI ?? "5173");
+const explorerPort = Number(process.env.LABKIT_PORT_EXPLORER ?? "8850");
 const api = `http://127.0.0.1:${apiPort}`;
 
 const collections = [
@@ -33,7 +33,7 @@ export default defineConfig({
   },
   server: {
     host: "127.0.0.1",
-    port: uiPort,
+    port: explorerPort,
     strictPort: true,
     proxy: {
       "/api": {

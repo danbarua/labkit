@@ -13,7 +13,7 @@ From `web/`:
 3. Start the API: `bun run server`.
 4. Start Vite: `bun run dev`.
 
-Print this checkout's ports: `cd web && bun run ports`. The main checkout keeps **5432** (db), **8899** (API), **5173** (Vite). Other worktrees add a path-hash offset. `web` scripts load those env vars. Do not hard-code the bases.
+Print this checkout's ports: `cd web && bun run ports`. The main checkout keeps **5432** (db), **8899** (API), **8850** (Vite explorer). Other worktrees add a path-hash offset. `web` scripts load those env vars. Do not hard-code the bases.
 
 Ingest is idempotent. If `Q_1` and `NOTE_68` already exist, it prints counts and exits.
 
@@ -28,7 +28,7 @@ The overseer image is **built**, not a pulled `postgres` tag. `docker/postgres/D
 | **5432** | Docker `labkit-web-db-1` | Overseer. API, ingest, and Playwright use this. |
 | **5433** | pg0 instance `labkit` (`~/.pg0/instances/labkit`) | Native Postgres 18.1.0 with AGE 1.7.0 installed. Not the overseer default. |
 
-pg0 is not a failed install. AGE is present (`CREATE EXTENSION age` works). A session that skips `LOAD 'age'` / `search_path = ag_catalog, public` fails with `type "agtype" does not exist`. That is why v1 uses the AGE image, which preloads the library. Do not retarget the overseer to 5433 unless the operator says so.
+pg0 is not a failed install. AGE 1.7.0 is present, and `bootstrapSession()` always runs `LOAD 'age'` plus `SET search_path`. Docker won because it is the compose / `test:pg` / default `LABKIT_DB_URL` path, and it avoids a one-time native AGE build. pg0 already holds the same graph. Do not retarget the overseer to 5433 unless the operator says so.
 
 The image also creates `labkit_tests`. Root `bun run test:pg` truncates that database. **Never** give `test:pg` URL `.../labkit`. `reset()` would empty the overseer copy.
 
@@ -57,7 +57,7 @@ Q_1 → LOE_7 → NOTE_68
 
 From `web/`: `bun run test:walk`. Playwright reuses a live API and Vite on this worktree's ports.
 
-If `.current-handle` stays empty and the banner shows `404: Not Found`, Vite is stale. It is serving the SPA for `/questions/1` instead of proxying. Restart Vite. Then `curl -H 'accept: application/json' http://127.0.0.1:$LABKIT_PORT_UI/questions/1` must return `"id":"Q_1"`.
+If `.current-handle` stays empty and the banner shows `404: Not Found`, Vite is stale. It is serving the SPA for `/questions/1` instead of proxying. Restart Vite. Then `curl -H 'accept: application/json' http://127.0.0.1:$LABKIT_PORT_EXPLORER/questions/1` must return `"id":"Q_1"`.
 
 Chrome channel is required (`playwright.config.ts`). Do not pipe the test.
 

@@ -39,7 +39,6 @@ set -euo pipefail
 # `${LABKIT_PORT_*}` with these as its defaults.
 BASE_DB=5432
 BASE_WEB=8899
-BASE_UI=5173
 BASE_POOLER=6432
 BASE_ALPHA=8901
 BASE_BETA=8902
@@ -83,7 +82,6 @@ fi
 
 PORT_DB=$((BASE_DB + offset))
 PORT_WEB=$((BASE_WEB + offset))
-PORT_UI=$((BASE_UI + offset))
 PORT_POOLER=$((BASE_POOLER + offset))
 PORT_ALPHA=$((BASE_ALPHA + offset))
 PORT_BETA=$((BASE_BETA + offset))
@@ -91,7 +89,6 @@ PORT_EXPLORER=$((BASE_EXPLORER + offset))
 if [ "${1:-}" = "--export" ]; then
   printf 'export LABKIT_PORT_DB=%s\n' "$PORT_DB"
   printf 'export LABKIT_PORT_WEB=%s\n' "$PORT_WEB"
-  printf 'export LABKIT_PORT_UI=%s\n' "$PORT_UI"
   printf 'export LABKIT_PORT_POOLER=%s\n' "$PORT_POOLER"
   printf 'export LABKIT_PORT_ALPHA=%s\n' "$PORT_ALPHA"
   printf 'export LABKIT_PORT_BETA=%s\n' "$PORT_BETA"
@@ -102,5 +99,5 @@ fi
 name=$([ -n "$toplevel" ] && basename "$toplevel" || echo "(not a git worktree)")
 printf '%s  offset %s%s\n' "$name" "$offset" \
   "$([ "$offset" = 0 ] && echo '  (the main checkout keeps the defaults)' || echo '')"
-printf '  db        %s\n  web       %s\n  ui        %s\n  pooler    %s\n  alpha     %s\n  beta      %s\n  explorer  %s\n' \
-  "$PORT_DB" "$PORT_WEB" "$PORT_UI" "$PORT_POOLER" "$PORT_ALPHA" "$PORT_BETA" "$PORT_EXPLORER"
+printf '  db        %s\n  web       %s\n  pooler    %s\n  alpha     %s\n  beta      %s\n  explorer  %s\n' \
+  "$PORT_DB" "$PORT_WEB" "$PORT_POOLER" "$PORT_ALPHA" "$PORT_BETA" "$PORT_EXPLORER"
