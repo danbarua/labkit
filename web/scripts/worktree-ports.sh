@@ -37,7 +37,7 @@ set -euo pipefail
 # Base ports, and the container port each maps to. Kept here rather than in
 # `docker-compose.yml` so one file decides, and the compose file reads
 # `${LABKIT_PORT_*}` with these as its defaults.
-BASE_DB=5432
+BASE_DB=5433
 BASE_WEB=8899
 BASE_POOLER=6432
 BASE_ALPHA=8901

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const explorerPort = process.env.LABKIT_PORT_EXPLORER ?? "8850";
-const dbPort = process.env.LABKIT_PORT_DB ?? "5432";
+const dbPort = process.env.LABKIT_PORT_DB ?? "5433";
 const ui = `http://127.0.0.1:${explorerPort}`;
 
 export default defineConfig({

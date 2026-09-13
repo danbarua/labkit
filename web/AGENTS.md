@@ -8,16 +8,11 @@ A researcher opens a handle and follows hypermedia links.
 
 ## Boot
 
-From `web/`:
+From `web/`: `bun run dev`.
 
-1. Once per machine: `bun run db:up`. Shared Postgres on **5432**. Every checkout uses it.
-2. `bun run dev`. Vite migrates, seeds overlap_bench if the source event seq moved, and serves UI + API with HMR.
+Postgres is the pg0 instance `labkit` at `127.0.0.1:5433` (`~/.pg0/instances/labkit`). Not hindsight (5432). Not PGlite. Vite migrates and seeds overlap_bench once, then serves UI + API.
 
-Print this checkout's HTTP port: `bun run ports`. The main checkout uses **8850**. Other worktrees offset that port. Database stays 5432.
-
-Seed is idempotent: dest stamp vs source `max(labkit_event.seq)`. Graph already present from an older copy gets stamped and skipped.
-
-PGlite source, sibling of this repo: `../08_overlap_bench/.labkit`. Override with `LABKIT_SOURCE`. Dest: `postgresql://postgres:agens@127.0.0.1:5432/labkit`. Tenant: `overlap-bench`.
+HTTP port: **8850** on this checkout (`bun run ports`).
 
 ## Two Postgres
 

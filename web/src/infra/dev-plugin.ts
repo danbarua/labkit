@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import { ensureOverlapBench } from "./seed";
+import { ensureLabkitPostgres } from "./postgres";
 import { openSession, type Session } from "../server/session";
 
 function toRequest(req: IncomingMessage): Request {
@@ -33,6 +34,7 @@ export function labkitDev(): Plugin {
     name: "labkit-dev",
     configureServer(server) {
       const boot: Promise<Session> = (async () => {
+        await ensureLabkitPostgres();
         await ensureOverlapBench();
         return openSession();
       })();
