@@ -147,7 +147,6 @@ export const howQuery = z.object({
 });
 export type HowQuery = z.infer<typeof howQuery>;
 
-
 export const whatDependsOnQuery = z.object({
   subject: z.string(),
 });

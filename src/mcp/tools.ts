@@ -240,11 +240,11 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     group: "What stands",
     description:
       "The ordered steps (by event seq when available, else natural id) that produced the current state of the named handle. " +
-        "Any handle on the record is accepted. Steps that were superseded are marked, with successor named when SUPERSEDES/CHANGES record one. " +
-        "`--since` (or since in the call) narrows to later steps.",
+      "Any handle on the record is accepted. Steps that were superseded are marked, with successor named when SUPERSEDES/CHANGES record one. " +
+      "`--since` (or since in the call) narrows to later steps.",
     inputSchema: {
       subject: z.string().describe("a handle of any kind"),
-      since: z.number().int().optional().describe("event seq cursor; only steps after this"),
+      since: z.number().optional().describe("event seq cursor; only steps after this"),
     },
     outputSchema: how,
     handler: (read, { subject, since }) =>
@@ -744,9 +744,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       supersedes: z
         .array(z.string())
         .optional()
-        .describe(
-          `ids of notes this one replaces, e.g. NOTE_18 — both stay readable`,
-        ),
+        .describe(`ids of notes this one replaces, e.g. NOTE_18 — both stay readable`),
     },
     outputSchema: noted,
     handler: (write, { text, on, prompted, supersedes }) =>

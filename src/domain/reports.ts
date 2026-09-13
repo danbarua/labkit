@@ -6,7 +6,6 @@
 import { z } from "zod";
 import type { EdgeLabel, NodeLabel } from "../db/domain";
 import type { Command } from "./commands";
-import { citedBasis } from "./commands";
 import type { DomainEvent, GraphChange } from "./events";
 import type { AnyRef, Kind, Ref } from "./ref";
 import { GATE_STATES, WORK_STATES } from "./vocab";
@@ -78,6 +77,28 @@ const listedNote = z.strictObject({
 
 export const notes = z.strictObject({
   notes: z.array(listedNote),
+});
+
+/**
+ * One step on the path that produced a handle's current state. Superseded steps
+ * are false starts; `successor` names what stands instead when the graph says.
+ */
+export const howStep = z.strictObject({
+  handle: z.string(),
+  /** Kind label, or the record's own prose when it has any. */
+  what: z.string(),
+  superseded: z.boolean(),
+  successor: z.string().optional(),
+  /** Decision reason when the superseding act carried one. */
+  because: z.string().optional(),
+  /** Minting event seq when the log joins; absent when it does not. */
+  seq: z.number().optional(),
+});
+
+/** `how` — the ordered acts behind one handle, false starts marked. */
+export const how = z.strictObject({
+  subject: z.string(),
+  steps: z.array(howStep),
 });
 
 /**
@@ -800,7 +821,7 @@ export const evaluatedCriterion = z.strictObject({
   at: z.string(),
   gate: ref("gate").optional(),
   about: ref("claim").optional(),
-  citing: z.array(citedBasis).optional(),
+  citing: z.array(z.string()).optional(),
   events: z.array(domainEvent),
 });
 export const acceptedAsUnresolved = z.strictObject({

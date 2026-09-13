@@ -63,7 +63,9 @@ test("how on a replaced claim marks the old as superseded with successor", async
     enquiry,
     method: "corrected sampling",
     from: [observations],
-    concludes: [{ proposition: "M does not work after correction", finding: "p = 0.4", replacing: claim }],
+    concludes: [
+      { proposition: "M does not work after correction", finding: "p = 0.4", replacing: claim },
+    ],
   });
   const newClaim = claimOf(repl.claims, "M does not work after correction");
 

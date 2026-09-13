@@ -118,6 +118,11 @@ describe("every tool answers when an agent actually calls it", () => {
 
       const origin = await call(c, "origin_of", { question: id(sharp) });
       expect((origin.origin as { kind: string }).kind).toBe("sharpened");
+      const howSharp = await call(c, "how", { subject: id(sharp) });
+      expect(howSharp.subject).toBe(id(sharp));
+      expect(
+        (howSharp.steps as Array<{ handle: string }>).some((s) => s.handle === id(sharp)),
+      ).toBe(true);
 
       // A question posed out of a note, over the wire. `origin_of`'s output
       // schema is a strictObject, so an arm the schema does not declare fails

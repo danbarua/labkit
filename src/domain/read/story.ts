@@ -1125,7 +1125,10 @@ export class StoryGroup extends SessionCore {
         { other: vertexProps<{ natural_id: string }>() },
         { id: cur },
       );
-      for (const r of sup) { const o = r.other?.natural_id; if (o && !visited.has(o)) toVisit.push(o); }
+      for (const r of sup) {
+        const o = r.other?.natural_id;
+        if (o && !visited.has(o)) toVisit.push(o);
+      }
 
       const ch = await this.graph.query(
         `MATCH (a {natural_id: $id})-[r:CHANGES]->(b) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other
@@ -1134,11 +1137,17 @@ export class StoryGroup extends SessionCore {
         { other: vertexProps<{ natural_id: string }>() },
         { id: cur },
       );
-      for (const r of ch) { const o = r.other?.natural_id; if (o && !visited.has(o)) toVisit.push(o); }
+      for (const r of ch) {
+        const o = r.other?.natural_id;
+        if (o && !visited.has(o)) toVisit.push(o);
+      }
 
       const viaS = await this.graph.query(
         `MATCH (d:Decision)-[:SUPERSEDES]->(x {natural_id: $id}) OPTIONAL MATCH (d)-[:MOTIVATES]->(m) RETURN d, m`,
-        { d: optional(vertexProps<{ natural_id: string }>()), m: optional(vertexProps<{ natural_id: string }>()) },
+        {
+          d: optional(vertexProps<{ natural_id: string }>()),
+          m: optional(vertexProps<{ natural_id: string }>()),
+        },
         { id: cur },
       );
       for (const r of viaS) {
@@ -1147,7 +1156,10 @@ export class StoryGroup extends SessionCore {
       }
       const viaC = await this.graph.query(
         `MATCH (d:Decision)-[:CHANGES]->(x {natural_id: $id}) OPTIONAL MATCH (d)-[:MOTIVATES]->(m) RETURN d, m`,
-        { d: optional(vertexProps<{ natural_id: string }>()), m: optional(vertexProps<{ natural_id: string }>()) },
+        {
+          d: optional(vertexProps<{ natural_id: string }>()),
+          m: optional(vertexProps<{ natural_id: string }>()),
+        },
         { id: cur },
       );
       for (const r of viaC) {
@@ -1160,7 +1172,11 @@ export class StoryGroup extends SessionCore {
          OPTIONAL MATCH (d)-[:SUPERSEDES]->(s)
          OPTIONAL MATCH (d)-[:CHANGES]->(c)
          RETURN d, s, c`,
-        { d: optional(vertexProps<{ natural_id: string }>()), s: optional(vertexProps<{ natural_id: string }>()), c: optional(vertexProps<{ natural_id: string }>()) },
+        {
+          d: optional(vertexProps<{ natural_id: string }>()),
+          s: optional(vertexProps<{ natural_id: string }>()),
+          c: optional(vertexProps<{ natural_id: string }>()),
+        },
         { id: cur },
       );
       for (const r of mot) {
@@ -1175,12 +1191,17 @@ export class StoryGroup extends SessionCore {
          OPTIONAL MATCH (d)-[:CHANGES]->(c)
          OPTIONAL MATCH (d)-[:MOTIVATES]->(m)
          RETURN s, c, m`,
-        { s: optional(vertexProps<{ natural_id: string }>()), c: optional(vertexProps<{ natural_id: string }>()), m: optional(vertexProps<{ natural_id: string }>()) },
+        {
+          s: optional(vertexProps<{ natural_id: string }>()),
+          c: optional(vertexProps<{ natural_id: string }>()),
+          m: optional(vertexProps<{ natural_id: string }>()),
+        },
         { id: cur },
       );
       for (const r of decL) {
-        for (const k of ["s","c","m"] as const) {
-          const v = r[k]?.natural_id; if (v && !visited.has(v)) toVisit.push(v);
+        for (const k of ["s", "c", "m"] as const) {
+          const v = r[k]?.natural_id;
+          if (v && !visited.has(v)) toVisit.push(v);
         }
       }
     }
@@ -1196,7 +1217,14 @@ export class StoryGroup extends SessionCore {
     const numberIn = (handle: string): number => Number(handle.slice(handle.indexOf("_") + 1)) || 0;
 
     const subjectKind = kindOf(id);
-    const steps: Array<{handle:string;what:string;superseded:boolean;successor?:string;because?:string;seq?:number}> = [];
+    const steps: Array<{
+      handle: string;
+      what: string;
+      superseded: boolean;
+      successor?: string;
+      because?: string;
+      seq?: number;
+    }> = [];
 
     for (const h of relevant) {
       const k = kindOf(h);
@@ -1211,7 +1239,10 @@ export class StoryGroup extends SessionCore {
         { newer: vertexProps<{ natural_id: string }>() },
         { id: h },
       );
-      if (nsup[0]?.newer) { superseded = true; successor = nsup[0].newer.natural_id; }
+      if (nsup[0]?.newer) {
+        superseded = true;
+        successor = nsup[0].newer.natural_id;
+      }
 
       if (!successor) {
         type SupersederRow = {
@@ -1225,24 +1256,35 @@ export class StoryGroup extends SessionCore {
         // the conclude --replacing creates the decision that SUPERSEDES old claim and MOTIVATES new claim.)
         const supRows = await this.graph.query(
           `MATCH (d:Decision)-[:SUPERSEDES]->(t {natural_id: $id}) WHERE t.retracted IS NULL OPTIONAL MATCH (d)-[:MOTIVATES]->(succ) RETURN d, succ`,
-          { d: vertexProps<{ natural_id: string; reason?: string }>(), succ: optional(vertexProps<{ natural_id: string }>()) },
+          {
+            d: vertexProps<{ natural_id: string; reason?: string }>(),
+            succ: optional(vertexProps<{ natural_id: string }>()),
+          },
           { id: h },
         );
         const chRows = await this.graph.query(
           `MATCH (d:Decision)-[:CHANGES]->(t {natural_id: $id}) WHERE t.retracted IS NULL OPTIONAL MATCH (d)-[:MOTIVATES]->(succ) RETURN d, succ`,
-          { d: vertexProps<{ natural_id: string; reason?: string }>(), succ: optional(vertexProps<{ natural_id: string }>()) },
+          {
+            d: vertexProps<{ natural_id: string; reason?: string }>(),
+            succ: optional(vertexProps<{ natural_id: string }>()),
+          },
           { id: h },
         );
         const candidates = [...supRows, ...chRows].filter((r) => r.d);
         if (candidates.length > 0) {
           // Prefer a successor that is a claim when the superseded handle is a claim.
           const isClaim = kindOf(h) === "claim";
-          drow = candidates.find((r) => {
-            const s = r.succ?.natural_id;
-            return !isClaim || !s || kindOf(s) === "claim";
-          }) || candidates[0]!;
+          drow =
+            candidates.find((r) => {
+              const s = r.succ?.natural_id;
+              return !isClaim || !s || kindOf(s) === "claim";
+            }) || candidates[0]!;
         }
-        if (drow?.d) { superseded = true; successor = drow.succ?.natural_id; because = drow.d.reason || undefined; }
+        if (drow?.d) {
+          superseded = true;
+          successor = drow.succ?.natural_id;
+          because = drow.d.reason || undefined;
+        }
       }
 
       let what = h;
@@ -1255,7 +1297,13 @@ export class StoryGroup extends SessionCore {
           { id: h },
         );
         if (row) {
-          for (const p of props) { const v = row.n[p]; if (typeof v === "string" && v.length > 0) { what = v; break; } }
+          for (const p of props) {
+            const v = row.n[p];
+            if (typeof v === "string" && v.length > 0) {
+              what = v;
+              break;
+            }
+          }
         }
       }
       if (what === h) what = k ?? "record";
@@ -1265,7 +1313,8 @@ export class StoryGroup extends SessionCore {
     }
 
     steps.sort((a, b) => {
-      const sa = a.seq, sb = b.seq;
+      const sa = a.seq,
+        sb = b.seq;
       if (sa !== undefined && sb !== undefined) return sa - sb;
       if (sa !== undefined) return -1;
       if (sb !== undefined) return 1;
