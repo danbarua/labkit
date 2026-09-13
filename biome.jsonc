@@ -13,7 +13,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "style": {
         // **Off because its fix breaks the build.** `tsconfig.json` runs
         // `noUncheckedIndexedAccess`, so `rows[0]` is `T | undefined` and
