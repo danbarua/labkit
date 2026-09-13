@@ -2,7 +2,7 @@
 
 ## Docker Postgres
 
-`docker/postgres/Dockerfile` builds `labkit-web-db` from `apache/age:release_PG18_1.7.0`. It is not a pulled `postgres` image. The Dockerfile adds `CREATE DATABASE` only (`labkit_tests` for `test:pg`, `labkit` for the overseer). Extensions, roles, and schema come from LabKit migrations.
+`docker/postgres/Dockerfile` builds from `apache/age:release_PG18_1.7.0`. It is not a pulled `postgres` image. Initdb creates database `labkit` only. Extensions, roles, and schema come from LabKit migrations.
 
 Start it from `web/`:
 
@@ -12,13 +12,13 @@ bun run db:up
 
 That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` first. Bare `docker compose up -d db` binds **5432** even in a worktree and collides with another checkout. `bun run db:down` stops the `db` service for this compose project. It does not delete the volume.
 
-`test:pg` truncates `labkit_tests`. Never point it at `labkit`.
+Ingest refuses destination databases named `labkit_tests` or `postgres`.
 
 ## pg0
 
 A native Postgres 18.1.0 lives at `~/.pg0/instances/labkit` on **5433**. AGE 1.7.0 is installed there (`age.dylib`, `CREATE EXTENSION age`).
 
-pg0 is compatible. `bootstrapSession()` in `src/db/backend.ts` always runs `LOAD 'age'` and `SET search_path = ag_catalog, "$user", public` on every direct connection. Docker won because it is the compose / `test:pg` / default URL path, and it skips the one-time native AGE compile. This pg0 instance already holds the same 290/452 graph.
+pg0 is compatible. `bootstrapSession()` in `src/db/backend.ts` always runs `LOAD 'age'` and `SET search_path = ag_catalog, "$user", public` on every direct connection. Docker won because it is this package's default URL and skips the one-time native AGE compile. This pg0 instance already holds the same 290/452 graph.
 
 Leave 5433 alone unless an operator names it.
 
