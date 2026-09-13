@@ -10,7 +10,7 @@ Start it from `web/`:
 bun run db:up
 ```
 
-That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` first and sets `--project-name` to `labkit-overseer` (or `labkit-overseer-<offset>` in a worktree). Bare `docker compose up -d db` binds **5432** and uses project name `web`. `bun run db:down` stops this worktree's `db` service. It does not delete the volume.
+That runs `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB` first and sets `--project-name` to `labkit-web` (or `labkit-web-<offset>` in a worktree). Bare `docker compose up -d db` binds **5432** and uses project name `web`. `bun run db:down` stops this worktree's `db` service. It does not delete the volume.
 
 Ingest refuses destination databases named `labkit_tests` or `postgres`.
 
@@ -29,7 +29,7 @@ Leave 5433 alone unless an operator names it.
 | Env | Main | Use |
 |-----|------|-----|
 | `LABKIT_PORT_DB` | 5432 | Docker Postgres host port |
-| `LABKIT_PORT_WEB` | 8899 | Overseer API |
+| `LABKIT_PORT_WEB` | 8899 | labkit-web API |
 | `LABKIT_PORT_EXPLORER` | 8850 | Vite explorer |
 
 `web/scripts/with-ports.sh` exports these, then execs. `bun run server`, `dev`, `ingest`, and `test:walk` all go through it.

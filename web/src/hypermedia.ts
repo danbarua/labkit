@@ -1,5 +1,5 @@
 /**
- * Hypermedia contract for the LabKit overseer.
+ * Hypermedia contract for labkit-web.
  *
  * Graph 1:1: a relation is a link or it is absent. No reverse-rel names.
  * `GET /notes/123` → resource id `NOTE_123`.

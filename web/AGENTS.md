@@ -1,6 +1,6 @@
 # web/
 
-Read-only overseer for one LabKit graph. A researcher opens a handle and follows hypermedia links. This package does not run CLI or MCP verbs.
+Read-only web app for one LabKit graph. A researcher opens a handle and follows hypermedia links. This package does not run CLI or MCP verbs.
 
 LabKit core stays in `../src`. This directory is the HTTP and browser surface.
 
@@ -25,14 +25,14 @@ PGlite source, as a sibling of this repo: `../08_overlap_bench/.labkit`. From `w
 
 ## Two Postgres
 
-The overseer image is **built**, not a pulled `postgres` tag. `docker/postgres/Dockerfile` starts from `apache/age:release_PG18_1.7.0` and adds `CREATE DATABASE`. Compose names the result `labkit-web-db`. Host port is `LABKIT_PORT_DB` (5432 on main).
+The labkit-web image is **built**, not a pulled `postgres` tag. `docker/postgres/Dockerfile` starts from `apache/age:release_PG18_1.7.0` and adds `CREATE DATABASE`. Compose names the result `labkit-web-db`. Host port is `LABKIT_PORT_DB` (5432 on main).
 
 | Port (main) | Process | Role |
 |------|---------|------|
-| **5432** | Docker `labkit-web-db-1` | Overseer. API, ingest, and Playwright use this. |
-| **5433** | pg0 instance `labkit` (`~/.pg0/instances/labkit`) | Native Postgres 18.1.0 with AGE 1.7.0 installed. Not the overseer default. |
+| **5432** | Docker `labkit-web-db-1` | labkit-web. API, ingest, and Playwright use this. |
+| **5433** | pg0 instance `labkit` (`~/.pg0/instances/labkit`) | Native Postgres 18.1.0 with AGE 1.7.0 installed. Not the labkit-web default. |
 
-pg0 is not a failed install. AGE 1.7.0 is present, and `bootstrapSession()` always runs `LOAD 'age'` plus `SET search_path`. Docker won because it is this package's default `LABKIT_DB_URL` and skips a one-time native AGE build. pg0 already holds the same graph. Do not retarget the overseer to 5433 unless the operator says so.
+pg0 is not a failed install. AGE 1.7.0 is present, and `bootstrapSession()` always runs `LOAD 'age'` plus `SET search_path`. Docker won because it is this package's default `LABKIT_DB_URL` and skips a one-time native AGE build. pg0 already holds the same graph. Do not retarget labkit-web to 5433 unless the operator says so.
 
 Ingest refuses destination databases named `labkit_tests` or `postgres`.
 
