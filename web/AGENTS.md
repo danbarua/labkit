@@ -4,6 +4,10 @@ Read-only overseer for one LabKit graph. A researcher opens a handle and follows
 
 LabKit core stays in `../src`. This directory is the HTTP and browser surface.
 
+As of 2026-09-13, until further notice, the repo root is unaware of `web/` and uncoupled from it. This package imports dependencies from `../src`. It changes nothing outside `web/`. It keeps its own `docs/`, `package.json`, Docker bits, and `scripts/`.
+
+Pre-commit, pre-push, and pre-PR hygiene is scoped to `web/` when the work is in `web/`.
+
 ## Boot
 
 From `web/`:
