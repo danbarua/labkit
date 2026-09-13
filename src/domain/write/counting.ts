@@ -142,6 +142,10 @@ export class Counting extends SessionCore {
           outcome: input.outcome,
           value: input.value,
           gates,
+          at,
+          gate: input.gate,
+          about: input.about,
+          citing: input.citing,
         },
       };
     });
