@@ -82,14 +82,14 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
 
       // The evaluation kept its instant, and it is the wound one rather than
       // the start -- so the clock genuinely drives durable state here.
-      const why = await reader.whySupported(claimOf(analysisClaims, CONVERGES));
+      const why = await reader.whySupported({ claim: claimOf(analysisClaims, CONVERGES) });
       expect(why.standard[0]?.decidedBy?.at).toBe(whenEvaluated);
       expect(why.standard[0]?.decidedBy?.at).not.toBe("2026-03-01T09:00:00.000Z");
 
       // The closure carries no instant at all. Sixty days of wound clock left no
       // durable trace of *when* the programme came to believe this, which is the
       // half of row Z that matters -- belief moves on decisions, not evaluations.
-      const status = await reader.enquiryStatus(enquiry);
+      const status = await reader.enquiryStatus({ enquiry });
       expect(status.closure).toBe("answered");
       const timeFields = Object.keys(status).filter((k) => /_?at$|when|time|date/i.test(k));
       expect(timeFields).toEqual([]);
@@ -126,7 +126,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
 
   /** A lower bound on when a question was settled, from evidence alone. Null when none exists. */
   async function settledNoEarlierThan(s: ResearchSession, claim: ClaimRef): Promise<string | null> {
-    const why = await s.whySupported(claim);
+    const why = await s.whySupported({ claim });
     // Through the drill-down: a check carries which evaluation decided it and
     // when, not every evaluation's text -- see helpers/criteria.ts.
     const perCheck = await Promise.all(why.standard.map((c) => evaluationsOf(s, c)));
@@ -332,7 +332,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         clock: c,
         events: inMemoryEventLog(),
       });
-      const atDay45 = await reader.whatWasKnown("2026-04-15T09:00:00.000Z");
+      const atDay45 = await reader.whatWasKnown({ at: "2026-04-15T09:00:00.000Z" });
       return {
         settledByDay45: atDay45.provisional.map((q) => q.asks),
         openAtDay45: atDay45.open.map((q) => q.asks).sort(),
@@ -401,12 +401,12 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       });
 
       // Day 25: settled, and resting on nothing anyone had promoted.
-      const midway = await reader.whatWasKnown("2026-03-26T09:00:00.000Z");
+      const midway = await reader.whatWasKnown({ at: "2026-03-26T09:00:00.000Z" });
       expect(midway.provisional.map((q) => q.asks)).toEqual([FIRST.asks]);
       expect(midway.established).toEqual([]);
 
       // Day 60: the promotion has happened, and only now is it established.
-      const after = await reader.whatWasKnown("2026-05-01T09:00:00.000Z");
+      const after = await reader.whatWasKnown({ at: "2026-05-01T09:00:00.000Z" });
       expect(after.established.map((q) => q.asks)).toEqual([FIRST.asks]);
       expect(after.provisional).toEqual([]);
 
@@ -455,7 +455,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       });
 
       // February: the question had not been posed. Absent, not open.
-      const before = await reader.whatWasKnown("2026-02-01T00:00:00.000Z");
+      const before = await reader.whatWasKnown({ at: "2026-02-01T00:00:00.000Z" });
       expect(before.open).toEqual([]);
       expect(before.established).toEqual([]);
       expect(before.provisional).toEqual([]);
@@ -463,7 +463,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       expect(before.at).toBe("2026-02-01T00:00:00.000Z");
 
       // Five days in: asked, and nothing has settled it.
-      const during = await reader.whatWasKnown("2026-03-06T09:00:00.000Z");
+      const during = await reader.whatWasKnown({ at: "2026-03-06T09:00:00.000Z" });
       expect(during.open.map((q) => q.asks)).toEqual([FIRST.asks]);
       expect(during.provisional).toEqual([]);
     } finally {

@@ -12,15 +12,22 @@ import type {
   CriterionRef,
   DesignHistory,
   EvidenceRef,
-  GateRef,
   GateStatus,
   ListedGate,
   ListedWork,
   TaskContract,
   StoppedReason,
-  WorkRef,
   WorkState,
 } from "../report";
+import type {
+  ContractForQuery,
+  CriteriaGoverningQuery,
+  DesignHistoryQuery,
+  GateListQuery,
+  GateStatusQuery,
+  StoppedWorkQuery,
+  WorkListQuery,
+} from "../queries";
 import {
   checkStatusForGate,
   gateConditionsAnchor as anchorInForce,
@@ -107,7 +114,7 @@ export function workStateFrom(
 
 export class BlockedGroup extends SessionCore {
   /** What a planned task is permitted to touch, and whether anyone is enforcing it. */
-  async contractFor(work: WorkRef): Promise<TaskContract> {
+  async contractFor({ work }: ContractForQuery): Promise<TaskContract> {
     const rows = await this.graph.query(
       `MATCH (t:Task {natural_id: $id})
        OPTIONAL MATCH (t)-[:ADDRESSES]->(loe:LineOfEnquiry)
@@ -161,7 +168,7 @@ export class BlockedGroup extends SessionCore {
   /**
    * Which criterion governs this gate?
    */
-  async criteriaGoverning(gate: GateRef): Promise<CriterionRef[]> {
+  async criteriaGoverning({ gate }: CriteriaGoverningQuery): Promise<CriterionRef[]> {
     const rows = await this.graph.query(
       `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
@@ -173,7 +180,7 @@ export class BlockedGroup extends SessionCore {
   /**
    * A locked design and everything that has happened to it, oldest first.
    */
-  async designHistory(gate: GateRef): Promise<DesignHistory> {
+  async designHistory({ gate }: DesignHistoryQuery): Promise<DesignHistory> {
     const governing = await this.graph.query(
       `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
       {
@@ -265,7 +272,7 @@ export class BlockedGroup extends SessionCore {
   /**
    * May this gate be relied on, and on what evidence?
    */
-  async gateStatus(gate: GateRef): Promise<GateStatus> {
+  async gateStatus({ gate }: GateStatusQuery): Promise<GateStatus> {
     const declared = await this.graph.query(
       `MATCH (g:Gate {natural_id: $id})
        OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(g)
@@ -382,7 +389,7 @@ export class BlockedGroup extends SessionCore {
   /**
    * Every gate, with the state a reader is filtering on.
    */
-  async gateList(state?: GateStatus["state"]): Promise<ListedGate[]> {
+  async gateList({ state }: GateListQuery): Promise<ListedGate[]> {
     const { cypher, decoders } = compose(anchorInForce("every"), checkStatusForGate, {
       crit: vertexProps<{ natural_id: string; proposition: string }>(),
       g: vertexProps<{ natural_id: string; consequence: string }>(),
@@ -440,7 +447,7 @@ export class BlockedGroup extends SessionCore {
   /**
    * The act that stopped a piece of work, if one did.
    */
-  async stoppedWork(work: WorkRef): Promise<StoppedReason | undefined> {
+  async stoppedWork({ work }: StoppedWorkQuery): Promise<StoppedReason | undefined> {
     const [row] = await this.graph.query(
       `MATCH (d:Decision)-[:RESOLVES]->(:Task {natural_id: $id}) RETURN d`,
       { d: vertexProps<{ natural_id: string; reason: string; decided_at: string }>() },
@@ -457,7 +464,7 @@ export class BlockedGroup extends SessionCore {
   /**
    * Every planned piece of work, with the state a reader is filtering on.
    */
-  async workList(state?: WorkState): Promise<ListedWork[]> {
+  async workList({ state }: WorkListQuery): Promise<ListedWork[]> {
     const rows = await this.graph.query(
       `MATCH (t:Task)
        OPTIONAL MATCH (ever)-[:GATES]->(t)
@@ -507,7 +514,7 @@ export class BlockedGroup extends SessionCore {
 
     // A gate's state is the gate's own answer, asked once for all of them
     // rather than per task: several tasks commonly share one gate.
-    const gateStates = new Map((await this.gateList()).map((g) => [g.gate as string, g.state]));
+    const gateStates = new Map((await this.gateList({})).map((g) => [g.gate as string, g.state]));
 
     // Sorted by handle, for the reason given in `gateList`.
     const listed = [...tasks.entries()]

@@ -88,7 +88,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
     // Researcher: run the classification stage. LabKit:     the first feasibility step is ready
     // — 1,000 training images. The official test data is not accessible to this task.
-    const contract = await session.contractFor(programme.feasibility);
+    const contract = await session.contractFor({ work: programme.feasibility });
     expect(contract.mayRead).toEqual(["the 1,000-image training slice"]);
     expect(contract.mayRead).not.toContain("the held-out official test set");
 
@@ -125,7 +125,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
 
-    const status = await session.gateStatus(programme.advancement);
+    const status = await session.gateStatus({ gate: programme.advancement });
     expect(status.state).toBe("incomplete");
     expect(status.unmet.map((u) => u.requires)).toEqual([SOLVER_HEALTH]);
   });
@@ -145,8 +145,8 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
 
-    const status = await session.gateStatus(programme.advancement);
-    expect(await (await afterwards()).gateStatus(programme.advancement)).toEqual(status);
+    const status = await session.gateStatus({ gate: programme.advancement });
+    expect(await (await afterwards()).gateStatus({ gate: programme.advancement })).toEqual(status);
 
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
@@ -159,7 +159,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     // read matched a `BLOCKS` edge that does not exist, so it reported
     // nothing protected while the gate page reported the task.
     const held = status.checks.find((c) => c.proposition === SOLVER_HEALTH)!;
-    const standing = await session.criterionStanding(held.criterion);
+    const standing = await session.criterionStanding({ criterion: held.criterion });
     const governed = standing.governs.find((g) => g.gate === programme.advancement)!;
     expect(governed.protecting.map((w) => w.objective)).toEqual(
       status.gating.map((g) => g.objective),
@@ -194,7 +194,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     });
 
     const later = await afterwards();
-    const status = await later.gateStatus(programme.advancement);
+    const status = await later.gateStatus({ gate: programme.advancement });
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c]));
 
     // Through the drill-down: a gate says what state each check is in, and
@@ -216,7 +216,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const programme = await aStagedProgramme();
 
     const later = await afterwards();
-    const contract = await later.contractFor(programme.feasibility);
+    const contract = await later.contractFor({ work: programme.feasibility });
     expect(contract.objective).toBe("feasibility slice: 1,000 training images");
     expect(contract.mayRead).toEqual(["the 1,000-image training slice"]);
     // Advisory. Nothing stops a process reading whatever it likes; LabKit
@@ -225,7 +225,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     // implying a guarantee the system cannot give.
     expect(contract.enforced).toBe(false);
 
-    const full = await later.contractFor(programme.fullRun);
+    const full = await later.contractFor({ work: programme.fullRun });
     expect(full.mayRead).toEqual(["the full training set"]);
   });
 
@@ -237,7 +237,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     const later = await afterwards();
-    const why = await later.whySupported(claimOf(measuredClaims, COST));
+    const why = await later.whySupported({ claim: claimOf(measuredClaims, COST) });
     expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.finding)).toEqual([
       "9,100 GPU-hours projected from the measured rate",
@@ -252,7 +252,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const programme = await aStagedProgramme();
     const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
-    const before = await session.whySupported(claimOf(measuredClaims, THROUGHPUT));
+    const before = await session.whySupported({ claim: claimOf(measuredClaims, THROUGHPUT) });
 
     await session.evaluateCriterion({
       criterion: programme.throughput,
@@ -263,12 +263,12 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     });
 
     const later = await afterwards();
-    const after = await later.whySupported(claimOf(measuredClaims, THROUGHPUT));
+    const after = await later.whySupported({ claim: claimOf(measuredClaims, THROUGHPUT) });
     expect(after).toEqual(before);
 
     // ...and the gate knows nothing about claims either. What it protects is
     // work.
-    const status = await later.gateStatus(programme.advancement);
+    const status = await later.gateStatus({ gate: programme.advancement });
     expect(status.gating.map((g) => g.objective)).toEqual(["the full classification run"]);
   });
 
@@ -288,7 +288,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     ).rejects.toThrow(/no finding bears on claim CLM_99999/);
 
     const later = await afterwards();
-    expect((await later.gateStatus(programme.advancement)).state).toBe("never-evaluated");
+    expect((await later.gateStatus({ gate: programme.advancement })).state).toBe("never-evaluated");
   });
 });
 

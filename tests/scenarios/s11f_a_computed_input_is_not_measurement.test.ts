@@ -63,7 +63,7 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
       clock,
       events: inMemoryEventLog(),
     });
-    const why = await later.whySupported(claimOf(trend.claims, TREND));
+    const why = await later.whySupported({ claim: claimOf(trend.claims, TREND) });
 
     expect(why.restingOn).toHaveLength(1);
     // The vocabulary is wrong and the wording is right, which is the wrong way
@@ -83,9 +83,10 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
     });
 
     // Stage one is fully accounted for: a hash was recorded and it matches.
-    const stageOne = await later.reproducibilityOf(calibration.analysis, [
-      { part: raw, hash: "sha256:raw" },
-    ]);
+    const stageOne = await later.reproducibilityOf({
+      analysis: calibration.analysis,
+      rebuilt: [{ part: raw, hash: "sha256:raw" }],
+    });
     expect(stageOne.exact.map((p) => p.name)).toEqual(["raw series"]);
     expect(stageOne.reproducible).toBe(true);
 
@@ -93,7 +94,7 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
     // there is nothing to hash against. That lands in `unverifiable`, which is the record
     // declining to answer rather than answering no, and it is the correct answer about that
     // record.
-    const stageTwo = await later.reproducibilityOf(trend.analysis, []);
+    const stageTwo = await later.reproducibilityOf({ analysis: trend.analysis, rebuilt: [] });
     expect(stageTwo.unverifiable.map((p) => p.name)).toEqual(["calibrate output"]);
     // The half that makes this a real probe rather than a restatement: absence
     // is not reported as difference. `differing` would be a wrong answer.

@@ -5,32 +5,11 @@
  */
 
 import { z } from "zod";
-import { kindOf, ref, type Kind } from "./ref";
+import { anyRefString, issue, refString } from "./brand";
+import { ref } from "./ref";
 
-/**
- * A handle field: wire string in, branded ref out. Uppercased first, as the
- * CLI already did — every handle this record mints is upper-case.
- * `ref()` throws; turn that into a zod issue so `safeParse` can refuse.
- */
-function refString<K extends Kind>(kind: K) {
-  return z.string().transform((raw, ctx) => {
-    try {
-      return ref(kind, raw.toUpperCase());
-    } catch (e) {
-      ctx.addIssue({ code: "custom", message: (e as Error).message });
-      return z.NEVER;
-    }
-  });
-}
-
-function issue<T>(ctx: z.RefinementCtx, run: () => T): T {
-  try {
-    return run();
-  } catch (e) {
-    ctx.addIssue({ code: "custom", message: (e as Error).message });
-    return z.NEVER;
-  }
-}
+export const GATE_CLOSURES = ["sidestepped", "retired"] as const;
+export type GateClosure = (typeof GATE_CLOSURES)[number];
 
 function inputRefString() {
   return z.string().transform((raw, ctx) =>
@@ -71,20 +50,6 @@ function citedBasisString() {
     }),
   );
 }
-
-function anyRefString() {
-  return z.string().transform((raw, ctx) =>
-    issue(ctx, () => {
-      const normalized = raw.toUpperCase();
-      const kind = kindOf(normalized);
-      if (!kind) throw new Error(`\`${raw}\` is not a handle this record recognises`);
-      return ref(kind, normalized);
-    }),
-  );
-}
-
-export const GATE_CLOSURES = ["sidestepped", "retired"] as const;
-export type GateClosure = (typeof GATE_CLOSURES)[number];
 
 const bearing = z.enum(["supports", "challenges"]);
 const standing = z.enum(["exploratory", "confirmatory"]);

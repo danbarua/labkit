@@ -38,7 +38,7 @@ describe("S-28: a hunch became a question", () => {
     const { note } = await session.note({ text: HUNCH });
     const { question } = await session.pose({ question: SHARP, from: note });
 
-    const origin = await (await afterwards()).originOf(question);
+    const origin = await (await afterwards()).originOf({ question });
     expect(origin?.kind).toBe("noted");
     expect(origin?.from).toBe(note);
     // The note's own words, not a restatement: a hunch is worth reading back
@@ -52,7 +52,7 @@ describe("S-28: a hunch became a question", () => {
 
     // The compound act records what the primitive would have. Otherwise the
     // common case is the one that loses the provenance.
-    const origin = await (await afterwards()).originOf(question);
+    const origin = await (await afterwards()).originOf({ question });
     expect(origin?.kind).toBe("noted");
     expect(origin?.from).toBe(note);
   });
@@ -65,7 +65,7 @@ describe("S-28: a hunch became a question", () => {
       because: "which edge, and measured how",
     });
 
-    const origin = await (await afterwards()).originOf(sharp);
+    const origin = await (await afterwards()).originOf({ question: sharp });
     expect(origin?.kind).toBe("sharpened");
     expect(origin?.from).toBe(broad);
     expect(origin?.said).toBe("does the edge matter?");
@@ -74,7 +74,7 @@ describe("S-28: a hunch became a question", () => {
 
   test("Afterward 4: a question asked outright still has no origin", async () => {
     const { question } = await session.pose({ question: SHARP });
-    expect(await (await afterwards()).originOf(question)).toBeNull();
+    expect(await (await afterwards()).originOf({ question })).toBeNull();
   });
 
   test("Afterward 5: `why` on the question names the note that prompted it", async () => {
@@ -83,7 +83,7 @@ describe("S-28: a hunch became a question", () => {
 
     // The generic walk, not a second special-cased read: the edge is one the
     // existing reader already renders, and this is the check that it does.
-    const why = await (await afterwards()).why(question);
+    const why = await (await afterwards()).why({ subject: question });
     expect(why.because).toEqual([{ handle: note, wording: `was prompted by ${HUNCH}` }]);
   });
 

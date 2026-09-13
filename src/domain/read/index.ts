@@ -3,11 +3,9 @@
  */
 
 import { vertexProps } from "../../db/cypher";
-import type { IdentityString, IndexedString, Prose, Timestamp } from "../../db/domain";
 import { createdIn, edgesIn } from "../events";
-import type { ClaimRef, EnquiryRef, GateRef, WorkRef } from "../report";
+import type { EnquiryRef } from "../report";
 import type {
-  AnalysisRef,
   AnalysisRevision,
   AnyRef,
   ConcludedClaim,
@@ -25,9 +23,7 @@ import type {
   KnowledgeSurvey,
   ListedGate,
   ListedWork,
-  ObservationsRef,
   QuestionOrigin,
-  QuestionRef,
   ReproducibilityReport,
   ReproductionReport,
   SearchGroup,
@@ -38,12 +34,41 @@ import type {
   SupportExplanation,
   StoppedReason,
   TaskContract,
-  WorkState,
 } from "../report";
 import { kindOf } from "../report";
 import type { Neighbour } from "./explain";
 import { SessionCore, type Methods } from "../core";
 import type { DomainEvent, EventFilter } from "../events";
+import type {
+  AnalysisRevisionQuery,
+  ClaimsAssertingQuery,
+  ContractForQuery,
+  CriteriaGoverningQuery,
+  CriterionStandingQuery,
+  DesignHistoryQuery,
+  DoTheseConflictQuery,
+  EnquiryInContextQuery,
+  EnquiryStatusQuery,
+  GateListQuery,
+  GateStatusQuery,
+  InterpretationHistoryQuery,
+  KnownAtQuery,
+  NeighboursOfQuery,
+  NotesQuery,
+  NowQuery,
+  OriginOfQuery,
+  ProseForQuery,
+  PursuitsOfQuery,
+  ReachableQuery,
+  ReproducibilityOfQuery,
+  ReproductionOfQuery,
+  SearchQuery,
+  StoppedWorkQuery,
+  WhatDependsOnQuery,
+  WhyQuery,
+  WhySupportedQuery,
+  WorkListQuery,
+} from "../queries";
 import { HappenedGroup } from "./happened";
 import { FindingGroup } from "./finding";
 import { StandingGroup } from "./standing";
@@ -89,17 +114,17 @@ export class ReadSurface extends SessionCore {
    * What was done, in order — the one read that answers from the event log
    * rather than the graph. See `HappenedGroup.whatHappened`.
    */
-  async whatHappened(filter: EventFilter = {}): Promise<readonly DomainEvent[]> {
+  async whatHappened(filter: EventFilter): Promise<readonly DomainEvent[]> {
     return this.#happened.whatHappened(filter);
   }
 
   /** Every note on the record, newest first, or only those concerning one handle. */
-  async notes(concerning?: AnyRef): Promise<ListedNote[]> {
-    return this.#happened.notes(concerning);
+  async notes(query: NotesQuery): Promise<ListedNote[]> {
+    return this.#happened.notes(query);
   }
 
   /** The same acts, and whether that was all of them. See `HappenedGroup.whatHappenedPage`. */
-  async whatHappenedPage(filter: EventFilter = {}): Promise<EventPage> {
+  async whatHappenedPage(filter: EventFilter): Promise<EventPage> {
     return this.#happened.whatHappenedPage(filter);
   }
 
@@ -109,28 +134,28 @@ export class ReadSurface extends SessionCore {
   }
 
   /** Every line of enquiry pursuing this question. */
-  async pursuitsOf(question: QuestionRef): Promise<EnquiryRef[]> {
-    return this.#finding.pursuitsOf(question);
+  async pursuitsOf(query: PursuitsOfQuery): Promise<EnquiryRef[]> {
+    return this.#finding.pursuitsOf(query);
   }
 
   /** Where a question came from, if it came from sharpening an earlier one. */
-  async originOf(question: QuestionRef): Promise<QuestionOrigin | null> {
-    return this.#finding.originOf(question);
+  async originOf(query: OriginOfQuery): Promise<QuestionOrigin | null> {
+    return this.#finding.originOf(query);
   }
 
   /** Claims asserting a proposition — the one place wording is resolved. */
-  async claimsAsserting(proposition: IndexedString): Promise<ConcludedClaim[]> {
-    return this.#finding.claimsAsserting(proposition);
+  async claimsAsserting(query: ClaimsAssertingQuery): Promise<ConcludedClaim[]> {
+    return this.#finding.claimsAsserting(query);
   }
 
   /** Every record containing the text, as `{handle, wording}` pairs grouped by label. */
-  async search(text: Prose): Promise<SearchGroup[]> {
-    return this.#finding.search(text);
+  async search(query: SearchQuery): Promise<SearchGroup[]> {
+    return this.#finding.search(query);
   }
 
   /** What the record held at a stated moment. */
-  async whatWasKnown(at: Timestamp): Promise<HistoricalSurvey> {
-    return this.#standing.whatWasKnown(at);
+  async whatWasKnown(query: KnownAtQuery): Promise<HistoricalSurvey> {
+    return this.#standing.whatWasKnown(query);
   }
 
   /** What the programme knows: settled, unsettled, and never looked at. */
@@ -139,119 +164,116 @@ export class ReadSurface extends SessionCore {
   }
 
   /** Why a piece of work is not being done, if somebody said so. */
-  async stoppedWork(work: WorkRef): Promise<StoppedReason | undefined> {
-    return this.#blocked.stoppedWork(work);
+  async stoppedWork(query: StoppedWorkQuery): Promise<StoppedReason | undefined> {
+    return this.#blocked.stoppedWork(query);
   }
 
   /** What a planned task is permitted to touch, and whether anyone is enforcing it. */
-  async contractFor(work: WorkRef): Promise<TaskContract> {
-    return this.#blocked.contractFor(work);
+  async contractFor(query: ContractForQuery): Promise<TaskContract> {
+    return this.#blocked.contractFor(query);
   }
 
   /** Which criterion governs this gate? */
-  async criteriaGoverning(gate: GateRef): Promise<CriterionRef[]> {
-    return this.#blocked.criteriaGoverning(gate);
+  async criteriaGoverning(query: CriteriaGoverningQuery): Promise<CriterionRef[]> {
+    return this.#blocked.criteriaGoverning(query);
   }
 
   /** A locked design and everything that has happened to it, oldest first. */
-  async designHistory(gate: GateRef): Promise<DesignHistory> {
-    return this.#blocked.designHistory(gate);
+  async designHistory(query: DesignHistoryQuery): Promise<DesignHistory> {
+    return this.#blocked.designHistory(query);
   }
 
   /** May this gate be relied on, and on what evidence? */
-  async gateStatus(gate: GateRef): Promise<GateStatus> {
-    return this.#blocked.gateStatus(gate);
+  async gateStatus(query: GateStatusQuery): Promise<GateStatus> {
+    return this.#blocked.gateStatus(query);
   }
 
   /** Every gate, with the state a reader is filtering on. */
-  async gateList(state?: GateStatus["state"]): Promise<ListedGate[]> {
-    return this.#blocked.gateList(state);
+  async gateList(query: GateListQuery): Promise<ListedGate[]> {
+    return this.#blocked.gateList(query);
   }
 
   /** Every planned piece of work, with the state a reader is filtering on. */
-  async workList(state?: WorkState): Promise<ListedWork[]> {
-    return this.#blocked.workList(state);
+  async workList(query: WorkListQuery): Promise<ListedWork[]> {
+    return this.#blocked.workList(query);
   }
 
   /** Is this enquiry open, and if not, how did it close? */
-  async enquiryStatus(enquiry: EnquiryRef): Promise<EnquiryStatus> {
-    return this.#story.enquiryStatus(enquiry);
+  async enquiryStatus(query: EnquiryStatusQuery): Promise<EnquiryStatus> {
+    return this.#story.enquiryStatus(query);
   }
 
   /** What a re-run did and did not establish. */
-  async reproductionOf(verification: AnalysisRef): Promise<ReproductionReport> {
-    return this.#story.reproductionOf(verification);
+  async reproductionOf(query: ReproductionOfQuery): Promise<ReproductionReport> {
+    return this.#story.reproductionOf(query);
   }
 
   /** An interpretation and every narrowing behind it, oldest first. */
-  async interpretationHistory(claim: ClaimRef): Promise<InterpretationHistory> {
-    return this.#story.interpretationHistory(claim);
+  async interpretationHistory(query: InterpretationHistoryQuery): Promise<InterpretationHistory> {
+    return this.#story.interpretationHistory(query);
   }
 
   /** Whether two findings actually conflict. */
-  async doTheseConflict(a: ClaimRef, b: ClaimRef): Promise<ConflictVerdict> {
-    return this.#story.doTheseConflict(a, b);
+  async doTheseConflict(query: DoTheseConflictQuery): Promise<ConflictVerdict> {
+    return this.#story.doTheseConflict(query);
   }
 
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */
-  async whySupported(claim: ClaimRef): Promise<SupportExplanation> {
-    return this.#story.whySupported(claim);
+  async whySupported(query: WhySupportedQuery): Promise<SupportExplanation> {
+    return this.#story.whySupported(query);
   }
 
   /** How much of a past construction can be rebuilt. */
-  async reproducibilityOf(
-    analysis: AnalysisRef,
-    rebuilt: Array<{ part: ObservationsRef; hash: IdentityString }>,
-  ): Promise<ReproducibilityReport> {
-    return this.#story.reproducibilityOf(analysis, rebuilt);
+  async reproducibilityOf(query: ReproducibilityOfQuery): Promise<ReproducibilityReport> {
+    return this.#story.reproducibilityOf(query);
   }
 
   /** What is affected if this artefact turns out to be wrong? */
-  async whatDependsOn(subject: IndexedString | ObservationsRef): Promise<DependencyReport> {
-    return this.#story.whatDependsOn(subject);
+  async whatDependsOn(query: WhatDependsOnQuery): Promise<DependencyReport> {
+    return this.#story.whatDependsOn(query);
   }
 
   /** One condition: what it requires, what has been said about it, and what it holds up. */
-  async criterionStanding(criterion: CriterionRef): Promise<CriterionStanding> {
-    return this.#explain.criterionStanding(criterion);
+  async criterionStanding(query: CriterionStandingQuery): Promise<CriterionStanding> {
+    return this.#explain.criterionStanding(query);
   }
 
   /** What one record is joined to, both directions — reached only through `why`. */
-  async neighboursOf(subject: AnyRef): Promise<Neighbour[]> {
-    return this.#explain.neighboursOf(subject);
+  async neighboursOf(query: NeighboursOfQuery): Promise<Neighbour[]> {
+    return this.#explain.neighboursOf(query);
   }
 
   /** A record's own text, whatever kind it is — reached only through `why`. */
-  async proseFor(subject: AnyRef): Promise<string | null> {
-    return this.#explain.proseFor(subject);
+  async proseFor(query: ProseForQuery): Promise<string | null> {
+    return this.#explain.proseFor(query);
   }
 
   /** Is this handle on the record and not retracted — reached only through `why`. */
-  async reachable(subject: AnyRef): Promise<boolean> {
-    return this.#explain.reachable(subject);
+  async reachable(query: ReachableQuery): Promise<boolean> {
+    return this.#explain.reachable(query);
   }
 
   /** What an analysis revised, and which findings moved. */
-  async analysisRevision(analysis: AnalysisRef): Promise<AnalysisRevision> {
-    return this.#explain.analysisRevision(analysis);
+  async analysisRevision(query: AnalysisRevisionQuery): Promise<AnalysisRevision> {
+    return this.#explain.analysisRevision(query);
   }
 
   /**
    * `enquiryStatus`, alongside where this enquiry's own question sits in the overall survey.
    */
-  async enquiryInContext(enquiry: EnquiryRef): Promise<EnquiryInContext> {
-    return enquiryInContextOf(this, enquiry);
+  async enquiryInContext(query: EnquiryInContextQuery): Promise<EnquiryInContext> {
+    return enquiryInContextOf(this, query.enquiry);
   }
 
   /**
    * "What am I blocked on right now, what are my priorities?" — see `Standing`'s own doc
    * comment for the shape and why there is no `at=`.
    */
-  async now(since?: number): Promise<Standing> {
+  async now({ since }: NowQuery): Promise<Standing> {
     const [events, gates, work, known, transcribed] = await Promise.all([
       this.whatHappened(since === undefined ? {} : { since }),
-      this.gateList(),
-      this.workList(),
+      this.gateList({}),
+      this.workList({}),
       this.whatIsKnown(),
       // Not derived from `events` above: with a cursor that list is the window,
       // and this answer is about the record.
@@ -334,18 +356,18 @@ export class ReadSurface extends SessionCore {
    * The handle test is case-insensitive and wording keeps the caller's casing, so `why task_8`
    * resolves rather than falling through to wording and reporting that nothing claims it.
    */
-  async why(subject: AnyRef | IndexedString): Promise<Explanation> {
+  async why({ subject }: WhyQuery): Promise<Explanation> {
     const asHandle = subject.toUpperCase() as AnyRef;
     const kind = kindOf(asHandle);
     if (kind) {
-      if (!(await this.reachable(asHandle)))
+      if (!(await this.reachable({ subject: asHandle })))
         throw new Error(
           `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
         );
       return EXPLAINERS[kind](this, asHandle);
     }
 
-    const found = await this.claimsAsserting(subject);
+    const found = await this.claimsAsserting({ proposition: subject });
     if (found.length === 0) throw new Error(`nothing on the record claims "${subject}"`);
     if (found.length > 1)
       throw new Error(

@@ -171,7 +171,9 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     // could later be read as a finding against it. It would hold for any string, and is here to
     // stay holding.
     expect(
-      await session.claimsAsserting("does the learned topology help on an external task?"),
+      await session.claimsAsserting({
+        proposition: "does the learned topology help on an external task?",
+      }),
     ).toEqual([]);
 
     // Afterward, from a second reader over the same graph.
@@ -189,10 +191,10 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
   test("an established weaker result does not discharge the stronger open question", async () => {
     const prior = await priorState();
 
-    const nonlinear = await session.whySupported(await claimNamed(session, NONLINEAR));
+    const nonlinear = await session.whySupported({ claim: await claimNamed(session, NONLINEAR) });
     expect(nonlinear.verdict).toBe("supported");
 
-    const stronger = await session.enquiryStatus(prior.smearEnquiry);
+    const stronger = await session.enquiryStatus({ enquiry: prior.smearEnquiry });
     expect(stronger.open).toBe(true);
     expect(stronger.closure).toBeNull();
 
@@ -213,13 +215,13 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
       because: "the vague form is not testable",
     });
 
-    const origin = await session.originOf(sharper);
+    const origin = await session.originOf({ question: sharper });
     expect(origin?.from).toBe(hunch);
     expect(origin?.reason).toContain("not testable");
 
     // From a second reader: the original still asks what it originally asked.
     const later = new ResearchSession(await scenario.current(), { clock });
-    const durable = await later.originOf(sharper);
+    const durable = await later.originOf({ question: sharper });
     expect(durable?.from).toBe(hunch);
     expect(durable?.said).toBe(
       "is the learned topology doing something computationally interesting?",
@@ -276,8 +278,8 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
       because: "reproducibility is now the part in doubt",
     });
 
-    const behindFirst = await session.originOf(first);
-    const behindSecond = await session.originOf(second);
+    const behindFirst = await session.originOf({ question: first });
+    const behindSecond = await session.originOf({ question: second });
 
     // The finding that arrived after the first sharpening must not appear
     // behind it, and must appear behind the second.
@@ -296,8 +298,10 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
       events: inMemoryEventLog(),
     });
     expect(await later.events.all()).toHaveLength(0);
-    expect((await later.originOf(first))?.knownAtTheTime).not.toContain(LATE);
-    expect((await later.originOf(second))?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
+    expect((await later.originOf({ question: first }))?.knownAtTheTime).not.toContain(LATE);
+    expect(
+      (await later.originOf({ question: second }))?.knownAtTheTime.map((f) => f.states),
+    ).toContain(LATE);
   });
 
   /**
@@ -330,7 +334,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
     // Nothing on the record cites the sharpening that never happened.
     for (const question of census(after)) {
-      const origin = await later.originOf(ref("question", question));
+      const origin = await later.originOf({ question: ref("question", question) });
       expect(origin?.reason).not.toBe("it should not get this far");
     }
   });
@@ -354,7 +358,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(byMapping).not.toBe(byProbe);
 
     const later = new ResearchSession(await scenario.current(), { clock });
-    const pursuits = await later.pursuitsOf(question);
+    const pursuits = await later.pursuitsOf({ question });
     expect(pursuits.map((p) => p).sort()).toEqual([byMapping, byProbe].sort());
 
     // One question on the books, not two.

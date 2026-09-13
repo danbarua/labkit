@@ -14,13 +14,11 @@ import { ref, isRefOfKind, verdictOf } from "../report";
 import type {
   AffectedClaim,
   AffectedEnquiry,
-  AnalysisRef,
   CheckStatus,
   ClaimRef,
   ConcludedClaim,
   ConflictSide,
   ConflictVerdict,
-  CriterionRef,
   DecisionRef,
   DependencyReport,
   EnquiryRef,
@@ -34,6 +32,15 @@ import type {
   Revision,
   SupportExplanation,
 } from "../report";
+import type {
+  DoTheseConflictQuery,
+  EnquiryStatusQuery,
+  InterpretationHistoryQuery,
+  ReproducibilityOfQuery,
+  ReproductionOfQuery,
+  WhatDependsOnQuery,
+  WhySupportedQuery,
+} from "../queries";
 import { checkStatus, checksAnchor } from "../survey-facts";
 import { blockedBy } from "./blocked";
 import { dedupeById, type Identified } from "./shared";
@@ -48,7 +55,7 @@ const deferral = (
 
 export class StoryGroup extends SessionCore {
   /** Is this enquiry open, and if not, how did this enquiry close? */
-  async enquiryStatus(enquiry: EnquiryRef): Promise<EnquiryStatus> {
+  async enquiryStatus({ enquiry }: EnquiryStatusQuery): Promise<EnquiryStatus> {
     const named = await this.graph.query(
       `MATCH (loe:LineOfEnquiry {natural_id: $id}) RETURN loe`,
       { loe: vertexProps<{ name: string }>() },
@@ -246,7 +253,7 @@ export class StoryGroup extends SessionCore {
   /**
    * What a re-run did and did not establish.
    */
-  async reproductionOf(verification: AnalysisRef): Promise<ReproductionReport> {
+  async reproductionOf({ verification }: ReproductionOfQuery): Promise<ReproductionReport> {
     const link = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(new:Evidence)
        MATCH (new)-[:REVERIFIES]->(old:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:USES]->(oldcomp:Computation)
@@ -383,7 +390,9 @@ export class StoryGroup extends SessionCore {
   /**
    * An interpretation and every narrowing behind it, oldest first.
    */
-  async interpretationHistory(claim: ClaimRef): Promise<InterpretationHistory> {
+  async interpretationHistory({
+    claim,
+  }: InterpretationHistoryQuery): Promise<InterpretationHistory> {
     // **Walked by id.** `reinterpret` writes `Decision -MOTIVATES-> narrower` and `Decision
     // -CHANGES-> each withdrawn claim`, both carrying natural ids, so every step is reachable
     // by identity.
@@ -488,7 +497,7 @@ export class StoryGroup extends SessionCore {
   /**
    * Whether two findings actually conflict.
    */
-  async doTheseConflict(a: ClaimRef, b: ClaimRef): Promise<ConflictVerdict> {
+  async doTheseConflict({ a, b }: DoTheseConflictQuery): Promise<ConflictVerdict> {
     const sides = [await this.sideOf(a), await this.sideOf(b)];
     const [left, right] = sides;
 
@@ -557,7 +566,7 @@ export class StoryGroup extends SessionCore {
   }
 
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */
-  async whySupported(claim: ClaimRef): Promise<SupportExplanation> {
+  async whySupported({ claim }: WhySupportedQuery): Promise<SupportExplanation> {
     const scope = await this.scopeOf(claim);
     const proposition = scope.proposition;
     // Both bearings, each partitioned by whether its analysis output was
@@ -784,10 +793,10 @@ export class StoryGroup extends SessionCore {
   /**
    * How much of a past construction can be rebuilt.
    */
-  async reproducibilityOf(
-    analysis: AnalysisRef,
-    rebuilt: Array<{ part: ObservationsRef; hash: IdentityString }>,
-  ): Promise<ReproducibilityReport> {
+  async reproducibilityOf({
+    analysis,
+    rebuilt,
+  }: ReproducibilityOfQuery): Promise<ReproducibilityReport> {
     const offered = new Map<ObservationsRef, IdentityString>(rebuilt.map((r) => [r.part, r.hash]));
 
     // An absent subject and an empty one are different states: answering them
@@ -859,7 +868,7 @@ export class StoryGroup extends SessionCore {
   /**
    * What is affected if this artefact turns out to be wrong?
    */
-  async whatDependsOn(subject: IndexedString | ObservationsRef): Promise<DependencyReport> {
+  async whatDependsOn({ subject }: WhatDependsOnQuery): Promise<DependencyReport> {
     // **`typeof` cannot tell these apart any more, and that is the trap.** A handle is a
     // branded string now, so `typeof subject === "string"` is true for both arms of the union
     // and sent every handle off to be looked up by logical name -- which threw `no artefact

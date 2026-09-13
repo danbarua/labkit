@@ -10,6 +10,7 @@ import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
 import { WriteSurface, UNATTRIBUTED, inMemoryEventLog, type Clock } from "../src/domain";
+import { eventFilter } from "../src/domain/queries";
 import { pgEventLog } from "../src/domain/event-store";
 import { recordAnalysis } from "./helpers/analysis";
 
@@ -369,7 +370,7 @@ describe("the log answers what the graph cannot", () => {
     const decision = decisions[0]!.d.natural_id;
 
     // Not the subject of any event...
-    const bySubject = await log.select({ touching: decision });
+    const bySubject = await log.select(eventFilter.parse({ touching: decision }));
     expect(bySubject.map((e) => e.subject)).not.toContain(decision);
     // ...but found anyway, because `touching` looks at `created` too.
     expect(bySubject.map((e) => e.operation)).toEqual(["closeEnquiry"]);

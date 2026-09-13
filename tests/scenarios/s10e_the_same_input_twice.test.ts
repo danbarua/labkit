@@ -61,7 +61,7 @@ describe("S-10e — the same record, read twice by one run", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf(rerun.verification);
+    const report = await later.reproductionOf({ verification: rerun.verification });
 
     expect(report.ofRead.map((i) => i.part)).toEqual([series, series]);
     expect(report.verificationRead.map((i) => i.part)).toEqual([series]);
@@ -98,7 +98,7 @@ describe("S-10e — the same record, read twice by one run", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf(rerun.verification);
+    const report = await later.reproductionOf({ verification: rerun.verification });
 
     expect(report.ofRead.map((i) => i.name)).toEqual(["series A", "series B", "series A"]);
     expect(report.differs).toEqual([]);

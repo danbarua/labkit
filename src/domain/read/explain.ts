@@ -13,7 +13,6 @@ import type {
   ClaimRef,
   ConcludedClaim,
   CriterionExplanation,
-  CriterionRef,
   CriterionStanding,
   EnquiryExplanation,
   EnquiryInContext,
@@ -30,10 +29,16 @@ import type {
   QuestionStanding,
   Ref,
   RevisedFinding,
-  WalkExplanation,
   WalkedKind,
   WorkExplanation,
 } from "../report";
+import type {
+  AnalysisRevisionQuery,
+  CriterionStandingQuery,
+  NeighboursOfQuery,
+  ProseForQuery,
+  ReachableQuery,
+} from "../queries";
 import { compose, per, type Row } from "../facts";
 import { criterionDetail } from "../survey-facts";
 import type { ReadSurface } from "./index";
@@ -47,7 +52,7 @@ export class ExplainGroup extends SessionCore {
    * per-label retraction policy cannot apply and `retracted` is filtered here instead. An
    * unlabelled pattern with no such filter reads nodes `undo` was supposed to have hidden.
    */
-  async proseFor(subject: AnyRef): Promise<string | null> {
+  async proseFor({ subject }: ProseForQuery): Promise<string | null> {
     const props = SEARCHABLE_TEXT[labelForNaturalId(subject)] ?? [];
     if (props.length === 0) return null;
     // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
@@ -71,7 +76,7 @@ export class ExplainGroup extends SessionCore {
    * is still there, so "no words" and "not here" are different answers. Matches without a
    * label, so it filters `retracted` rather than relying on the per-label policy.
    */
-  async reachable(subject: AnyRef): Promise<boolean> {
+  async reachable({ subject }: ReachableQuery): Promise<boolean> {
     // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const rows = await this.graph.query(
       `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
@@ -89,7 +94,7 @@ export class ExplainGroup extends SessionCore {
    * far end is any kind by design — so neither carries the per-label retraction policy and both
    * filter `retracted` here. Without it, `why` cites decisions and findings `undo` took back.
    */
-  async neighboursOf(subject: AnyRef): Promise<Neighbour[]> {
+  async neighboursOf({ subject }: NeighboursOfQuery): Promise<Neighbour[]> {
     const decoders = {
       other: vertexProps<Record<string, unknown> & { natural_id: string }>(),
       via: scalar<string>(),
@@ -132,7 +137,7 @@ export class ExplainGroup extends SessionCore {
    * `why <criterion>` — what a condition requires, what has been said about it, and what it
    * holds up.
    */
-  async criterionStanding(criterion: CriterionRef): Promise<CriterionStanding> {
+  async criterionStanding({ criterion }: CriterionStandingQuery): Promise<CriterionStanding> {
     const { cypher, decoders } = compose(
       `MATCH (crit:Criterion {natural_id: $id})`,
       criterionDetail,
@@ -185,7 +190,7 @@ export class ExplainGroup extends SessionCore {
   /**
    * What an analysis revised, and which findings moved — {@link AnalysisRevision}.
    */
-  async analysisRevision(analysis: AnalysisRef): Promise<AnalysisRevision> {
+  async analysisRevision({ analysis }: AnalysisRevisionQuery): Promise<AnalysisRevision> {
     const lineage = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
        OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
@@ -333,7 +338,7 @@ export async function enquiryInContext(
   self: ReadSurface,
   enquiry: EnquiryRef,
 ): Promise<EnquiryInContext> {
-  const status = await self.enquiryStatus(enquiry);
+  const status = await self.enquiryStatus({ enquiry });
   if (!status.question) return { enquiry: status, standing: null };
 
   const survey = await self.whatIsKnown();
@@ -367,7 +372,7 @@ type Explainer = (self: ReadSurface, subject: string) => Promise<Explanation>;
 
 /** The `Claim` case: `whySupported`, plus the derived `{is, because}` envelope. */
 async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimExplanation> {
-  const report = await self.whySupported(ref("claim", subject));
+  const report = await self.whySupported({ claim: ref("claim", subject) });
   // The read surface derived the state; this says it in words and names what
   // it rests on. It used to rebuild the state here from `supported`,
   // `withdrawn` and `challenged`, and had no arm for a synthesis or for a
@@ -421,8 +426,8 @@ async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimEx
 /** The `Work` case: the state `workList` already computes, then the lineage. */
 async function explainWork(self: ReadSurface, subject: string): Promise<WorkExplanation> {
   const work = ref("work", subject);
-  const report = await self.contractFor(work);
-  const listed = (await self.workList()).find((row) => row.work === work);
+  const report = await self.contractFor({ work });
+  const listed = (await self.workList({})).find((row) => row.work === work);
   if (!listed)
     throw new Error(
       `no planned work ${work}; work is planned before it can be read back, and 'search' finds its handle by the objective`,
@@ -467,7 +472,7 @@ function sentenceForWork(listed: ListedWork, namedQuestion: boolean): string {
 async function causesForWorkState(self: ReadSurface, listed: ListedWork): Promise<Cause[]> {
   switch (listed.state) {
     case "abandoned": {
-      const stopped = await self.stoppedWork(listed.work);
+      const stopped = await self.stoppedWork({ work: listed.work });
       return stopped ? [{ handle: stopped.decision, wording: stopped.because }] : [];
     }
     case "blocked":
@@ -486,7 +491,7 @@ async function causesForWorkState(self: ReadSurface, listed: ListedWork): Promis
 async function causesForGates(self: ReadSurface, gates: ListedWork["gates"]): Promise<Cause[]> {
   const causes: Cause[] = [];
   for (const gate of gates) {
-    const status = await self.gateStatus(gate);
+    const status = await self.gateStatus({ gate });
     causes.push(causeForHoldingGate(status));
   }
   return causes;
@@ -504,11 +509,11 @@ function causeForHoldingGate(status: GateStatus): Cause {
 }
 
 async function implementingAnalyses(self: ReadSurface, work: ListedWork["work"]): Promise<Cause[]> {
-  const fromWork = await self.neighboursOf(work);
+  const fromWork = await self.neighboursOf({ subject: work });
   const units = fromWork.filter((n) => n.via === "IMPLEMENTS" && n.direction === "out");
   const analyses: Cause[] = [];
   for (const unit of units) {
-    const fromUnit = await self.neighboursOf(unit.handle);
+    const fromUnit = await self.neighboursOf({ subject: unit.handle });
     for (const n of fromUnit) {
       if (n.via === "USES" && n.direction === "out" && kindOf(n.handle) === "analysis")
         analyses.push({ handle: n.handle, wording: "carried out by" });
@@ -520,7 +525,7 @@ async function implementingAnalyses(self: ReadSurface, work: ListedWork["work"])
 /** The LineOfEnquiry case: its own closure, with aggregate question context beside it. */
 async function explainEnquiry(self: ReadSurface, subject: string): Promise<EnquiryExplanation> {
   const enquiry = ref("enquiry", subject);
-  const report = await self.enquiryInContext(enquiry);
+  const report = await self.enquiryInContext({ enquiry });
   const status = report.enquiry;
   let is: string;
   switch (status.closure) {
@@ -582,7 +587,7 @@ function causeForCheck(c: CheckStatus): Cause {
  */
 async function explainAnalysis(self: ReadSurface, subject: string): Promise<AnalysisExplanation> {
   const analysis = ref("analysis", subject);
-  const report = await self.analysisRevision(analysis);
+  const report = await self.analysisRevision({ analysis });
   if (report.supersedes === undefined)
     return { kind: "analysis", subject: analysis, is: "a first run", because: [], report };
 
@@ -619,7 +624,7 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
  */
 async function explainCriterion(self: ReadSurface, subject: string): Promise<CriterionExplanation> {
   const criterion = ref("criterion", subject);
-  const report = await self.criterionStanding(criterion);
+  const report = await self.criterionStanding({ criterion });
   const last = report.evaluations.at(-1);
   const is =
     report.state === "never-run"
@@ -661,7 +666,7 @@ async function explainCriterion(self: ReadSurface, subject: string): Promise<Cri
  */
 async function explainGate(self: ReadSurface, subject: string): Promise<GateExplanation> {
   const gate = ref("gate", subject);
-  const report = await self.gateStatus(gate);
+  const report = await self.gateStatus({ gate });
   let is: string;
   let because: Cause[];
   switch (report.state) {
@@ -783,8 +788,8 @@ const SAYS: Record<WalkedKind, string> = {
 function walked(kind: WalkedKind): Explainer {
   return async (self, subject) => {
     const handle = ref(kind, subject);
-    const neighbours = await self.neighboursOf(handle);
-    const own = await self.proseFor(handle);
+    const neighbours = await self.neighboursOf({ subject: handle });
+    const own = await self.proseFor({ subject: handle });
     return {
       kind,
       subject: handle,

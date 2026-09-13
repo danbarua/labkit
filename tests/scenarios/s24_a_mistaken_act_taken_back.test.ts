@@ -110,8 +110,8 @@ describe("S-24 — a mistaken act taken back", () => {
       because: "the gate was declared against the wrong work",
     });
 
-    expect((await session.workList()).find((row) => row.work === work)?.state).toBe("waiting");
-    expect((await session.now()).untouched.map((row) => row.work)).not.toContain(work);
+    expect((await session.workList({})).find((row) => row.work === work)?.state).toBe("waiting");
+    expect((await session.now({})).untouched.map((row) => row.work)).not.toContain(work);
   });
 
   /**

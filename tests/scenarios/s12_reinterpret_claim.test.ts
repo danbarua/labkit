@@ -129,7 +129,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
    */
   test("the withdrawn interpretation stops standing, in full", async () => {
     const programme = await assertedTwice();
-    const beforehand = await session.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
+    const beforehand = await session.whySupported({
+      claim: claimOf(programme.firstClaims, PREFERENTIAL),
+    });
     expect(beforehand.verdict).toBe("supported");
     expect(beforehand.support).toHaveLength(2);
 
@@ -143,7 +145,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    const withdrawn = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
+    const withdrawn = await later.whySupported({
+      claim: claimOf(programme.firstClaims, PREFERENTIAL),
+    });
     expect(withdrawn.verdict).toBe("withdrawn");
 
     // Withdrawn is its own state. Nobody asserts the sentence any more, and
@@ -162,7 +166,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // never happened.
     // Asked with the handle the verb returned -- no round trip back through
     // the wording to re-find the record this very call created.
-    const history = await later.interpretationHistory(narrowing.nowClaims.claim);
+    const history = await later.interpretationHistory({ claim: narrowing.nowClaims.claim });
     expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
     expect(history.nowClaims.asserts).toBe(NARROWER);
     expect(history.revisions).toHaveLength(1);
@@ -184,7 +188,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    const now = await later.whySupported(await claimNamed(later, NARROWER));
+    const now = await later.whySupported({ claim: await claimNamed(later, NARROWER) });
     expect(now.verdict).toBe("supported");
     expect(now.support.map((s) => s.finding).sort()).toEqual([
       "discriminative amplitude ratio 0.79, non-discriminative 0.41",
@@ -202,7 +206,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
 
     // And the withdrawn interpretation's findings are not reported as
     // withdrawn evidence: nothing about them changed.
-    const withdrawn = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
+    const withdrawn = await later.whySupported({
+      claim: claimOf(programme.firstClaims, PREFERENTIAL),
+    });
     expect(withdrawn.superseded).toEqual([]);
     void programme;
   });
@@ -231,7 +237,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.interpretationHistory(await claimNamed(later, NARROWER));
+    const history = await later.interpretationHistory({ claim: await claimNamed(later, NARROWER) });
     expect(history.revisions[0]!.restingOnTheOldReading.map((q) => q.asks)).toEqual([
       "does the encoding preferentially preserve discriminative signal?",
     ]);
@@ -263,7 +269,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     });
     expect(await later.events.all()).toHaveLength(0);
 
-    const history = await later.interpretationHistory(await claimNamed(later, EVEN_NARROWER));
+    const history = await later.interpretationHistory({
+      claim: await claimNamed(later, EVEN_NARROWER),
+    });
     expect(history.originally.map((c) => c.asserts)).toEqual([PREFERENTIAL, PREFERENTIAL]);
     expect(history.nowClaims.asserts).toBe(EVEN_NARROWER);
     expect(history.revisions.map((r) => r.nowClaims.asserts)).toEqual([NARROWER, EVEN_NARROWER]);
@@ -304,7 +312,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    const standing = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
+    const standing = await later.whySupported({
+      claim: claimOf(programme.firstClaims, PREFERENTIAL),
+    });
     expect(standing.challenged).toBe(true);
     // Challenged, but nobody withdrew it -- the two states must not collapse.
     expect(standing.withdrawn).toBe(false);
@@ -352,7 +362,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    const still = await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
+    const still = await later.whySupported({ claim: claimOf(programme.firstClaims, PREFERENTIAL) });
     expect(still.withdrawn).toBe(true);
     expect(still.replacedBy?.asserts).toBe(NARROWER);
     expect(still.verdict).toBe("withdrawn");
@@ -361,7 +371,9 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
   /** Reinterpreting something nobody claimed writes nothing. */
   test("reinterpreting a proposition that is not on the record writes nothing", async () => {
     const programme = await assertedTwice();
-    const before = await session.whySupported(claimOf(programme.firstClaims, PREFERENTIAL));
+    const before = await session.whySupported({
+      claim: claimOf(programme.firstClaims, PREFERENTIAL),
+    });
 
     await expect(
       session.reinterpret({
@@ -375,6 +387,8 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       clock,
       events: inMemoryEventLog(),
     });
-    expect(await later.whySupported(claimOf(programme.firstClaims, PREFERENTIAL))).toEqual(before);
+    expect(
+      await later.whySupported({ claim: claimOf(programme.firstClaims, PREFERENTIAL) }),
+    ).toEqual(before);
   });
 });

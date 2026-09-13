@@ -74,13 +74,13 @@ describe("S-26: work nobody is doing", () => {
     const { work } = await twoPlannedThings();
     await session.stopWork({ work, because: DROPPED });
 
-    const listed = await (await afterwards()).workList();
+    const listed = await (await afterwards()).workList({});
     expect(listed.find((w) => w.work === work)?.state).toBe("abandoned");
 
     // The reason is the whole of what the act said, so it has to be
     // reconstructible from durable state — not from the return value, and not
     // from the event log, which a second reader's is empty by design.
-    const why = await (await afterwards()).why(work);
+    const why = await (await afterwards()).why({ subject: work });
     expect(why.is).toBe("abandoned");
     expect(why.because.map((c) => c.wording)).toEqual([DROPPED]);
   });
@@ -90,13 +90,13 @@ describe("S-26: work nobody is doing", () => {
 
     // The gated port is waiting on a gate nobody has checked; the profiling is
     // ready to start. Two lists, and the port is on the first.
-    const before = await (await afterwards()).now();
+    const before = await (await afterwards()).now({});
     expect(before.unevaluated.work.map((w) => w.work)).toEqual([work]);
     expect(before.untouched.map((w) => w.work)).toEqual([other]);
 
     await session.stopWork({ work, because: DROPPED });
 
-    const after = await (await afterwards()).now();
+    const after = await (await afterwards()).now({});
     expect(after.unevaluated.work).toEqual([]);
     expect(after.untouched.map((w) => w.work)).toEqual([other]);
   });
@@ -111,16 +111,16 @@ describe("S-26: work nobody is doing", () => {
     });
 
     // The gate really is blocked, and the work really was blocked on it.
-    const held = await (await afterwards()).workList();
+    const held = await (await afterwards()).workList({});
     expect(held.find((w) => w.work === work)?.state).toBe("blocked");
 
     await session.stopWork({ work, because: DROPPED });
 
     // Now it is neither blocked nor ready. A failing gate over work nobody is
     // doing is not something a reader should be shown as an obstruction.
-    const dropped = await (await afterwards()).workList();
+    const dropped = await (await afterwards()).workList({});
     expect(dropped.find((w) => w.work === work)?.state).toBe("abandoned");
-    const standing = await (await afterwards()).now();
+    const standing = await (await afterwards()).now({});
     expect(standing.blocked.work.map((w) => w.work)).toEqual([]);
   });
 
@@ -144,7 +144,7 @@ describe("S-26: work nobody is doing", () => {
       outcome: "fail",
     });
 
-    const before = await (await afterwards()).gateStatus(gate);
+    const before = await (await afterwards()).gateStatus({ gate });
     expect(before.gating.map((w) => w.work)).toEqual(expect.arrayContaining([stopped, active]));
     expect(before.gating).toHaveLength(2);
     const beforeBlocked = before.unmet.flatMap((check) =>
@@ -155,7 +155,7 @@ describe("S-26: work nobody is doing", () => {
 
     await session.stopWork({ work: stopped, because: DROPPED });
 
-    const after = await (await afterwards()).gateStatus(gate);
+    const after = await (await afterwards()).gateStatus({ gate });
     expect(after.gating.map((w) => w.work)).toEqual([active]);
     const afterBlocked = after.unmet.flatMap((check) =>
       check.blocks.flatMap((block) => block.gating.map((work) => work.work)),
@@ -167,7 +167,7 @@ describe("S-26: work nobody is doing", () => {
       closure: "sidestepped",
       because: "the sampler is no longer released",
     });
-    const closed = await (await afterwards()).gateStatus(gate);
+    const closed = await (await afterwards()).gateStatus({ gate });
     expect(closed.state).toBe("sidestepped");
     expect(closed.gating.map((w) => w.work)).toEqual([active]);
     expect(closed.unmet.flatMap((check) => check.blocks)).toEqual([]);

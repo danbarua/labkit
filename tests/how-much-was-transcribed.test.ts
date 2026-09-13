@@ -95,13 +95,13 @@ describe("which acts were read off something", () => {
     await threeActs(events, graph);
     const read = new ReadSurface(graph, { events });
 
-    const whole = await read.now();
+    const whole = await read.now({});
     expect(whole.transcribed).toEqual({ transcribed: 2, acts: 3 });
 
     // A cursor past the two transcribed acts. Their absence from the sections
     // is right; their absence from the count would be a different number under
     // the same name.
-    const narrowed = await read.now(2);
+    const narrowed = await read.now({ since: 2 });
     expect(narrowed.transcribed).toEqual({ transcribed: 2, acts: 3 });
   });
 });

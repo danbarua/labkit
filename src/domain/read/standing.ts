@@ -1,16 +1,17 @@
 import { optional, vertexProps } from "../../db/cypher";
-import type { ClaimProps, Timestamp } from "../../db/domain";
+import type { ClaimProps } from "../../db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
 import { ref } from "../report";
+import type { KnownAtQuery } from "../queries";
 import { BEARINGS, answeringClaimBearing, checksMetBearing, standingAsOf } from "../survey-facts";
 
 export class StandingGroup extends SessionCore {
   /**
    * What the record held at a stated moment. Row Z.
    */
-  async whatWasKnown(at: Timestamp): Promise<HistoricalSurvey> {
+  async whatWasKnown({ at }: KnownAtQuery): Promise<HistoricalSurvey> {
     const parsed = Date.parse(at);
     if (Number.isNaN(parsed))
       throw new Error(

@@ -100,7 +100,7 @@ describe("S-31: the read answers what was asked", () => {
     });
     const { note: about } = await session.note({ text: "seeds 1..10", on: question });
 
-    const listed = await (await afterwards()).notes();
+    const listed = await (await afterwards()).notes({});
     // Newest first.
     expect(listed.map((n) => n.note)).toEqual([about, why, loose]);
 

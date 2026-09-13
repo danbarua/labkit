@@ -183,7 +183,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       citing: cites,
     });
 
-    const history = await session.designHistory(programme.feasibilityBoundary);
+    const history = await session.designHistory({ gate: programme.feasibilityBoundary });
     expect(theCondition(history).originally.requires).toBe(LOCKED_LIMIT);
     expect(theCondition(history).nowRequires.requires).toBe(RAISED_LIMIT);
 
@@ -191,7 +191,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const durable = await later.designHistory(programme.feasibilityBoundary);
+    const durable = await later.designHistory({ gate: programme.feasibilityBoundary });
     expect(theCondition(durable).originally.requires).toBe(LOCKED_LIMIT);
     expect(theCondition(durable).nowRequires.requires).toBe(RAISED_LIMIT);
   });
@@ -213,7 +213,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.designHistory(programme.feasibilityBoundary);
+    const history = await later.designHistory({ gate: programme.feasibilityBoundary });
     expect(theCondition(history).amendments).toHaveLength(1);
     expect(theCondition(history).amendments[0]!.reason).toContain(
       "unrelated to the effect under test",
@@ -224,7 +224,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
 
     // ...and the cited diagnosis is a finding with a chain behind it, not an
     // assertion attached to the amendment.
-    const why = await later.whySupported(await claimNamed(later, MULTICOLLINEAR));
+    const why = await later.whySupported({ claim: await claimNamed(later, MULTICOLLINEAR) });
     expect(why.verdict).toBe("supported");
     expect(why.restingOn.map((a) => a.name)).toContain("non-convergence traces");
   });
@@ -234,7 +234,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
    */
   test("the confirmatory boundary is untouched, and shown to be", async () => {
     const programme = await lockedProgramme();
-    const before = await session.gateStatus(programme.confirmatoryBoundary);
+    const before = await session.gateStatus({ gate: programme.confirmatoryBoundary });
 
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
     const report = await session.amendDesign({
@@ -244,7 +244,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       citing: cites,
     });
 
-    const after = await session.gateStatus(programme.confirmatoryBoundary);
+    const after = await session.gateStatus({ gate: programme.confirmatoryBoundary });
     expect(after).toEqual(before);
 
     // The confirmatory result is on the record, and is not in the blast radius.
@@ -253,7 +253,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const standing = await later.whySupported(await claimNamed(later, BEATS_CONTROL));
+    const standing = await later.whySupported({ claim: await claimNamed(later, BEATS_CONTROL) });
     expect(standing.verdict).toBe("supported");
     expect(standing.superseded).toEqual([]);
   });
@@ -288,8 +288,8 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const feasibility = await later.designHistory(programme.feasibilityBoundary);
-    const confirmatory = await later.designHistory(programme.confirmatoryBoundary);
+    const feasibility = await later.designHistory({ gate: programme.feasibilityBoundary });
+    const confirmatory = await later.designHistory({ gate: programme.confirmatoryBoundary });
     expect(theCondition(feasibility).amendments[0]!.nature).toBe("mechanical");
     expect(theCondition(confirmatory).amendments[0]!.nature).toBe("scientific");
   });
@@ -308,7 +308,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       citing: cites,
     });
 
-    const current = await session.designHistory(programme.feasibilityBoundary);
+    const current = await session.designHistory({ gate: programme.feasibilityBoundary });
     const raised = theCondition(current).nowRequires.requires;
     expect(raised).toBe(RAISED_LIMIT);
 
@@ -336,7 +336,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
     expect(await later.events.all()).toHaveLength(0);
 
-    const history = await later.designHistory(programme.feasibilityBoundary);
+    const history = await later.designHistory({ gate: programme.feasibilityBoundary });
     expect(theCondition(history).originally.requires).toBe(LOCKED_LIMIT);
     expect(theCondition(history).nowRequires.requires).toBe(
       "the solver converges within 50,000 iterations",
@@ -353,7 +353,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // The second amendment stands instead of the first, and says so on the
     // record rather than only in the order this report happens to render.
     const [first, second] = theCondition(history).amendments;
-    const stands = await later.why(second!.amendment);
+    const stands = await later.why({ subject: second!.amendment });
     expect(stands.because.map((c) => c.handle)).toContain(first!.amendment);
   });
 
@@ -380,7 +380,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.designHistory(programme.feasibilityBoundary);
+    const history = await later.designHistory({ gate: programme.feasibilityBoundary });
     expect(theCondition(history).amendments[0]!.rerun.map((w) => w.objective)).toEqual([
       "feasibility sweep of the evolved condition",
     ]);
@@ -404,9 +404,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       value: "the run needed more iterations than the locked limit allows",
       outcome: "fail",
     });
-    const held = await new ResearchSession(await scenario.current(), { clock }).gateStatus(
-      programme.feasibilityBoundary,
-    );
+    const held = await new ResearchSession(await scenario.current(), { clock }).gateStatus({
+      gate: programme.feasibilityBoundary,
+    });
     expect(held.state).toBe("blocked");
 
     const report = await session.amendDesign({
@@ -422,9 +422,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       outcome: "pass",
     });
 
-    const after = await new ResearchSession(await scenario.current(), { clock }).gateStatus(
-      programme.feasibilityBoundary,
-    );
+    const after = await new ResearchSession(await scenario.current(), { clock }).gateStatus({
+      gate: programme.feasibilityBoundary,
+    });
     expect(after.state).toBe("satisfied");
     // One live condition, not two: the retired one is gone from the count.
     expect(after.checks).toHaveLength(1);
@@ -435,9 +435,9 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     expect(after.everFailed).toBe(true);
 
     // The retired condition is still readable where it belongs.
-    const history = await new ResearchSession(await scenario.current(), { clock }).designHistory(
-      programme.feasibilityBoundary,
-    );
+    const history = await new ResearchSession(await scenario.current(), { clock }).designHistory({
+      gate: programme.feasibilityBoundary,
+    });
     expect(theCondition(history).originally.criterion).toBe(programme.iterationLimit);
   });
 
@@ -451,7 +451,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       because: "the locked limit is unreachable",
       citing: cites,
     });
-    const afterFirst = await session.designHistory(programme.feasibilityBoundary);
+    const afterFirst = await session.designHistory({ gate: programme.feasibilityBoundary });
 
     await expect(
       session.amendDesign({
@@ -467,14 +467,14 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    expect(await later.designHistory(programme.feasibilityBoundary)).toEqual(afterFirst);
+    expect(await later.designHistory({ gate: programme.feasibilityBoundary })).toEqual(afterFirst);
   });
 
   /** Amending a condition nobody stated writes nothing. */
   test("amending a criterion that is not on the record writes nothing", async () => {
     const programme = await lockedProgramme();
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
-    const before = await session.designHistory(programme.feasibilityBoundary);
+    const before = await session.designHistory({ gate: programme.feasibilityBoundary });
 
     await expect(
       session.amendDesign({
@@ -489,7 +489,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    expect(await later.designHistory(programme.feasibilityBoundary)).toEqual(before);
+    expect(await later.designHistory({ gate: programme.feasibilityBoundary })).toEqual(before);
   });
 
   /**
@@ -530,7 +530,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.designHistory(gate);
+    const history = await later.designHistory({ gate });
 
     const byOriginal = new Map(history.conditions.map((c) => [c.originally.requires, c]));
     expect([...byOriginal.keys()].sort()).toEqual([LOCKED_LIMIT, LOCKED_TOLERANCE].sort());
@@ -547,7 +547,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // superseded the cap amendment, this record would say one setting was
     // replaced by a change to a different setting.
     expect(capHistory.amendments[0]!.amendment).not.toBe(tol.amendments[0]!.amendment);
-    const withdrawal = await later.why(tol.amendments[0]!.amendment);
+    const withdrawal = await later.why({ subject: tol.amendments[0]!.amendment });
     expect(withdrawal.because.map((c) => c.handle)).not.toContain(
       capHistory.amendments[0]!.amendment,
     );

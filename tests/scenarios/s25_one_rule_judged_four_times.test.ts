@@ -80,7 +80,7 @@ describe("S-25: one rule judged four times", () => {
   test("four verdicts under one criterion, each naming what it judged", async () => {
     const { criterion, judged } = await fourComparisonsUnderOneRule();
 
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     expect(standing.evaluations).toHaveLength(4);
 
     // Each verdict says which comparison it is about. Without this they are
@@ -96,7 +96,7 @@ describe("S-25: one rule judged four times", () => {
     // The defect this replaces: four criteria carrying identical wording, with
     // nothing joining them. `claimsAsserting` is the wrong tool for a criterion,
     // so the check is over what `search` finds.
-    const found = await (await afterwards()).search("noise floor");
+    const found = await (await afterwards()).search({ text: "noise floor" });
     const criteria = found.find((g) => g.label === "Criterion");
     expect(criteria?.matches).toHaveLength(1);
   });
@@ -104,7 +104,7 @@ describe("S-25: one rule judged four times", () => {
   test("one failing comparison blocks the gate, and the gate says which", async () => {
     const { gate, judged } = await fourComparisonsUnderOneRule();
 
-    const status = await (await afterwards()).gateStatus(gate);
+    const status = await (await afterwards()).gateStatus({ gate });
     expect(status.state).toBe("blocked");
 
     // **One condition per comparison, not one per criterion.** A rule held against four
@@ -126,7 +126,7 @@ describe("S-25: one rule judged four times", () => {
     // The whole criterion, not one subject: `checkStatus` is one entry per
     // comparison and this asks about the rule. Two of the four failed, so the
     // worst of them is what a reader gets.
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     expect(standing.state).toBe("failed");
     expect(standing.requires).toBe(RULE);
 
@@ -151,7 +151,7 @@ describe("S-25: one rule judged four times", () => {
       outcome: "fail",
     });
 
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     expect(standing.evaluations).toHaveLength(5);
     expect(standing.evaluations.filter((e) => e.about === undefined)).toHaveLength(1);
   });

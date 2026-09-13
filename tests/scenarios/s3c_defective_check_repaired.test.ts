@@ -145,10 +145,10 @@ describe("S-3c: the check was wrong, not the result", () => {
       citing: [claimOf(secondRunClaims, AGREES)],
     });
 
-    const why = await session.whySupported(claimOf(analysisClaims, PROPOSITION));
-    expect(await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).toEqual(
-      why,
-    );
+    const why = await session.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
+    expect(
+      await (await afterwards()).whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
+    ).toEqual(why);
 
     expect(why.verdict).toBe("standard-unmet");
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
@@ -183,9 +183,9 @@ describe("S-3c: the check was wrong, not the result", () => {
       outcome: "fail",
       citing: [claimOf(defectiveClaims, DISAGREES)],
     });
-    expect((await session.whySupported(claimOf(analysisClaims, PROPOSITION))).verdict).toBe(
-      "standard-unmet",
-    );
+    expect(
+      (await session.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).verdict,
+    ).toBe("standard-unmet");
 
     // The fault is found in the check, and the check is replaced -- the same
     // act used for an analysis that was wrong, aimed here at a piece of work
@@ -217,10 +217,10 @@ describe("S-3c: the check was wrong, not the result", () => {
       citing: [await claimNamed(session, AGREES)],
     });
 
-    const why = await session.whySupported(claimOf(analysisClaims, PROPOSITION));
-    expect(await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).toEqual(
-      why,
-    );
+    const why = await session.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
+    expect(
+      await (await afterwards()).whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
+    ).toEqual(why);
 
     expect(why.verdict).toBe("supported");
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
@@ -267,7 +267,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       outcome: "fail",
       citing: [claimOf(defectiveClaims, DISAGREES)],
     });
-    expect((await session.gateStatus(gate)).state).toBe("blocked");
+    expect((await session.gateStatus({ gate })).state).toBe("blocked");
 
     const { review } = await session.recordReview({
       of: defective,
@@ -297,7 +297,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       citing: [await claimNamed(session, AGREES)],
     });
 
-    const status = await (await afterwards()).gateStatus(gate);
+    const status = await (await afterwards()).gateStatus({ gate });
     expect(status.state).toBe("satisfied");
     expect(status.unmet.map((u) => u.requires)).toEqual([]);
     // The guard has still been seen to fail. Correcting a defective check does
@@ -346,9 +346,9 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     const reader = await afterwards();
-    expect((await reader.whySupported(claimOf(analysisClaims, PROPOSITION))).verdict).toBe(
-      "standard-unmet",
-    );
+    expect(
+      (await reader.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).verdict,
+    ).toBe("standard-unmet");
 
     // Now, and only now, is the first run found to have been faulty. Nothing
     // else about the record changes -- no new evaluation, no new check.
@@ -374,7 +374,8 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     expect(
-      (await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION))).verdict,
+      (await (await afterwards()).whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }))
+        .verdict,
     ).toBe("supported");
   });
 
@@ -414,7 +415,9 @@ describe("S-3c: the check was wrong, not the result", () => {
       concludes: [{ proposition: AGREES, finding: "median p = 0.05" }],
     });
 
-    const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
+    const why = await (await afterwards()).whySupported({
+      claim: claimOf(analysisClaims, PROPOSITION),
+    });
     expect(why.verdict).toBe("standard-unmet");
     expect(why.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
   });
@@ -464,7 +467,9 @@ describe("S-3c: the check was wrong, not the result", () => {
       ],
     });
 
-    const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
+    const why = await (await afterwards()).whySupported({
+      claim: claimOf(analysisClaims, PROPOSITION),
+    });
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
     expect(check?.state).toBe("no-standing-verdict");
     expect(check?.decidedBy).toBeUndefined();
@@ -507,7 +512,9 @@ describe("S-3c: the check was wrong, not the result", () => {
       because: "the fold handling was wrong throughout",
     });
 
-    const before = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
+    const before = await (await afterwards()).whySupported({
+      claim: claimOf(analysisClaims, PROPOSITION),
+    });
     const { review } = await session.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
@@ -524,7 +531,9 @@ describe("S-3c: the check was wrong, not the result", () => {
     ).rejects.toThrow();
 
     // Nothing moved. The command failed whole.
-    const after = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
+    const after = await (await afterwards()).whySupported({
+      claim: claimOf(analysisClaims, PROPOSITION),
+    });
     expect(after).toEqual(before);
   });
 
@@ -558,7 +567,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       outcome: "pass",
       citing: [claimOf(passingClaims, AGREES)],
     });
-    expect((await session.gateStatus(gate)).state).toBe("satisfied");
+    expect((await session.gateStatus({ gate })).state).toBe("satisfied");
 
     // The passing check turns out to have been defective and is replaced.
     // Nobody has re-run it yet: the only evaluation of `robustness` now cites
@@ -579,22 +588,26 @@ describe("S-3c: the check was wrong, not the result", () => {
     const reader = await afterwards();
 
     // 1. gateStatus (src/domain/read.ts:1030).
-    const status = await reader.gateStatus(gate);
+    const status = await reader.gateStatus({ gate });
     expect(status.state).toBe("incomplete");
     expect(status.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
 
     // 2. gateList (src/domain/read.ts:1924) -- the same fact, the other reader.
-    const listed = await reader.gateList();
+    const listed = await reader.gateList({});
     const ourGate = listed.find((g) => g.gate === gate);
     expect(ourGate?.state).toBe("incomplete");
-    expect((await reader.gateList("incomplete")).some((g) => g.gate === gate)).toBe(true);
-    expect((await reader.gateList("satisfied")).some((g) => g.gate === gate)).toBe(false);
+    expect((await reader.gateList({ state: "incomplete" })).some((g) => g.gate === gate)).toBe(
+      true,
+    );
+    expect((await reader.gateList({ state: "satisfied" })).some((g) => g.gate === gate)).toBe(
+      false,
+    );
 
     // 3. work, via workStateFrom's gateStates map.
     // A retracted verdict is not a failure -- S-3c's own distinction -- so the
     // task it protects is not blocked; it is waiting on a gate short of
     // satisfied, and not ready to start.
-    const listedWork = await reader.workList();
+    const listedWork = await reader.workList({});
     const ourWork = listedWork.find((w) => w.work === tertiary);
     expect(ourWork?.state).not.toBe("blocked");
     expect(ourWork?.state).toBe("waiting");

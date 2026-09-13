@@ -59,37 +59,37 @@ describe("S-17: does the guard actually guard?", () => {
   test("Afterward 1: a declared but unevaluated gate is 'never evaluated', not 'passed'", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
-    const status = await session.gateStatus(gate);
+    const status = await session.gateStatus({ gate });
     expect(status.state).toBe("never-evaluated");
     expect(status.state).not.toBe("satisfied");
 
-    expect((await (await afterwards()).gateStatus(gate)).state).toBe("never-evaluated");
+    expect((await (await afterwards()).gateStatus({ gate })).state).toBe("never-evaluated");
   });
 
   test("Afterward 2: the evidence that its criterion was evaluated is stated as none", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
-    const status = await session.gateStatus(gate);
+    const status = await session.gateStatus({ gate });
     // A gate carries no evaluation list any more (#241), so "nothing has been
     // evaluated" is read off the counts and each check's own state.
     expect(status.counts["never-run"]).toBe(status.checks.length);
     expect(status.checks.every((c) => c.decidedBy === undefined)).toBe(true);
 
-    const later = await (await afterwards()).gateStatus(gate);
+    const later = await (await afterwards()).gateStatus({ gate });
     expect(later.counts["never-run"]).toBe(later.checks.length);
   });
 
   test("Afterward 3: what relies on this gate is enumerable", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
-    const status = await session.gateStatus(gate);
+    const status = await session.gateStatus({ gate });
     expect(status.gating.map((g) => g.objective)).toEqual([
       "promote the accelerated implementation to reference",
     ]);
 
-    expect((await (await afterwards()).gateStatus(gate)).gating.map((g) => g.objective)).toEqual([
-      "promote the accelerated implementation to reference",
-    ]);
+    expect(
+      (await (await afterwards()).gateStatus({ gate })).gating.map((g) => g.objective),
+    ).toEqual(["promote the accelerated implementation to reference"]);
   });
 
   test("Afterward 4: 'has it ever been shown to fail' is separate from 'has it ever passed'", async () => {
@@ -104,11 +104,11 @@ describe("S-17: does the guard actually guard?", () => {
       outcome: "pass",
     });
 
-    const status = await session.gateStatus(gate);
+    const status = await session.gateStatus({ gate });
     expect(status.state).toBe("satisfied");
     expect(status.everFailed).toBe(false);
 
-    const durable = await (await afterwards()).gateStatus(gate);
+    const durable = await (await afterwards()).gateStatus({ gate });
     expect(durable.state).toBe("satisfied");
     expect(durable.everFailed).toBe(false);
   });
@@ -122,14 +122,14 @@ describe("S-17: does the guard actually guard?", () => {
       outcome: "fail",
     });
 
-    const status = await session.gateStatus(gate);
+    const status = await session.gateStatus({ gate });
     expect(status.state).toBe("blocked");
     expect(status.everFailed).toBe(true);
     // Distinguishable from never-evaluated -- the whole point.
     // One evaluation now reads as one check having a deciding verdict.
     expect(status.checks.filter((c) => c.decidedBy !== undefined)).toHaveLength(1);
 
-    const durable = await (await afterwards()).gateStatus(gate);
+    const durable = await (await afterwards()).gateStatus({ gate });
     expect(durable.state).toBe("blocked");
     expect(durable.everFailed).toBe(true);
   });
@@ -178,7 +178,7 @@ describe("S-17: does the guard actually guard?", () => {
       outcome: "fail",
     });
 
-    const release = await session.gateStatus(releaseGate);
+    const release = await session.gateStatus({ gate: releaseGate });
     expect(release.state).toBe("blocked");
     expect(release.counts.failed).toBe(1);
     expect(release.counts["never-run"]).toBe(0);
@@ -186,13 +186,13 @@ describe("S-17: does the guard actually guard?", () => {
     // And it says what is holding it, rather than reporting a condition nobody ran.
     expect(release.unmet.map((u) => u.criterion)).toEqual([criterion]);
 
-    const durable = await (await afterwards()).gateStatus(releaseGate);
+    const durable = await (await afterwards()).gateStatus({ gate: releaseGate });
     expect(durable.state).toBe("blocked");
 
     // The reader's own question: `now` must say blocked, not "some checks
     // remain". An agent waiting on incomplete waits for a check that already
     // has a verdict.
-    const standing = await (await afterwards()).now();
+    const standing = await (await afterwards()).now({});
     expect(standing.blocked.gates.map((g) => g.gate).sort()).toEqual(
       [stagingGate, releaseGate].sort(),
     );
@@ -212,9 +212,9 @@ describe("S-17: does the guard actually guard?", () => {
       outcome: "pass",
     });
 
-    expect((await session.gateStatus(stagingGate)).state).toBe("satisfied");
+    expect((await session.gateStatus({ gate: stagingGate })).state).toBe("satisfied");
 
-    const release = await session.gateStatus(releaseGate);
+    const release = await session.gateStatus({ gate: releaseGate });
     expect(release.state).toBe("never-evaluated");
     expect(release.counts["never-run"]).toBe(release.checks.length);
     expect(release.counts.passed).toBe(0);
@@ -230,10 +230,10 @@ describe("S-17: does the guard actually guard?", () => {
 
     await session.evaluateCriterion({ criterion, value: "hash differs", outcome: "fail" });
 
-    expect((await session.gateStatus(stagingGate)).state).toBe("blocked");
-    expect((await session.gateStatus(releaseGate)).state).toBe("blocked");
+    expect((await session.gateStatus({ gate: stagingGate })).state).toBe("blocked");
+    expect((await session.gateStatus({ gate: releaseGate })).state).toBe("blocked");
 
-    const durable = await (await afterwards()).gateStatus(releaseGate);
+    const durable = await (await afterwards()).gateStatus({ gate: releaseGate });
     expect(durable.state).toBe("blocked");
     expect(durable.counts.failed).toBe(1);
   });
@@ -267,12 +267,12 @@ describe("S-17: does the guard actually guard?", () => {
 
     // Rejected before anything was written: the gate is untouched, and no
     // stray evaluation is sitting in the graph.
-    const status = await session.gateStatus(gate);
+    const status = await session.gateStatus({ gate });
     expect(status.state).toBe("never-evaluated");
     expect(status.counts["never-run"]).toBe(status.checks.length);
     expect(status.everFailed).toBe(false);
 
-    const durable = await (await afterwards()).gateStatus(gate);
+    const durable = await (await afterwards()).gateStatus({ gate });
     expect(durable.state).toBe("never-evaluated");
     expect(durable.counts["never-run"]).toBe(durable.checks.length);
   });
@@ -285,10 +285,10 @@ describe("S-17: does the guard actually guard?", () => {
   test("Afterward 2, restated: which criterion governs this gate?", async () => {
     const { gate, criterion } = await aDeclaredButUnevaluatedGate();
 
-    const governing = await session.criteriaGoverning(gate);
+    const governing = await session.criteriaGoverning({ gate });
     expect(governing.map((c) => c)).toEqual([criterion]);
 
-    const durable = await (await afterwards()).criteriaGoverning(gate);
+    const durable = await (await afterwards()).criteriaGoverning({ gate });
     expect(durable.map((c) => c)).toEqual([criterion]);
   });
 });

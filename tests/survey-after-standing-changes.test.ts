@@ -77,7 +77,7 @@ test("replace removes the old claim from established", async () => {
 
 test("undecided after promote is not established", async () => {
   const { claim } = await aClosedPromotedAnswer();
-  const finding = (await s.whySupported(claim)).support[0]?.evidence;
+  const finding = (await s.whySupported({ claim })).support[0]?.evidence;
   if (!finding) throw new Error("the closed answer had no finding to grade");
   await s.isUndecided({ claim, because: finding });
 

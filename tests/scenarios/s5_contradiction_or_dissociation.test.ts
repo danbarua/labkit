@@ -108,10 +108,10 @@ describe("S-5 — contradiction or dissociation?", () => {
 
     // Researcher: didn't the earlier stage prove the graph choice doesn't
     //             matter? Why does this one rank them?
-    const verdict = await session.doTheseConflict(
-      claimOf(programme.earlierClaims, IMMATERIAL),
-      claimOf(programme.laterClaims, IMMATERIAL),
-    );
+    const verdict = await session.doTheseConflict({
+      a: claimOf(programme.earlierClaims, IMMATERIAL),
+      b: claimOf(programme.laterClaims, IMMATERIAL),
+    });
 
     // LabKit:     the earlier stage tested internal mapping strength; this one
     //             tested external classification utility. Those are distinct
@@ -136,10 +136,10 @@ describe("S-5 — contradiction or dissociation?", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const verdict = await later.doTheseConflict(
-      claimOf(programme.earlierClaims, IMMATERIAL),
-      claimOf(programme.laterClaims, IMMATERIAL),
-    );
+    const verdict = await later.doTheseConflict({
+      a: claimOf(programme.earlierClaims, IMMATERIAL),
+      b: claimOf(programme.laterClaims, IMMATERIAL),
+    });
 
     const [first, second] = verdict.sides;
     expect(first!.proposition).toBe(IMMATERIAL);
@@ -181,10 +181,10 @@ describe("S-5 — contradiction or dissociation?", () => {
       ],
     });
 
-    const verdict = await session.doTheseConflict(
-      claimOf(programme.earlierClaims, IMMATERIAL),
-      claimOf(dissentingClaims, IMMATERIAL),
-    );
+    const verdict = await session.doTheseConflict({
+      a: claimOf(programme.earlierClaims, IMMATERIAL),
+      b: claimOf(dissentingClaims, IMMATERIAL),
+    });
 
     expect(verdict.conflict).toBe(true);
     expect(verdict.relation).toBe("contradiction");
@@ -195,10 +195,10 @@ describe("S-5 — contradiction or dissociation?", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const durable = await later.doTheseConflict(
-      claimOf(programme.earlierClaims, IMMATERIAL),
-      claimOf(dissentingClaims, IMMATERIAL),
-    );
+    const durable = await later.doTheseConflict({
+      a: claimOf(programme.earlierClaims, IMMATERIAL),
+      b: claimOf(dissentingClaims, IMMATERIAL),
+    });
     expect(durable.relation).toBe("contradiction");
   });
 
@@ -219,12 +219,16 @@ describe("S-5 — contradiction or dissociation?", () => {
       events: inMemoryEventLog(),
     });
 
-    const withdrawn = await later.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
+    const withdrawn = await later.whySupported({
+      claim: claimOf(programme.earlierClaims, IMMATERIAL),
+    });
     expect(withdrawn.withdrawn).toBe(true);
 
     // The other stage's claim is untouched: same words, different question,
     // nobody withdrew it.
-    const untouched = await later.whySupported(claimOf(programme.laterClaims, IMMATERIAL));
+    const untouched = await later.whySupported({
+      claim: claimOf(programme.laterClaims, IMMATERIAL),
+    });
     expect(untouched.withdrawn).toBe(false);
     expect(untouched.challenged).toBe(true);
     expect(untouched.against).toHaveLength(1);
@@ -279,7 +283,7 @@ describe("S-5 — contradiction or dissociation?", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const settledStill = await later.whySupported(claimOf(settledClaims, IMMATERIAL));
+    const settledStill = await later.whySupported({ claim: claimOf(settledClaims, IMMATERIAL) });
     expect(settledStill.withdrawn).toBe(false);
     expect(settledStill.verdict).toBe("supported");
   });
@@ -323,8 +327,8 @@ describe("S-5 — contradiction or dissociation?", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const here = await later.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
-    const there = await later.whySupported(claimOf(freshClaims, IMMATERIAL));
+    const here = await later.whySupported({ claim: claimOf(programme.earlierClaims, IMMATERIAL) });
+    const there = await later.whySupported({ claim: claimOf(freshClaims, IMMATERIAL) });
     expect(here.withdrawn).toBe(true);
     expect(there.withdrawn).toBe(false);
     expect(there.verdict).toBe("supported");
@@ -334,7 +338,7 @@ describe("S-5 — contradiction or dissociation?", () => {
   test("naming a claim that does not exist is refused", async () => {
     const _programme = await twoStages();
 
-    await expect(session.whySupported(ref("claim", "CLM_9999"))).rejects.toThrow(
+    await expect(session.whySupported({ claim: ref("claim", "CLM_9999") })).rejects.toThrow(
       /no claim CLM_9999/,
     );
 
@@ -357,7 +361,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     // `whySupported` and `reinterpret` take a handle, so neither has to guess
     // which claim was meant -- `claimsAsserting` is the single seam where
     // text becomes a handle. It reports every match rather than choosing.
-    const found = await session.claimsAsserting(IMMATERIAL);
+    const found = await session.claimsAsserting({ proposition: IMMATERIAL });
     expect(found).toHaveLength(2);
     expect(found.map((c) => c.claim).sort()).toEqual(
       [
@@ -370,8 +374,10 @@ describe("S-5 — contradiction or dissociation?", () => {
     await expect(claimNamed(session, IMMATERIAL)).rejects.toThrow(/is claimed 2 times/);
 
     // And naming one is unambiguous: each answers about its own question.
-    const earlier = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
-    const later = await session.whySupported(claimOf(programme.laterClaims, IMMATERIAL));
+    const earlier = await session.whySupported({
+      claim: claimOf(programme.earlierClaims, IMMATERIAL),
+    });
+    const later = await session.whySupported({ claim: claimOf(programme.laterClaims, IMMATERIAL) });
     expect(earlier.proposition).toBe(later.proposition);
     expect(earlier.support).not.toEqual(later.support);
   });
@@ -379,7 +385,9 @@ describe("S-5 — contradiction or dissociation?", () => {
   /** One sentence in one scope still reads by text — every earlier scenario depends on it. */
   test("an unambiguous proposition still answers to its own words", async () => {
     const programme = await twoStages();
-    const solo = await session.whySupported(claimOf(programme.earlierClaims, IMMATERIAL));
+    const solo = await session.whySupported({
+      claim: claimOf(programme.earlierClaims, IMMATERIAL),
+    });
 
     const { question: enquiryOnly } = await session.pose({
       question: "does the encoding respond nonlinearly?",
@@ -405,9 +413,9 @@ describe("S-5 — contradiction or dissociation?", () => {
       ],
     });
 
-    const byText = await session.whySupported(
-      await claimNamed(session, "the encoding responds nonlinearly"),
-    );
+    const byText = await session.whySupported({
+      claim: await claimNamed(session, "the encoding responds nonlinearly"),
+    });
     expect(byText.verdict).toBe("supported");
     expect(solo.verdict).toBe("supported");
   });

@@ -82,7 +82,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     });
 
     const reader = await afterwards();
-    const status = await reader.enquiryStatus(enquiry);
+    const status = await reader.enquiryStatus({ enquiry });
     expect(status.closure).toBe("answered");
     expect(status.answer).toBe("yes");
     expect(status.restsOn).toBe("exploratory");
@@ -106,7 +106,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     });
 
     const reader = await afterwards();
-    const why = await reader.whySupported(claimOf(analysisClaims, PROPOSITION));
+    const why = await reader.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
     expect(why.standing).toBe("confirmatory");
     expect(why.promotedBecause).toBe(
       "re-run under seed control on the held-out split, same direction and magnitude",
@@ -133,7 +133,9 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       because: "re-run under seed control on the held-out split, same direction and magnitude",
     });
 
-    const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
+    const why = await (await afterwards()).whySupported({
+      claim: claimOf(analysisClaims, PROPOSITION),
+    });
     expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
       {
         finding: "convergence point moves by ~3 steps",
@@ -156,7 +158,9 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   test("scratch that nobody promotes is provisional, not wrong", async () => {
     const { analysisClaims } = await scratchExploration();
 
-    const why = await (await afterwards()).whySupported(claimOf(analysisClaims, PROPOSITION));
+    const why = await (await afterwards()).whySupported({
+      claim: claimOf(analysisClaims, PROPOSITION),
+    });
     expect(why.verdict).toBe("supported");
     expect(why.standing).toBe("exploratory");
     expect(why.promotedBecause).toBeUndefined();
@@ -198,11 +202,11 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     });
 
     const reader = await afterwards();
-    expect((await reader.whySupported(claimOf(analysisClaims, PROPOSITION))).standing).toBe(
-      "confirmatory",
-    );
-    expect((await reader.whySupported(claimOf(otherAnalysisClaims, PROPOSITION))).standing).toBe(
-      "exploratory",
-    );
+    expect(
+      (await reader.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).standing,
+    ).toBe("confirmatory");
+    expect(
+      (await reader.whySupported({ claim: claimOf(otherAnalysisClaims, PROPOSITION) })).standing,
+    ).toBe("exploratory");
   });
 });

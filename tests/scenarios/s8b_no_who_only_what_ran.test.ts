@@ -88,20 +88,26 @@ describe("S-8b: there is no who, only what ran", () => {
       const reader = await afterwards();
       return {
         // Offering the older configuration against the older analysis, analysisClaims matches.
-        matched: await reader.reproducibilityOf(first, [
-          { part: readings, hash: "sha256:sweep" },
-          { part: older, hash: "sha256:cfg-v3" },
-        ]),
+        matched: await reader.reproducibilityOf({
+          analysis: first,
+          rebuilt: [
+            { part: readings, hash: "sha256:sweep" },
+            { part: older, hash: "sha256:cfg-v3" },
+          ],
+        }),
         // Offering the newer one against it does not. "Which configuration
         // produced this" is answered by comparison, not by a signature.
-        mismatched: await reader.reproducibilityOf(first, [
-          { part: readings, hash: "sha256:sweep" },
-          { part: older, hash: "sha256:cfg-v4" },
-        ]),
+        mismatched: await reader.reproducibilityOf({
+          analysis: first,
+          rebuilt: [
+            { part: readings, hash: "sha256:sweep" },
+            { part: older, hash: "sha256:cfg-v4" },
+          ],
+        }),
         // And the configuration carries its dependants like any other input,
         // so "what rests on this configuration" is the ordinary propagation
         // question rather than a new kind of query.
-        rests: await reader.whatDependsOn(older),
+        rests: await reader.whatDependsOn({ subject: older }),
       };
     });
 

@@ -102,8 +102,8 @@ describe("S-4: a negative result that closes the question", () => {
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.open).toBe(false);
   });
 
@@ -126,8 +126,8 @@ describe("S-4: a negative result that closes the question", () => {
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.open).toBe(false);
     expect(status.closure).toBe("answered");
     // The three must not be one state.
@@ -154,8 +154,8 @@ describe("S-4: a negative result that closes the question", () => {
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.answer).toBe("no");
   });
 
@@ -180,11 +180,13 @@ describe("S-4: a negative result that closes the question", () => {
 
     // Reconstructible from a fresh reader, not from a value we kept.
     const reader = new ResearchSession(await scenario.current(), { clock });
-    const neighbour = await reader.whySupported(await claimNamed(reader, TRANSFORMATION));
+    const neighbour = await reader.whySupported({
+      claim: await claimNamed(reader, TRANSFORMATION),
+    });
     expect(neighbour.verdict).toBe("supported");
     expect(neighbour.superseded).toEqual([]);
 
-    const closed = await reader.whySupported(await claimNamed(reader, SPECIFICITY));
+    const closed = await reader.whySupported({ claim: await claimNamed(reader, SPECIFICITY) });
     expect(closed.verdict).toBe("challenged");
   });
 
@@ -207,8 +209,8 @@ describe("S-4: a negative result that closes the question", () => {
       answeredBy: claimOf(nullResultClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.evidence).toHaveLength(1);
     expect(status.evidence[0]!.states).toContain("no separation detectable");
   });
@@ -223,8 +225,8 @@ describe("S-4: a negative result that closes the question", () => {
 
     await session.closeEnquiry({ enquiry: specificity });
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.open).toBe(false);
     expect(status.closure).toBe("abandoned");
     expect(status.answer).toBeNull();
@@ -251,11 +253,13 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    const refuted = await session.whySupported(await claimNamed(session, SPECIFICITY));
+    const refuted = await session.whySupported({ claim: await claimNamed(session, SPECIFICITY) });
 
     // **A sentence nobody claimed has no claim to ask about.** `whySupported` takes a handle,
     // and there is no handle to hand it for an unclaimed sentence.
-    expect(await session.claimsAsserting("nobody has ever asked this")).toEqual([]);
+    expect(await session.claimsAsserting({ proposition: "nobody has ever asked this" })).toEqual(
+      [],
+    );
 
     expect(refuted.verdict).toBe("challenged");
     expect(refuted.challenged).toBe(true);
@@ -296,8 +300,8 @@ describe("S-4: a negative result that closes the question", () => {
     ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
     // Nothing was written on the way to failing.
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
     expect(observations).toMatch(/^ART_/);
@@ -325,8 +329,8 @@ describe("S-4: a negative result that closes the question", () => {
       }),
     ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.open).toBe(true);
   });
 
@@ -359,8 +363,8 @@ describe("S-4: a negative result that closes the question", () => {
       answeredBy: claimOf(mixedClaims, SPECIFICITY),
     });
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.closure).toBe("answered");
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
@@ -389,7 +393,7 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    const before = await session.whySupported(claimOf(refutationClaims, SPECIFICITY));
+    const before = await session.whySupported({ claim: claimOf(refutationClaims, SPECIFICITY) });
     expect(before.challenged).toBe(true);
     expect(before.against).toHaveLength(1);
 
@@ -420,14 +424,14 @@ describe("S-4: a negative result that closes the question", () => {
     // supporting side saw nothing here at all. By handle, not by sentence: after the
     // replacement two records assert these words, and this names the refutation's own claim,
     // the one that was withdrawn.
-    const revision = await (await afterwards()).why(report.replacement);
+    const revision = await (await afterwards()).why({ subject: report.replacement });
     if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
     expect(revision.report.changed).toHaveLength(1);
     expect(revision.report.changed[0]!.was).toEqual(claimOf(refutationClaims, SPECIFICITY));
 
     // After the replacement the sentence is claimed twice; this asks about
     // the original, which is the one that was withdrawn.
-    const after = await session.whySupported(claimOf(refutationClaims, SPECIFICITY));
+    const after = await session.whySupported({ claim: claimOf(refutationClaims, SPECIFICITY) });
     expect(after.withdrawn).toBe(true);
     expect(after.verdict).toBe("withdrawn");
     expect(after.against.map((a) => a.finding)).toEqual(["still no separation, corrected metric"]);
@@ -438,15 +442,15 @@ describe("S-4: a negative result that closes the question", () => {
     });
 
     // ...and invalidating the record enumerates the challenged claim.
-    const downstream = await session.whatDependsOn("cluster-comparison output");
+    const downstream = await session.whatDependsOn({ subject: "cluster-comparison output" });
     expect(downstream.claims.map((c) => c.asserts)).toContain(SPECIFICITY);
   });
 
   test("an enquiry nobody has closed is open, and that is not a kind of closure", async () => {
     const { specificity } = await aProgrammeWithOneOpenQuestion();
 
-    const status = await session.enquiryStatus(specificity);
-    expect(await (await afterwards()).enquiryStatus(specificity)).toEqual(status);
+    const status = await session.enquiryStatus({ enquiry: specificity });
+    expect(await (await afterwards()).enquiryStatus({ enquiry: specificity })).toEqual(status);
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
   });

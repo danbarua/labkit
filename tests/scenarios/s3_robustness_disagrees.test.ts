@@ -88,8 +88,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       outcome: "fail",
     });
 
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     // Not satisfied -- so the primary result does not carry the day...
     expect(status.state).toBe("blocked");
     // ...and not "never evaluated" either. The work was done; it disagreed.
@@ -121,8 +121,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       outcome: "fail",
     });
 
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
     expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
   });
@@ -149,8 +149,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     });
     // Seed stability is never evaluated at all.
 
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     // Keyed by proposition for readability here; `criterion` is the stable
     // identity and two criteria worded alike are two criteria.
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c.state]));
@@ -170,8 +170,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       outcome: "pass",
     });
 
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
     expect(status.unmet.map((u) => u.requires).sort()).toEqual([MEDIAN, SEED].sort());
@@ -210,8 +210,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       outcome: "pass",
     });
 
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("blocked");
     expect(status.unmet.map((u) => u.requires)).toContain(MEDIAN);
     expect(status.gating.map((g) => g.objective)).toEqual(["fit the tertiary model"]);
@@ -263,15 +263,17 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     });
 
     // The gate knows the checks disagreed.
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("blocked");
 
     // And so does the finding: `QUALIFIES` connects the prespecified criteria
     // to the analysis they qualify, so "supported" means "the evidence holds
     // up by its own prespecified standard", not just "some evidence exists".
     // See tests/scenarios/s3b_criteria_qualify_only.test.ts.
-    const why = await session.whySupported(await claimNamed(session, "T differs from rewired"));
+    const why = await session.whySupported({
+      claim: await claimNamed(session, "T differs from rewired"),
+    });
     expect(await whyOf(await afterwards(), "T differs from rewired")).toEqual(why);
     expect(why.verdict).toBe("standard-unmet");
     expect([...why.unmet.map((u) => u.requires)].sort()).toEqual([MEDIAN, SEED].sort());
@@ -306,8 +308,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       outcome: "pass",
     });
 
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     expect(status.checks).toHaveLength(2);
     expect(new Set(status.checks.map((c) => c.criterion)).size).toBe(2);
     // One checked, one not -- which the collapsed version could not express.
@@ -347,7 +349,9 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       outcome: "pass",
     });
 
-    const check = (await session.gateStatus(gate)).checks.find((c) => c.proposition === MEDIAN)!;
+    const check = (await session.gateStatus({ gate })).checks.find(
+      (c) => c.proposition === MEDIAN,
+    )!;
     expect(check.state).toBe("failed");
     // The decisive record is the failure, not whichever row came back last.
     // The check names which evaluation decided it; what that evaluation said
@@ -385,8 +389,8 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
       outcome: "pass",
     });
 
-    const status = await session.gateStatus(gate);
-    expect(await (await afterwards()).gateStatus(gate)).toEqual(status);
+    const status = await session.gateStatus({ gate });
+    expect(await (await afterwards()).gateStatus({ gate })).toEqual(status);
     expect(status.state).toBe("blocked");
     expect(status.unmet.map((u) => u.requires)).toEqual([MEDIAN]);
     expect(status.everFailed).toBe(true);

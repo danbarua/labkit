@@ -75,10 +75,13 @@ describe("S-10b: the same inputs, in a different order", () => {
    */
   test("both orders record the same two inputs", async () => {
     const forwards = await anAlignmentRunInOneOrder(session, "first-then-second");
-    const report = await (await afterwards()).reproducibilityOf(forwards.analysis, [
-      { part: forwards.first, hash: "sha256:A" },
-      { part: forwards.second, hash: "sha256:B" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf({
+      analysis: forwards.analysis,
+      rebuilt: [
+        { part: forwards.first, hash: "sha256:A" },
+        { part: forwards.second, hash: "sha256:B" },
+      ],
+    });
     expect(report.exact.map((p) => p.name).sort()).toEqual(["series A", "series B"]);
     expect(report.reproducible).toBe(true);
   });
@@ -89,10 +92,13 @@ describe("S-10b: the same inputs, in a different order", () => {
   test("a rebuild in the opposite order reports itself reproducible", async () => {
     const backwards = await anAlignmentRunInOneOrder(session, "second-then-first");
 
-    const report = await (await afterwards()).reproducibilityOf(backwards.analysis, [
-      { part: backwards.first, hash: "sha256:A" },
-      { part: backwards.second, hash: "sha256:B" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf({
+      analysis: backwards.analysis,
+      rebuilt: [
+        { part: backwards.first, hash: "sha256:A" },
+        { part: backwards.second, hash: "sha256:B" },
+      ],
+    });
 
     // Identical to the forwards run in the control above. The two orders are
     // indistinguishable to every read on the surface.
@@ -119,7 +125,9 @@ describe("S-10b: the same inputs, in a different order", () => {
       concludes: { proposition: SHIFTED, finding: "offset of +4.1 units" },
     });
 
-    const verification = await (await afterwards()).whySupported(claimOf(analysisClaims, SHIFTED));
+    const verification = await (await afterwards()).whySupported({
+      claim: claimOf(analysisClaims, SHIFTED),
+    });
     expect(verification.reverifiedBy.map((r) => r.method)).toEqual(["pairwise-alignment"]);
     expect(verification.support).toHaveLength(1);
 

@@ -64,7 +64,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
   test("the claim's own report says the prespecified check is unmet", async () => {
     const { check, claim } = await aPromotedAnswerNobodyChecked();
 
-    const why = await session.whySupported(claim);
+    const why = await session.whySupported({ claim });
     expect(why.unmet.map((u: { criterion: string }) => u.criterion)).toContain(check);
     expect(why.standard.find((c: { criterion: string }) => c.criterion === check)?.state).toBe(
       "never-run",
@@ -85,7 +85,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
     const asked = (bucket: readonly { asks: string }[]) => bucket.some((q) => q.asks === QUESTION);
 
     expect(asked(survey.established)).toBe(false);
-    expect((await later.enquiryStatus(enquiry)).restsOn).toBe("exploratory");
+    expect((await later.enquiryStatus({ enquiry })).restsOn).toBe("exploratory");
 
     // It is not untested, not unresolved, and not accepted either: the question
     // *was* worked on, *was* answered, and nobody parked it. Whatever bucket it
@@ -122,7 +122,7 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
     const later = await afterwards();
     const survey = await later.whatIsKnown();
     expect(survey.established.some((q: { asks: string }) => q.asks === QUESTION)).toBe(true);
-    expect((await later.enquiryStatus(enquiry)).restsOn).toBe("confirmatory");
+    expect((await later.enquiryStatus({ enquiry })).restsOn).toBe("confirmatory");
   });
 
   /**

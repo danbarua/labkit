@@ -5,10 +5,8 @@
 
 import { InvalidArgumentError } from "commander";
 import { z } from "zod";
-import { ref, kindOf } from "../domain/report";
-import type { AnyRef } from "../domain/report";
+import { ref } from "../domain/report";
 import { GATE_CLOSURES, type CitedBasis } from "../domain/commands";
-import { GATE_STATES, WORK_STATES } from "../domain/report";
 import type { AnalysisRef, ClaimRef, EvidenceRef, ObservationsRef, Ref } from "../domain";
 
 /**
@@ -35,10 +33,9 @@ export function isoInstant(raw: string): string {
 
 /**
  * A handle of a named kind.
- *
- * Uppercased before it is resolved, as `anyRef` does: every handle this record
- * mints is upper-case by construction, so `gate gate_4` is a caller writing the
- * same handle rather than a different one.
+ * Uppercased before it is resolved: every handle this record mints is
+ * upper-case by construction, so `gate gate_4` is a caller writing the same
+ * handle rather than a different one.
  */
 export function handle<K extends string>(kind: K): (raw: string) => Ref<K> {
   return (raw) => {
@@ -93,16 +90,6 @@ export function citedBasis(raw: string): CitedBasis {
   );
 }
 
-/**
- * Any handle on the record, resolved to the kind its own prefix names.
- */
-export function anyRef(raw: string): AnyRef {
-  const normalized = raw.toUpperCase();
-  const kind = kindOf(normalized);
-  if (!kind) throw new InvalidArgumentError(`\`${raw}\` is not a handle this record recognises`);
-  return ref(kind, normalized);
-}
-
 /** Which way a finding cuts. The domain's own two words, so a typo is refused rather than defaulted. */
 export function bearing(raw: string): "supports" | "challenges" {
   if (raw === "supports" || raw === "challenges") return raw;
@@ -113,18 +100,6 @@ export function bearing(raw: string): "supports" | "challenges" {
 export function standing(raw: string): "exploratory" | "confirmatory" {
   if (raw === "exploratory" || raw === "confirmatory") return raw;
   throw new InvalidArgumentError(`expected \`exploratory\` or \`confirmatory\` (got \`${raw}\`)`);
-}
-
-/**
- * A `<part-id>=<hash>` pair.
- */
-export function rebuilt(raw: string): { part: ObservationsRef; hash: string } {
-  const at = raw.indexOf("=");
-  if (at < 1) throw new InvalidArgumentError(`\`${raw}\` is not <part-id>=<hash>`);
-  return {
-    part: handle("observations")(raw.slice(0, at)),
-    hash: raw.slice(at + 1),
-  };
 }
 
 /**
@@ -141,24 +116,22 @@ function oneOf<T extends string>(values: readonly T[], flag: string) {
   };
 }
 
-/** `labkit gates --state ...` */
-export const gateState = oneOf(GATE_STATES, "--state");
-
 /** `labkit close gate GATE --as ...` */
 export const gateClosure = oneOf(GATE_CLOSURES, "--as");
 
-/** `labkit work --state ...` */
-export const workState = oneOf(WORK_STATES, "--state");
-
 /**
- * Brand and validate a write payload with the domain command schema.
+ * Brand and validate a payload with the domain command or query schema.
  * Throws before `run` opens a database.
  */
 export function parseCommand<S extends z.ZodType>(schema: S, value: unknown): z.output<S> {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new InvalidArgumentError(issue?.message ?? parsed.error.message);
+    // Plain Error, not InvalidArgumentError: commander stamps the latter with
+    // `exitCode`, and `main` then returns that code on the assumption commander
+    // already printed. An action throw never prints, so the user would see exit 1
+    // and nothing else.
+    throw new Error(issue?.message ?? parsed.error.message);
   }
   return parsed.data;
 }

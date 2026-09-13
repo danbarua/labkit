@@ -115,9 +115,10 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       });
       // The same rebuild offered in both worlds; only what the record holds
       // differs.
-      return (await afterwards()).reproducibilityOf(rebuilt, [
-        { part: second, hash: "sha256:one" },
-      ]);
+      return (await afterwards()).reproducibilityOf({
+        analysis: rebuilt,
+        rebuilt: [{ part: second, hash: "sha256:one" }],
+      });
     };
     const { a, b } = await inTwoWorlds(build("sha256:one"), build("sha256:two"));
 
@@ -148,14 +149,14 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       });
       const reader = await afterwards();
       return {
-        why: await reader.whySupported(claimOf(rebuiltClaims, MATCHES)),
+        why: await reader.whySupported({ claim: claimOf(rebuiltClaims, MATCHES) }),
         known: (await reader.whatIsKnown()).provisional.map((q) => q.asks).sort(),
         // Identity normalised, the way `rebuilt` below already is. Natural ids
         // are global sequences, so two paired worlds legitimately draw
         // different ones -- comparing them raw would report a difference that
         // is only the counter moving. What the comparison is for is whether
         // anything *else* differs.
-        depends: normaliseIds(await reader.whatDependsOn(second)),
+        depends: normaliseIds(await reader.whatDependsOn({ subject: second })),
         rebuilt: rebuilt.replace(/\d+/, "N"),
       };
     };
@@ -195,7 +196,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         from: [regenerated],
         concludes: [{ proposition: MATCHES, finding: "agreement within 1e-6" }],
       });
-      return (await afterwards()).whySupported(claimOf(secondClaims, MATCHES));
+      return (await afterwards()).whySupported({ claim: claimOf(secondClaims, MATCHES) });
     });
     // Recorded, not asserted-as-correct. Whether two entries here is a wrong
     // answer or an accurate report of what the researcher recorded is the
@@ -225,7 +226,7 @@ describe("S-9b: was this a rebuild, or new work?", () => {
         under: [regenerated],
         concludes: { proposition: MATCHES, finding: "agreement within 1e-6" },
       });
-      return (await afterwards()).whySupported(claimOf(verified.claims, MATCHES));
+      return (await afterwards()).whySupported({ claim: claimOf(verified.claims, MATCHES) });
     });
     expect(why.support.length).toBe(1);
     expect(why.reverifiedBy.map((r) => r.method)).toEqual(["stage2-construction, rebuilt"]);
@@ -327,13 +328,15 @@ describe("S-9b: was this a rebuild, or new work?", () => {
 
       const reader = await afterwards();
       // Asking by name is refused, correctly.
-      await expect(reader.whatDependsOn(CONTROL)).rejects.toThrow(/2 artefacts are named/);
+      await expect(reader.whatDependsOn({ subject: CONTROL })).rejects.toThrow(
+        /2 artefacts are named/,
+      );
 
       // Asking by reference answers about that artefact only. The assertion is on the report's
       // **shape**, not on its values, and that is deliberate: a test that only checked `claims`
       // would stay green even if a field naming what was rebuilt were added to this report by
       // mistake.
-      const exact = await reader.whatDependsOn(regenerated);
+      const exact = await reader.whatDependsOn({ subject: regenerated });
       expect(Object.keys(exact).sort()).toEqual([
         "claims",
         "complete",
@@ -348,9 +351,10 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       // Same detector on the other read a consumer would reach for. The
       // reproducibility report is offered per part and says which parts match;
       // no field of it says what any part was an attempt to rebuild.
-      const report = await reader.reproducibilityOf(analysis, [
-        { part: regenerated, hash: "sha256:second" },
-      ]);
+      const report = await reader.reproducibilityOf({
+        analysis,
+        rebuilt: [{ part: regenerated, hash: "sha256:second" }],
+      });
       // `analysis` here is likewise the construction handed in, not an answer
       // to what any part was rebuilding.
       expect(Object.keys(report).sort()).toEqual([

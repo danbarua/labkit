@@ -81,7 +81,8 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // The replacement really does rest on it, and the record says the record it
     // rests on has been retracted — every finding in it superseded by this very
     // act. Read from the claim, because that is where a reader arrives.
-    const resting = (await (await afterwards()).whySupported(report.claims[0]!.claim)).restingOn;
+    const resting = (await (await afterwards()).whySupported({ claim: report.claims[0]!.claim }))
+      .restingOn;
     // **Two inputs, and that is the add-only rule.** The successor inherits
     // what its predecessor read, and consumes the predecessor's own output
     // besides, because this call named it. Only the second is retracted:
@@ -100,8 +101,9 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
       from: [clean.observations],
       concludes: [{ proposition: PROP, finding: "one day shorter, adjusted" }],
     });
-    const ordinaryResting = (await (await afterwards()).whySupported(ordinary.claims[0]!.claim))
-      .restingOn;
+    const ordinaryResting = (
+      await (await afterwards()).whySupported({ claim: ordinary.claims[0]!.claim })
+    ).restingOn;
     expect(ordinaryResting[0]!.invalidated).toBeUndefined();
   });
 
@@ -120,7 +122,7 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
       clock,
       events: inMemoryEventLog(),
     });
-    const why = await later.whySupported(report.claims[0]!.claim);
+    const why = await later.whySupported({ claim: report.claims[0]!.claim });
 
     // a `supported` verdict stays, and that is the design rather than an oversight:
     // invalidating a record deliberately does not withdraw what rests on it --
@@ -135,7 +137,7 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     // "not automatic" is relying on. If it did not, a `supported` verdict would be
     // a wrong answer with no way to find out.
     const retracted = why.restingOn.find((r) => r.invalidated)!;
-    const affected = await later.whatDependsOn(retracted.part);
+    const affected = await later.whatDependsOn({ subject: retracted.part });
     expect(affected.claims.map((c) => c.claim)).toContain(report.claims[0]!.claim);
   });
 });

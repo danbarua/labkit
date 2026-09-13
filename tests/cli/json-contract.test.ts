@@ -180,7 +180,8 @@ beforeAll(async () => {
     "--finding",
     "holds at n=24",
   ]);
-  const question = (await surfaces.read.enquiryStatus(enquiry as never)).question!.question;
+  const question = (await surfaces.read.enquiryStatus({ enquiry: enquiry as never })).question!
+    .question;
   await out(["close", "enquiry", enquiry, "--answered-by", claim]);
 
   seeded = {

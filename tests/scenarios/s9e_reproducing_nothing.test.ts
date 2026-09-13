@@ -61,7 +61,7 @@ describe("S-9e: reproducing nothing", () => {
   test("an analysis that consumed nothing has not been shown to reproduce", async () => {
     const { analysis } = await anAnalysisThatConsumedNothing(session);
 
-    const report = await session.reproducibilityOf(analysis, []);
+    const report = await session.reproducibilityOf({ analysis, rebuilt: [] });
     expect(report.reproducible).toBe(false);
     expect(report.exact).toEqual([]);
     expect(report.differing).toEqual([]);
@@ -69,7 +69,7 @@ describe("S-9e: reproducing nothing", () => {
     expect(report.notRebuilt).toEqual([]);
 
     // Afterward, from a second reader over the same graph.
-    const again = await (await afterwards()).reproducibilityOf(analysis, []);
+    const again = await (await afterwards()).reproducibilityOf({ analysis, rebuilt: [] });
     expect(again.reproducible).toBe(false);
   });
 
@@ -79,9 +79,9 @@ describe("S-9e: reproducing nothing", () => {
    * the surface throws when its subject is absent.
    */
   test("an analysis that does not exist is refused, not reported on", async () => {
-    await expect(session.reproducibilityOf(ref("analysis", "COMP_999999"), [])).rejects.toThrow(
-      /COMP_999999/,
-    );
+    await expect(
+      session.reproducibilityOf({ analysis: ref("analysis", "COMP_999999"), rebuilt: [] }),
+    ).rejects.toThrow(/COMP_999999/);
   });
 
   /**
@@ -92,10 +92,10 @@ describe("S-9e: reproducing nothing", () => {
     const { analysis } = await anAnalysisThatConsumedNothing(session);
     const read = await afterwards();
 
-    const empty = await read.reproducibilityOf(analysis, []);
+    const empty = await read.reproducibilityOf({ analysis, rebuilt: [] });
     let ghost = "(no throw)";
     try {
-      await read.reproducibilityOf(ref("analysis", "COMP_999999"), []);
+      await read.reproducibilityOf({ analysis: ref("analysis", "COMP_999999"), rebuilt: [] });
     } catch (e) {
       ghost = (e as Error).message;
     }

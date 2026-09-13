@@ -72,7 +72,7 @@ describe("S-21: a finding drawn across findings", () => {
       restingOn: claims,
     });
 
-    const why = await (await afterwards()).whySupported(claim);
+    const why = await (await afterwards()).whySupported({ claim });
     expect(why.proposition).toBe(HEADLINE);
     expect(why.drawnAcross.map((r) => r.claim).sort()).toEqual([...claims].sort());
     // No evidence of its own, and that is the point: a synthesis measures
@@ -89,7 +89,7 @@ describe("S-21: a finding drawn across findings", () => {
     const { claims } = await fourComparisons();
     const { claim } = await session.synthesise({ proposition: HEADLINE, restingOn: claims });
 
-    const explained = await (await afterwards()).why(claim);
+    const explained = await (await afterwards()).why({ subject: claim });
     expect(explained.is).not.toMatch(/nothing has examined/);
     expect(explained.because.map((c) => c.handle).sort()).toEqual([...claims].sort());
   });
@@ -105,7 +105,7 @@ describe("S-21: a finding drawn across findings", () => {
 
     // Afterward: the question is answered, and answered on the headline —
     // not on whichever of the four was cited to stand in for it.
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.open).toBe(false);
     expect(status.closure).toBe("answered");
     // All four findings are what it rests on. Citing one would name an
@@ -141,7 +141,7 @@ describe("S-21: a finding drawn across findings", () => {
 
     await session.closeEnquiry({ enquiry, answeredBy: claim });
 
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.closure).toBe("answered");
     // Answered "no", and resting on all four — the polarity comes from which
     // way the findings underneath it cut.
@@ -156,7 +156,7 @@ describe("S-21: a finding drawn across findings", () => {
       session.synthesise({ proposition: HEADLINE, restingOn: [ref("claim", "CLM_999")] }),
     ).rejects.toThrow(/no claim CLM_999 to rest on/);
 
-    const found = await (await afterwards()).claimsAsserting(HEADLINE);
+    const found = await (await afterwards()).claimsAsserting({ proposition: HEADLINE });
     expect(found).toEqual([]);
   });
 
@@ -202,7 +202,7 @@ describe("S-21: a finding drawn across findings", () => {
       edges.filter((edge) => edge.label === "SUPPORTS" || edge.label === "CHALLENGES"),
     ).toEqual([]);
 
-    const narrowed = await (await afterwards()).whySupported(report.nowClaims.claim);
+    const narrowed = await (await afterwards()).whySupported({ claim: report.nowClaims.claim });
     expect(narrowed.drawnAcross.map((part) => part.claim).sort()).toEqual(expectedParts);
     expect(narrowed.support).toEqual([]);
 
@@ -250,8 +250,8 @@ describe("S-21: a finding drawn across findings", () => {
       (change): change is import("../../src/domain").EdgeCreated => change.change === "EdgeCreated",
     );
     const expectedEvidence = [
-      ...(await session.whySupported(claims[0]!.claim)).support,
-      ...(await session.whySupported(claims[1]!.claim)).against,
+      ...(await session.whySupported({ claim: claims[0]!.claim })).support,
+      ...(await session.whySupported({ claim: claims[1]!.claim })).against,
     ]
       .map((finding) => finding.evidence)
       .sort();
@@ -265,7 +265,7 @@ describe("S-21: a finding drawn across findings", () => {
         .map((edge) => edge.to)
         .sort(),
     ).toEqual(expectedEvidence);
-    const explained = await (await afterwards()).why(accepted.decision);
+    const explained = await (await afterwards()).why({ subject: accepted.decision });
     expect(explained.because).toContainEqual(
       expect.objectContaining({
         handle: synthesis,
@@ -300,7 +300,7 @@ describe("S-21: a finding drawn across findings", () => {
     });
 
     const expectedFindings = CONTROLS.map(([name]) => `difference within noise, ${name}`).sort();
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis.map((finding) => finding.states).sort()).toEqual(
       expectedFindings,
     );
@@ -312,7 +312,7 @@ describe("S-21: a finding drawn across findings", () => {
       citing: synthesis,
     });
     expect(amendment.nature).toBe("mechanical");
-    const history = await (await afterwards()).designHistory(gate);
+    const history = await (await afterwards()).designHistory({ gate });
     expect(
       history.conditions[0]!.amendments[0]!.citing.map((finding) => finding.states).sort(),
     ).toEqual(expectedFindings);
