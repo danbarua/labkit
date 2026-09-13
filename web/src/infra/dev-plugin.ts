@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import { ensureOverlapBench } from "./seed";
 import { ensureLabkitPostgres } from "./postgres";
+import { handle, isLabkitApiPath } from "../server/handler";
 import { openSession, type Session } from "../server/session";
 
 function toRequest(req: IncomingMessage): Request {
@@ -44,15 +45,11 @@ export function labkitDev(): Plugin {
           const pathname = (req.url ?? "/").split("?")[0] ?? "/";
           const accept = String(req.headers.accept ?? "");
           const session = await boot;
-          const mod = (await server.ssrLoadModule("/src/server/handler.ts")) as {
-            handle: (request: Request, sess: Session) => Promise<Response>;
-            isLabkitApiPath: (path: string, acc: string) => boolean;
-          };
-          if (!mod.isLabkitApiPath(pathname, accept)) {
+          if (!isLabkitApiPath(pathname, accept)) {
             next();
             return;
           }
-          await writeResponse(res, await mod.handle(toRequest(req), session));
+          await writeResponse(res, await handle(toRequest(req), session));
         } catch (err) {
           next(err);
         }
