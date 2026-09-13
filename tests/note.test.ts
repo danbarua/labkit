@@ -60,3 +60,71 @@ test("--on refuses a handle from the wrong kind of act", async () => {
     session.writes.note({ text: "x", on: "NOT_A_REAL_HANDLE" as never }),
   ).rejects.toThrow();
 });
+
+test("supersedes writes SUPERSEDES edges (repeatable) and why walks both directions with PHRASE", async () => {
+  const { note: old1 } = await session.writes.note({ text: "initial take" });
+  const { note: old2 } = await session.writes.note({ text: "another take" });
+  const { note: newer } = await session.writes.note({
+    text: "replaces the earlier notes",
+    supersedes: [old1, old2],
+  });
+
+  // why on old includes the newer as replacement
+  const whyOld1 = await session.reads.why({ subject: old1 });
+  expect(
+    whyOld1.because.some(
+      (b) => b.handle === newer && /was replaced by/.test(b.wording ?? ""),
+    ),
+  ).toBe(true);
+
+  const whyNew = await session.reads.why({ subject: newer });
+  expect(
+    whyNew.because.some(
+      (b) => (b.handle === old1 || b.handle === old2) && /replaced/.test(b.wording ?? ""),
+    ),
+  ).toBe(true);
+
+  // listed notes surface the arrays
+  const listed = await session.reads.notes({});
+  const byId = new Map(listed.map((n) => [n.note, n] as const));
+  expect(byId.get(newer)!.supersedes.slice().sort()).toEqual([old1, old2].sort());
+  expect(byId.get(old1)!.supersededBy).toContain(newer);
+  expect(byId.get(old2)!.supersededBy).toContain(newer);
+});
+
+test("note --supersedes refuses missing target", async () => {
+  await expect(
+    session.writes.note({ text: "x", supersedes: ["NOTE_999999"] as never }),
+  ).rejects.toThrow(/no note NOTE_999999 for this note to supersede/);
+});
+
+test("note --supersedes refuses non-note handle (treated as missing note target)", async () => {
+  const { question } = await session.writes.pose({ question: "some q" });
+  await expect(
+    session.writes.note({ text: "x", supersedes: [question] as never }),
+  ).rejects.toThrow(/no note .* for this note to supersede/);
+});
+
+test("note --supersedes refuses self", async () => {
+  // Patch reserveId for this graph instance to force the id minted for this note()
+  // to a known value present in the supersedes input. This exercises the exact
+  // post-mint `if (old === noted)` self guard in Asking.note.
+  const g = graph as unknown as {
+    reserveId: (label: import("../src/db/domain").NodeLabel) => Promise<string>;
+  };
+  const original = g.reserveId;
+  g.reserveId = async (label) => {
+    if (label === "Note") return "NOTE_SELF";
+    return original.call(graph, label);
+  };
+  try {
+    await expect(
+      session.writes.note({
+        text: "would supersede the note being created",
+        supersedes: ["NOTE_SELF"] as never,
+      }),
+    ).rejects.toThrow(/a note cannot supersede itself \(NOTE_SELF\)/);
+  } finally {
+    g.reserveId = original;
+  }
+});

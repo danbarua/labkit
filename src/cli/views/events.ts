@@ -21,10 +21,15 @@ export function renderNotes(notes: readonly ListedNote[], p: Palette): string {
       const about = n.concerns.length
         ? p.quiet(" on ") + n.concerns.map((h) => p.handle(h)).join(p.quiet(", "))
         : "";
+      const supersededMark = n.supersededBy.length
+        ? p.quiet(
+            ` (replaced by ${n.supersededBy.map((h) => p.handle(h)).join(p.quiet(", "))})`,
+          )
+        : "";
       // Its own line, and only when there is one: this is the fact that makes
       // the note an origin rather than a remark beside the record.
       const why = n.prompted ? [`         ${p.quiet("prompted ")}${p.handle(n.prompted)}`] : [];
-      return [`${p.handle(n.note)}${about}`, `  ${n.says}`, ...why].join("\n");
+      return [`${p.handle(n.note)}${about}${supersededMark}`, `  ${n.says}`, ...why].join("\n");
     })
     .join("\n\n");
 }

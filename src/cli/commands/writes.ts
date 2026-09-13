@@ -136,16 +136,26 @@ export function registerWrites(program: Command, run: Run): void {
       "--prompted <question-id>",
       "a question this note is the reason for — why it was asked, not what it is about",
     )
-    .action(async (text: string, opts: { on?: string; prompted?: string }) =>
-      parsed(
-        noteCommand,
-        {
-          text,
-          ...(opts.on === undefined ? {} : { on: opts.on }),
-          ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
-        },
-        (write, input) => write.note(input),
-      ),
+    .option(
+      "--supersedes <note-id>",
+      "a note this one replaces — both stay readable; the edge is what a read walks (repeatable)",
+      collect(String),
+    )
+    .action(
+      async (
+        text: string,
+        opts: { on?: string; prompted?: string; supersedes?: string[] },
+      ) =>
+        parsed(
+          noteCommand,
+          {
+            text,
+            ...(opts.on === undefined ? {} : { on: opts.on }),
+            ...(opts.prompted === undefined ? {} : { prompted: opts.prompted }),
+            ...(opts.supersedes === undefined ? {} : { supersedes: opts.supersedes }),
+          },
+          (write, input) => write.note(input),
+        ),
     );
   program
     .command("observe")

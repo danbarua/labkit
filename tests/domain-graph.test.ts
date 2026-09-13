@@ -346,6 +346,21 @@ describe("edge integrity", () => {
     );
     expect(rows).toHaveLength(1);
   });
+
+  test("createEdge allows Note-SUPERSEDES-Note", async () => {
+    const oldN = await graph.createNode("Note", { text: "earlier note" });
+    const newN = await graph.createNode("Note", { text: "correction" });
+    await graph.createEdge(newN.natural_id, "SUPERSEDES", oldN.natural_id);
+
+    const rows = await graph.query(
+      `MATCH (:Note {natural_id: $id})-[e:SUPERSEDES]->(old:Note)
+       RETURN old`,
+      { old: vertexProps<{ text: string }>() },
+      { id: newN.natural_id },
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.old.text).toBe("earlier note");
+  });
 });
 
 describe("Gate is reconnected to what it actually gates", () => {

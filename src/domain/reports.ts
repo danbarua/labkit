@@ -72,6 +72,8 @@ const listedNote = z.strictObject({
   says: z.string(),
   concerns: z.array(anyRef()),
   prompted: ref("question").optional(),
+  supersedes: z.array(ref("note")),
+  supersededBy: z.array(ref("note")),
 });
 
 export const notes = z.strictObject({
