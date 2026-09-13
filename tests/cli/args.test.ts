@@ -4,6 +4,7 @@
 
 import { expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
+import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../../src/cli/cli";
@@ -172,13 +173,41 @@ test("main prints a validation message when --state is wrong", async () => {
   console.error = (...args: unknown[]) => {
     chunks.push(args.map(String).join(" "));
   };
+  let db: string | undefined;
   try {
-    const db = await mkdtemp(join(tmpdir(), "labkit-state-msg-"));
+    db = await mkdtemp(join(tmpdir(), "labkit-state-msg-"));
     const code = await main(["--db", db, "gates", "--state", "blockd"]);
     expect(code).toBe(1);
     expect(chunks.join("")).toContain("sidestepped");
+    expect(chunks.join("")).not.toContain('"labkit":"request-failed"');
   } finally {
     process.stderr.write = write;
     console.error = error;
+    if (db !== undefined) rmSync(db, { recursive: true, force: true });
+  }
+});
+
+test("main prints a validation message for a wrong claim handle", async () => {
+  const chunks: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  const error = console.error;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+    return true;
+  }) as typeof process.stderr.write;
+  console.error = (...args: unknown[]) => {
+    chunks.push(args.map(String).join(" "));
+  };
+  let db: string | undefined;
+  try {
+    db = await mkdtemp(join(tmpdir(), "labkit-claim-msg-"));
+    const code = await main(["--db", db, "is", "confirmed", "GATE_1", "--because", "x"]);
+    expect(code).toBe(1);
+    expect(chunks.join("")).toContain("claim handle expected a Claim id");
+    expect(chunks.join("")).not.toContain('"labkit":"request-failed"');
+  } finally {
+    process.stderr.write = write;
+    console.error = error;
+    if (db !== undefined) rmSync(db, { recursive: true, force: true });
   }
 });

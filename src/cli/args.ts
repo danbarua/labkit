@@ -45,8 +45,10 @@ export function parseCommand<S extends z.ZodType>(schema: S, value: unknown): z.
     // Plain Error, not InvalidArgumentError: commander stamps the latter with
     // `exitCode`, and `main` then returns that code on the assumption commander
     // already printed. An action throw never prints, so the user would see exit 1
-    // and nothing else.
-    throw new Error(issue?.message ?? parsed.error.message);
+    // and nothing else. `name` lets `main` skip request-failed JSON.
+    const error = new Error(issue?.message ?? parsed.error.message);
+    error.name = "ValidationError";
+    throw error;
   }
   return parsed.data;
 }

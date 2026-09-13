@@ -5,6 +5,7 @@
 
 import { buildProgram } from "./program";
 import { logFailedRequest, type Adapter } from "../request-log";
+import { DomainRefusal } from "../domain";
 import { writeSync } from "node:fs";
 import { runner } from "./session";
 
@@ -44,10 +45,16 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
     // Commander has already printed help or the argument error; it only needs
     // its exit code carrying out.
     if (typeof error.exitCode === "number") return error.exitCode;
-    // The request as the user gave it, on stderr, beside the error. `argv` and
-    // not the parsed options: a parse failure never produces options, and that
-    // is the case this is most useful for — "unexpected input" is exactly what
-    // you cannot reconstruct from a stack trace. See `src/request-log.ts`.
+    // parseCommand and DomainRefusal are expected refusals: one labkit line,
+    // no request-failed JSON.
+    if (
+      error.name === "ValidationError" ||
+      error instanceof DomainRefusal ||
+      error.name === "DomainRefusal"
+    ) {
+      console.error(`labkit: ${error.message}`);
+      return 1;
+    }
     logFailedRequest({ adapter: "cli" satisfies Adapter, argv }, error);
     console.error(`labkit: ${error.message}`);
     return 1;
