@@ -89,7 +89,9 @@ describe("S-11b: which review retracted it?", () => {
         from: [readings],
         concludes: [{ proposition: SHIFTS, finding }],
       });
-      const why = await (await afterwards()).whySupported(claimOf(report.claims, SHIFTS));
+      const why = await (await afterwards()).whySupported({
+        claim: claimOf(report.claims, SHIFTS),
+      });
       return why.support.map((x) => x.finding).sort();
     };
     const { a, b } = await inTwoWorlds(build("onset moves by 2.8 K"), build("onset does not move"));
@@ -112,7 +114,9 @@ describe("S-11b: which review retracted it?", () => {
         from: [w.readings],
         concludes: [{ proposition: SHIFTS, finding: "onset moves by 2.8 K" }],
       });
-      const why = await (await afterwards()).whySupported(claimOf(report.claims, SHIFTS));
+      const why = await (await afterwards()).whySupported({
+        claim: claimOf(report.claims, SHIFTS),
+      });
       return why.superseded
         .map((x) => ({ finding: x.finding, reason: x.reason }))
         .sort((p, q) => p.reason.localeCompare(q.reason));
@@ -146,7 +150,9 @@ describe("S-11b: which review retracted it?", () => {
         from: [w.readings],
         concludes: [{ proposition: SHIFTS, finding: "onset moves by 2.8 K" }],
       });
-      const why = await (await afterwards()).whySupported(claimOf(report.claims, SHIFTS));
+      const why = await (await afterwards()).whySupported({
+        claim: claimOf(report.claims, SHIFTS),
+      });
       return why.superseded.map((x) => x.reason);
     });
     // Two entries for one supersession, because `findingsBearing()` returns a

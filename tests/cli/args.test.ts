@@ -3,6 +3,10 @@
  */
 
 import { expect, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { main } from "../../src/cli/cli";
 import { buildProgram } from "../../src/cli/program";
 import type { Run } from "../../src/cli/session";
 
@@ -80,10 +84,13 @@ test("a non-numeric --since or --limit is refused, not coerced", async () => {
 });
 
 test("a handle of the wrong kind is refused at the boundary", async () => {
-  // `ref()` already refuses a mismatch, because an id's prefix names the label
-  // a kind expects. Carrying that to the boundary means a caller who passes a
-  // claim where a gate belongs is told which argument was wrong.
-  expect(await refusal(["gate", "CLM_1"])).toContain("gate-id");
+  // The query schema brands the handle. A claim where a gate belongs is refused
+  // before `run` opens a database, the same way a write command is.
+  expect(await refusal(["gate", "CLM_1"])).toContain("gate handle expected");
+});
+
+test("happened touching a non-handle is refused at the boundary", async () => {
+  expect(await refusal(["happened", "not-a-handle"])).toContain("not a handle");
 });
 
 test("a write handle of the wrong kind is refused at the boundary", async () => {
@@ -100,14 +107,10 @@ test("a command with no bad arguments reaches its action", async () => {
 });
 
 test("a bad --state names the values it would have accepted", async () => {
-  // `oneOf`'s whole purpose: a typo means the caller asked for something and is
-  // owed a message naming what was available, not a silent full list.
-  expect(await refusal(["gates", "--state", "blockd"])).toContain(
-    "never-evaluated, incomplete, blocked, satisfied",
-  );
-  expect(await refusal(["work", "--state", "carriedout"])).toContain(
-    "planned, waiting, blocked, carried-out, abandoned",
-  );
+  // The query schema is the validator. A typo is refused with the vocab, not a silent full list.
+  expect(await refusal(["gates", "--state", "blockd"])).toContain("sidestepped");
+  expect(await refusal(["gates", "--state", "blockd"])).toContain("retired");
+  expect(await refusal(["work", "--state", "carriedout"])).toContain("carried-out");
 });
 
 test("a non-ISO --date is refused, not stamped into the record", async () => {
@@ -131,11 +134,8 @@ test("a non-ISO --date is refused, not stamped into the record", async () => {
   expect(ran).toBe(false);
 });
 
-test("a bad --state is refused before the action, so no database is opened", async () => {
-  // **This is the assertion that would have caught it, and the message one would not.**
-  // `gateState` was called *inside* `.action()`, so it did throw -- but by then `run` had been
-  // reached and the run wrapper had created a database. Worse, `main()`'s catch returns early
-  // on any error carrying an `exitCode`, on the assumption commander has already printed it.
+test("a bad --state is refused before run opens a database", async () => {
+  // parseCommand runs in the action before `run`, so a bad --state never opens a database.
   for (const argv of [
     ["gates", "--state", "blockd"],
     ["work", "--state", "carriedout"],
@@ -149,5 +149,28 @@ test("a bad --state is refused before the action, so no database is opened", asy
     for (const command of program.commands) command.exitOverride().configureOutput(silence);
     await expect(program.parseAsync(argv, { from: "user" })).rejects.toThrow();
     expect(ran).toBe(false);
+  }
+});
+
+test("main prints a validation message when --state is wrong", async () => {
+  // parseAsync alone would still pass if main swallowed InvalidArgumentError's exitCode.
+  const chunks: string[] = [];
+  const write = process.stderr.write.bind(process.stderr);
+  const error = console.error;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+    return true;
+  }) as typeof process.stderr.write;
+  console.error = (...args: unknown[]) => {
+    chunks.push(args.map(String).join(" "));
+  };
+  try {
+    const db = await mkdtemp(join(tmpdir(), "labkit-state-msg-"));
+    const code = await main(["--db", db, "gates", "--state", "blockd"]);
+    expect(code).toBe(1);
+    expect(chunks.join("")).toContain("sidestepped");
+  } finally {
+    process.stderr.write = write;
+    console.error = error;
   }
 });

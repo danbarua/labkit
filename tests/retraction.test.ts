@@ -39,7 +39,7 @@ test("undo hides what it retracted from the role every ordinary session runs as"
 
     // Unreachable by the wording that used to find it -- not merely absent
     // from one report, but genuinely invisible to a normal read.
-    const found = await session.search(wording);
+    const found = await session.search({ text: wording });
     expect(found.flatMap((g) => g.matches)).toEqual([]);
 
     // And unreachable as a write target, the same way a handle nobody ever
@@ -100,12 +100,12 @@ test("every retracted node label is unreachable by lookup and traversal", async 
       const kind = kindOf(node.natural_id);
       if (!kind) throw new Error(`no handle kind for ${node.natural_id}`);
       const handle = ref(kind, node.natural_id);
-      expect(await session.reachable(handle)).toBe(false);
-      await expect(session.why(handle)).rejects.toThrow();
+      expect(await session.reachable({ subject: handle })).toBe(false);
+      await expect(session.why({ subject: handle })).rejects.toThrow();
     }
 
-    expect(await session.neighboursOf(anchor)).toEqual([]);
-    expect((await session.why(anchor)).because).toEqual([]);
+    expect(await session.neighboursOf({ subject: anchor })).toEqual([]);
+    expect((await session.why({ subject: anchor })).because).toEqual([]);
   } finally {
     await connection.close();
   }

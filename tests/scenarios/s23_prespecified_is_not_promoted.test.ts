@@ -70,8 +70,8 @@ describe("S-23: prespecified is not promoted", () => {
     const { prespecified, promoted } = await twoRoutesToConfirmatory();
     const reader = await afterwards();
 
-    expect((await reader.whySupported(prespecified)).standing).toBe("confirmatory");
-    expect((await reader.whySupported(promoted)).standing).toBe("confirmatory");
+    expect((await reader.whySupported({ claim: prespecified })).standing).toBe("confirmatory");
+    expect((await reader.whySupported({ claim: promoted })).standing).toBe("confirmatory");
   });
 
   test("the promotion names itself, and the prespecified result has none", async () => {
@@ -81,10 +81,10 @@ describe("S-23: prespecified is not promoted", () => {
     // The act that conferred the standing, when an act conferred it. A claim
     // that was confirmatory from birth has none, and that absence is the
     // distinction rather than a gap in the answer.
-    expect((await reader.whySupported(promoted)).promotedBecause).toBe(
+    expect((await reader.whySupported({ claim: promoted })).promotedBecause).toBe(
       "the prespecified robustness check passed",
     );
-    expect((await reader.whySupported(prespecified)).promotedBecause).toBeUndefined();
+    expect((await reader.whySupported({ claim: prespecified })).promotedBecause).toBeUndefined();
   });
 
   test("the stream says which standing each was recorded with", async () => {

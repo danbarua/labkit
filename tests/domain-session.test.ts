@@ -75,7 +75,9 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
     concludes: [{ proposition: "T beats rewired", finding: "p = 0.002" }],
   });
 
-  const before = await session.whySupported(await claimNamed(session, "T beats rewired"));
+  const before = await session.whySupported({
+    claim: await claimNamed(session, "T beats rewired"),
+  });
 
   // Fourth edge: MOTIVATES, EVALUATES, the CHANGES that withdraws the original,
   // and then the SUPPORTS that carries the evidence across to the narrower
@@ -90,12 +92,14 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
   ).rejects.toThrow(/injected failure/);
 
   // Nothing moved: the finding still stands and still rests on its evidence.
-  const after = await session.whySupported(await claimNamed(session, "T beats rewired"));
+  const after = await session.whySupported({ claim: await claimNamed(session, "T beats rewired") });
   expect(after).toEqual(before);
   expect(after.withdrawn).toBe(false);
   expect(after.verdict).toBe("supported");
   // And no half-made revision is readable.
-  const history = await session.interpretationHistory(await claimNamed(session, "T beats rewired"));
+  const history = await session.interpretationHistory({
+    claim: await claimNamed(session, "T beats rewired"),
+  });
   expect(history.nowClaims.asserts).toBe("T beats rewired");
   expect(history.revisions).toEqual([]);
 });
@@ -134,7 +138,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
     ],
   });
 
-  const before = await session.gateStatus(gate);
+  const before = await session.gateStatus({ gate });
   expect(before.checks.map((c) => c.proposition)).toEqual([
     "solver converges within 500 iterations",
   ]);
@@ -153,7 +157,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
 
   // One condition, not two. A gate governed by both the retired and the
   // proposed condition is a control-plane object nobody agreed to.
-  const after = await session.gateStatus(gate);
+  const after = await session.gateStatus({ gate });
   expect(after.checks.map((c) => c.proposition)).toEqual([
     "solver converges within 500 iterations",
   ]);
@@ -263,7 +267,7 @@ test("an interrupted sharpen leaves nothing at all", async () => {
 
   // And so `originOf` answers null because the question genuinely has no
   // origin, not because the edge it needs happened to be written last.
-  expect(await session.originOf(original)).toBeNull();
+  expect(await session.originOf({ question: original })).toBeNull();
 
   // The sharper question was never created, so the survey is simply correct.
   const survey = await session.whatIsKnown();
@@ -329,7 +333,7 @@ for (const edge of ["EVALUATED_AS", "TRIGGERS", "BASED_ON"] as const) {
     });
     expect(left).toEqual([]);
 
-    const status = await session.gateStatus(gate);
+    const status = await session.gateStatus({ gate });
     expect(status.state).toBe("never-evaluated");
     expect(status.everFailed).toBe(false);
   });
@@ -374,7 +378,7 @@ test("a close interrupted before BASED_ON writes nothing before retry", async ()
     { d: vertexProps<{ natural_id: string; reason: string }>() },
     { enquiry },
   );
-  const status = await session.enquiryStatus(enquiry);
+  const status = await session.enquiryStatus({ enquiry });
 
   expect(resolving).toHaveLength(1);
   // The question was answered "no" on a challenging finding. Anything else is
@@ -397,7 +401,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
     outcome: "fail",
     citing: [claimOf(analysisClaims, "the solver converges")],
   });
-  const before = await session.gateStatus(gate);
+  const before = await session.gateStatus({ gate });
   expect((await evaluationsOf(session, before.checks[0]!))[0]?.basis?.map((b) => b.states)).toEqual(
     ["residual 1e-9"],
   );
@@ -416,7 +420,7 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
     concludes: [{ proposition: "the solver converges", finding: "residual 4e-9" }],
   });
 
-  const after = await session.gateStatus(gate);
+  const after = await session.gateStatus({ gate });
   expect((await evaluationsOf(session, after.checks[0]!))[0]?.withdrawn).toBe(true);
   expect(after.state).not.toBe("blocked");
 });
@@ -447,7 +451,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   });
 
   await s.closeEnquiry({ enquiry });
-  expect((await s.enquiryStatus(enquiry)).closure).toBe("abandoned");
+  expect((await s.enquiryStatus({ enquiry })).closure).toBe("abandoned");
 
   await expect(
     s.closeEnquiry({
@@ -458,7 +462,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
 
   // And the record is unchanged rather than half-updated: one close, the one
   // that happened.
-  const after = await s.enquiryStatus(enquiry);
+  const after = await s.enquiryStatus({ enquiry });
   expect(after.closure).toBe("abandoned");
   expect(after.answer).toBeNull();
 });
@@ -492,7 +496,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     until: "a data source other than the spent set",
     inLightOf: claimOf(analysisClaims, "depth moves convergence"),
   });
-  const accepted = await s.enquiryStatus(enquiry);
+  const accepted = await s.enquiryStatus({ enquiry });
   expect(accepted.closure).toBeNull();
   expect(accepted.open).toBe(true);
 
@@ -501,7 +505,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
     enquiry,
     answeredBy: claimOf(analysisClaims, "depth moves convergence"),
   });
-  const closed = await s.enquiryStatus(enquiry);
+  const closed = await s.enquiryStatus({ enquiry });
   expect(closed.closure).toBe("answered");
   expect(closed.answer).toBe("yes");
 });
@@ -542,7 +546,7 @@ test("an interrupted pursue leaves no enquiry at all", async () => {
     question,
     approach: "thermal cycling",
   });
-  expect((await session.enquiryStatus(retried)).open).toBe(true);
+  expect((await session.enquiryStatus({ enquiry: retried })).open).toBe(true);
 });
 
 /**
@@ -609,7 +613,7 @@ test("an interrupted recordReview leaves a review nothing can reach", async () =
   expect(attached).toEqual([]);
 
   // The finding still stands: no review reaches it, so nothing retracts it.
-  const why = await session.whySupported(await claimNamed(session, "it holds"));
+  const why = await session.whySupported({ claim: await claimNamed(session, "it holds") });
   expect(why.verdict).toBe("supported");
   expect(why.withdrawn).toBe(false);
 });
@@ -651,7 +655,7 @@ test("an interrupted declareGate leaves no gate at all", async () => {
 
   // The work the gate would have protected is untouched: a failed
   // `declareGate` must not damage what it was declared over.
-  const contract = await session.contractFor(work);
+  const contract = await session.contractFor({ work });
   expect(contract.objective).toBe("scale up");
 });
 
@@ -669,8 +673,8 @@ test("a task planned with no readable inputs reports an empty contract, not a mi
     mayRead: [],
   });
 
-  expect((await session.contractFor(omitted)).mayRead).toEqual([]);
-  expect((await session.contractFor(explicit)).mayRead).toEqual([]);
+  expect((await session.contractFor({ work: omitted })).mayRead).toEqual([]);
+  expect((await session.contractFor({ work: explicit })).mayRead).toEqual([]);
 
   // And the populated case still round-trips through the same read, so this
   // test fails for the right reason if arrays stop working altogether.
@@ -679,7 +683,10 @@ test("a task planned with no readable inputs reports an empty contract, not a mi
     acceptance: "all seeds complete",
     mayRead: ["seeds.csv", "config.toml"],
   });
-  expect((await session.contractFor(populated)).mayRead).toEqual(["seeds.csv", "config.toml"]);
+  expect((await session.contractFor({ work: populated })).mayRead).toEqual([
+    "seeds.csv",
+    "config.toml",
+  ]);
 });
 
 /**
@@ -701,13 +708,13 @@ test("a task planned against an enquiry reports it, with wording; one planned wi
     acceptance: "no stray files",
   });
 
-  expect((await session.contractFor(served)).addressing).toEqual({
+  expect((await session.contractFor({ work: served })).addressing).toEqual({
     enquiry,
     pursuing: "can this mapping reach an external task?",
     question,
     asks: "can this mapping reach an external task?",
   });
-  expect((await session.contractFor(unaddressed)).addressing).toBeUndefined();
+  expect((await session.contractFor({ work: unaddressed })).addressing).toBeUndefined();
 });
 
 test("closing a blocked gate releases work without changing its failed check", async () => {
@@ -723,15 +730,15 @@ test("closing a blocked gate releases work without changing its failed check", a
   });
   await session.evaluateCriterion({ criterion, gate, value: "2e-5", outcome: "fail" });
 
-  expect((await session.gateStatus(gate)).state).toBe("blocked");
-  expect((await session.workList()).find((row) => row.work === work)?.state).toBe("blocked");
+  expect((await session.gateStatus({ gate })).state).toBe("blocked");
+  expect((await session.workList({})).find((row) => row.work === work)?.state).toBe("blocked");
 
   const closed = await session.closeGate({
     gate,
     closure: "sidestepped",
     because: "the report now labels this comparison exploratory",
   });
-  const status = await session.gateStatus(gate);
+  const status = await session.gateStatus({ gate });
   expect(closed).toMatchObject({ gate, closure: "sidestepped" });
   expect(status.state).toBe("sidestepped");
   expect(status.closure).toEqual({
@@ -740,8 +747,8 @@ test("closing a blocked gate releases work without changing its failed check", a
     because: "the report now labels this comparison exploratory",
   });
   expect(status.checks.map((check) => check.state)).toEqual(["failed"]);
-  expect((await session.workList()).find((row) => row.work === work)?.state).toBe("planned");
-  expect((await session.now()).blocked.work.map((row) => row.work)).not.toContain(work);
+  expect((await session.workList({})).find((row) => row.work === work)?.state).toBe("planned");
+  expect((await session.now({})).blocked.work.map((row) => row.work)).not.toContain(work);
 
   await expect(
     session.closeGate({ gate, closure: "retired", because: "duplicate" }),
@@ -765,7 +772,7 @@ test("criterion report refuses an evaluation with no stored outcome", async () =
   );
   await graph.createEdge(criterion, "EVALUATED_AS", evaluation);
 
-  await expect(session.criterionStanding(criterion)).rejects.toThrow(
+  await expect(session.criterionStanding({ criterion })).rejects.toThrow(
     new RegExp(`evaluation ${evaluation} has no stored outcome`),
   );
 });
@@ -841,7 +848,7 @@ test("knowledge standing preserves valid pass and fail outcomes", async () => {
   await session.isConfirmed({ claim, because: "the checked answer is being relied on" });
   await session.closeEnquiry({ enquiry, answeredBy: claim });
 
-  expect((await session.criterionStanding(criterion)).state).toBe("passed");
+  expect((await session.criterionStanding({ criterion })).state).toBe("passed");
   let known = await session.whatIsKnown();
   expect(known.established.map((q) => q.asks)).toContain(
     "does a valid outcome preserve knowledge?",
@@ -853,7 +860,7 @@ test("knowledge standing preserves valid pass and fail outcomes", async () => {
     value: "the later check failed",
     citing: [claim],
   });
-  expect((await session.criterionStanding(criterion)).state).toBe("failed");
+  expect((await session.criterionStanding({ criterion })).state).toBe("failed");
   known = await session.whatIsKnown();
   expect(known.established.map((q) => q.asks)).not.toContain(
     "does a valid outcome preserve knowledge?",

@@ -72,7 +72,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
   test("Afterward 1: accepted-as-open is a state of its own, not 'still being worked'", async () => {
     const { enquiry, analysisClaims } = await aMarginalComparisonWithNothingLeftToRunIt();
 
-    const stillWorking = await session.enquiryStatus(enquiry);
+    const stillWorking = await session.enquiryStatus({ enquiry });
     expect(stillWorking.open).toBe(true);
     expect(stillWorking.closure).toBeNull();
 
@@ -83,7 +83,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
       inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
     // Not answered. Accepting a question is not deciding it.
@@ -132,7 +132,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
       inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.question!.reopensIf).toBe(CONDITION);
   });
 
@@ -149,7 +149,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
       inLightOf: claimOf(analysisClaims, PROPOSITION),
     });
 
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.question!.acceptedBecause).toBe(
       "the confirmatory dataset is spent and there is no larger held-out sample",
     );
@@ -166,7 +166,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
   test("a question nobody has accepted still reads as open work", async () => {
     const { enquiry } = await aMarginalComparisonWithNothingLeftToRunIt();
 
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
     expect(status.question!.reopensIf).toBeUndefined();
@@ -212,7 +212,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
       answeredBy: claimOf(settledClaims, PROPOSITION),
     });
 
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.open).toBe(false);
     expect(status.closure).toBe("answered");
     expect(status.answer).toBe("yes");
@@ -243,7 +243,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
 
     await session.closeEnquiry({ enquiry });
 
-    const status = await (await afterwards()).enquiryStatus(enquiry);
+    const status = await (await afterwards()).enquiryStatus({ enquiry });
     expect(status.open).toBe(false);
     expect(status.closure).toBe("abandoned");
     // The work that was done, and the reason it stopped, are both absent.

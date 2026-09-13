@@ -70,7 +70,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       events: inMemoryEventLog(),
     });
 
-    const status = await later.enquiryStatus(enquiry);
+    const status = await later.enquiryStatus({ enquiry });
     expect(status.answer).toBe("no");
     // The promotion happened and is what a reader deciding whether to build on
     // this needs to see. `exploratory` here says nobody vouched for it.
@@ -98,7 +98,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
 
     // Same SUPPORTS-only shape, one query over. Asked at an instant after the
     // promotion and the closure.
-    const then = await later.whatWasKnown(NOW);
+    const then = await later.whatWasKnown({ at: NOW });
     expect(then.established.map((q) => q.asks)).toContain(ASKS);
     expect(then.provisional.map((q) => q.asks)).not.toContain(ASKS);
   });
@@ -135,7 +135,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const status = await later.enquiryStatus(enquiry);
+    const status = await later.enquiryStatus({ enquiry });
     expect(status.answer).toBe("no");
     expect(status.restsOn).toBe("exploratory");
 

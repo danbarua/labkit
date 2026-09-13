@@ -148,7 +148,7 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       const built = await fixture(s);
-      const states = new Map((await s.gateList()).map((g) => [g.gate as string, g.state]));
+      const states = new Map((await s.gateList({})).map((g) => [g.gate as string, g.state]));
 
       // **The control for every filter test below.** Without it a filter that
       // returned nothing would pass by matching nothing, which is the same
@@ -166,14 +166,14 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       await fixture(s);
-      const all = await s.gateList();
+      const all = await s.gateList({});
 
       // Every state the fixture actually produces, so this cannot pass by
       // filtering to nothing: a filter that always returned `[]` would agree
       // with an `all` that had no gates in that state, and would not agree
       // with the count.
       for (const state of new Set(all.map((g) => g.state))) {
-        const filtered = await s.gateList(state);
+        const filtered = await s.gateList({ state });
         expect(filtered.map((g) => g.gate).sort()).toEqual(
           all
             .filter((g) => g.state === state)
@@ -188,7 +188,7 @@ describe("enumerating gates and work", () => {
       const unused = (["never-evaluated", "incomplete", "blocked", "satisfied"] as const).find(
         (st) => !all.some((g) => g.state === st),
       );
-      if (unused) expect(await s.gateList(unused)).toEqual([]);
+      if (unused) expect(await s.gateList({ state: unused })).toEqual([]);
     } finally {
       await scenario.end();
     }
@@ -198,7 +198,7 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       await fixture(s);
-      const listed = await s.gateList();
+      const listed = await s.gateList({});
       expect(listed.length).toBeGreaterThan(3);
 
       // The property the shared `gateStateFrom` exists for: a reader who lists
@@ -206,7 +206,7 @@ describe("enumerating gates and work", () => {
       // over every gate rather than a chosen one, so a scoping mistake in
       // either reader shows up wherever it is.
       for (const row of listed) {
-        const full = await s.gateStatus(row.gate);
+        const full = await s.gateStatus({ gate: row.gate });
         expect(full.state).toBe(row.state);
         expect(full.consequence).toBe(row.consequence);
       }
@@ -258,7 +258,7 @@ describe("enumerating gates and work", () => {
         citing: [claimOf(claims, HOLDS)],
       });
 
-      const states = new Map((await s.gateList()).map((g) => [g.gate as string, g.state]));
+      const states = new Map((await s.gateList({})).map((g) => [g.gate as string, g.state]));
       expect(states.get(gateA)).toBe("blocked");
       // Blocked too: the condition failed, and gate A was the work whoever
       // recorded it was trying to unblock, not the only gate allowed to know.
@@ -273,7 +273,7 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       const built = await fixture(s);
-      const states = new Map((await s.workList()).map((w) => [w.work as string, w.state]));
+      const states = new Map((await s.workList({})).map((w) => [w.work as string, w.state]));
 
       // Ready means nothing done and nothing in the way. Work behind a gate
       // nobody has finished checking — never evaluated, or half-checked with
@@ -345,12 +345,12 @@ describe("enumerating gates and work", () => {
         citing: [claimOf(claims, HOLDS)],
       });
 
-      const states = new Map((await s.workList()).map((w) => [w.work as string, w.state]));
+      const states = new Map((await s.workList({})).map((w) => [w.work as string, w.state]));
       expect(states.get(work)).toBe("blocked");
 
       // And the control: the analysis really did implement it, so this is a
       // precedence choice and not a missing IMPLEMENTS edge.
-      const unblocked = await s.workList("carried-out");
+      const unblocked = await s.workList({ state: "carried-out" });
       expect(unblocked.map((w) => w.work as string)).not.toContain(work as string);
     } finally {
       await scenario.end();
@@ -367,7 +367,7 @@ describe("enumerating gates and work", () => {
         objective: "nobody has touched this",
         acceptance: "done",
       });
-      const planned = await s.workList("planned");
+      const planned = await s.workList({ state: "planned" });
       expect(planned.map((w) => w.work as string)).toContain(orphan as string);
       expect(planned.find((w) => w.work === orphan)?.objective).toBe("nobody has touched this");
     } finally {

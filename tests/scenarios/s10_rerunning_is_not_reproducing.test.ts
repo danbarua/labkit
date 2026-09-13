@@ -81,7 +81,9 @@ describe("S-10: rerunning is not reproducing", () => {
       concludes: [{ proposition: PROPOSITION, finding: "converged, residual 2.9e-4" }],
     });
 
-    const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));
+    const why = await (await afterwards()).whySupported({
+      claim: claimOf(historicalClaims, PROPOSITION),
+    });
     expect(why.verdict).toBe("supported");
     // Two findings, presented alike, with nothing saying one re-checked the
     // other or that their executions differ.
@@ -115,7 +117,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     expect(report.conclusion).toBe("agrees");
     // The original recorded nothing it read, so there is nothing to have
     // reproduced. LabKit says that and stops.
@@ -146,7 +148,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
       {
         what: "initial conditions, newly specified",
@@ -178,7 +180,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     expect(report.bearing).toBe("raises");
     // There is no `confirms` field: "raises confidence" and "reproduced the
     // execution" are different questions, asked separately, without settling
@@ -188,7 +190,9 @@ describe("S-10: rerunning is not reproducing", () => {
 
     // And the claim itself now reads as re-verified rather than as twice
     // independently established.
-    const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));
+    const why = await (await afterwards()).whySupported({
+      claim: claimOf(historicalClaims, PROPOSITION),
+    });
     expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);
     expect(why.reverifiedBy.map((r) => r.method)).toEqual(["annealing-v1, re-run"]);
   });
@@ -215,7 +219,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     // LabKit does not decide whether two sets of numbers may be put side by
     // side -- that is the reader's call, not the record's. What the record
     // gives is the fact a comparison call would rest on: the re-run named
@@ -258,7 +262,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     // Both runs named what they read, and it was the same record. Nothing
     // differs, and the report says so without calling that a reproduction --
     // whether it is one depends on what the method does.
@@ -302,7 +306,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     // Both directions, and both are true: the re-run read an "initial conditions" the original
     // did not, and the original read one the re-run did not. Identical names, two artefacts,
     // two differences. The entries carry identity, so "which one changed" is answerable even
@@ -339,7 +343,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     // Neither run named anything. Two empty lists, and no claim that they
     // therefore match -- absence on both sides is still absence.
     expect(report.verificationRead).toEqual([]);
@@ -382,7 +386,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     expect(report.differs.map((d) => ({ what: d.what.name, standing: d.standing }))).toEqual([
       { what: "conditions B", standing: "not-used-by-the-re-run" },
     ]);
@@ -426,7 +430,7 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const report = await (await afterwards()).reproductionOf(rerun.verification);
+    const report = await (await afterwards()).reproductionOf({ verification: rerun.verification });
     expect(report.conclusion).toBe("agrees");
     // Agreeing with a negative finding does not raise confidence in the
     // proposition -- bearing is about the claim, not about the two runs.
@@ -467,7 +471,9 @@ describe("S-10: rerunning is not reproducing", () => {
       },
     });
 
-    const why = await (await afterwards()).whySupported(claimOf(historicalClaims, PROPOSITION));
+    const why = await (await afterwards()).whySupported({
+      claim: claimOf(historicalClaims, PROPOSITION),
+    });
     expect(why.support.map((s) => s.method)).toEqual(["annealing-v1"]);
     expect(why.reverifiedBy.map((r) => r.method)).toEqual(["annealing-v1, re-run"]);
     expect(why.restingOn.map((a) => a.name)).toEqual(["original conditions"]);

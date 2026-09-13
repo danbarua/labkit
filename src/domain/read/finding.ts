@@ -1,13 +1,12 @@
 import { vertexProps } from "../../db/cypher";
 import { NODE_LABELS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } from "../../db/domain";
-import type { IndexedString, Prose } from "../../db/domain";
+import type { ClaimsAssertingQuery, OriginOfQuery, PursuitsOfQuery, SearchQuery } from "../queries";
 import { SessionCore } from "../core";
 import { ref, KIND_BY_LABEL } from "../report";
 import type {
   ConcludedClaim,
   EnquiryRef,
   QuestionOrigin,
-  QuestionRef,
   SearchGroup,
   SearchMatch,
 } from "../report";
@@ -15,7 +14,7 @@ import { dedupeById, type Identified } from "./shared";
 
 export class FindingGroup extends SessionCore {
   /** Every line of enquiry pursuing this question. */
-  async pursuitsOf(question: QuestionRef): Promise<EnquiryRef[]> {
+  async pursuitsOf({ question }: PursuitsOfQuery): Promise<EnquiryRef[]> {
     const rows = await this.graph.query(
       `MATCH (:Question {natural_id: $id})-[:MOTIVATES]->(loe:LineOfEnquiry) RETURN loe`,
       { loe: vertexProps<{ natural_id: string }>() },
@@ -27,7 +26,7 @@ export class FindingGroup extends SessionCore {
   /**
    * Where a question came from, if it came from sharpening an earlier one.
    */
-  async originOf(question: QuestionRef): Promise<QuestionOrigin | null> {
+  async originOf({ question }: OriginOfQuery): Promise<QuestionOrigin | null> {
     // Its own MATCH, because AGE has no edge alternation and the two origins do
     // not share a shape: a note gave rise to the question directly, a sharpening
     // did it through the decision that recorded why.
@@ -84,7 +83,7 @@ export class FindingGroup extends SessionCore {
   /**
    * Claims asserting a proposition — the **one** place wording is resolved.
    */
-  async claimsAsserting(proposition: IndexedString): Promise<ConcludedClaim[]> {
+  async claimsAsserting({ proposition }: ClaimsAssertingQuery): Promise<ConcludedClaim[]> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {name: $name}) RETURN c`,
       { c: vertexProps<{ name: string } & Identified>() },
@@ -100,7 +99,7 @@ export class FindingGroup extends SessionCore {
    * Every record containing the text, as `{handle, wording}` pairs grouped by label — how a
    * caller holding only wording finds the handle for it.
    */
-  async search(text: Prose): Promise<SearchGroup[]> {
+  async search({ text }: SearchQuery): Promise<SearchGroup[]> {
     const groups: SearchGroup[] = [];
     for (const label of NODE_LABELS) {
       const scalarProps = SEARCHABLE_TEXT[label] ?? [];

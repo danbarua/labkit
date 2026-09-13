@@ -66,7 +66,7 @@ describe("S-30: fixed before the first run", () => {
     expect(amended.confirmatoryAffected).toEqual([]);
 
     // And it is a real amendment, not a note beside the condition.
-    const history = await (await afterwards()).designHistory(gate);
+    const history = await (await afterwards()).designHistory({ gate });
     const wordings = history.conditions.flatMap((c) =>
       c.amendments.map((a) => a.replaced.requires),
     );
@@ -191,8 +191,8 @@ describe("S-30: fixed before the first run", () => {
     // than blocked or ready. Recorded here because a live programme reaching
     // this shape will ask exactly this, and the answer is not obvious.
     const later = await afterwards();
-    expect((await later.gateList()).map((g) => g.state)).toEqual(["incomplete"]);
-    const standing = await later.now();
+    expect((await later.gateList({})).map((g) => g.state)).toEqual(["incomplete"]);
+    const standing = await later.now({});
     expect(standing.unevaluated.work.map((w) => w.work)).toEqual([work]);
     expect(standing.blocked.work).toEqual([]);
     expect(standing.untouched).toEqual([]);

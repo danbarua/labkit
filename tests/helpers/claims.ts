@@ -23,10 +23,10 @@ export function claimOf(claims: ConcludedClaim[], proposition: string): ClaimRef
  * The claim asserting a proposition, resolved through the read surface.
  */
 export async function claimNamed(
-  read: { claimsAsserting(p: string): Promise<ConcludedClaim[]> },
+  read: { claimsAsserting(query: { proposition: string }): Promise<ConcludedClaim[]> },
   proposition: string,
 ): Promise<ClaimRef> {
-  const found = await read.claimsAsserting(proposition);
+  const found = await read.claimsAsserting({ proposition });
   if (found.length === 0) throw new Error(`nothing claims "${proposition}"`);
   if (found.length > 1)
     throw new Error(`"${proposition}" is claimed ${found.length} times; name one`);
@@ -36,10 +36,10 @@ export async function claimNamed(
 /** `whySupported`, given a proposition — resolves the handle first. */
 export async function whyOf<T>(
   read: {
-    claimsAsserting(p: string): Promise<ConcludedClaim[]>;
-    whySupported(c: ClaimRef): Promise<T>;
+    claimsAsserting(query: { proposition: string }): Promise<ConcludedClaim[]>;
+    whySupported(query: { claim: ClaimRef }): Promise<T>;
   },
   proposition: string,
 ): Promise<T> {
-  return read.whySupported(await claimNamed(read, proposition));
+  return read.whySupported({ claim: await claimNamed(read, proposition) });
 }

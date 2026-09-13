@@ -91,7 +91,7 @@ describe("S-11c: nothing found is not nothing there", () => {
   test("a re-entered intermediate still severs the chain, and the report says so", async () => {
     const { raw } = await aTwoStagePipeline(session);
 
-    const affected = await (await afterwards()).whatDependsOn(raw);
+    const affected = await (await afterwards()).whatDependsOn({ subject: raw });
 
     // The traversal is transitive now (row AE), but this builder deliberately re-enters the
     // intermediate as fresh observations rather than reading the first analysis's output --
@@ -117,8 +117,8 @@ describe("S-11c: nothing found is not nothing there", () => {
     });
 
     const reader = await afterwards();
-    const under = await reader.whatDependsOn(raw);
-    const none = await reader.whatDependsOn(unrelated);
+    const under = await reader.whatDependsOn({ subject: raw });
+    const none = await reader.whatDependsOn({ subject: unrelated });
 
     // Nothing was found for the humidity log, and the report does not let that
     // be read as independence. This is the remedy in full: the values are
@@ -140,7 +140,7 @@ describe("S-11c: nothing found is not nothing there", () => {
    */
   test("the report cannot be made to claim completeness", async () => {
     const { raw } = await aTwoStagePipeline(session);
-    const affected = await (await afterwards()).whatDependsOn(raw);
+    const affected = await (await afterwards()).whatDependsOn({ subject: raw });
 
     expect(affected.complete).toBe(false);
 

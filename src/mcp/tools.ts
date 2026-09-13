@@ -7,7 +7,30 @@ import { createdIn } from "../domain";
 import { z } from "zod";
 import type { ReadGroup, ReadSurface, WriteGroup, WriteSurface } from "../domain";
 import type { SessionRegistry } from "../attribution";
-import { ref } from "../domain/report";
+import {
+  claimsAssertingQuery,
+  contractForQuery,
+  criteriaGoverningQuery,
+  designHistoryQuery,
+  doTheseConflictQuery,
+  enquiryStatusQuery,
+  eventFilter,
+  gateListQuery,
+  gateStatusQuery,
+  interpretationHistoryQuery,
+  knownAtQuery,
+  notesQuery,
+  nowQuery,
+  originOfQuery,
+  pursuitsOfQuery,
+  reproducibilityOfQuery,
+  reproductionOfQuery,
+  searchQuery,
+  whatDependsOnQuery,
+  whyQuery,
+  whySupportedQuery,
+  workListQuery,
+} from "../domain/queries";
 import {
   acceptAsUnresolvedCommand,
   amendDesignCommand,
@@ -166,7 +189,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       since: z.number().optional().describe("a `seq` `now` returned before"),
     },
     outputSchema: standingSchema,
-    handler: (read, { since }) => read.now(since),
+    handler: (read, { since }) =>
+      read.now(nowQuery.parse({ ...(since === undefined ? {} : { since }) })),
   }),
   tool({
     name: "known",
@@ -186,7 +210,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     // | HistoricalSurvey` — genuinely two reports, not one with an extra field: the as-of
     // answer has `open` where the present-day one has `unresolved` and `untested`, and cannot
     // split them.
-    handler: (read, { at }) => (at ? read.whatWasKnown(at) : read.whatIsKnown()),
+    handler: (read, { at }) =>
+      at ? read.whatWasKnown(knownAtQuery.parse({ at })) : read.whatIsKnown(),
   }),
 
   tool({
@@ -205,7 +230,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       subject: z.string().describe("a handle of any kind, or a claim's proposition"),
     },
     // No `outputSchema` -- see `known`'s comment for the measured reason.
-    handler: (read, { subject }) => read.why(subject),
+    handler: (read, { subject }) => read.why(whyQuery.parse({ subject })),
   }),
 
   tool({
@@ -228,7 +253,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
     },
     outputSchema: supportExplanationSchema,
-    handler: (read, { claim }) => read.whySupported(ref("claim", claim)),
+    handler: (read, { claim }) => read.whySupported(whySupportedQuery.parse({ claim })),
   }),
 
   tool({
@@ -245,7 +270,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: searchSchema,
     handler: async (read, { text }) => ({
-      groups: await read.search(text),
+      groups: await read.search(searchQuery.parse({ text })),
     }),
   }),
 
@@ -264,7 +289,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: claimsAssertingSchema,
     handler: async (read, { proposition }) => ({
-      claims: await read.claimsAsserting(proposition),
+      claims: await read.claimsAsserting(claimsAssertingQuery.parse({ proposition })),
     }),
   }),
 
@@ -282,7 +307,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: pursuitsSchema,
     handler: async (read, { question }) => ({
-      enquiries: await read.pursuitsOf(ref("question", question)),
+      enquiries: await read.pursuitsOf(pursuitsOfQuery.parse({ question })),
     }),
   }),
 
@@ -300,7 +325,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: originOfSchema,
     handler: async (read, { question }) => ({
-      origin: await read.originOf(ref("question", question)),
+      origin: await read.originOf(originOfQuery.parse({ question })),
     }),
   }),
   tool({
@@ -315,13 +340,14 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "is stopping work, `never-evaluated` is a condition nobody has checked. Use " +
       "`gate_status` for the itemised checks behind any one of them.",
     inputSchema: {
-      state: z
-        .enum(["never-evaluated", "incomplete", "blocked", "satisfied"])
-        .optional()
-        .describe("only gates in this state (default: all of them)"),
+      state: gateListQuery.shape.state.describe("only gates in this state (default: all of them)"),
     },
     outputSchema: gateListSchema,
-    handler: async (read, { state }) => ({ gates: await read.gateList(state) }),
+    handler: async (read, { state }) => ({
+      gates: await read.gateList(
+        gateListQuery.parse({ ...(state === undefined ? {} : { state }) }),
+      ),
+    }),
   }),
 
   tool({
@@ -334,7 +360,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "gate that failed and was re-checked does not read as though it never failed.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
     outputSchema: gateStatusSchema,
-    handler: (read, { gate }) => read.gateStatus(ref("gate", gate)),
+    handler: (read, { gate }) => read.gateStatus(gateStatusQuery.parse({ gate })),
   }),
 
   tool({
@@ -347,7 +373,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
     outputSchema: criteriaGoverningSchema,
     handler: async (read, { gate }) => ({
-      criteria: await read.criteriaGoverning(ref("gate", gate)),
+      criteria: await read.criteriaGoverning(criteriaGoverningQuery.parse({ gate })),
     }),
   }),
   tool({
@@ -361,7 +387,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "so that is the handle, not the design's name.",
     inputSchema: { gate: z.string().describe(`gate id, e.g. ${GATE_PREFIX}1`) },
     outputSchema: designHistorySchema,
-    handler: (read, { gate }) => read.designHistory(ref("gate", gate)),
+    handler: (read, { gate }) => read.designHistory(designHistoryQuery.parse({ gate })),
   }),
   tool({
     name: "work_list",
@@ -376,13 +402,12 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "done. Not the same question as `gate_list`: a gate reaches only the work it protects, " +
       "and work planned without one appears nowhere else.",
     inputSchema: {
-      state: z
-        .enum(["planned", "waiting", "blocked", "carried-out", "abandoned"])
-        .optional()
-        .describe("only work in this state (default: all of it)"),
+      state: workListQuery.shape.state.describe("only work in this state (default: all of it)"),
     },
     outputSchema: workListSchema,
-    handler: async (read, { state }) => ({ work: await read.workList(state) }),
+    handler: async (read, { state }) => ({
+      work: await read.workList(workListQuery.parse({ ...(state === undefined ? {} : { state }) })),
+    }),
   }),
 
   tool({
@@ -395,7 +420,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "look at, and nothing stops a computation reading elsewhere.",
     inputSchema: { work: z.string().describe(`work id, e.g. ${WORK_PREFIX}1`) },
     outputSchema: taskContractSchema,
-    handler: (read, { work }) => read.contractFor(ref("work", work)),
+    handler: (read, { work }) => read.contractFor(contractForQuery.parse({ work })),
   }),
 
   tool({
@@ -409,7 +434,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
     },
     outputSchema: enquiryStatusSchema,
-    handler: (read, { enquiry }) => read.enquiryStatus(ref("enquiry", enquiry)),
+    handler: (read, { enquiry }) => read.enquiryStatus(enquiryStatusQuery.parse({ enquiry })),
   }),
 
   tool({
@@ -425,7 +450,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4`),
     },
     outputSchema: interpretationHistorySchema,
-    handler: (read, { claim }) => read.interpretationHistory(ref("claim", claim)),
+    handler: (read, { claim }) =>
+      read.interpretationHistory(interpretationHistoryQuery.parse({ claim })),
   }),
 
   tool({
@@ -443,7 +469,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       analysis: z.string().describe(`id of the verifying analysis, e.g. ${ANALYSIS_PREFIX}5`),
     },
     outputSchema: reproductionReportSchema,
-    handler: (read, { analysis }) => read.reproductionOf(ref("analysis", analysis)),
+    handler: (read, { analysis }) =>
+      read.reproductionOf(reproductionOfQuery.parse({ verification: analysis })),
   }),
 
   tool({
@@ -470,13 +497,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: reproducibilityReportSchema,
     handler: (read, { analysis, rebuilt }) =>
-      read.reproducibilityOf(
-        ref("analysis", analysis),
-        ((rebuilt ?? []) as Array<{ part: string; hash: string }>).map((r) => ({
-          part: ref("observations", r.part),
-          hash: r.hash,
-        })),
-      ),
+      read.reproducibilityOf(reproducibilityOfQuery.parse({ analysis, rebuilt: rebuilt ?? [] })),
   }),
 
   tool({
@@ -494,9 +515,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: dependencyReportSchema,
     handler: (read, { artefact }) =>
-      read.whatDependsOn(
-        artefact.startsWith(ARTEFACT_PREFIX) ? ref("observations", artefact) : artefact,
-      ),
+      read.whatDependsOn(whatDependsOnQuery.parse({ subject: artefact })),
   }),
 
   tool({
@@ -514,7 +533,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       b: z.string().describe(`the second claim's id, e.g. ${CLAIM_PREFIX}7`),
     },
     outputSchema: conflictVerdictSchema,
-    handler: (read, { a, b }) => read.doTheseConflict(ref("claim", a), ref("claim", b)),
+    handler: (read, { a, b }) => read.doTheseConflict(doTheseConflictQuery.parse({ a, b })),
   }),
 
   tool({
@@ -544,14 +563,16 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     },
     outputSchema: whatHappenedSchema,
     handler: async (read, { since_seq, by, operation, touching, reconstructed, limit }) => {
-      const page = await read.whatHappenedPage({
-        ...(since_seq === undefined ? {} : { since: since_seq }),
-        ...(by === undefined ? {} : { by }),
-        ...(operation === undefined ? {} : { operation }),
-        ...(touching === undefined ? {} : { touching }),
-        ...(reconstructed === undefined ? {} : { reconstructed }),
-        limit: limit ?? 50,
-      });
+      const page = await read.whatHappenedPage(
+        eventFilter.parse({
+          ...(since_seq === undefined ? {} : { since: since_seq }),
+          ...(by === undefined ? {} : { by }),
+          ...(operation === undefined ? {} : { operation }),
+          ...(touching === undefined ? {} : { touching }),
+          ...(reconstructed === undefined ? {} : { reconstructed }),
+          limit: limit ?? 50,
+        }),
+      );
       return {
         more: page.more,
         events: page.acts.map((e) => ({
@@ -581,7 +602,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "concerns, and the question it prompted where it prompted one.",
     inputSchema: {},
     outputSchema: notesSchema,
-    handler: async (read) => ({ notes: await read.notes() }),
+    handler: async (read) => ({ notes: await read.notes(notesQuery.parse({})) }),
   }),
 ] as ReadonlyArray<ToolDefinition<z.ZodRawShape>>;
 

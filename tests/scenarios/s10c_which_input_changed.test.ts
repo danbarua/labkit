@@ -87,7 +87,7 @@ describe("S-10c: which input changed?", () => {
    */
   test("swapping an input for a same-named one is reported as two differences", async () => {
     const { verification } = await aReVerificationAgainstTheRegeneratedControl(session);
-    const report = await (await afterwards()).reproductionOf(verification);
+    const report = await (await afterwards()).reproductionOf({ verification });
     expect(report.differs).toHaveLength(2);
   });
 
@@ -98,7 +98,7 @@ describe("S-10c: which input changed?", () => {
     const { original, regenerated, verification } =
       await aReVerificationAgainstTheRegeneratedControl(session);
 
-    const report = await (await afterwards()).reproductionOf(verification);
+    const report = await (await afterwards()).reproductionOf({ verification });
 
     expect(report.differs.map((d) => d.what.name)).toEqual([NAME, NAME]);
     expect(report.differs.map((d) => d.what.part).sort()).toEqual([original, regenerated].sort());
@@ -119,11 +119,11 @@ describe("S-10c: which input changed?", () => {
     const reader = await afterwards();
 
     // Name: refused, with the count that makes the refusal actionable.
-    await expect(reader.whatDependsOn(NAME)).rejects.toThrow(/2 artefacts are named/);
+    await expect(reader.whatDependsOn({ subject: NAME })).rejects.toThrow(/2 artefacts are named/);
 
     // Reference: answered, separately, for each.
     for (const part of [original, regenerated]) {
-      const rests = await reader.whatDependsOn(part);
+      const rests = await reader.whatDependsOn({ subject: part });
       expect(rests.claims.map((c) => c.asserts)).toEqual([HOLDS]);
     }
   });

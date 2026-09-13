@@ -27,6 +27,7 @@ import {
   type SessionRegistry,
 } from "../src/attribution";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
+import { GATE_STATES } from "../src/domain/vocab";
 import {
   explanationSchema,
   historicalSurveySchema,
@@ -620,6 +621,15 @@ describe("the tool documentation resource", () => {
     expect(cli).toContain("not for your own results");
   });
 
+  test("gate_list advertises closed gate states, not a four-state subset", () => {
+    const tool = TOOLS.find((t) => t.name === "gate_list")!;
+    // Through `toJSONSchema`: it is what an agent is actually handed.
+    const declared = z.toJSONSchema(z.strictObject(tool.inputSchema)) as {
+      properties: Record<string, { enum?: string[] }>;
+    };
+    expect(declared.properties.state?.enum).toEqual([...GATE_STATES]);
+  });
+
   test("every tool, and every field of every declared output, is documented", async () => {
     const client = await connected();
     try {
@@ -710,15 +720,17 @@ describe("behaviour — the same answers, over the wire", () => {
       );
       const claim = await claimNamed(read, PROP);
       expect(await structured(client, "why_supported", { claim: claim })).toEqual(
-        JSON.parse(JSON.stringify(await read.whySupported(claim))),
+        JSON.parse(JSON.stringify(await read.whySupported({ claim }))),
       );
       expect(
         await structured(client, "what_depends_on", {
           artefact: "sweep readings",
         }),
-      ).toEqual(JSON.parse(JSON.stringify(await read.whatDependsOn("sweep readings"))));
+      ).toEqual(
+        JSON.parse(JSON.stringify(await read.whatDependsOn({ subject: "sweep readings" }))),
+      );
       expect(await structured(client, "enquiry_status", { enquiry: enquiry })).toEqual(
-        JSON.parse(JSON.stringify(await read.enquiryStatus(enquiry))),
+        JSON.parse(JSON.stringify(await read.enquiryStatus({ enquiry }))),
       );
       await client.close();
     } finally {
@@ -756,7 +768,7 @@ describe("behaviour — the same answers, over the wire", () => {
     const { client, read } = await seeded();
     try {
       const claim = await claimNamed(read, PROP);
-      const direct = JSON.parse(JSON.stringify(await read.whySupported(claim)));
+      const direct = JSON.parse(JSON.stringify(await read.whySupported({ claim })));
       const overWire = await structured(client, "why_supported", {
         claim: claim,
       });
@@ -781,7 +793,7 @@ describe("behaviour — the same answers, over the wire", () => {
       };
 
       await parsed("why_supported", {
-        claim: (await read.claimsAsserting(PROP))[0]!.claim,
+        claim: (await read.claimsAsserting({ proposition: PROP }))[0]!.claim,
       });
       await parsed("what_depends_on", { artefact: "sweep readings" });
       await parsed("enquiry_status", { enquiry: enquiry });
@@ -801,7 +813,9 @@ describe("behaviour — the same answers, over the wire", () => {
       // union -- checked here for both cases this test already has a handle
       // for. `work`'s case is checked the same way in tests/mcp-smoke.test.ts.
       const claimWhy = explanationSchema.safeParse(
-        await structured(client, "why", { subject: (await read.claimsAsserting(PROP))[0]!.claim }),
+        await structured(client, "why", {
+          subject: (await read.claimsAsserting({ proposition: PROP }))[0]!.claim,
+        }),
       );
       expect(claimWhy.success).toBe(true);
       expect(claimWhy.success && claimWhy.data.kind).toBe("claim");

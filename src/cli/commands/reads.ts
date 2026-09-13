@@ -2,12 +2,34 @@
  * The read commands — one per public verb on `ReadSurface`.
  */
 
-import type { Command } from "commander";
-import { anyRef, gateState, handle, rebuilt, whole, workState } from "../args";
+import { InvalidArgumentError, type Command } from "commander";
+import { parseCommand, whole } from "../args";
 import { answer } from "../output";
 import type { Run } from "../session";
-import type { EventFilter } from "../../domain";
-import type { AnyRef } from "../../domain/report";
+import {
+  claimsAssertingQuery,
+  contractForQuery,
+  criteriaGoverningQuery,
+  designHistoryQuery,
+  doTheseConflictQuery,
+  enquiryStatusQuery,
+  eventFilter,
+  gateListQuery,
+  gateStatusQuery,
+  interpretationHistoryQuery,
+  knownAtQuery,
+  notesQuery,
+  nowQuery,
+  originOfQuery,
+  pursuitsOfQuery,
+  reproducibilityOfQuery,
+  reproductionOfQuery,
+  searchQuery,
+  whatDependsOnQuery,
+  whyQuery,
+  workListQuery,
+} from "../../domain/queries";
+import { GATE_STATES, WORK_STATES } from "../../domain/vocab";
 import {
   renderHistorical,
   renderKnown,
@@ -47,9 +69,10 @@ export function registerReads(program: Command, run: Run): void {
         "seq, and always prints the current `seq`, to pass back next time.",
     )
     .option("--since <seq>", "only what moved since this seq -- the one `now` last returned", whole)
-    .action(async ({ since }: { since?: number }) =>
-      run(async ({ read }) => answer(await read.now(since), renderStanding)),
-    );
+    .action(async ({ since }: { since?: number }) => {
+      const query = parseCommand(nowQuery, { ...(since === undefined ? {} : { since }) });
+      return run(async ({ read }) => answer(await read.now(query), renderStanding));
+    });
   program
     .command("known")
     .helpGroup("What stands")
@@ -62,17 +85,17 @@ export function registerReads(program: Command, run: Run): void {
         "because nothing records when work began.",
     )
     .option("--at <instant>", "ISO instant, e.g. 2026-08-21T09:00:00.000Z")
-    .action(async ({ at }: { at?: string }) =>
-      run(async ({ read }) =>
-        // Two reports, not one with an extra field: the as-of answer has `open`
-        // where the present-day one has `unresolved` and `untested`, and cannot
-        // split them. Two views, chosen here rather than inside one that
-        // has to ask which it was given.
-        at
-          ? answer(await read.whatWasKnown(at), renderHistorical)
-          : answer(await read.whatIsKnown(), renderKnown),
-      ),
-    );
+    .action(async ({ at }: { at?: string }) => {
+      // Two reports, not one with an extra field: the as-of answer has `open`
+      // where the present-day one has `unresolved` and `untested`, and cannot
+      // split them. Two views, chosen here rather than inside one that
+      // has to ask which it was given.
+      if (at) {
+        const query = parseCommand(knownAtQuery, { at });
+        return run(async ({ read }) => answer(await read.whatWasKnown(query), renderHistorical));
+      }
+      return run(async ({ read }) => answer(await read.whatIsKnown(), renderKnown));
+    });
   program
     .command("why")
     .helpGroup("What stands")
@@ -86,9 +109,10 @@ export function registerReads(program: Command, run: Run): void {
         "not explain yet is refused, naming what it does.",
     )
     .argument("<subject>", "a handle of any kind, or a claim's proposition")
-    .action(async (subject: string) =>
-      run(async ({ read }) => answer(await read.why(subject), renderWhyDispatch)),
-    );
+    .action(async (subject: string) => {
+      const query = parseCommand(whyQuery, { subject });
+      return run(async ({ read }) => answer(await read.why(query), renderWhyDispatch));
+    });
   program
     .command("search")
     .helpGroup("Finding a handle")
@@ -99,12 +123,13 @@ export function registerReads(program: Command, run: Run): void {
         "and cheaper, is `claims`, which finds a claim by its exact asserted sentence.",
     )
     .argument("<text>", "the text to search for")
-    .action(async (text: string) =>
-      run(async ({ read }) => {
-        const groups = await read.search(text);
-        return answer(groups, (g, p) => renderSearch(g, text, p));
-      }),
-    );
+    .action(async (text: string) => {
+      const query = parseCommand(searchQuery, { text });
+      return run(async ({ read }) => {
+        const groups = await read.search(query);
+        return answer(groups, (g, p) => renderSearch(g, query.text, p));
+      });
+    });
   program
     .command("claims")
     .helpGroup("Finding a handle")
@@ -115,12 +140,13 @@ export function registerReads(program: Command, run: Run): void {
         "claims (S-5).",
     )
     .argument("<proposition>", "the sentence, as worded")
-    .action(async (proposition: string) =>
-      run(async ({ read }) => {
-        const claims = await read.claimsAsserting(proposition);
-        return answer(claims, (c, p) => renderClaims(c, proposition, p));
-      }),
-    );
+    .action(async (proposition: string) => {
+      const query = parseCommand(claimsAssertingQuery, { proposition });
+      return run(async ({ read }) => {
+        const claims = await read.claimsAsserting(query);
+        return answer(claims, (c, p) => renderClaims(c, query.proposition, p));
+      });
+    });
   program
     .command("pursuits")
     .helpGroup("Finding a handle")
@@ -129,13 +155,14 @@ export function registerReads(program: Command, run: Run): void {
       "How a caller that did not open an enquiry finds one to work in. An empty list means the " +
         "question is on the books and nothing has been started on it.",
     )
-    .argument("<question-id>", "e.g. Q_12", handle("question"))
-    .action(async (question) =>
-      run(async ({ read }) => {
-        const enquiries = await read.pursuitsOf(question);
-        return answer(enquiries, (e, p) => renderPursuits(e, question, p));
-      }),
-    );
+    .argument("<question-id>", "e.g. Q_12")
+    .action(async (question: string) => {
+      const query = parseCommand(pursuitsOfQuery, { question });
+      return run(async ({ read }) => {
+        const enquiries = await read.pursuitsOf(query);
+        return answer(enquiries, (e, p) => renderPursuits(e, query.question, p));
+      });
+    });
   program
     .command("origin")
     .helpGroup("Finding a handle")
@@ -145,13 +172,14 @@ export function registerReads(program: Command, run: Run): void {
         "sharpening was recorded rather than recomputed now. Null for a question somebody " +
         "simply asked, which is most of them.",
     )
-    .argument("<question-id>", "e.g. Q_12", handle("question"))
-    .action(async (question) =>
-      run(async ({ read }) => {
-        const origin = await read.originOf(question);
-        return answer(origin, (o, p) => renderOrigin(o, question, p));
-      }),
-    );
+    .argument("<question-id>", "e.g. Q_12")
+    .action(async (question: string) => {
+      const query = parseCommand(originOfQuery, { question });
+      return run(async ({ read }) => {
+        const origin = await read.originOf(query);
+        return answer(origin, (o, p) => renderOrigin(o, query.question, p));
+      });
+    });
   program
     .command("gates")
     .helpGroup("What is blocked")
@@ -161,19 +189,15 @@ export function registerReads(program: Command, run: Run): void {
         "handle, and until this existed the only way to get one was to already hold a " +
         "claim. `--state blocked` is what is stopping work.",
     )
-    // **The coercion is commander's parser, not called in the action.** Passed here, commander
-    // catches the `InvalidArgumentError`, prints it with usage and exits before any command
-    // body runs.
-    .option(
-      "--state <state>",
-      "never-evaluated | incomplete | blocked | satisfied | sidestepped | retired",
-      gateState,
-    )
-    .action(async (opts: { state?: ReturnType<typeof gateState> }) =>
-      run(async ({ read }) =>
-        answer(await read.gateList(opts.state), (gates, p) => renderGateList(gates, p, true)),
-      ),
-    );
+    .option("--state <state>", GATE_STATES.join(" | "))
+    .action(async (opts: { state?: string }) => {
+      const query = parseCommand(gateListQuery, {
+        ...(opts.state === undefined ? {} : { state: opts.state }),
+      });
+      return run(async ({ read }) =>
+        answer(await read.gateList(query), (gates, p) => renderGateList(gates, p, true)),
+      );
+    });
   program
     .command("work")
     .helpGroup("What is blocked")
@@ -186,13 +210,15 @@ export function registerReads(program: Command, run: Run): void {
         "without one appears nowhere else. `why <task-id>` gives the line of enquiry (and " +
         "question) a task exists to advance, where `plan` was told one.",
     )
-    // Commander's parser, for the reason given on `gates` above.
-    .option("--state <state>", "planned | waiting | blocked | carried-out | abandoned", workState)
-    .action(async (opts: { state?: ReturnType<typeof workState> }) =>
-      run(async ({ read }) =>
-        answer(await read.workList(opts.state), (work, p) => renderWorkList(work, p, true)),
-      ),
-    );
+    .option("--state <state>", WORK_STATES.join(" | "))
+    .action(async (opts: { state?: string }) => {
+      const query = parseCommand(workListQuery, {
+        ...(opts.state === undefined ? {} : { state: opts.state }),
+      });
+      return run(async ({ read }) =>
+        answer(await read.workList(query), (work, p) => renderWorkList(work, p, true)),
+      );
+    });
   program
     .command("gate")
     .helpGroup("What is blocked")
@@ -201,22 +227,24 @@ export function registerReads(program: Command, run: Run): void {
       "Which checks passed, which failed, which were never run, and which have no standing " +
         "verdict.",
     )
-    .argument("<gate-id>", "e.g. GATE_1", handle("gate"))
-    .action(async (gate) =>
-      run(async ({ read }) => answer(await read.gateStatus(gate), renderGate)),
-    );
+    .argument("<gate-id>", "e.g. GATE_1")
+    .action(async (gate: string) => {
+      const query = parseCommand(gateStatusQuery, { gate });
+      return run(async ({ read }) => answer(await read.gateStatus(query), renderGate));
+    });
   program
     .command("criteria")
     .helpGroup("What is blocked")
     .summary("which conditions a gate is bound to")
     .description("Pair it with `gate` for their wording and their current standing.")
-    .argument("<gate-id>", "e.g. GATE_1", handle("gate"))
-    .action(async (gate) =>
-      run(async ({ read }) => {
-        const criteria = await read.criteriaGoverning(gate);
-        return answer(criteria, (c, p) => renderCriteria(c, gate, p));
-      }),
-    );
+    .argument("<gate-id>", "e.g. GATE_1")
+    .action(async (gate: string) => {
+      const query = parseCommand(criteriaGoverningQuery, { gate });
+      return run(async ({ read }) => {
+        const criteria = await read.criteriaGoverning(query);
+        return answer(criteria, (c, p) => renderCriteria(c, query.gate, p));
+      });
+    });
   program
     .command("design")
     .helpGroup("What is blocked")
@@ -225,10 +253,11 @@ export function registerReads(program: Command, run: Run): void {
       "Each amendment, its reason, and whether it was mechanical or substantive. Ordered from " +
         "the record itself rather than from timestamps.",
     )
-    .argument("<gate-id>", "e.g. GATE_1", handle("gate"))
-    .action(async (gate) =>
-      run(async ({ read }) => answer(await read.designHistory(gate), renderDesign)),
-    );
+    .argument("<gate-id>", "e.g. GATE_1")
+    .action(async (gate: string) => {
+      const query = parseCommand(designHistoryQuery, { gate });
+      return run(async ({ read }) => answer(await read.designHistory(query), renderDesign));
+    });
   program
     .command("contract")
     .helpGroup("What is blocked")
@@ -237,10 +266,11 @@ export function registerReads(program: Command, run: Run): void {
       "Its objective, what would count as meeting it, and what it may read. Not enforced, and " +
         "it says so: nothing stops a computation reading elsewhere.",
     )
-    .argument("<work-id>", "e.g. TASK_1", handle("work"))
-    .action(async (work) =>
-      run(async ({ read }) => answer(await read.contractFor(work), renderContract)),
-    );
+    .argument("<work-id>", "e.g. TASK_1")
+    .action(async (work: string) => {
+      const query = parseCommand(contractForQuery, { work });
+      return run(async ({ read }) => answer(await read.contractFor(query), renderContract));
+    });
   program
     .command("enquiry")
     .helpGroup("One record's story")
@@ -251,10 +281,11 @@ export function registerReads(program: Command, run: Run): void {
         "adds which of `known`'s five buckets this enquiry's own question currently sits in — " +
         "did closing it move the bucket?",
     )
-    .argument("<enquiry-id>", "e.g. LOE_7", handle("enquiry"))
-    .action(async (enquiry) =>
-      run(async ({ read }) => answer(await read.enquiryStatus(enquiry), renderEnquiry)),
-    );
+    .argument("<enquiry-id>", "e.g. LOE_7")
+    .action(async (enquiry: string) => {
+      const query = parseCommand(enquiryStatusQuery, { enquiry });
+      return run(async ({ read }) => answer(await read.enquiryStatus(query), renderEnquiry));
+    });
   program
     .command("interpretation")
     .helpGroup("One record's story")
@@ -263,12 +294,13 @@ export function registerReads(program: Command, run: Run): void {
       "The claims each step withdrew, the decision that narrowed them and why. One step can " +
         "withdraw several claims, so every step names records rather than a sentence.",
     )
-    .argument("<claim-id>", "e.g. CLM_4", handle("claim"))
-    .action(async (claim) =>
-      run(async ({ read }) =>
-        answer(await read.interpretationHistory(claim), renderInterpretation),
-      ),
-    );
+    .argument("<claim-id>", "e.g. CLM_4")
+    .action(async (claim: string) => {
+      const query = parseCommand(interpretationHistoryQuery, { claim });
+      return run(async ({ read }) =>
+        answer(await read.interpretationHistory(query), renderInterpretation),
+      );
+    });
   program
     .command("reproduction")
     .helpGroup("One record's story")
@@ -278,10 +310,11 @@ export function registerReads(program: Command, run: Run): void {
         "records is the same execution depends on what the method does, which the record does " +
         "not know. Takes the id of the analysis that did the verifying.",
     )
-    .argument("<analysis-id>", "the verifying analysis, e.g. COMP_5", handle("analysis"))
-    .action(async (analysis) =>
-      run(async ({ read }) => answer(await read.reproductionOf(analysis), renderReproduction)),
-    );
+    .argument("<analysis-id>", "the verifying analysis, e.g. COMP_5")
+    .action(async (analysis: string) => {
+      const query = parseCommand(reproductionOfQuery, { verification: analysis });
+      return run(async ({ read }) => answer(await read.reproductionOf(query), renderReproduction));
+    });
   program
     .command("reproducibility")
     .helpGroup("One record's story")
@@ -291,13 +324,21 @@ export function registerReads(program: Command, run: Run): void {
         "unverifiable (the record kept no hash), or not rebuilt. Unverifiable is the record " +
         "admitting it cannot answer, which is different from answering no.",
     )
-    .argument("<analysis-id>", "e.g. COMP_3", handle("analysis"))
+    .argument("<analysis-id>", "e.g. COMP_3")
     .argument("[parts...]", "<part-id>=<hash> pairs for what you rebuilt")
-    .action(async (analysis, parts: string[]) =>
-      run(async ({ read }) =>
-        answer(await read.reproducibilityOf(analysis, parts.map(rebuilt)), renderReproducibility),
-      ),
-    );
+    .action(async (analysis: string, parts: string[]) => {
+      const query = parseCommand(reproducibilityOfQuery, {
+        analysis,
+        rebuilt: (parts ?? []).map((raw) => {
+          const at = raw.indexOf("=");
+          if (at < 1) throw new InvalidArgumentError(`\`${raw}\` is not <part-id>=<hash>`);
+          return { part: raw.slice(0, at), hash: raw.slice(at + 1) };
+        }),
+      });
+      return run(async ({ read }) =>
+        answer(await read.reproducibilityOf(query), renderReproducibility),
+      );
+    });
   program
     .command("affects")
     .helpGroup("One record's story")
@@ -308,16 +349,10 @@ export function registerReads(program: Command, run: Run): void {
         "route not listed is absent from the lists, not thereby unaffected.",
     )
     .argument("<artefact-or-name>", "a logical name, or an ART_… id when a name is ambiguous")
-    .action(async (subject: string) =>
-      run(async ({ read }) =>
-        answer(
-          await read.whatDependsOn(
-            subject.startsWith("ART_") ? handle("observations")(subject) : subject,
-          ),
-          renderAffects,
-        ),
-      ),
-    );
+    .action(async (subject: string) => {
+      const query = parseCommand(whatDependsOnQuery, { subject });
+      return run(async ({ read }) => answer(await read.whatDependsOn(query), renderAffects));
+    });
   program
     .command("conflict")
     .helpGroup("One record's story")
@@ -327,11 +362,12 @@ export function registerReads(program: Command, run: Run): void {
         "results are not in conflict if they asked about different endpoints, and this is what " +
         "tells them apart.",
     )
-    .argument("<claim-a>", "the first claim's id", handle("claim"))
-    .argument("<claim-b>", "the second claim's id", handle("claim"))
-    .action(async (a, b) =>
-      run(async ({ read }) => answer(await read.doTheseConflict(a, b), renderConflict)),
-    );
+    .argument("<claim-a>", "the first claim's id")
+    .argument("<claim-b>", "the second claim's id")
+    .action(async (a: string, b: string) => {
+      const query = parseCommand(doTheseConflictQuery, { a, b });
+      return run(async ({ read }) => answer(await read.doTheseConflict(query), renderConflict));
+    });
   program
     .command("notes")
     .helpGroup("What was done")
@@ -343,10 +379,11 @@ export function registerReads(program: Command, run: Run): void {
         "notes about one record, which is the only route to them for a claim, gate or line of " +
         "enquiry: `why` surfaces attached notes for a question and not for those.",
     )
-    .option("--on <handle>", "only the notes concerning this record", anyRef)
-    .action(async ({ on }: { on?: AnyRef }) =>
-      run(async ({ read }) => answer(await read.notes(on), renderNotes)),
-    );
+    .option("--on <handle>", "only the notes concerning this record")
+    .action(async ({ on }: { on?: string }) => {
+      const query = parseCommand(notesQuery, { ...(on === undefined ? {} : { concerning: on }) });
+      return run(async ({ read }) => answer(await read.notes(query), renderNotes));
+    });
   program
     .command("happened")
     .helpGroup("What was done")
@@ -377,22 +414,21 @@ export function registerReads(program: Command, run: Run): void {
           unsourced?: boolean;
           limit: number;
         },
-      ) =>
-        run(async ({ read }) => {
-          if (opts.reconstructed && opts.unsourced)
-            throw new Error(
-              "--reconstructed and --unsourced ask for opposite halves; pass neither for both",
-            );
-          const filter: EventFilter = {
-            ...(id === undefined ? {} : { touching: id }),
-            ...(opts.since === undefined ? {} : { since: opts.since }),
-            ...(opts.by === undefined ? {} : { by: opts.by }),
-            ...(opts.operation === undefined ? {} : { operation: opts.operation }),
-            ...(opts.reconstructed ? { reconstructed: true } : {}),
-            ...(opts.unsourced ? { reconstructed: false } : {}),
-            limit: opts.limit,
-          };
-          return answer(await read.whatHappenedPage(filter), renderHappened);
-        }),
+      ) => {
+        if (opts.reconstructed && opts.unsourced)
+          throw new Error(
+            "--reconstructed and --unsourced ask for opposite halves; pass neither for both",
+          );
+        const query = parseCommand(eventFilter, {
+          ...(id === undefined ? {} : { touching: id }),
+          ...(opts.since === undefined ? {} : { since: opts.since }),
+          ...(opts.by === undefined ? {} : { by: opts.by }),
+          ...(opts.operation === undefined ? {} : { operation: opts.operation }),
+          ...(opts.reconstructed ? { reconstructed: true } : {}),
+          ...(opts.unsourced ? { reconstructed: false } : {}),
+          limit: opts.limit,
+        });
+        return run(async ({ read }) => answer(await read.whatHappenedPage(query), renderHappened));
+      },
     );
 }

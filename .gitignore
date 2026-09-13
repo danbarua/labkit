@@ -22,6 +22,7 @@ bin/
 package-lock.json
 
 .idea
+.vscode
 
 # Claude Code, shared vs local.
 #

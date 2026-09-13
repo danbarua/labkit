@@ -40,7 +40,7 @@ describe("S-29: the note came after the question", () => {
     const { question } = await session.pose({ question: ASKS });
     const { note } = await session.note({ text: PROBE, prompted: question });
 
-    const origin = await (await afterwards()).originOf(question);
+    const origin = await (await afterwards()).originOf({ question });
     expect(origin?.kind).toBe("noted");
     expect(origin?.from).toBe(note);
     expect(origin?.said).toBe(PROBE);
@@ -58,7 +58,7 @@ describe("S-29: the note came after the question", () => {
       on: question,
     });
 
-    const why = await (await afterwards()).why(question);
+    const why = await (await afterwards()).why({ subject: question });
     const said = new Map(why.because.map((c) => [c.handle, c.wording]));
     expect(said.get(because)).toContain("was prompted by");
     expect(said.get(about)).toContain("has a note on it");
@@ -68,7 +68,7 @@ describe("S-29: the note came after the question", () => {
     const { question } = await session.pose({ question: ASKS });
     const { note } = await session.note({ text: PROBE, on: question, prompted: question });
 
-    const why = await (await afterwards()).why(question);
+    const why = await (await afterwards()).why({ subject: question });
     const wordings = why.because.filter((c) => c.handle === note).map((c) => c.wording);
     expect(wordings.some((w) => w.includes("was prompted by"))).toBe(true);
     expect(wordings.some((w) => w.includes("has a note on it"))).toBe(true);

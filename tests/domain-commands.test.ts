@@ -80,7 +80,7 @@ describe("commands are values a caller can hold", () => {
     await s.closeEnquiry(closing);
 
     const read = new ReadSurface(await scenario.current());
-    const why = await read.whySupported(await claimNamed(read, PROP));
+    const why = await read.whySupported({ claim: await claimNamed(read, PROP) });
     expect(why.verdict).toBe("supported");
     expect(why.promotedBecause).toBe("checked against the held-out split");
 

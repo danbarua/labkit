@@ -52,7 +52,7 @@ describe("what was known, as of an instant", () => {
     clock.wind(days(31));
     await s.openEnquiry("does batch size interact with it?");
 
-    const march = await s.whatWasKnown("2026-03-15T00:00:00.000Z");
+    const march = await s.whatWasKnown({ at: "2026-03-15T00:00:00.000Z" });
     expect(asked(march).open).toEqual(["does the schedule move convergence?"]);
     expect(asked(march).open).not.toContain("does batch size interact with it?");
   });
@@ -88,7 +88,7 @@ describe("what was known, as of an instant", () => {
     });
 
     // 14:00Z, four hours after the close — but "09" sorts before "10".
-    const offset = await s.whatWasKnown("2026-03-01T09:00:00-05:00");
+    const offset = await s.whatWasKnown({ at: "2026-03-01T09:00:00-05:00" });
     expect(asked(offset).provisional).toEqual(["does the schedule move convergence?"]);
     expect(asked(offset).open).toEqual([]);
   });
@@ -117,15 +117,15 @@ test("historical standing follows each pursuit from its own start through closur
   clock.windTo("2026-01-06T09:00:00.000Z");
   await s.closeEnquiry({ enquiry: sibling });
 
-  expect(asked(await s.whatWasKnown("2026-01-03T09:00:00.000Z"))).toMatchObject({
+  expect(asked(await s.whatWasKnown({ at: "2026-01-03T09:00:00.000Z" }))).toMatchObject({
     provisional: ["does depth move convergence?"],
     open: [],
   });
-  expect(asked(await s.whatWasKnown("2026-01-05T09:00:00.000Z"))).toMatchObject({
+  expect(asked(await s.whatWasKnown({ at: "2026-01-05T09:00:00.000Z" }))).toMatchObject({
     provisional: [],
     open: ["does depth move convergence?"],
   });
-  expect(asked(await s.whatWasKnown("2026-01-07T09:00:00.000Z"))).toMatchObject({
+  expect(asked(await s.whatWasKnown({ at: "2026-01-07T09:00:00.000Z" }))).toMatchObject({
     provisional: ["does depth move convergence?"],
     open: [],
   });

@@ -9,7 +9,7 @@ export async function evaluationsOf(
   session: ResearchSession,
   check: CheckStatus,
 ): Promise<EvaluationRecord[]> {
-  return (await session.criterionStanding(check.criterion)).evaluations;
+  return (await session.criterionStanding({ criterion: check.criterion })).evaluations;
 }
 
 /** What the evaluation that decided a check actually said. */

@@ -55,7 +55,7 @@ describe("why <task> names the state work already computes", () => {
       outcome: "fail",
     });
 
-    const explained = await (await afterwards()).why(work);
+    const explained = await (await afterwards()).why({ subject: work });
     expect(explained.is).toBe("blocked");
     expect(explained.because.map((c) => c.handle)).toContain(gate);
     expect(explained.because[0]!.wording).toContain("failed");
@@ -76,7 +76,7 @@ describe("why <task> names the state work already computes", () => {
       protecting: [work],
     });
 
-    const explained = await (await afterwards()).why(work);
+    const explained = await (await afterwards()).why({ subject: work });
     expect(explained.is).toBe("waiting");
     expect(explained.because.map((c) => c.handle)).toContain(gate);
     expect(explained.because[0]!.wording).toBe("never-evaluated");
@@ -102,7 +102,7 @@ describe("why <task> names the state work already computes", () => {
       concludes: [{ proposition: "T beats the control", finding: "p = 0.004" }],
     });
 
-    const explained = await (await afterwards()).why(work);
+    const explained = await (await afterwards()).why({ subject: work });
     expect(explained.is).toBe("carried-out");
     expect(explained.because.map((c) => c.handle)).toContain(analysis);
   });
@@ -115,7 +115,7 @@ describe("why <task> names the state work already computes", () => {
       addressing: enquiry,
     });
 
-    const explained = await (await afterwards()).why(work);
+    const explained = await (await afterwards()).why({ subject: work });
     expect(explained.is).toBe("planned — ready, no gate holds it");
     expect(explained.because.map((c) => c.handle)).toContain(enquiry);
   });
@@ -126,7 +126,7 @@ describe("why <task> names the state work already computes", () => {
       acceptance: "a table",
     });
 
-    const explained = await (await afterwards()).why(work);
+    const explained = await (await afterwards()).why({ subject: work });
     expect(explained.is).toBe("planned — ready, no gate holds it, and no question named");
     expect(explained.because).toHaveLength(0);
   });
@@ -143,7 +143,7 @@ describe("why <task> names the state work already computes", () => {
       because: "the comparison is no longer worth running",
     });
 
-    const explained = await (await afterwards()).why(work);
+    const explained = await (await afterwards()).why({ subject: work });
     expect(explained.is).toBe("abandoned");
     expect(explained.because.map((c) => c.handle)).toContain(stopped.decision);
   });

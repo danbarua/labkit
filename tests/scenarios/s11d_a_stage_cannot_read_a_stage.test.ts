@@ -76,9 +76,10 @@ describe("S-11d: a stage cannot read a stage", () => {
   /** The record is right about stage one: it rests on something uncheckable. */
   test("stage one reports itself unreproducible, correctly", async () => {
     const { raw, calibration } = await aPipelineOnUnverifiableRawData(session);
-    const report = await (await afterwards()).reproducibilityOf(calibration, [
-      { part: raw, hash: "sha256:whatever" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf({
+      analysis: calibration,
+      rebuilt: [{ part: raw, hash: "sha256:whatever" }],
+    });
     expect(report.unverifiable.map((p) => p.name)).toEqual(["raw sensor series"]);
     expect(report.reproducible).toBe(false);
   });
@@ -91,7 +92,7 @@ describe("S-11d: a stage cannot read a stage", () => {
   test("stage two does not claim reproducibility it cannot have", async () => {
     const { trend } = await aPipelineOnUnverifiableRawData(session);
 
-    const report = await (await afterwards()).reproducibilityOf(trend, []);
+    const report = await (await afterwards()).reproducibilityOf({ analysis: trend, rebuilt: [] });
 
     expect(report.reproducible).toBe(false);
     // The calibration's output artefact -- what stage two actually read.
@@ -106,7 +107,7 @@ describe("S-11d: a stage cannot read a stage", () => {
   test("what depends on the raw series reaches every stage built on it", async () => {
     const { raw } = await aPipelineOnUnverifiableRawData(session);
 
-    const fromRaw = await (await afterwards()).whatDependsOn(raw);
+    const fromRaw = await (await afterwards()).whatDependsOn({ subject: raw });
     expect(fromRaw.claims.map((c) => c.asserts).sort()).toEqual(
       ["the calibration is stable", TRENDS].sort(),
     );

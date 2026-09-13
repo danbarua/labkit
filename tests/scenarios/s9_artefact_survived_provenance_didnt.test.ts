@@ -103,12 +103,15 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     // Offered by part, not by name. Keying these by `logical_name` would have
     // reintroduced, one function away, the identity defect this scenario is
     // about -- and in S-9 of all places, where two parts share a name.
-    const report = await (await afterwards()).reproducibilityOf(analysis, [
-      { part: parts[0]!, hash: "sha256:aaa" },
-      { part: parts[1]!, hash: "sha256:bbb" },
-      { part: parts[2]!, hash: "sha256:ccc" },
-      { part: parts[3]!, hash: "sha256:regenerated" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf({
+      analysis,
+      rebuilt: [
+        { part: parts[0]!, hash: "sha256:aaa" },
+        { part: parts[1]!, hash: "sha256:bbb" },
+        { part: parts[2]!, hash: "sha256:ccc" },
+        { part: parts[3]!, hash: "sha256:regenerated" },
+      ],
+    });
 
     expect(report.exact.map((p) => p.name).sort()).toEqual(["priors", "splits", "weights"]);
     expect(report.unverifiable.map((p) => p.name)).toEqual([CONTROL]);
@@ -123,7 +126,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
   test("Afterward 2: what rests on the unverifiable part is enumerable", async () => {
     await aCachedConstructionWithOneUnrecordedPart();
 
-    const dependents = await (await afterwards()).whatDependsOn(CONTROL);
+    const dependents = await (await afterwards()).whatDependsOn({ subject: CONTROL });
     expect(dependents.claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
     expect(dependents.enquiries.map((e) => e.pursuing)).toEqual([
       "does the accelerated path match the reference?",
@@ -162,11 +165,11 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     const reader = await afterwards();
     // The historical part still carries what always rested on it, and nothing
     // that rests on the rebuild.
-    const historical = await reader.whatDependsOn(original);
+    const historical = await reader.whatDependsOn({ subject: original });
     expect(historical.claims.map((c) => c.asserts)).toEqual([PROPOSITION]);
 
     // And the regenerated part carries only its own.
-    const rebuilt = await reader.whatDependsOn(regenerated);
+    const rebuilt = await reader.whatDependsOn({ subject: regenerated });
     expect(rebuilt.claims.map((c) => c.asserts)).toEqual(["the rebuild agrees with the cache"]);
     expect(downstream).toBeDefined();
   });
@@ -212,9 +215,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     const { enquiry } = await aCachedConstructionWithOneUnrecordedPart();
 
     // Before regenerating, the name is unambiguous and the question answerable.
-    expect((await session.whatDependsOn(CONTROL)).claims.map((c) => c.asserts)).toEqual([
-      PROPOSITION,
-    ]);
+    expect(
+      (await session.whatDependsOn({ subject: CONTROL })).claims.map((c) => c.asserts),
+    ).toEqual([PROPOSITION]);
 
     await session.recordObservations({
       enquiry,
@@ -223,7 +226,7 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
       contentHash: "sha256:regenerated",
     });
 
-    await expect((await afterwards()).whatDependsOn(CONTROL)).rejects.toThrow(
+    await expect((await afterwards()).whatDependsOn({ subject: CONTROL })).rejects.toThrow(
       /2 artefacts are named/,
     );
   });
@@ -236,10 +239,13 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
 
     // Only two of the three hashed parts were rebuilt.
-    const report = await (await afterwards()).reproducibilityOf(analysis, [
-      { part: parts[0]!, hash: "sha256:aaa" },
-      { part: parts[1]!, hash: "sha256:bbb" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf({
+      analysis,
+      rebuilt: [
+        { part: parts[0]!, hash: "sha256:aaa" },
+        { part: parts[1]!, hash: "sha256:bbb" },
+      ],
+    });
 
     expect(report.exact.map((p) => p.name).sort()).toEqual(["splits", "weights"]);
     expect(report.differing.map((p) => p.name)).toEqual([]);
@@ -256,11 +262,14 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
   test("a part that was rebuilt and differs still reports as differing", async () => {
     const { parts, analysis } = await aCachedConstructionWithOneUnrecordedPart();
 
-    const report = await (await afterwards()).reproducibilityOf(analysis, [
-      { part: parts[0]!, hash: "sha256:aaa" },
-      { part: parts[1]!, hash: "sha256:DIFFERENT" },
-      { part: parts[2]!, hash: "sha256:ccc" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf({
+      analysis,
+      rebuilt: [
+        { part: parts[0]!, hash: "sha256:aaa" },
+        { part: parts[1]!, hash: "sha256:DIFFERENT" },
+        { part: parts[2]!, hash: "sha256:ccc" },
+      ],
+    });
 
     expect(report.exact.map((p) => p.name).sort()).toEqual(["priors", "weights"]);
     expect(report.differing.map((p) => p.name)).toEqual(["splits"]);
@@ -287,9 +296,9 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     const reader = await afterwards();
     // What S-9 did establish, and all this test claims to pin:
     expect(regenerated).not.toBe(original);
-    expect((await reader.whatDependsOn(regenerated)).claims).toEqual([]);
-    expect((await reader.whatDependsOn(original)).claims.map((c) => c.asserts)).toEqual([
-      PROPOSITION,
-    ]);
+    expect((await reader.whatDependsOn({ subject: regenerated })).claims).toEqual([]);
+    expect(
+      (await reader.whatDependsOn({ subject: original })).claims.map((c) => c.asserts),
+    ).toEqual([PROPOSITION]);
   });
 });

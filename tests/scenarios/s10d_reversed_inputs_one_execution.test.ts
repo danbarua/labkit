@@ -71,7 +71,7 @@ describe("S-10d — the order a run read its inputs in", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf(rerun.verification);
+    const report = await later.reproductionOf({ verification: rerun.verification });
 
     // The same two records on both sides, so nothing differs...
     expect(report.differs).toEqual([]);
@@ -99,7 +99,7 @@ describe("S-10d — the order a run read its inputs in", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf(rerun.verification);
+    const report = await later.reproductionOf({ verification: rerun.verification });
 
     expect(report.differs).toEqual([]);
     expect(report.verificationRead.map((i) => i.name)).toEqual([
@@ -126,7 +126,7 @@ describe("S-10d — the order a run read its inputs in", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const report = await later.reproductionOf(rerun.verification);
+    const report = await later.reproductionOf({ verification: rerun.verification });
 
     expect(report.verificationRead.map((i) => i.part)).not.toEqual(
       report.ofRead.map((i) => i.part),

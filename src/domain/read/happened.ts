@@ -3,6 +3,7 @@ import { SessionCore } from "../core";
 import { ref } from "../report";
 import type { DomainEvent, EventFilter } from "../events";
 import type { AnyRef, EventPage, ListedNote, Transcription } from "../report";
+import type { NotesQuery } from "../queries";
 
 /** The number in a handle, for ordering ids minted in sequence. */
 const numberIn = (handle: string): number => Number(handle.slice(handle.indexOf("_") + 1)) || 0;
@@ -12,7 +13,7 @@ export class HappenedGroup extends SessionCore {
    * What was done, in order — the one read that answers from the event log rather than the
    * graph.
    */
-  async whatHappened(filter: EventFilter = {}): Promise<readonly DomainEvent[]> {
+  async whatHappened(filter: EventFilter): Promise<readonly DomainEvent[]> {
     return this.events.select(filter);
   }
 
@@ -21,7 +22,7 @@ export class HappenedGroup extends SessionCore {
    * read — `.seq > 52` over a default page of 50 — gets an empty answer from a full page and
    * cannot tell it from an empty record.
    */
-  async whatHappenedPage(filter: EventFilter = {}): Promise<EventPage> {
+  async whatHappenedPage(filter: EventFilter): Promise<EventPage> {
     if (filter.limit === undefined) {
       const acts = await this.events.select(filter);
       return { acts, more: false };
@@ -41,7 +42,7 @@ export class HappenedGroup extends SessionCore {
    * `concerning` narrows to one handle's notes. `why` surfaces them for a question and not for
    * a claim, gate or line of enquiry, so this is their only route.
    */
-  async notes(concerning?: AnyRef): Promise<ListedNote[]> {
+  async notes({ concerning }: NotesQuery): Promise<ListedNote[]> {
     // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const rows = await this.graph.query(
       `MATCH (n:Note)

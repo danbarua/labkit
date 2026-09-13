@@ -69,7 +69,7 @@ describe("S-22: a check decided by measurement says so", () => {
 
     // Afterward: the check reports what it was decided against, so a reader
     // can tell this from a verdict somebody simply asserted.
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     const [verdict] = standing.evaluations;
     expect(verdict!.basis).toHaveLength(1);
     expect(verdict!.basis[0]!.states).toContain("0/240,000");
@@ -85,7 +85,7 @@ describe("S-22: a check decided by measurement says so", () => {
       outcome: "pass",
     });
 
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis).toEqual([]);
   });
 
@@ -106,7 +106,7 @@ describe("S-22: a check decided by measurement says so", () => {
       citing: [claimOf(claims, HEALTH)],
     });
 
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis[0]!.states).toBe("no failures observed");
   });
 
@@ -128,7 +128,7 @@ describe("S-22: a check decided by measurement says so", () => {
 
     // Both, not one: citing a single measurement would name an arbitrary part
     // as what decided a check that read two.
-    const standing = await (await afterwards()).criterionStanding(criterion);
+    const standing = await (await afterwards()).criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis).toHaveLength(2);
   });
 

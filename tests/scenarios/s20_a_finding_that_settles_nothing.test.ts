@@ -80,7 +80,7 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
 
     await session.isUndecided({ claim: w.claim, because: w.finding });
 
-    const why = await (await afterwards()).whySupported(w.claim);
+    const why = await (await afterwards()).whySupported({ claim: w.claim });
 
     // The whole of #139: today this reads a `supported` verdict, because
     // `conclude` defaults the bearing to supports and nothing can say
@@ -96,7 +96,7 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
     // The same answer through `why`, which is what an agent is handed over
     // MCP. It had no undecided arm and said "nothing has examined it" of a
     // claim carrying a finding.
-    const explained = await (await afterwards()).why(w.claim);
+    const explained = await (await afterwards()).why({ subject: w.claim });
     expect(explained.is).not.toMatch(/nothing has examined/);
   });
 

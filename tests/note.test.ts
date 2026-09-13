@@ -31,7 +31,7 @@ test("a bare note needs only its text, and search finds it afterward", async () 
   });
   expect(note).toMatch(/^NOTE_\d+$/);
 
-  const groups = await session.search("markdown temples");
+  const groups = await session.search({ text: "markdown temples" });
   const notes = groups.find((g) => g.label === "Note");
   expect(notes?.matches.map((m) => m.handle)).toContain(note);
 });
@@ -45,7 +45,7 @@ test("--on attaches to a real record, and search still finds the note by its own
     on: question,
   });
 
-  const groups = await session.search("ripping the schedule out");
+  const groups = await session.search({ text: "ripping the schedule out" });
   expect(groups.find((g) => g.label === "Note")?.matches.map((m) => m.handle)).toContain(note);
 });
 

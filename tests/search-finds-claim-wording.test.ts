@@ -54,7 +54,7 @@ async function aRecordedFinding() {
 test("a phrase from a claim's proposition finds the claim", async () => {
   const { claim } = await aRecordedFinding();
 
-  const groups = await session.search("unique winner");
+  const groups = await session.search({ text: "unique winner" });
   const found = groups.find((g) => g.label === "Claim")?.matches.map((m) => String(m.handle));
   expect(found).toContain(String(claim));
 });
@@ -62,7 +62,7 @@ test("a phrase from a claim's proposition finds the claim", async () => {
 test("a phrase from an artefact's name finds the artefact", async () => {
   const { artefact } = await aRecordedFinding();
 
-  const groups = await session.search("depth-sweep");
+  const groups = await session.search({ text: "depth-sweep" });
   const found = groups.find((g) => g.label === "Artefact")?.matches.map((m) => String(m.handle));
   expect(found).toContain(String(artefact));
 });
@@ -71,9 +71,11 @@ test("claimsAsserting still needs the whole sentence, which is why search had to
   const { claim } = await aRecordedFinding();
 
   // The exact-match seam, unchanged: the full proposition resolves.
-  expect((await session.claimsAsserting(PROPOSITION)).map((c) => c.claim)).toEqual([claim]);
+  expect((await session.claimsAsserting({ proposition: PROPOSITION })).map((c) => c.claim)).toEqual(
+    [claim],
+  );
   // A phrase does not, and nobody retypes the sentence above.
-  expect(await session.claimsAsserting("unique winner")).toEqual([]);
+  expect(await session.claimsAsserting({ proposition: "unique winner" })).toEqual([]);
 });
 
 /**
@@ -82,7 +84,7 @@ test("claimsAsserting still needs the whole sentence, which is why search had to
 test("a phrase from an analysis's method finds the computation", async () => {
   await aRecordedFinding();
 
-  const groups = await session.search("unpruned baseline");
+  const groups = await session.search({ text: "unpruned baseline" });
   const found = groups.find((g) => g.label === "Computation");
   expect(found?.matches).toHaveLength(1);
 });
@@ -90,5 +92,5 @@ test("a phrase from an analysis's method finds the computation", async () => {
 test("an empty answer is empty because nothing matched, not because nothing was scanned", async () => {
   await aRecordedFinding();
 
-  expect(await session.search("a phrase nothing on this record uses")).toEqual([]);
+  expect(await session.search({ text: "a phrase nothing on this record uses" })).toEqual([]);
 });

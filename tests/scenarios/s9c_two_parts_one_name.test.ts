@@ -70,10 +70,13 @@ describe("S-9c: two parts, one name", () => {
   test("a part that matched and a part that differed are distinguishable", async () => {
     const { original, regenerated, comparison } = await anAnalysisComparingBothControls(session);
 
-    const report = await (await afterwards()).reproducibilityOf(comparison, [
-      { part: original, hash: "sha256:orig" },
-      { part: regenerated, hash: "sha256:something-else" },
-    ]);
+    const report = await (await afterwards()).reproducibilityOf({
+      analysis: comparison,
+      rebuilt: [
+        { part: original, hash: "sha256:orig" },
+        { part: regenerated, hash: "sha256:something-else" },
+      ],
+    });
 
     expect(report.exact).toEqual([{ part: original, name: NAME }]);
     expect(report.differing).toEqual([{ part: regenerated, name: NAME }]);
@@ -105,7 +108,7 @@ describe("S-9c: two parts, one name", () => {
       ],
     });
 
-    const report = await (await afterwards()).reproducibilityOf(analysis, []);
+    const report = await (await afterwards()).reproducibilityOf({ analysis, rebuilt: [] });
     expect(report.unverifiable).toEqual([{ part: noHash, name: NAME }]);
     expect(report.notRebuilt).toEqual([]);
   });

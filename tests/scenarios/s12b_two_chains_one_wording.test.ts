@@ -99,13 +99,13 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
       events: inMemoryEventLog(),
     });
 
-    const historyA = await later.interpretationHistory(a.last.claim);
+    const historyA = await later.interpretationHistory({ claim: a.last.claim });
     expect(historyA.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, A3]);
     expect(historyA.originally.map((c) => c.claim)).toEqual([a.first]);
     // The step through the shared wording is A's record, not B's.
     expect(historyA.revisions[1]!.previously.map((c) => c.claim)).toEqual([a.middle.claim]);
 
-    const historyB = await later.interpretationHistory(b.last.claim);
+    const historyB = await later.interpretationHistory({ claim: b.last.claim });
     expect(historyB.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, B3]);
     expect(historyB.originally.map((c) => c.claim)).toEqual([b.first]);
     expect(historyB.revisions[1]!.previously.map((c) => c.claim)).toEqual([b.middle.claim]);
@@ -168,7 +168,7 @@ describe("S-12b — a history that merges", () => {
       events: inMemoryEventLog(),
     });
 
-    const history = await later.interpretationHistory(after.claim);
+    const history = await later.interpretationHistory({ claim: after.claim });
 
     // The last act withdrew both branches at once, which is what makes this a
     // merge rather than two histories.
@@ -219,7 +219,7 @@ describe("S-12b — a history that merges", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.interpretationHistory(after.nowClaims.claim);
+    const history = await later.interpretationHistory({ claim: after.nowClaims.claim });
 
     // Two readings were withdrawn together: the one this chain narrowed to, and
     // one an analysis concluded outright. The second was never narrowed, so no
@@ -252,7 +252,7 @@ describe("S-12b — a history that merges", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.interpretationHistory(claimOf(claims, LEFT));
+    const history = await later.interpretationHistory({ claim: claimOf(claims, LEFT) });
     expect(history.revisions).toEqual([]);
     expect(history.originally).toEqual([]);
     expect(history.nowClaims.claim).toBe(claimOf(claims, LEFT));
@@ -302,7 +302,7 @@ describe("S-12b — a reading is narrowed once", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.interpretationHistory(narrowed.nowClaims.claim);
+    const history = await later.interpretationHistory({ claim: narrowed.nowClaims.claim });
     expect(history.revisions).toHaveLength(1);
     expect(history.originally.map((c) => c.claim)).toEqual([original]);
   });

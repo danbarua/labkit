@@ -81,7 +81,7 @@ describe("Probe 1 — orientation: where does this stand, and why?", () => {
         outcome,
         citing: [claimOf(analysisClaims, CONVERGES)],
       });
-      return s.whySupported(claimOf(analysisClaims, CONVERGES));
+      return s.whySupported({ claim: claimOf(analysisClaims, CONVERGES) });
     };
 
     const { a: passed, b: failed } = await inTwoWorlds(build("pass"), build("fail"));
@@ -221,9 +221,10 @@ describe("Probe 3 — reconstruction provenance: what was this reconstructing?",
       });
 
       // A regeneration that does NOT match -- coherent, unlike the first draft.
-      const report = await s.reproducibilityOf(analysis, [
-        { part: historical, hash: "sha256:2222" },
-      ]);
+      const report = await s.reproducibilityOf({
+        analysis,
+        rebuilt: [{ part: historical, hash: "sha256:2222" }],
+      });
       expect(report.differing.map((p) => p.name)).toEqual(["random control"]);
       expect(report.reproducible).toBe(false);
 
@@ -273,7 +274,7 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
         enquiry,
         answeredBy: claimOf(analysisClaims, "the difference is real"),
       });
-      return s.enquiryStatus(enquiry);
+      return s.enquiryStatus({ enquiry });
     };
 
     const { a: byAlice, b: byBob } = await inTwoWorlds(build("Alice"), build("Bob"));

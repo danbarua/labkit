@@ -103,7 +103,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     const w = await aRunPartlyReAnalysed();
     await theLogScaleReAnalysis(w);
 
-    const why = await (await afterwards()).whySupported(w.stands);
+    const why = await (await afterwards()).whySupported({ claim: w.stands });
 
     // The claim Bonsai's own record calls final.
     expect(why.superseded).toEqual([]);
@@ -126,7 +126,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     const w = await aRunPartlyReAnalysed();
     await theLogScaleReAnalysis(w);
 
-    const why = await (await afterwards()).whySupported(w.revisited);
+    const why = await (await afterwards()).whySupported({ claim: w.revisited });
     expect(why.superseded.map((s) => s.finding)).toEqual(["p = 0.03 raw"]);
     expect(why.superseded[0]!.reason).toContain("raw-scale aggregation is untrustworthy");
   });
@@ -166,7 +166,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       finding: "p = 0.007 log",
     });
 
-    const why = await (await afterwards()).why(report.replacement);
+    const why = await (await afterwards()).why({ subject: report.replacement });
     if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
     // The superseded one is reported, and not paired with the successor: the
     // wording matched more than one finding of the revised analysis.
@@ -219,7 +219,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       replacing: buggy,
       bearing: "supports",
     });
-    const why = await (await afterwards()).whySupported(fixed[0]!.claim);
+    const why = await (await afterwards()).whySupported({ claim: fixed[0]!.claim });
     expect(why.verdict).toBe("supported");
   });
 
@@ -259,7 +259,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       replacing: batchTwo,
     });
 
-    const why = await (await afterwards()).why(report.replacement);
+    const why = await (await afterwards()).why({ subject: report.replacement });
     if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
 
     // Paired, and to the one that was named.
@@ -343,7 +343,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
         citing: [cites === "revisited" ? w.revisited : w.stands],
       });
       await theLogScaleReAnalysis(w);
-      const why = await (await afterwards()).whySupported(w.stands);
+      const why = await (await afterwards()).whySupported({ claim: w.stands });
       return why.standard.find((c) => c.proposition === AGGREGATION)?.state;
     };
 
@@ -386,7 +386,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       finding: "p = 0.007 log",
     });
 
-    const why = await (await afterwards()).why(report.replacement);
+    const why = await (await afterwards()).why({ subject: report.replacement });
     if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
     expect(why.report.unpaired).toEqual([]);
     expect(why.report.changed.map((c) => c.was)).toEqual([v1Claims[0]!.claim]);
@@ -441,7 +441,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     expect(superseding).not.toContain(claimOf(v1Claims, SURVIVES));
 
     const later = await afterwards();
-    const why = await later.why(report.replacement);
+    const why = await later.why({ subject: report.replacement });
     if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
     // What did fall is the other conclusion, and this act did not answer it.
     expect(why.report.unpaired.map((u) => u.claim)).toEqual([claimOf(v1Claims, REVISITED)]);

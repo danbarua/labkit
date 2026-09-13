@@ -1,5 +1,6 @@
 import type { NodeLabel, ResolutionKind } from "../db/domain";
 import type { DomainEvent } from "./events";
+import { GATE_STATES, WORK_STATES } from "./vocab";
 
 export type { ResolutionKind } from "../db/domain";
 export {
@@ -325,14 +326,7 @@ export interface UnaffectedRecord {
 }
 
 /** Whether a gate may be relied on. */
-export const GATE_STATES = [
-  "never-evaluated",
-  "incomplete",
-  "blocked",
-  "satisfied",
-  "sidestepped",
-  "retired",
-] as const;
+export { GATE_STATES, WORK_STATES };
 export interface GateStatus {
   gate: GateRef;
   consequence: string;
@@ -980,7 +974,6 @@ export interface StoppedReason {
 /**
  * What a task's state can be, computed from the graph and never stored.
  */
-export const WORK_STATES = ["planned", "waiting", "blocked", "carried-out", "abandoned"] as const;
 export type WorkState = (typeof WORK_STATES)[number];
 
 /**

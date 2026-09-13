@@ -107,8 +107,8 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       });
 
       const later = new ResearchSession(await scenario.current(), { clock });
-      const ana = await later.enquiryStatus(anasSweep);
-      const bruno = await later.enquiryStatus(brunosAblation);
+      const ana = await later.enquiryStatus({ enquiry: anasSweep });
+      const bruno = await later.enquiryStatus({ enquiry: brunosAblation });
 
       // Both reports name the same motivating question, but closure belongs to the pursuit.
       expect(ana.question!.question).toBe(bruno.question!.question);
@@ -130,8 +130,8 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence));
       expect(counted.length).toBe(new Set(counted).size);
       await s.closeEnquiry({ enquiry: brunosAblation });
-      const afterAna = await later.enquiryStatus(anasSweep);
-      const afterBruno = await later.enquiryStatus(brunosAblation);
+      const afterAna = await later.enquiryStatus({ enquiry: anasSweep });
+      const afterBruno = await later.enquiryStatus({ enquiry: brunosAblation });
       expect(afterAna.closure).toBe("answered");
       expect(afterBruno.closure).toBe("abandoned");
     } finally {
@@ -168,7 +168,7 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       });
 
       const later = new ResearchSession(await scenario.current(), { clock });
-      const status = await later.enquiryStatus(untouched);
+      const status = await later.enquiryStatus({ enquiry: untouched });
 
       const known = await later.whatIsKnown();
       expect(status.question!.question).toBe(question);
@@ -210,7 +210,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       });
 
       const later = new ReadSurface(await scenario.current());
-      const parts = await later.reproducibilityOf(analysis, []);
+      const parts = await later.reproducibilityOf({ analysis, rebuilt: [] });
       const consumed = [
         ...parts.exact,
         ...parts.differing,
@@ -259,7 +259,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       });
 
       const read = new ReadSurface(await scenario.current());
-      const consumedByA = await read.reproducibilityOf(viaAnalysis, []);
+      const consumedByA = await read.reproducibilityOf({ analysis: viaAnalysis, rebuilt: [] });
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
       expect(outputOfStageOne?.startsWith("ART_")).toBe(true);
 
@@ -269,7 +269,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
         from: [outputOfStageOne!],
         concludes: [{ proposition: "p2b", finding: "f2" }],
       });
-      const consumedByB = await read.reproducibilityOf(viaArtefact, []);
+      const consumedByB = await read.reproducibilityOf({ analysis: viaArtefact, rebuilt: [] });
 
       // Indistinguishable. The `kind` on the second was a lie and cost nothing,
       // which is why this is an ambiguity rather than a defect.
@@ -357,7 +357,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       expect(looksLikeAnId(standing.asks)).toBe(false);
 
       // reproducibilityOf: `part` is the id, `name` is the text.
-      const parts = await read.reproducibilityOf(analysis, []);
+      const parts = await read.reproducibilityOf({ analysis, rebuilt: [] });
       const inputs = [
         ...parts.exact,
         ...parts.differing,
@@ -375,7 +375,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
   test("EnquiryStatus identifies its question — FIXED, step 2", async () => {
     try {
       const { read, enquiry, question } = await programme();
-      const status = await read.enquiryStatus(enquiry);
+      const status = await read.enquiryStatus({ enquiry });
 
       expect(looksLikeAnId(status.enquiry)).toBe(true);
       // The question it pursues, by identity -- and it is the RIGHT question,
@@ -397,7 +397,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     // no follow-up verb accepts. Now both, in the shape the other reports use.
     try {
       const { read } = await programme();
-      const affected = await read.whatDependsOn("sweep readings");
+      const affected = await read.whatDependsOn({ subject: "sweep readings" });
 
       expect(affected.claims.length + affected.enquiries.length).toBeGreaterThan(0);
       expect(affected.claims.every((c) => looksLikeAnId(c.claim))).toBe(true);
@@ -412,7 +412,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
   test("whySupported identifies the analysis it cites — FIXED, step 2", async () => {
     try {
       const { read } = await programme();
-      const why = await read.whySupported(await claimNamed(read, MOVES));
+      const why = await read.whySupported({ claim: await claimNamed(read, MOVES) });
 
       expect(why.support.length).toBeGreaterThan(0);
       // Was a bare `via` holding the computation's METHOD text, so two runs of
@@ -433,7 +433,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
   test("gateStatus identifies the work it gates — FIXED, step 2", async () => {
     try {
       const { read, gate } = await programme();
-      const status = await read.gateStatus(gate);
+      const status = await read.gateStatus({ gate });
 
       expect(looksLikeAnId(status.gate)).toBe(true);
       expect(status.gating.length).toBeGreaterThan(0);
@@ -455,17 +455,17 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       const { read, gate, enquiry } = await programme();
       const claim = await claimNamed(read, MOVES);
 
-      expect((await read.whySupported(claim)).claim).toEqual(claim);
-      expect((await read.gateStatus(gate)).gate).toEqual(gate);
-      expect((await read.enquiryStatus(enquiry)).enquiry).toEqual(enquiry);
-      expect((await read.designHistory(gate)).gate).toEqual(gate);
+      expect((await read.whySupported({ claim })).claim).toEqual(claim);
+      expect((await read.gateStatus({ gate })).gate).toEqual(gate);
+      expect((await read.enquiryStatus({ enquiry })).enquiry).toEqual(enquiry);
+      expect((await read.designHistory({ gate })).gate).toEqual(gate);
 
       // whatDependsOn also accepts a logical NAME, and its echo is the record
       // that name resolved to -- the one thing a caller passing a name cannot
       // otherwise learn about the answer they got back.
-      const byName = await read.whatDependsOn("sweep readings");
+      const byName = await read.whatDependsOn({ subject: "sweep readings" });
       expect(looksLikeAnId(byName.subject)).toBe(true);
-      expect(await read.whatDependsOn(byName.subject)).toEqual(byName);
+      expect(await read.whatDependsOn({ subject: byName.subject })).toEqual(byName);
     } finally {
       await scenario.end();
     }
