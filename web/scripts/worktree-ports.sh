@@ -80,7 +80,7 @@ if [ -n "$common" ]; then
   fi
 fi
 
-PORT_DB=$((BASE_DB + offset))
+PORT_DB=$BASE_DB
 PORT_WEB=$((BASE_WEB + offset))
 PORT_POOLER=$((BASE_POOLER + offset))
 PORT_ALPHA=$((BASE_ALPHA + offset))

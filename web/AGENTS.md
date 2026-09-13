@@ -10,16 +10,14 @@ A researcher opens a handle and follows hypermedia links.
 
 From `web/`:
 
-1. Start Docker Postgres: `bun run db:up`. This calls `scripts/compose.sh`, which exports this worktree's `LABKIT_PORT_DB`. Do not run bare `docker compose up -d db`. That always binds 5432.
-2. Copy the overlap_bench graph: `bun run ingest`.
-3. Start the API: `bun run server`.
-4. Start Vite: `bun run dev`.
+1. Once per machine: `bun run db:up`. Shared Postgres on **5432**. Every checkout uses it.
+2. `bun run dev`. Vite migrates, seeds overlap_bench if the source event seq moved, and serves UI + API with HMR.
 
-Print this checkout's ports: `cd web && bun run ports`. The main checkout keeps **5432** (db), **8899** (API), **8850** (Vite explorer). Other worktrees add a path-hash offset. `web` scripts load those env vars. Do not hard-code the bases.
+Print this checkout's HTTP port: `bun run ports`. The main checkout uses **8850**. Other worktrees offset that port. Database stays 5432.
 
-Ingest is idempotent. If `Q_1` and `NOTE_68` already exist, it prints counts and exits.
+Seed is idempotent: dest stamp vs source `max(labkit_event.seq)`. Graph already present from an older copy gets stamped and skipped.
 
-PGlite source, as a sibling of this repo: `../08_overlap_bench/.labkit`. From `web/` that is `../../08_overlap_bench/.labkit`. The ingest script joins from `web/scripts/`, so its default is `../../../08_overlap_bench/.labkit`. Override with `LABKIT_SOURCE`. Dest default is `postgresql://postgres:agens@127.0.0.1:$LABKIT_PORT_DB/labkit`. Override with `LABKIT_DB_URL`. Tenant slug default: `overlap-bench`. Override with `LABKIT_TENANT`.
+PGlite source, sibling of this repo: `../08_overlap_bench/.labkit`. Override with `LABKIT_SOURCE`. Dest: `postgresql://postgres:agens@127.0.0.1:5432/labkit`. Tenant: `overlap-bench`.
 
 ## Two Postgres
 

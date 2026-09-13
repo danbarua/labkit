@@ -8,11 +8,10 @@ labkit-web is a read-only HTTP module in front of one LabKit AGE graph. It is no
 
 | Surface | Bind | Process |
 |---------|------|---------|
-| Hypermedia API | `127.0.0.1:$LABKIT_PORT_WEB` (8899 on main) | `bun run server` → `src/server/main.ts` |
-| Explorer UI | `127.0.0.1:$LABKIT_PORT_EXPLORER` (8850 on main) | `bun run dev` → Vite, proxies collections to the API |
-| Graph store | host `$LABKIT_PORT_DB` → container 5432 | `bun run db:up` |
+| Vite (UI + API) | `127.0.0.1:$LABKIT_PORT_EXPLORER` (8850 on main) | `bun run dev` |
+| Graph store | host 5432 → container 5432 | `bun run db:up` (shared) |
 
-`GET /healthz` returns `{ ok, worktree, tenant }`. Use `worktree` to see which checkout answered. Two agents on one machine must not share 5432/8899/8850. See [infra.md](infra.md).
+`GET /healthz` returns `{ ok, worktree, tenant }`. See [infra.md](infra.md).
 
 ## Hypermedia
 
