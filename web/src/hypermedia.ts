@@ -1,13 +1,16 @@
 /**
  * Hypermedia contract for labkit-web.
  *
- * Graph 1:1: a relation is a link or it is absent. No reverse-rel names.
- * `GET /notes/123` → resource id `NOTE_123`.
+ * Graph 1:1: a relation is a HAL link or it is absent. Rel names are EdgeLabel
+ * (`MOTIVATES`, not `in`/`out`). Direction is a link attribute (`dir`) and
+ * on the embedded neighbor, never the rel key.
  *
- * Walk test: BFS from `/questions/1` (`Q_1`) following every `href` in
- * `links.out` and `links.in` until `NOTE_68` (last minted node on overlap_bench).
+ * `GET /notes/123` → HAL document id `NOTE_123`, media type application/hal+json.
+ *
+ * UI walk: `/questions/1` (`Q_1`) to `NOTE_68`.
+ * API walk: `Q_1` to last non-Note (`CLM_27`) without Notes or CONCERNS.
  */
-import { NODE_TYPES, type EdgeLabel, type NodeLabel } from "../../src/db/domain";
+import { EDGE_LABELS, NODE_TYPES, type EdgeLabel, type NodeLabel } from "../../src/db/domain";
 
 export type CollectionSlug =
   | "questions"
@@ -59,44 +62,79 @@ export const LABEL_BY_COLLECTION: { readonly [S in CollectionSlug]: NodeLabel } 
   notes: "Note",
 };
 
-export interface HypermediaRef {
+export const HAL_JSON = "application/hal+json";
+
+export type HalDir = "in" | "out";
+
+/** draft-kelly-json-hal link object, plus `dir` for inbound vs outbound. */
+export interface HalLink {
   href: string;
-  id: string;
+  name?: string;
+  title?: string;
+  dir?: HalDir;
 }
 
-export interface ResourceDocument {
+/**
+ * Neighbor as it appears in `_embedded`. Same identity as the GET of its
+ * `self` href; no nested `_embedded` (one hop).
+ */
+export interface HalResource {
   id: string;
   type: NodeLabel;
-  href: string;
-  properties: Record<string, unknown>;
-  links: {
-    out: Partial<Record<EdgeLabel, HypermediaRef[]>>;
-    in: Partial<Record<EdgeLabel, HypermediaRef[]>>;
-  };
+  dir?: HalDir;
+  properties?: Record<string, unknown>;
+  _links: HalLinks;
+  _embedded?: Partial<Record<EdgeLabel, HalResource | HalResource[]>>;
 }
+
+export type HalLinks = {
+  self: HalLink;
+} & Partial<Record<EdgeLabel, HalLink | HalLink[]>>;
+
+/** Resource viewmodel. `id`/`type`/`properties` sit beside HAL reserved keys. */
+export type ResourceDocument = HalResource;
 
 export interface CollectionDocument {
   type: NodeLabel;
-  href: string;
-  items: HypermediaRef[];
+  _links: {
+    self: HalLink;
+    item?: HalLink | HalLink[];
+  };
+  _embedded?: {
+    item?: HalResource | HalResource[];
+  };
 }
 
-export interface RootDocument {
+export type RootDocument = {
   id: "labkit";
-  href: "/";
-  links: {
-    start: HypermediaRef;
-    collections: { readonly [S in CollectionSlug]: string };
-  };
+  _links: { self: HalLink; start: HalLink } & { readonly [S in CollectionSlug]: HalLink };
+};
+
+export function isEdgeLabel(rel: string): rel is EdgeLabel {
+  return (EDGE_LABELS as readonly string[]).includes(rel);
+}
+
+export function asLinkArray(value: HalLink | HalLink[] | undefined): HalLink[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+export function asResourceArray(value: HalResource | HalResource[] | undefined): HalResource[] {
+  if (value == null) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 /** First pose on overlap_bench; the walk starts here. */
 export const WALK_START_ID = "Q_1";
 export const WALK_START_HREF = "/questions/1";
 
-/** Last minted node on overlap_bench (event 215, `note` → NOTE_68 -[:CONCERNS]-> LOE_7). */
+/** Last minted node on overlap_bench (event 215, `note` → NOTE_68). */
 export const WALK_END_ID = "NOTE_68";
 export const WALK_END_HREF = "/notes/68";
+
+/** Last non-Note NodeCreated (seq 209, reverify COMP_11). Notes after that are labels. */
+export const WALK_END_NON_NOTE_ID = "CLM_27";
+export const WALK_END_NON_NOTE_HREF = "/claims/27";
 
 export function numericId(naturalId: string): string {
   const sep = naturalId.lastIndexOf("_");
@@ -123,6 +161,3 @@ function labelFromId(naturalId: string): NodeLabel {
   return entry[0];
 }
 
-export function emptyLinks(): ResourceDocument["links"] {
-  return { out: {}, in: {} };
-}

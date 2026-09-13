@@ -3,24 +3,25 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import {
   LABEL_BY_COLLECTION,
   WALK_START_HREF,
+  asResourceArray,
+  isEdgeLabel,
   type CollectionSlug,
-  type HypermediaRef,
   type ResourceDocument,
   type RootDocument,
 } from "../hypermedia";
-import { GraphView, type Overlay, type ViewMode } from "./GraphView";
+import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay, type ViewMode } from "./GraphView";
 import { ResourcePanel } from "./ResourcePanel";
 import "./graph.css";
 
 interface GraphState {
-  nodes: { id: string; type: string; href: string }[];
-  edges: { from: string; to: string; label: string }[];
+  nodes: GraphNodeSeed[];
+  edges: GraphEdgeSeed[];
 }
 
 const EMPTY_GRAPH: GraphState = { nodes: [], edges: [] };
 
 async function getJson<T>(href: string): Promise<T> {
-  const res = await fetch(href, { headers: { Accept: "application/json" } });
+  const res = await fetch(href, { headers: { Accept: "application/hal+json" } });
   const text = await res.text();
   if (!res.ok) throw new Error(`${res.status}: ${text.trim() || res.statusText}`);
   const type = res.headers.get("content-type") ?? "";
@@ -34,8 +35,8 @@ async function getJson<T>(href: string): Promise<T> {
   }
 }
 
-function inferType(ref: HypermediaRef): string {
-  const slug = ref.href.split("/").filter(Boolean)[0];
+function inferTypeFromHref(href: string): string {
+  const slug = href.split("/").filter(Boolean)[0];
   if (slug && slug in LABEL_BY_COLLECTION) {
     return LABEL_BY_COLLECTION[slug as CollectionSlug];
   }
@@ -43,34 +44,30 @@ function inferType(ref: HypermediaRef): string {
 }
 
 function absorb(graph: GraphState, doc: ResourceDocument): GraphState {
+  const href = doc._links.self.href;
   const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
-  nodeMap.set(doc.id, { id: doc.id, type: doc.type, href: doc.href });
+  nodeMap.set(doc.id, { id: doc.id, type: doc.type, href });
   const edgeKeys = new Set(graph.edges.map((e) => `${e.from}\0${e.label}\0${e.to}`));
   const edges = [...graph.edges];
 
-  const addNeighbor = (ref: HypermediaRef) => {
-    if (!nodeMap.has(ref.id)) {
-      nodeMap.set(ref.id, { id: ref.id, type: inferType(ref), href: ref.href });
-    }
-  };
-
-  for (const [label, refs] of Object.entries(doc.links.out ?? {})) {
-    for (const ref of refs ?? []) {
-      addNeighbor(ref);
-      const key = `${doc.id}\0${label}\0${ref.id}`;
-      if (!edgeKeys.has(key)) {
-        edgeKeys.add(key);
-        edges.push({ from: doc.id, to: ref.id, label });
+  for (const [rel, value] of Object.entries(doc._embedded ?? {})) {
+    if (!isEdgeLabel(rel)) continue;
+    for (const neighbor of asResourceArray(value)) {
+      const neighborHref = neighbor._links.self.href;
+      if (!nodeMap.has(neighbor.id)) {
+        nodeMap.set(neighbor.id, {
+          id: neighbor.id,
+          type: neighbor.type ?? inferTypeFromHref(neighborHref),
+          href: neighborHref,
+        });
       }
-    }
-  }
-  for (const [label, refs] of Object.entries(doc.links.in ?? {})) {
-    for (const ref of refs ?? []) {
-      addNeighbor(ref);
-      const key = `${ref.id}\0${label}\0${doc.id}`;
+      const dir = neighbor.dir ?? "out";
+      const from = dir === "in" ? neighbor.id : doc.id;
+      const to = dir === "in" ? doc.id : neighbor.id;
+      const key = `${from}\0${rel}\0${to}`;
       if (!edgeKeys.has(key)) {
         edgeKeys.add(key);
-        edges.push({ from: ref.id, to: doc.id, label });
+        edges.push({ from, to, label: rel });
       }
     }
   }
@@ -105,7 +102,7 @@ export function App() {
     (async () => {
       try {
         const root = await getJson<RootDocument>("/api");
-        const start = root.links.start?.href;
+        const start = root._links.start?.href;
         if (!cancelled && start) {
           await loadResource(start);
           return;

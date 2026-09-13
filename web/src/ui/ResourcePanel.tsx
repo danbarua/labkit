@@ -1,6 +1,11 @@
 import { Fragment, type MouseEvent } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import type { HypermediaRef, ResourceDocument } from "../hypermedia";
+import {
+  asResourceArray,
+  isEdgeLabel,
+  type HalResource,
+  type ResourceDocument,
+} from "../hypermedia";
 
 export interface ResourcePanelProps {
   resource: ResourceDocument | null;
@@ -34,12 +39,12 @@ function follow(
 
 function LinkRel({
   label,
-  refs,
+  neighbors,
   currentId,
   onNavigate,
 }: {
   label: string;
-  refs: HypermediaRef[];
+  neighbors: HalResource[];
   currentId: string | undefined;
   onNavigate: (href: string) => void;
 }) {
@@ -47,52 +52,52 @@ function LinkRel({
     <div className="link-rel">
       <h4>{label}</h4>
       <ul>
-        {refs.map((ref) => (
-          <li key={`${label}:${ref.id}:${ref.href}`}>
-            <a
-              href={ref.href}
-              data-id={ref.id}
-              aria-current={ref.id === currentId ? "page" : undefined}
-              onClick={(event) => follow(event, ref.href, onNavigate)}
-            >
-              {ref.id}
-            </a>
-          </li>
-        ))}
+        {neighbors.map((neighbor) => {
+          const href = neighbor._links.self.href;
+          return (
+            <li key={`${label}:${neighbor.dir ?? ""}:${neighbor.id}:${href}`}>
+              <a
+                href={href}
+                data-id={neighbor.id}
+                data-dir={neighbor.dir}
+                aria-current={neighbor.id === currentId ? "page" : undefined}
+                onClick={(event) => follow(event, href, onNavigate)}
+              >
+                {neighbor.id}
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
 }
 
-function LinkDirection({
-  title,
-  groups,
-  currentId,
+function EmbeddedRels({
+  resource,
   onNavigate,
 }: {
-  title: string;
-  groups: Partial<Record<string, HypermediaRef[]>> | undefined;
-  currentId: string | undefined;
+  resource: ResourceDocument;
   onNavigate: (href: string) => void;
 }) {
-  const entries = Object.entries(groups ?? {}).filter(
-    (entry): entry is [string, HypermediaRef[]] => {
-      const refs = entry[1];
-      return Array.isArray(refs) && refs.length > 0;
-    },
-  );
+  const entries: [string, HalResource[]][] = [];
+  for (const [rel, value] of Object.entries(resource._embedded ?? {})) {
+    if (!isEdgeLabel(rel)) continue;
+    const neighbors = asResourceArray(value);
+    if (neighbors.length > 0) entries.push([rel, neighbors]);
+  }
   return (
     <section>
-      <h3>{title}</h3>
+      <h3>links</h3>
       {entries.length === 0 ? (
         <div className="empty">none</div>
       ) : (
-        entries.map(([label, refs]) => (
+        entries.map(([label, neighbors]) => (
           <LinkRel
-            key={`${title}:${label}`}
+            key={label}
             label={label}
-            refs={refs}
-            currentId={currentId}
+            neighbors={neighbors}
+            currentId={resource.id}
             onNavigate={onNavigate}
           />
         ))
@@ -132,7 +137,7 @@ export function ResourcePanel({ resource, error, loading, onNavigate }: Resource
           <h2>Resource</h2>
           <div className="kind">{resource.type}</div>
           <div className="handle">{resource.id}</div>
-          <div className="href">{resource.href}</div>
+          <div className="href">{resource._links.self.href}</div>
           {loading ? <div className="empty">loading…</div> : null}
 
           <h3>properties</h3>
@@ -149,18 +154,7 @@ export function ResourcePanel({ resource, error, loading, onNavigate }: Resource
             </dl>
           )}
 
-          <LinkDirection
-            title="out"
-            groups={resource.links.out}
-            currentId={resource.id}
-            onNavigate={onNavigate}
-          />
-          <LinkDirection
-            title="in"
-            groups={resource.links.in}
-            currentId={resource.id}
-            onNavigate={onNavigate}
-          />
+          <EmbeddedRels resource={resource} onNavigate={onNavigate} />
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar className="resource-scrollbar" orientation="vertical">
           <ScrollArea.Thumb className="resource-thumb" />

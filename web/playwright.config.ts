@@ -6,6 +6,7 @@ const ui = `http://127.0.0.1:${explorerPort}`;
 
 export default defineConfig({
   testDir: "tests",
+  testMatch: "**/*.spec.ts",
   timeout: 120_000,
   use: {
     baseURL: ui,
