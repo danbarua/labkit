@@ -8,11 +8,6 @@ bin/
 !.env.*.example
 
 *.bun-build
-
-# Vite/Playwright output from the overseer app. Machine-local, regenerated.
-web/dist/
-web/test-results/
-web/playwright-report/
 .labkit
 # The exo-ledger belief store, when a session has exo-memory wired up. Same
 # reason as `.labkit` above: it is an embedded PGlite database, machine-local,

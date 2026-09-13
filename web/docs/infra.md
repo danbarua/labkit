@@ -24,7 +24,7 @@ Leave 5433 alone unless an operator names it.
 
 ## Ports
 
-`scripts/worktree-ports.sh` hashes the worktree path. Offset 0 is the main checkout. Other worktrees use `10000 + cksum(path) % 10000`. A hash collision is refused.
+`scripts/worktree-ports.sh` (this package) hashes the worktree path. Offset 0 is the main checkout. Other worktrees use `10000 + cksum(path) % 10000`. A hash collision is refused.
 
 | Env | Main | Use |
 |-----|------|-----|

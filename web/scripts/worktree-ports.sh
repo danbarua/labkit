@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints the host-port offset for this worktree, and the five ports it implies.
+# Prints the host-port offset for this worktree, and the ports it implies.
 #
 # **The main checkout gets 0**, so `docker compose ps`, a log line and a curl on
 # `localhost:5432` all say what they have always said for the person doing
@@ -86,7 +86,6 @@ PORT_POOLER=$((BASE_POOLER + offset))
 PORT_ALPHA=$((BASE_ALPHA + offset))
 PORT_BETA=$((BASE_BETA + offset))
 PORT_EXPLORER=$((BASE_EXPLORER + offset))
-
 if [ "${1:-}" = "--export" ]; then
   printf 'export LABKIT_PORT_DB=%s\n' "$PORT_DB"
   printf 'export LABKIT_PORT_WEB=%s\n' "$PORT_WEB"
