@@ -39,13 +39,13 @@ const PROMOTED = "the coating slows corrosion";
 
 /** Two confirmatory claims that got there by different routes. */
 async function twoRoutesToConfirmatory() {
-  const { enquiry } = await session.openEnquiry("does the treatment hold?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("does the treatment hold?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "60-day panel",
     finding: "no failures at 60 days",
   });
-  const { claims } = await recordAnalysis(session, {
+  const { claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "accelerated ageing",
     from: [observations],
@@ -58,7 +58,7 @@ async function twoRoutesToConfirmatory() {
   });
   const prespecified = claimOf(claims, PRESPECIFIED);
   const promoted = claimOf(claims, PROMOTED);
-  await session.isConfirmed({
+  await session.writes.isConfirmed({
     claim: promoted,
     because: "the prespecified robustness check passed",
   });
@@ -70,8 +70,8 @@ describe("S-23: prespecified is not promoted", () => {
     const { prespecified, promoted } = await twoRoutesToConfirmatory();
     const reader = await afterwards();
 
-    expect((await reader.whySupported({ claim: prespecified })).standing).toBe("confirmatory");
-    expect((await reader.whySupported({ claim: promoted })).standing).toBe("confirmatory");
+    expect((await reader.reads.whySupported({ claim: prespecified })).standing).toBe("confirmatory");
+    expect((await reader.reads.whySupported({ claim: promoted })).standing).toBe("confirmatory");
   });
 
   test("the promotion names itself, and the prespecified result has none", async () => {
@@ -81,10 +81,10 @@ describe("S-23: prespecified is not promoted", () => {
     // The act that conferred the standing, when an act conferred it. A claim
     // that was confirmatory from birth has none, and that absence is the
     // distinction rather than a gap in the answer.
-    expect((await reader.whySupported({ claim: promoted })).promotedBecause).toBe(
+    expect((await reader.reads.whySupported({ claim: promoted })).promotedBecause).toBe(
       "the prespecified robustness check passed",
     );
-    expect((await reader.whySupported({ claim: prespecified })).promotedBecause).toBeUndefined();
+    expect((await reader.reads.whySupported({ claim: prespecified })).promotedBecause).toBeUndefined();
   });
 
   test("the stream says which standing each was recorded with", async () => {

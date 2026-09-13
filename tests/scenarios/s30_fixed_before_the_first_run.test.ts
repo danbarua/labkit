@@ -36,12 +36,12 @@ const WHY = "we never said which standard deviation, and at ten seeds the two di
 
 /** A locked design nobody has evaluated: the state a prespecification fix happens in. */
 async function aLockedDesign() {
-  const { work } = await session.planWork({
+  const { work } = await session.writes.planWork({
     objective: "the 27-cell sweep over alpha and sigma",
     acceptance: "a number per cell on val",
   });
-  const { criterion } = await session.stateCriterion(VAGUE);
-  const { gate } = await session.declareGate({
+  const { criterion } = await session.writes.stateCriterion(VAGUE);
+  const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "the sweep is not reported",
     protecting: [work],
@@ -53,7 +53,7 @@ describe("S-30: fixed before the first run", () => {
   test("Afterward 1: an amendment before any evaluation needs no diagnosis, and says so", async () => {
     const { criterion, gate } = await aLockedDesign();
 
-    const amended = await session.amendDesign({
+    const amended = await session.writes.amendDesign({
       criterion,
       nowRequires: PRECISE,
       because: WHY,
@@ -66,7 +66,7 @@ describe("S-30: fixed before the first run", () => {
     expect(amended.confirmatoryAffected).toEqual([]);
 
     // And it is a real amendment, not a note beside the condition.
-    const history = await (await afterwards()).designHistory({ gate });
+    const history = await (await afterwards()).reads.designHistory({ gate });
     const wordings = history.conditions.flatMap((c) =>
       c.amendments.map((a) => a.replaced.requires),
     );
@@ -75,7 +75,7 @@ describe("S-30: fixed before the first run", () => {
 
   test("Afterward 2: once a number exists, the diagnosis is required again", async () => {
     const { criterion, gate } = await aLockedDesign();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "the gap is 1.8 sd on the sparse set",
@@ -83,7 +83,7 @@ describe("S-30: fixed before the first run", () => {
     });
 
     await expect(
-      session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
+      session.writes.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
     ).rejects.toThrow(/has been evaluated/);
   });
 
@@ -94,19 +94,19 @@ describe("S-30: fixed before the first run", () => {
    */
   test("Afterward 3: an evaluation that was undone does not reopen prespecification", async () => {
     const { criterion, gate } = await aLockedDesign();
-    const evaluated = await session.evaluateCriterion({
+    const evaluated = await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "the gap is 1.8 sd on the sparse set",
       outcome: "fail",
     });
-    await session.undo({
+    await session.writes.undo({
       event: evaluated.events[0]!.seq!,
       because: "the sparse set was the wrong split to judge it on",
     });
 
     await expect(
-      session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
+      session.writes.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
     ).rejects.toThrow(/has been evaluated/);
   });
 
@@ -118,10 +118,10 @@ describe("S-30: fixed before the first run", () => {
    */
   test("Afterward 4: a verdict whose claim was superseded is still a verdict", async () => {
     const { criterion, gate } = await aLockedDesign();
-    const { question } = await session.pose({ question: "what did the pilot show?" });
-    const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
-    const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
-    const pilot = await session.conclude({
+    const { question } = await session.writes.pose({ question: "what did the pilot show?" });
+    const { enquiry } = await session.writes.pursue({ question, approach: "the pilot run" });
+    const { analysis } = await session.writes.recordAnalysis({ enquiry, method: "the pilot", from: [] });
+    const pilot = await session.writes.conclude({
       analysis,
       finding: "the gap is 2.4 sd on the pilot split",
       proposition: "the gap clears two standard deviations",
@@ -129,7 +129,7 @@ describe("S-30: fixed before the first run", () => {
     });
     const claim = pilot.claims[0]!.claim;
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "2.4 sd on the pilot split",
@@ -139,14 +139,14 @@ describe("S-30: fixed before the first run", () => {
 
     // Everything the verdict rested on is superseded, so it has no standing
     // basis left — `no-standing-verdict`, not `never-run`.
-    await session.reinterpret({
+    await session.writes.reinterpret({
       of: claim,
       as: "the gap clears two standard deviations on the pilot split only",
       because: "the pilot split is not the reporting split",
     });
 
     await expect(
-      session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
+      session.writes.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
     ).rejects.toThrow(/has been evaluated/);
   });
 
@@ -158,17 +158,17 @@ describe("S-30: fixed before the first run", () => {
    */
   test("Afterward 5: a verdict whose whole basis fell is still a verdict", async () => {
     const { criterion, gate, work } = await aLockedDesign();
-    const { question } = await session.pose({ question: "what did the pilot show?" });
-    const { enquiry } = await session.pursue({ question, approach: "the pilot run" });
-    const { analysis } = await session.recordAnalysis({ enquiry, method: "the pilot", from: [] });
-    const pilot = await session.conclude({
+    const { question } = await session.writes.pose({ question: "what did the pilot show?" });
+    const { enquiry } = await session.writes.pursue({ question, approach: "the pilot run" });
+    const { analysis } = await session.writes.recordAnalysis({ enquiry, method: "the pilot", from: [] });
+    const pilot = await session.writes.conclude({
       analysis,
       finding: "the gap is 2.4 sd on the pilot split",
       proposition: "the gap clears two standard deviations",
       bearing: "supports",
     });
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "2.4 sd on the pilot split",
@@ -178,8 +178,8 @@ describe("S-30: fixed before the first run", () => {
 
     // `replaceAnalysis`, not `reinterpret`: only a Decision that SUPERSEDES the
     // claim fells the finding beneath it, which is what `verdictsWhere` counts.
-    const { review } = await session.recordReview({ of: analysis, verdict: "the pilot had a bug" });
-    await session.replaceAnalysis({
+    const { review } = await session.writes.recordReview({ of: analysis, verdict: "the pilot had a bug" });
+    await session.writes.replaceAnalysis({
       supersedes: analysis,
       because: review,
       method: "the pilot, with the bug fixed",
@@ -191,34 +191,34 @@ describe("S-30: fixed before the first run", () => {
     // than blocked or ready. Recorded here because a live programme reaching
     // this shape will ask exactly this, and the answer is not obvious.
     const later = await afterwards();
-    expect((await later.gateList({})).map((g) => g.state)).toEqual(["incomplete"]);
-    const standing = await later.now({});
+    expect((await later.reads.gateList({})).map((g) => g.state)).toEqual(["incomplete"]);
+    const standing = await later.reads.now({});
     expect(standing.unevaluated.work.map((w) => w.work)).toEqual([work]);
     expect(standing.blocked.work).toEqual([]);
     expect(standing.untouched).toEqual([]);
 
     await expect(
-      session.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
+      session.writes.amendDesign({ criterion, nowRequires: PRECISE, because: WHY }),
     ).rejects.toThrow(/has been evaluated/);
   });
 
   test("a diagnosis is still accepted before the first run, and still classified by its blast radius", async () => {
     const { criterion } = await aLockedDesign();
-    const { question } = await session.pose({ question: "does ddof matter here?" });
-    const { enquiry } = await session.pursue({ question, approach: "read the two definitions" });
-    const { analysis } = await session.recordAnalysis({
+    const { question } = await session.writes.pose({ question: "does ddof matter here?" });
+    const { enquiry } = await session.writes.pursue({ question, approach: "read the two definitions" });
+    const { analysis } = await session.writes.recordAnalysis({
       enquiry,
       method: "compared the two conventions at n=10",
       from: [],
     });
-    const concluded = await session.conclude({
+    const concluded = await session.writes.conclude({
       analysis,
       finding: "at n=10 the two conventions differ by sqrt(10/9)",
       proposition: "the two standard-deviation conventions differ enough to flip a verdict",
       bearing: "supports",
     });
 
-    const amended = await session.amendDesign({
+    const amended = await session.writes.amendDesign({
       criterion,
       nowRequires: PRECISE,
       because: WHY,

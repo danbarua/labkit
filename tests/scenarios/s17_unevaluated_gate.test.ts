@@ -40,14 +40,14 @@ async function afterwards(): Promise<ResearchSession> {
 
 /** The state the agent describes as "the verification gate is implemented". */
 async function aDeclaredButUnevaluatedGate() {
-  const { work: promotion } = await session.planWork({
+  const { work: promotion } = await session.writes.planWork({
     objective: "promote the accelerated implementation to reference",
     acceptance: "protected artefact matches its recorded hash",
   });
-  const { criterion } = await session.stateCriterion(
+  const { criterion } = await session.writes.stateCriterion(
     "the protected artefact matches its recorded hash",
   );
-  const { gate } = await session.declareGate({
+  const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "block promotion unless the artefact verifies",
     protecting: [promotion],
@@ -59,36 +59,36 @@ describe("S-17: does the guard actually guard?", () => {
   test("Afterward 1: a declared but unevaluated gate is 'never evaluated', not 'passed'", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
-    const status = await session.gateStatus({ gate });
+    const status = await session.reads.gateStatus({ gate });
     expect(status.state).toBe("never-evaluated");
     expect(status.state).not.toBe("satisfied");
 
-    expect((await (await afterwards()).gateStatus({ gate })).state).toBe("never-evaluated");
+    expect((await (await afterwards()).reads.gateStatus({ gate })).state).toBe("never-evaluated");
   });
 
   test("Afterward 2: the evidence that its criterion was evaluated is stated as none", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
-    const status = await session.gateStatus({ gate });
+    const status = await session.reads.gateStatus({ gate });
     // A gate carries no evaluation list any more (#241), so "nothing has been
     // evaluated" is read off the counts and each check's own state.
     expect(status.counts["never-run"]).toBe(status.checks.length);
     expect(status.checks.every((c) => c.decidedBy === undefined)).toBe(true);
 
-    const later = await (await afterwards()).gateStatus({ gate });
+    const later = await (await afterwards()).reads.gateStatus({ gate });
     expect(later.counts["never-run"]).toBe(later.checks.length);
   });
 
   test("Afterward 3: what relies on this gate is enumerable", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
 
-    const status = await session.gateStatus({ gate });
+    const status = await session.reads.gateStatus({ gate });
     expect(status.gating.map((g) => g.objective)).toEqual([
       "promote the accelerated implementation to reference",
     ]);
 
     expect(
-      (await (await afterwards()).gateStatus({ gate })).gating.map((g) => g.objective),
+      (await (await afterwards()).reads.gateStatus({ gate })).gating.map((g) => g.objective),
     ).toEqual(["promote the accelerated implementation to reference"]);
   });
 
@@ -97,39 +97,39 @@ describe("S-17: does the guard actually guard?", () => {
 
     // The guard runs and reports a pass. It has still never been shown able
     // to fail, which is exactly what the reviewer demanded evidence of.
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "hash matches",
       outcome: "pass",
     });
 
-    const status = await session.gateStatus({ gate });
+    const status = await session.reads.gateStatus({ gate });
     expect(status.state).toBe("satisfied");
     expect(status.everFailed).toBe(false);
 
-    const durable = await (await afterwards()).gateStatus({ gate });
+    const durable = await (await afterwards()).reads.gateStatus({ gate });
     expect(durable.state).toBe("satisfied");
     expect(durable.everFailed).toBe(false);
   });
 
   test("a failing evaluation blocks the gate rather than leaving it unevaluated", async () => {
     const { criterion, gate } = await aDeclaredButUnevaluatedGate();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "hash differs",
       outcome: "fail",
     });
 
-    const status = await session.gateStatus({ gate });
+    const status = await session.reads.gateStatus({ gate });
     expect(status.state).toBe("blocked");
     expect(status.everFailed).toBe(true);
     // Distinguishable from never-evaluated -- the whole point.
     // One evaluation now reads as one check having a deciding verdict.
     expect(status.checks.filter((c) => c.decidedBy !== undefined)).toHaveLength(1);
 
-    const durable = await (await afterwards()).gateStatus({ gate });
+    const durable = await (await afterwards()).reads.gateStatus({ gate });
     expect(durable.state).toBe("blocked");
     expect(durable.everFailed).toBe(true);
   });
@@ -138,23 +138,23 @@ describe("S-17: does the guard actually guard?", () => {
    * One criterion, two gates, so the two directions can be asked separately.
    */
   async function oneConditionOverTwoGates() {
-    const { criterion } = await session.stateCriterion(
+    const { criterion } = await session.writes.stateCriterion(
       "the protected artefact matches its recorded hash",
     );
-    const { work: stagingWork } = await session.planWork({
+    const { work: stagingWork } = await session.writes.planWork({
       objective: "publish to staging",
       acceptance: "verified",
     });
-    const { work: releaseWork } = await session.planWork({
+    const { work: releaseWork } = await session.writes.planWork({
       objective: "publish to release",
       acceptance: "verified",
     });
-    const { gate: stagingGate } = await session.declareGate({
+    const { gate: stagingGate } = await session.writes.declareGate({
       governedBy: [criterion],
       consequence: "block staging unless the artefact verifies",
       protecting: [stagingWork],
     });
-    const { gate: releaseGate } = await session.declareGate({
+    const { gate: releaseGate } = await session.writes.declareGate({
       governedBy: [criterion],
       consequence: "block release unless the artefact verifies",
       protecting: [releaseWork],
@@ -171,14 +171,14 @@ describe("S-17: does the guard actually guard?", () => {
     const { criterion, stagingGate, releaseGate } = await oneConditionOverTwoGates();
 
     // The check demonstrably fires on staging.
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate: stagingGate,
       value: "hash differs",
       outcome: "fail",
     });
 
-    const release = await session.gateStatus({ gate: releaseGate });
+    const release = await session.reads.gateStatus({ gate: releaseGate });
     expect(release.state).toBe("blocked");
     expect(release.counts.failed).toBe(1);
     expect(release.counts["never-run"]).toBe(0);
@@ -186,13 +186,13 @@ describe("S-17: does the guard actually guard?", () => {
     // And it says what is holding it, rather than reporting a condition nobody ran.
     expect(release.unmet.map((u) => u.criterion)).toEqual([criterion]);
 
-    const durable = await (await afterwards()).gateStatus({ gate: releaseGate });
+    const durable = await (await afterwards()).reads.gateStatus({ gate: releaseGate });
     expect(durable.state).toBe("blocked");
 
     // The reader's own question: `now` must say blocked, not "some checks
     // remain". An agent waiting on incomplete waits for a check that already
     // has a verdict.
-    const standing = await (await afterwards()).now({});
+    const standing = await (await afterwards()).reads.now({});
     expect(standing.blocked.gates.map((g) => g.gate).sort()).toEqual(
       [stagingGate, releaseGate].sort(),
     );
@@ -205,16 +205,16 @@ describe("S-17: does the guard actually guard?", () => {
   test("a criterion passed for one gate leaves another it governs unevaluated", async () => {
     const { criterion, stagingGate, releaseGate } = await oneConditionOverTwoGates();
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate: stagingGate,
       value: "hash matches",
       outcome: "pass",
     });
 
-    expect((await session.gateStatus({ gate: stagingGate })).state).toBe("satisfied");
+    expect((await session.reads.gateStatus({ gate: stagingGate })).state).toBe("satisfied");
 
-    const release = await session.gateStatus({ gate: releaseGate });
+    const release = await session.reads.gateStatus({ gate: releaseGate });
     expect(release.state).toBe("never-evaluated");
     expect(release.counts["never-run"]).toBe(release.checks.length);
     expect(release.counts.passed).toBe(0);
@@ -228,12 +228,12 @@ describe("S-17: does the guard actually guard?", () => {
   test("a verdict reached for no gate counts for every gate the criterion governs", async () => {
     const { criterion, stagingGate, releaseGate } = await oneConditionOverTwoGates();
 
-    await session.evaluateCriterion({ criterion, value: "hash differs", outcome: "fail" });
+    await session.writes.evaluateCriterion({ criterion, value: "hash differs", outcome: "fail" });
 
-    expect((await session.gateStatus({ gate: stagingGate })).state).toBe("blocked");
-    expect((await session.gateStatus({ gate: releaseGate })).state).toBe("blocked");
+    expect((await session.reads.gateStatus({ gate: stagingGate })).state).toBe("blocked");
+    expect((await session.reads.gateStatus({ gate: releaseGate })).state).toBe("blocked");
 
-    const durable = await (await afterwards()).gateStatus({ gate: releaseGate });
+    const durable = await (await afterwards()).reads.gateStatus({ gate: releaseGate });
     expect(durable.state).toBe("blocked");
     expect(durable.counts.failed).toBe(1);
   });
@@ -245,19 +245,19 @@ describe("S-17: does the guard actually guard?", () => {
    */
   test("a criterion cannot be evaluated against a gate it does not govern", async () => {
     const { gate } = await aDeclaredButUnevaluatedGate();
-    const { criterion: unrelated } = await session.stateCriterion("an unrelated condition");
-    const { work: otherWork } = await session.planWork({
+    const { criterion: unrelated } = await session.writes.stateCriterion("an unrelated condition");
+    const { work: otherWork } = await session.writes.planWork({
       objective: "other work",
       acceptance: "n/a",
     });
-    await session.declareGate({
+    await session.writes.declareGate({
       governedBy: [unrelated],
       consequence: "block other work",
       protecting: [otherWork],
     });
 
     await expect(
-      session.evaluateCriterion({
+      session.writes.evaluateCriterion({
         criterion: unrelated,
         gate,
         value: "irrelevant",
@@ -267,12 +267,12 @@ describe("S-17: does the guard actually guard?", () => {
 
     // Rejected before anything was written: the gate is untouched, and no
     // stray evaluation is sitting in the graph.
-    const status = await session.gateStatus({ gate });
+    const status = await session.reads.gateStatus({ gate });
     expect(status.state).toBe("never-evaluated");
     expect(status.counts["never-run"]).toBe(status.checks.length);
     expect(status.everFailed).toBe(false);
 
-    const durable = await (await afterwards()).gateStatus({ gate });
+    const durable = await (await afterwards()).reads.gateStatus({ gate });
     expect(durable.state).toBe("never-evaluated");
     expect(durable.counts["never-run"]).toBe(durable.checks.length);
   });
@@ -285,10 +285,10 @@ describe("S-17: does the guard actually guard?", () => {
   test("Afterward 2, restated: which criterion governs this gate?", async () => {
     const { gate, criterion } = await aDeclaredButUnevaluatedGate();
 
-    const governing = await session.criteriaGoverning({ gate });
+    const governing = await session.reads.criteriaGoverning({ gate });
     expect(governing.map((c) => c)).toEqual([criterion]);
 
-    const durable = await (await afterwards()).criteriaGoverning({ gate });
+    const durable = await (await afterwards()).reads.criteriaGoverning({ gate });
     expect(durable.map((c) => c)).toEqual([criterion]);
   });
 });

@@ -124,27 +124,27 @@ describe("the event stream is a write-ahead log for a graph store", () => {
     // A real arc, not a single node: two questions, an analysis, a conclusion,
     // a criterion evaluated, a claim confirmed in place, an enquiry closed.
     // Every change kind is exercised — `is` is what produces `PropsChanged`.
-    const { enquiry, question } = await session.openEnquiry("does the coating hold?");
-    const { observations } = await session.recordObservations({
+    const { enquiry, question } = await session.writes.openEnquiry("does the coating hold?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "60-day panel",
       finding: "no failures at 60 days",
     });
-    const { analysis } = await session.recordAnalysis({
+    const { analysis } = await session.writes.recordAnalysis({
       enquiry,
       method: "accelerated ageing",
       from: [observations],
     });
-    const { claims } = await session.conclude({
+    const { claims } = await session.writes.conclude({
       analysis,
       proposition: "the coating holds",
       finding: "0 of 40 failed",
     });
-    await session.isConfirmed({
+    await session.writes.isConfirmed({
       claim: claims[0]!.claim,
       because: "the prespecified check passed",
     });
-    await session.closeEnquiry({ enquiry, answeredBy: claims[0]!.claim });
+    await session.writes.closeEnquiry({ enquiry, answeredBy: claims[0]!.claim });
     void question;
 
     const age = await fromTheGraph(graph, [...state.nodes.keys()]);

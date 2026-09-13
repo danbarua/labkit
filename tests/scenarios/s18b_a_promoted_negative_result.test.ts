@@ -35,13 +35,13 @@ const PROP = "the coating reduces fatigue cracking";
 
 /** A question answered *no*, on a finding somebody then vouched for. */
 async function aVouchedForNo() {
-  const { enquiry } = await session.openEnquiry(ASKS);
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry(ASKS);
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "cycle counts",
     finding: "forty coupons, coated and bare",
   });
-  const { claims } = await recordAnalysis(session, {
+  const { claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "survival comparison",
     from: [observations],
@@ -54,11 +54,11 @@ async function aVouchedForNo() {
     ],
   });
   const claim = claimOf(claims, PROP);
-  await session.isConfirmed({
+  await session.writes.isConfirmed({
     claim,
     because: "re-counted blind by a second reader",
   });
-  await session.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
   return { enquiry, claim };
 }
 
@@ -70,7 +70,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       events: inMemoryEventLog(),
     });
 
-    const status = await later.enquiryStatus({ enquiry });
+    const status = await later.reads.enquiryStatus({ enquiry });
     expect(status.answer).toBe("no");
     // The promotion happened and is what a reader deciding whether to build on
     // this needs to see. `exploratory` here says nobody vouched for it.
@@ -84,7 +84,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       events: inMemoryEventLog(),
     });
 
-    const known = await later.whatIsKnown();
+    const known = await later.reads.whatIsKnown();
     expect(known.established.map((q) => q.asks)).toContain(ASKS);
     expect(known.provisional.map((q) => q.asks)).not.toContain(ASKS);
   });
@@ -98,7 +98,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
 
     // Same SUPPORTS-only shape, one query over. Asked at an instant after the
     // promotion and the closure.
-    const then = await later.whatWasKnown({ at: NOW });
+    const then = await later.reads.whatWasKnown({ at: NOW });
     expect(then.established.map((q) => q.asks)).toContain(ASKS);
     expect(then.provisional.map((q) => q.asks)).not.toContain(ASKS);
   });
@@ -108,13 +108,13 @@ describe("S-18b — a negative result that somebody vouched for", () => {
    * or the fix above would have made every closure look vouched-for.
    */
   test("an unpromoted negative result still reads as provisional", async () => {
-    const { enquiry } = await session.openEnquiry("does the sealant reduce cracking?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("does the sealant reduce cracking?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "sealant counts",
       finding: "forty coupons",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "survival comparison",
       from: [observations],
@@ -126,7 +126,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
         },
       ],
     });
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry,
       answeredBy: claimOf(claims, "the sealant reduces cracking"),
     });
@@ -135,11 +135,11 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const status = await later.enquiryStatus({ enquiry });
+    const status = await later.reads.enquiryStatus({ enquiry });
     expect(status.answer).toBe("no");
     expect(status.restsOn).toBe("exploratory");
 
-    const known = await later.whatIsKnown();
+    const known = await later.reads.whatIsKnown();
     expect(known.provisional.map((q) => q.asks)).toContain("does the sealant reduce cracking?");
     expect(known.established.map((q) => q.asks)).not.toContain("does the sealant reduce cracking?");
   });

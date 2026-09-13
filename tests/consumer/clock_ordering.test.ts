@@ -43,14 +43,14 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
         events: inMemoryEventLog(),
       });
 
-      const { enquiry } = await s.openEnquiry("does the schedule move convergence?");
-      const { criterion: check } = await s.stateCriterion("stable across five seeds");
-      const { observations } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry("does the schedule move convergence?");
+      const { criterion: check } = await s.writes.stateCriterion("stable across five seeds");
+      const { observations } = await s.writes.recordObservations({
         enquiry,
         name: "sweep readings",
         finding: "twelve runs",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "convergence-fit",
         from: [observations],
@@ -60,7 +60,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
 
       winding.wind(days(30));
       const whenEvaluated = winding.peek();
-      await s.evaluateCriterion({
+      await s.writes.evaluateCriterion({
         criterion: check,
         value: "spread 0.4 steps",
         outcome: "pass",
@@ -70,7 +70,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       // A month later the question is closed -- a Decision, and the act that
       // changes what the programme believes.
       winding.wind(days(30));
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry,
         answeredBy: claimOf(analysisClaims, CONVERGES),
       });
@@ -82,14 +82,14 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
 
       // The evaluation kept its instant, and it is the wound one rather than
       // the start -- so the clock genuinely drives durable state here.
-      const why = await reader.whySupported({ claim: claimOf(analysisClaims, CONVERGES) });
+      const why = await reader.reads.whySupported({ claim: claimOf(analysisClaims, CONVERGES) });
       expect(why.standard[0]?.decidedBy?.at).toBe(whenEvaluated);
       expect(why.standard[0]?.decidedBy?.at).not.toBe("2026-03-01T09:00:00.000Z");
 
       // The closure carries no instant at all. Sixty days of wound clock left no
       // durable trace of *when* the programme came to believe this, which is the
       // half of row Z that matters -- belief moves on decisions, not evaluations.
-      const status = await reader.enquiryStatus({ enquiry });
+      const status = await reader.reads.enquiryStatus({ enquiry });
       expect(status.closure).toBe("answered");
       const timeFields = Object.keys(status).filter((k) => /_?at$|when|time|date/i.test(k));
       expect(timeFields).toEqual([]);
@@ -126,7 +126,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
 
   /** A lower bound on when a question was settled, from evidence alone. Null when none exists. */
   async function settledNoEarlierThan(s: ResearchSession, claim: ClaimRef): Promise<string | null> {
-    const why = await s.whySupported({ claim });
+    const why = await s.reads.whySupported({ claim });
     // Through the drill-down: a check carries which evaluation decided it and
     // when, not every evaluation's text -- see helpers/criteria.ts.
     const perCheck = await Promise.all(why.standard.map((c) => evaluationsOf(s, c)));
@@ -146,20 +146,20 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         events: inMemoryEventLog(),
       });
 
-      const { enquiry } = await s.openEnquiry(FIRST.asks);
-      const { observations: obs } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry(FIRST.asks);
+      const { observations: obs } = await s.writes.recordObservations({
         enquiry,
         name: "readings",
         finding: "twelve runs",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "paired-comparison",
         from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
       c.wind(days(40));
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry,
         answeredBy: claimOf(analysisClaims, FIRST.prop),
       });
@@ -172,7 +172,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
       // Forty days passed between the analysis and the closure. Nothing recorded
       // either instant, and this is the ordinary case: a question answered on a
       // finding nobody held to a prespecified condition.
-      expect(await settledNoEarlierThan(reader, await claimNamed(reader, FIRST.prop))).toBeNull();
+      expect(await settledNoEarlierThan(reader, await claimNamed(reader.reads, FIRST.prop))).toBeNull();
     } finally {
       await scenario.end();
     }
@@ -184,21 +184,21 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
      * a bound.
      */
     const prepare = async (s: ResearchSession, asks: string, prop: string) => {
-      const { enquiry } = await s.openEnquiry(asks);
-      const { criterion: check } = await s.stateCriterion(`prespecified check for ${prop}`);
-      const { observations: obs } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry(asks);
+      const { criterion: check } = await s.writes.stateCriterion(`prespecified check for ${prop}`);
+      const { observations: obs } = await s.writes.recordObservations({
         enquiry,
         name: `${prop} readings`,
         finding: `runs for ${prop}`,
       });
-      const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+      const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "paired-comparison",
         from: [obs],
         concludes: [{ proposition: prop, finding: `result for ${prop}` }],
         heldTo: [check],
       });
-      await s.evaluateCriterion({
+      await s.writes.evaluateCriterion({
         criterion: check,
         value: "within tolerance",
         outcome: "pass",
@@ -224,14 +224,14 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         // The only difference: which of them the programme settles first.
         c.wind(days(30));
         const [early, late] = closeFirstThenSecond ? [a, b] : [b, a];
-        await s.closeEnquiry({
+        await s.writes.closeEnquiry({
           enquiry: early.enquiry,
-          answeredBy: await claimNamed(s, early.prop),
+          answeredBy: await claimNamed(s.reads, early.prop),
         });
         c.wind(days(60));
-        await s.closeEnquiry({
+        await s.writes.closeEnquiry({
           enquiry: late.enquiry,
-          answeredBy: await claimNamed(s, late.prop),
+          answeredBy: await claimNamed(s.reads, late.prop),
         });
 
         const reader = new ResearchSession(await scenario.current(), {
@@ -239,8 +239,8 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
           events: inMemoryEventLog(),
         });
         return {
-          first: await settledNoEarlierThan(reader, await claimNamed(reader, a.prop)),
-          second: await settledNoEarlierThan(reader, await claimNamed(reader, b.prop)),
+          first: await settledNoEarlierThan(reader, await claimNamed(reader.reads, a.prop)),
+          second: await settledNoEarlierThan(reader, await claimNamed(reader.reads, b.prop)),
         };
       } finally {
         await scenario.end();
@@ -296,13 +296,13 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         analysis: AnalysisRef;
       }> = [];
       for (const q of [FIRST, SECOND]) {
-        const { enquiry } = await s.openEnquiry(q.asks);
-        const { observations: obs } = await s.recordObservations({
+        const { enquiry } = await s.writes.openEnquiry(q.asks);
+        const { observations: obs } = await s.writes.recordObservations({
           enquiry,
           name: `${q.prop} readings`,
           finding: `runs for ${q.prop}`,
         });
-        const { analysis } = await recordAnalysis(s, {
+        const { analysis } = await recordAnalysis(s.writes, {
           enquiry,
           method: "paired-comparison",
           from: [obs],
@@ -315,15 +315,15 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       // Thirty days in, the first of them is settled. Sixty days in, the other.
       c.wind(days(30));
       const early = find(order[0]);
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry: early.enquiry,
-        answeredBy: await claimNamed(s, early.prop),
+        answeredBy: await claimNamed(s.reads, early.prop),
       });
       c.wind(days(30));
       const late = find(order[1]);
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry: late.enquiry,
-        answeredBy: await claimNamed(s, late.prop),
+        answeredBy: await claimNamed(s.reads, late.prop),
       });
 
       // A second reader over the same graph, and an empty event log: whatever it
@@ -332,11 +332,11 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         clock: c,
         events: inMemoryEventLog(),
       });
-      const atDay45 = await reader.whatWasKnown({ at: "2026-04-15T09:00:00.000Z" });
+      const atDay45 = await reader.reads.whatWasKnown({ at: "2026-04-15T09:00:00.000Z" });
       return {
         settledByDay45: atDay45.provisional.map((q) => q.asks),
         openAtDay45: atDay45.open.map((q) => q.asks).sort(),
-        nowSettled: (await reader.whatIsKnown()).provisional.map((q) => q.asks).sort(),
+        nowSettled: (await reader.reads.whatIsKnown()).provisional.map((q) => q.asks).sort(),
       };
     } finally {
       await scenario.end();
@@ -372,25 +372,25 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         events: inMemoryEventLog(),
       });
 
-      const { enquiry } = await s.openEnquiry(FIRST.asks);
-      const { observations: obs } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry(FIRST.asks);
+      const { observations: obs } = await s.writes.recordObservations({
         enquiry,
         name: "readings",
         finding: "twelve runs",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "paired-comparison",
         from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "moves by ~3 steps" }],
       });
       c.wind(days(10));
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry,
         answeredBy: claimOf(analysisClaims, FIRST.prop),
       });
       c.wind(days(40));
-      await s.isConfirmed({
+      await s.writes.isConfirmed({
         claim: claimOf(analysisClaims, FIRST.prop),
         because: "replicated under seed control",
       });
@@ -401,18 +401,18 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       });
 
       // Day 25: settled, and resting on nothing anyone had promoted.
-      const midway = await reader.whatWasKnown({ at: "2026-03-26T09:00:00.000Z" });
+      const midway = await reader.reads.whatWasKnown({ at: "2026-03-26T09:00:00.000Z" });
       expect(midway.provisional.map((q) => q.asks)).toEqual([FIRST.asks]);
       expect(midway.established).toEqual([]);
 
       // Day 60: the promotion has happened, and only now is it established.
-      const after = await reader.whatWasKnown({ at: "2026-05-01T09:00:00.000Z" });
+      const after = await reader.reads.whatWasKnown({ at: "2026-05-01T09:00:00.000Z" });
       expect(after.established.map((q) => q.asks)).toEqual([FIRST.asks]);
       expect(after.provisional).toEqual([]);
 
       // The present-tense read collapses that distinction, correctly -- it is
       // answering a different question.
-      expect((await reader.whatIsKnown()).established.map((q) => q.asks)).toEqual([FIRST.asks]);
+      expect((await reader.reads.whatIsKnown()).established.map((q) => q.asks)).toEqual([FIRST.asks]);
     } finally {
       await scenario.end();
     }
@@ -431,20 +431,20 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
         clock: c,
         events: inMemoryEventLog(),
       });
-      const { enquiry } = await s.openEnquiry(FIRST.asks);
-      const { observations: obs } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry(FIRST.asks);
+      const { observations: obs } = await s.writes.recordObservations({
         enquiry,
         name: "readings",
         finding: "runs",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "pc",
         from: [obs],
         concludes: [{ proposition: FIRST.prop, finding: "a result" }],
       });
       c.wind(days(10));
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry,
         answeredBy: claimOf(analysisClaims, FIRST.prop),
       });
@@ -455,7 +455,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       });
 
       // February: the question had not been posed. Absent, not open.
-      const before = await reader.whatWasKnown({ at: "2026-02-01T00:00:00.000Z" });
+      const before = await reader.reads.whatWasKnown({ at: "2026-02-01T00:00:00.000Z" });
       expect(before.open).toEqual([]);
       expect(before.established).toEqual([]);
       expect(before.provisional).toEqual([]);
@@ -463,7 +463,7 @@ describe("Probe 7 — rung 3: the as-of view, once decisions carry an instant", 
       expect(before.at).toBe("2026-02-01T00:00:00.000Z");
 
       // Five days in: asked, and nothing has settled it.
-      const during = await reader.whatWasKnown({ at: "2026-03-06T09:00:00.000Z" });
+      const during = await reader.reads.whatWasKnown({ at: "2026-03-06T09:00:00.000Z" });
       expect(during.open.map((q) => q.asks)).toEqual([FIRST.asks]);
       expect(during.provisional).toEqual([]);
     } finally {

@@ -42,15 +42,15 @@ const INCONCLUSIVE =
  *  stop. I am not going to call it either way."
  */
 async function aReVerificationThatSettledNothing() {
-  const { enquiry, question } = await session.openEnquiry(
+  const { enquiry, question } = await session.writes.openEnquiry(
     "does T differ from the rewiring control?",
   );
-  const { observations } = await session.recordObservations({
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "per-image results",
     finding: "T and the rewiring control, ten seeds",
   });
-  const { analysis, claims } = await recordAnalysis(session, {
+  const { analysis, claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "log-scale re-aggregation",
     from: [observations],
@@ -78,9 +78,9 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
   test("the claim reads as neither supported nor challenged, and keeps its finding", async () => {
     const w = await aReVerificationThatSettledNothing();
 
-    await session.isUndecided({ claim: w.claim, because: w.finding });
+    await session.writes.isUndecided({ claim: w.claim, because: w.finding });
 
-    const why = await (await afterwards()).whySupported({ claim: w.claim });
+    const why = await (await afterwards()).reads.whySupported({ claim: w.claim });
 
     // The whole of #139: today this reads a `supported` verdict, because
     // `conclude` defaults the bearing to supports and nothing can say
@@ -96,15 +96,15 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
     // The same answer through `why`, which is what an agent is handed over
     // MCP. It had no undecided arm and said "nothing has examined it" of a
     // claim carrying a finding.
-    const explained = await (await afterwards()).why({ subject: w.claim });
+    const explained = await (await afterwards()).reads.why({ subject: w.claim });
     expect(explained.is).not.toMatch(/nothing has examined/);
   });
 
   test("the question is not counted as answered by a finding that settles nothing", async () => {
     const w = await aReVerificationThatSettledNothing();
-    await session.isUndecided({ claim: w.claim, because: w.finding });
+    await session.writes.isUndecided({ claim: w.claim, because: w.finding });
 
-    const survey = await (await afterwards()).whatIsKnown();
+    const survey = await (await afterwards()).reads.whatIsKnown();
 
     // `unresolved` already means "worked on, not settled", which is exactly
     // this. The failure to avoid is `established` or `provisional`: both say

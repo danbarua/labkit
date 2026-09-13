@@ -29,9 +29,9 @@ afterEach(async () => {
  */
 test("a session built without a sink still has exactly one, and `undo` can see it", async () => {
   const session = new ResearchSession(await scenario.current());
-  const { events } = await session.pose({ question: "can undo see its own event?" });
+  const { events } = await session.writes.pose({ question: "can undo see its own event?" });
 
-  const undone = await session.undo({ event: events[0]!.seq!, because: "a duplicate" });
+  const undone = await session.writes.undo({ event: events[0]!.seq!, because: "a duplicate" });
   expect(undone.retracted.length).toBeGreaterThan(0);
 });
 

@@ -65,14 +65,14 @@ const AGREES = "median aggregation agrees";
  * if the median aggregation agrees with the mean."
  */
 async function aResultHeldToARobustnessCheck() {
-  const { criterion: robustness } = await session.stateCriterion(ROBUSTNESS);
-  const { enquiry } = await session.openEnquiry("does T differ from rewired?");
-  const { observations } = await session.recordObservations({
+  const { criterion: robustness } = await session.writes.stateCriterion(ROBUSTNESS);
+  const { enquiry } = await session.writes.openEnquiry("does T differ from rewired?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "per-image results",
     finding: "per-image accuracy, 10,000 images",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "holm-pairwise",
     from: [observations],
@@ -93,7 +93,7 @@ async function theCheckIsRun(
   method: string,
   concludes: { proposition: string; finding: string },
 ) {
-  return await recordAnalysis(session, {
+  return await recordAnalysis(session.writes, {
     enquiry,
     method,
     from: [observations],
@@ -120,7 +120,7 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.21",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
@@ -138,16 +138,16 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.04",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
       citing: [claimOf(secondRunClaims, AGREES)],
     });
 
-    const why = await session.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
+    const why = await session.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
     expect(
-      await (await afterwards()).whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
+      await (await afterwards()).reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
     ).toEqual(why);
 
     expect(why.verdict).toBe("standard-unmet");
@@ -177,24 +177,24 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.21",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
       citing: [claimOf(defectiveClaims, DISAGREES)],
     });
     expect(
-      (await session.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).verdict,
+      (await session.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).verdict,
     ).toBe("standard-unmet");
 
     // The fault is found in the check, and the check is replaced -- the same
     // act used for an analysis that was wrong, aimed here at a piece of work
     // that happens to be a check.
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    const _corrected = await replaceAnalysis(session, {
+    const _corrected = await replaceAnalysis(session.writes, {
       supersedes: defective,
       because: review,
       enquiry,
@@ -210,16 +210,16 @@ describe("S-3c: the check was wrong, not the result", () => {
         },
       ],
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: [await claimNamed(session, AGREES)],
+      citing: [await claimNamed(session.reads, AGREES)],
     });
 
-    const why = await session.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
+    const why = await session.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
     expect(
-      await (await afterwards()).whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
+      await (await afterwards()).reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }),
     ).toEqual(why);
 
     expect(why.verdict).toBe("supported");
@@ -240,12 +240,12 @@ describe("S-3c: the check was wrong, not the result", () => {
    */
   test("the same distinction holds for work a check gates, not just findings it qualifies", async () => {
     const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();
-    const { work: tertiary } = await session.planWork({
+    const { work: tertiary } = await session.writes.planWork({
       objective: "fit the tertiary model",
       acceptance: "converges",
       mayRead: ["per-image results"],
     });
-    const { gate } = await session.declareGate({
+    const { gate } = await session.writes.declareGate({
       governedBy: [robustness],
       consequence: "the tertiary model may be fitted",
       protecting: [tertiary],
@@ -260,20 +260,20 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.21",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       gate,
       value: "median p = 0.21",
       outcome: "fail",
       citing: [claimOf(defectiveClaims, DISAGREES)],
     });
-    expect((await session.gateStatus({ gate })).state).toBe("blocked");
+    expect((await session.reads.gateStatus({ gate })).state).toBe("blocked");
 
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    const _corrected = await replaceAnalysis(session, {
+    const _corrected = await replaceAnalysis(session.writes, {
       supersedes: defective,
       because: review,
       enquiry,
@@ -289,15 +289,15 @@ describe("S-3c: the check was wrong, not the result", () => {
         },
       ],
     });
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       gate,
       value: "median p = 0.04",
       outcome: "pass",
-      citing: [await claimNamed(session, AGREES)],
+      citing: [await claimNamed(session.reads, AGREES)],
     });
 
-    const status = await (await afterwards()).gateStatus({ gate });
+    const status = await (await afterwards()).reads.gateStatus({ gate });
     expect(status.state).toBe("satisfied");
     expect(status.unmet.map((u) => u.requires)).toEqual([]);
     // The guard has still been seen to fail. Correcting a defective check does
@@ -323,7 +323,7 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.21",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
@@ -338,7 +338,7 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.04",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.04",
       outcome: "pass",
@@ -347,16 +347,16 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     const reader = await afterwards();
     expect(
-      (await reader.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).verdict,
+      (await reader.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).verdict,
     ).toBe("standard-unmet");
 
     // Now, and only now, is the first run found to have been faulty. Nothing
     // else about the record changes -- no new evaluation, no new check.
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: failed,
       verdict: "the aggregation dropped the last fold",
     });
-    await replaceAnalysis(session, {
+    await replaceAnalysis(session.writes, {
       supersedes: failed,
       because: review,
       enquiry,
@@ -374,7 +374,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     expect(
-      (await (await afterwards()).whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }))
+      (await (await afterwards()).reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) }))
         .verdict,
     ).toBe("supported");
   });
@@ -387,7 +387,7 @@ describe("S-3c: the check was wrong, not the result", () => {
   test("a failure that cited nothing cannot be cleared by withdrawing something else", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "looked wrong to me",
       outcome: "fail",
@@ -402,11 +402,11 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.04",
       },
     );
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: unrelated,
       verdict: "the aggregation dropped the last fold",
     });
-    await replaceAnalysis(session, {
+    await replaceAnalysis(session.writes, {
       supersedes: unrelated,
       because: review,
       enquiry,
@@ -415,7 +415,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       concludes: [{ proposition: AGREES, finding: "median p = 0.05" }],
     });
 
-    const why = await (await afterwards()).whySupported({
+    const why = await (await afterwards()).reads.whySupported({
       claim: claimOf(analysisClaims, PROPOSITION),
     });
     expect(why.verdict).toBe("standard-unmet");
@@ -438,7 +438,7 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.21",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
@@ -446,11 +446,11 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     // The check is found faulty and retired. Nobody has re-run it yet.
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
-    await replaceAnalysis(session, {
+    await replaceAnalysis(session.writes, {
       supersedes: defective,
       because: review,
       enquiry,
@@ -467,7 +467,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       ],
     });
 
-    const why = await (await afterwards()).whySupported({
+    const why = await (await afterwards()).reads.whySupported({
       claim: claimOf(analysisClaims, PROPOSITION),
     });
     const check = why.standard.find((c) => c.proposition === ROBUSTNESS);
@@ -497,7 +497,7 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.21",
       },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       value: "median p = 0.21",
       outcome: "fail",
@@ -506,21 +506,21 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     // Retire the proposition the replacement is going to try to re-assert, so
     // the second half of the compound action is guaranteed to be refused.
-    await session.reinterpret({
+    await session.writes.reinterpret({
       of: claimOf(defectiveClaims, DISAGREES),
       as: "the median aggregation was never computed correctly",
       because: "the fold handling was wrong throughout",
     });
 
-    const before = await (await afterwards()).whySupported({
+    const before = await (await afterwards()).reads.whySupported({
       claim: claimOf(analysisClaims, PROPOSITION),
     });
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: defective,
       verdict: "the aggregation dropped the last fold",
     });
     await expect(
-      replaceAnalysis(session, {
+      replaceAnalysis(session.writes, {
         supersedes: defective,
         because: review,
         enquiry,
@@ -531,7 +531,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     ).rejects.toThrow();
 
     // Nothing moved. The command failed whole.
-    const after = await (await afterwards()).whySupported({
+    const after = await (await afterwards()).reads.whySupported({
       claim: claimOf(analysisClaims, PROPOSITION),
     });
     expect(after).toEqual(before);
@@ -543,12 +543,12 @@ describe("S-3c: the check was wrong, not the result", () => {
    */
   test("a gate whose only verdict was withdrawn reads incomplete, not satisfied", async () => {
     const { robustness, enquiry, observations } = await aResultHeldToARobustnessCheck();
-    const { work: tertiary } = await session.planWork({
+    const { work: tertiary } = await session.writes.planWork({
       objective: "fit the tertiary model",
       acceptance: "converges",
       mayRead: ["per-image results"],
     });
-    const { gate } = await session.declareGate({
+    const { gate } = await session.writes.declareGate({
       governedBy: [robustness],
       consequence: "the tertiary model may be fitted",
       protecting: [tertiary],
@@ -560,23 +560,23 @@ describe("S-3c: the check was wrong, not the result", () => {
       "median-aggregation",
       { proposition: AGREES, finding: "median p = 0.04" },
     );
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: robustness,
       gate,
       value: "median p = 0.04",
       outcome: "pass",
       citing: [claimOf(passingClaims, AGREES)],
     });
-    expect((await session.gateStatus({ gate })).state).toBe("satisfied");
+    expect((await session.reads.gateStatus({ gate })).state).toBe("satisfied");
 
     // The passing check turns out to have been defective and is replaced.
     // Nobody has re-run it yet: the only evaluation of `robustness` now cites
     // withdrawn evidence, so the criterion has no standing verdict at all.
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: passing,
       verdict: "the aggregation dropped the last fold",
     });
-    await replaceAnalysis(session, {
+    await replaceAnalysis(session.writes, {
       supersedes: passing,
       because: review,
       enquiry,
@@ -588,18 +588,18 @@ describe("S-3c: the check was wrong, not the result", () => {
     const reader = await afterwards();
 
     // 1. gateStatus (src/domain/read.ts:1030).
-    const status = await reader.gateStatus({ gate });
+    const status = await reader.reads.gateStatus({ gate });
     expect(status.state).toBe("incomplete");
     expect(status.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
 
     // 2. gateList (src/domain/read.ts:1924) -- the same fact, the other reader.
-    const listed = await reader.gateList({});
+    const listed = await reader.reads.gateList({});
     const ourGate = listed.find((g) => g.gate === gate);
     expect(ourGate?.state).toBe("incomplete");
-    expect((await reader.gateList({ state: "incomplete" })).some((g) => g.gate === gate)).toBe(
+    expect((await reader.reads.gateList({ state: "incomplete" })).some((g) => g.gate === gate)).toBe(
       true,
     );
-    expect((await reader.gateList({ state: "satisfied" })).some((g) => g.gate === gate)).toBe(
+    expect((await reader.reads.gateList({ state: "satisfied" })).some((g) => g.gate === gate)).toBe(
       false,
     );
 
@@ -607,7 +607,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     // A retracted verdict is not a failure -- S-3c's own distinction -- so the
     // task it protects is not blocked; it is waiting on a gate short of
     // satisfied, and not ready to start.
-    const listedWork = await reader.workList({});
+    const listedWork = await reader.reads.workList({});
     const ourWork = listedWork.find((w) => w.work === tertiary);
     expect(ourWork?.state).not.toBe("blocked");
     expect(ourWork?.state).toBe("waiting");

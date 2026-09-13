@@ -49,24 +49,22 @@ const COST = "a full run costs roughly 9,000 GPU-hours at the current throughput
  * until two conditions are established.
  */
 async function aStagedProgramme() {
-  const { enquiry } = await session.openEnquiry(
-    "does the learned topology classify better than the baseline?",
-  );
+  const { enquiry } = await session.writes.openEnquiry("does the learned topology classify better than the baseline?",);
 
-  const { work: feasibility } = await session.planWork({
+  const { work: feasibility } = await session.writes.planWork({
     objective: "feasibility slice: 1,000 training images",
     acceptance: "the pipeline runs end to end and reports throughput",
     mayRead: ["the 1,000-image training slice"],
   });
-  const { work: fullRun } = await session.planWork({
+  const { work: fullRun } = await session.writes.planWork({
     objective: "the full classification run",
     acceptance: "all folds complete on the full training set",
     mayRead: ["the full training set"],
   });
 
-  const { criterion: throughput } = await session.stateCriterion(THROUGHPUT);
-  const { criterion: solverHealth } = await session.stateCriterion(SOLVER_HEALTH);
-  const { gate: advancement } = await session.declareGate({
+  const { criterion: throughput } = await session.writes.stateCriterion(THROUGHPUT);
+  const { criterion: solverHealth } = await session.writes.stateCriterion(SOLVER_HEALTH);
+  const { gate: advancement } = await session.writes.declareGate({
     governedBy: [throughput, solverHealth],
     consequence: "the full run may start",
     protecting: [fullRun],
@@ -88,17 +86,17 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
     // Researcher: run the classification stage. LabKit:     the first feasibility step is ready
     // — 1,000 training images. The official test data is not accessible to this task.
-    const contract = await session.contractFor({ work: programme.feasibility });
+    const contract = await session.reads.contractFor({ work: programme.feasibility });
     expect(contract.mayRead).toEqual(["the 1,000-image training slice"]);
     expect(contract.mayRead).not.toContain("the held-out official test set");
 
     // Agent:      first step passed.
-    const { observations: readings } = await session.recordObservations({
+    const { observations: readings } = await session.writes.recordObservations({
       enquiry: programme.enquiry,
       name: "feasibility slice timings",
       finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
     });
-    const { claims: measuredClaims } = await recordAnalysis(session, {
+    const { claims: measuredClaims } = await recordAnalysis(session.writes, {
       enquiry: programme.enquiry,
       method: "throughput-and-convergence",
       implementing: programme.feasibility,
@@ -117,7 +115,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
 
     // LabKit:     before scaling, the next step must establish throughput and
     //             solver-health conditions.
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: programme.throughput,
       gate: programme.advancement,
       value: "44 images per second",
@@ -125,7 +123,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
 
-    const status = await session.gateStatus({ gate: programme.advancement });
+    const status = await session.reads.gateStatus({ gate: programme.advancement });
     expect(status.state).toBe("incomplete");
     expect(status.unmet.map((u) => u.requires)).toEqual([SOLVER_HEALTH]);
   });
@@ -137,7 +135,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const programme = await aStagedProgramme();
     const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: programme.throughput,
       gate: programme.advancement,
       value: "44 images per second",
@@ -145,8 +143,8 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
 
-    const status = await session.gateStatus({ gate: programme.advancement });
-    expect(await (await afterwards()).gateStatus({ gate: programme.advancement })).toEqual(status);
+    const status = await session.reads.gateStatus({ gate: programme.advancement });
+    expect(await (await afterwards()).reads.gateStatus({ gate: programme.advancement })).toEqual(status);
 
     expect(status.state).toBe("incomplete");
     expect(status.state).not.toBe("satisfied");
@@ -159,7 +157,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     // read matched a `BLOCKS` edge that does not exist, so it reported
     // nothing protected while the gate page reported the task.
     const held = status.checks.find((c) => c.proposition === SOLVER_HEALTH)!;
-    const standing = await session.criterionStanding({ criterion: held.criterion });
+    const standing = await session.reads.criterionStanding({ criterion: held.criterion });
     const governed = standing.governs.find((g) => g.gate === programme.advancement)!;
     expect(governed.protecting.map((w) => w.objective)).toEqual(
       status.gating.map((g) => g.objective),
@@ -178,7 +176,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const programme = await aStagedProgramme();
     const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: programme.throughput,
       gate: programme.advancement,
       value: "44 images per second",
@@ -186,7 +184,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
       citing: [claimOf(measuredClaims, THROUGHPUT)],
     });
     // The same verdict, asserted rather than measured.
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: programme.solverHealth,
       gate: programme.advancement,
       value: "looked fine",
@@ -194,7 +192,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     });
 
     const later = await afterwards();
-    const status = await later.gateStatus({ gate: programme.advancement });
+    const status = await later.reads.gateStatus({ gate: programme.advancement });
     const byName = Object.fromEntries(status.checks.map((c) => [c.proposition, c]));
 
     // Through the drill-down: a gate says what state each check is in, and
@@ -216,7 +214,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const programme = await aStagedProgramme();
 
     const later = await afterwards();
-    const contract = await later.contractFor({ work: programme.feasibility });
+    const contract = await later.reads.contractFor({ work: programme.feasibility });
     expect(contract.objective).toBe("feasibility slice: 1,000 training images");
     expect(contract.mayRead).toEqual(["the 1,000-image training slice"]);
     // Advisory. Nothing stops a process reading whatever it likes; LabKit
@@ -225,7 +223,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     // implying a guarantee the system cannot give.
     expect(contract.enforced).toBe(false);
 
-    const full = await later.contractFor({ work: programme.fullRun });
+    const full = await later.reads.contractFor({ work: programme.fullRun });
     expect(full.mayRead).toEqual(["the full training set"]);
   });
 
@@ -237,7 +235,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
     const later = await afterwards();
-    const why = await later.whySupported({ claim: claimOf(measuredClaims, COST) });
+    const why = await later.reads.whySupported({ claim: claimOf(measuredClaims, COST) });
     expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.finding)).toEqual([
       "9,100 GPU-hours projected from the measured rate",
@@ -252,9 +250,9 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const programme = await aStagedProgramme();
     const { claims: measuredClaims } = await aPassingFeasibilityStep(programme);
 
-    const before = await session.whySupported({ claim: claimOf(measuredClaims, THROUGHPUT) });
+    const before = await session.reads.whySupported({ claim: claimOf(measuredClaims, THROUGHPUT) });
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion: programme.throughput,
       gate: programme.advancement,
       value: "44 images per second",
@@ -263,12 +261,12 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     });
 
     const later = await afterwards();
-    const after = await later.whySupported({ claim: claimOf(measuredClaims, THROUGHPUT) });
+    const after = await later.reads.whySupported({ claim: claimOf(measuredClaims, THROUGHPUT) });
     expect(after).toEqual(before);
 
     // ...and the gate knows nothing about claims either. What it protects is
     // work.
-    const status = await later.gateStatus({ gate: programme.advancement });
+    const status = await later.reads.gateStatus({ gate: programme.advancement });
     expect(status.gating.map((g) => g.objective)).toEqual(["the full classification run"]);
   });
 
@@ -278,7 +276,7 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     await aPassingFeasibilityStep(programme);
 
     await expect(
-      session.evaluateCriterion({
+      session.writes.evaluateCriterion({
         criterion: programme.throughput,
         gate: programme.advancement,
         value: "44 images per second",
@@ -288,18 +286,18 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     ).rejects.toThrow(/no finding bears on claim CLM_99999/);
 
     const later = await afterwards();
-    expect((await later.gateStatus({ gate: programme.advancement })).state).toBe("never-evaluated");
+    expect((await later.reads.gateStatus({ gate: programme.advancement })).state).toBe("never-evaluated");
   });
 });
 
 /** The feasibility step, run and measured. */
 async function aPassingFeasibilityStep(programme: Awaited<ReturnType<typeof aStagedProgramme>>) {
-  const { observations: readings } = await session.recordObservations({
+  const { observations: readings } = await session.writes.recordObservations({
     enquiry: programme.enquiry,
     name: "feasibility slice timings",
     finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
   });
-  return await recordAnalysis(session, {
+  return await recordAnalysis(session.writes, {
     enquiry: programme.enquiry,
     method: "throughput-and-convergence",
     implementing: programme.feasibility,

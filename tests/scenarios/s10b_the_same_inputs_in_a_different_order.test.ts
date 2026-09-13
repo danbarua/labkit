@@ -45,21 +45,21 @@ async function anAlignmentRunInOneOrder(
   s: ResearchSession,
   order: "first-then-second" | "second-then-first",
 ) {
-  const { enquiry } = await s.openEnquiry("is the second series shifted relative to the first?");
-  const { observations: first } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("is the second series shifted relative to the first?");
+  const { observations: first } = await s.writes.recordObservations({
     enquiry,
     name: "series A",
     finding: "baseline trace",
     contentHash: "sha256:A",
   });
-  const { observations: second } = await s.recordObservations({
+  const { observations: second } = await s.writes.recordObservations({
     enquiry,
     name: "series B",
     finding: "comparison trace",
     contentHash: "sha256:B",
   });
   const inputs = order === "first-then-second" ? [first, second] : [second, first];
-  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "pairwise-alignment",
     from: inputs,
@@ -75,7 +75,7 @@ describe("S-10b: the same inputs, in a different order", () => {
    */
   test("both orders record the same two inputs", async () => {
     const forwards = await anAlignmentRunInOneOrder(session, "first-then-second");
-    const report = await (await afterwards()).reproducibilityOf({
+    const report = await (await afterwards()).reads.reproducibilityOf({
       analysis: forwards.analysis,
       rebuilt: [
         { part: forwards.first, hash: "sha256:A" },
@@ -92,7 +92,7 @@ describe("S-10b: the same inputs, in a different order", () => {
   test("a rebuild in the opposite order reports itself reproducible", async () => {
     const backwards = await anAlignmentRunInOneOrder(session, "second-then-first");
 
-    const report = await (await afterwards()).reproducibilityOf({
+    const report = await (await afterwards()).reads.reproducibilityOf({
       analysis: backwards.analysis,
       rebuilt: [
         { part: backwards.first, hash: "sha256:A" },
@@ -117,7 +117,7 @@ describe("S-10b: the same inputs, in a different order", () => {
       "first-then-second",
     );
 
-    await session.reverify({
+    await session.writes.reverify({
       historical: analysis,
       enquiry,
       method: "pairwise-alignment",
@@ -125,7 +125,7 @@ describe("S-10b: the same inputs, in a different order", () => {
       concludes: { proposition: SHIFTED, finding: "offset of +4.1 units" },
     });
 
-    const verification = await (await afterwards()).whySupported({
+    const verification = await (await afterwards()).reads.whySupported({
       claim: claimOf(analysisClaims, SHIFTED),
     });
     expect(verification.reverifiedBy.map((r) => r.method)).toEqual(["pairwise-alignment"]);

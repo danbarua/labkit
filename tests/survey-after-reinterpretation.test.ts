@@ -29,14 +29,14 @@ afterAll(async () => {
 const BUCKETS = ["established", "provisional", "unresolved", "untested", "accepted"] as const;
 
 test("a reinterpretation does not move the question between buckets", async () => {
-  const { enquiry } = await s.openEnquiry("does the drug work?");
-  const { criterion: crit } = await s.stateCriterion("holds under leave-one-out");
-  const { observations: obs } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does the drug work?");
+  const { criterion: crit } = await s.writes.stateCriterion("holds under leave-one-out");
+  const { observations: obs } = await s.writes.recordObservations({
     enquiry,
     name: "cohort",
     finding: "+11%",
   });
-  const rec = await recordAnalysis(s, {
+  const rec = await recordAnalysis(s.writes, {
     enquiry,
     method: "fit",
     from: [obs],
@@ -49,23 +49,23 @@ test("a reinterpretation does not move the question between buckets", async () =
   // promoted and its check failed -> `provisional`. The narrowed claim has
   // no criteria at all -> vacuously met -> `established`. With a passing check
   // both readings agree and the probe cannot fail.
-  await s.evaluateCriterion({ criterion: crit, value: "0.071", outcome: "fail", citing: [claim] });
+  await s.writes.evaluateCriterion({ criterion: crit, value: "0.071", outcome: "fail", citing: [claim] });
   // Promoted, so the two candidate answering claims give DIFFERENT buckets:
   // the original is promoted and its check is met -> established; the narrowed
   // one is neither -> provisional. Without this the probe cannot fail.
-  await s.isConfirmed({ claim, because: "held at the prespecified bar" });
-  await s.closeEnquiry({ enquiry, answeredBy: claim });
+  await s.writes.isConfirmed({ claim, because: "held at the prespecified bar" });
+  await s.writes.closeEnquiry({ enquiry, answeredBy: claim });
 
-  const before = await s.whatIsKnown();
+  const before = await s.reads.whatIsKnown();
   const bucketBefore = BUCKETS.find((b) => before[b].some((q) => q.asks === "does the drug work?"));
 
-  const report = await s.reinterpret({
+  const report = await s.writes.reinterpret({
     of: claim,
     as: "the drug is associated with the improvement",
     because: "the design cannot separate selection from effect",
   });
 
-  const after = await s.whatIsKnown();
+  const after = await s.reads.whatIsKnown();
   const bucketAfter = BUCKETS.find((b) => after[b].some((q) => q.asks === "does the drug work?"));
 
   expect(bucketBefore).toBe("provisional");
@@ -76,7 +76,7 @@ test("a reinterpretation does not move the question between buckets", async () =
   // between reads of the same graph.
   const runs: (string | undefined)[] = [];
   for (let i = 0; i < 5; i++) {
-    const k = await s.whatIsKnown();
+    const k = await s.reads.whatIsKnown();
     runs.push(BUCKETS.find((b) => k[b].some((q) => q.asks === "does the drug work?")));
   }
   expect(new Set(runs)).toEqual(new Set(["provisional"]));

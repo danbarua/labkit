@@ -52,20 +52,20 @@ const CONFIRMING = "numbers check out; independently recomputed the same values"
  * is wrong. The other says the arithmetic is right."
  */
 async function anAnalysisWithTwoReviews(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("does the coating shift the onset temperature?");
-  const { observations: readings } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does the coating shift the onset temperature?");
+  const { observations: readings } = await s.writes.recordObservations({
     enquiry,
     name: "onset sweep",
     finding: "onset across twelve coatings",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "linear-onset-fit",
     from: [readings],
     concludes: [{ proposition: SHIFTS, finding: "onset moves by 4.2 K" }],
   });
-  const { review: critical } = await s.recordReview({ of: analysis, verdict: UNSOUND });
-  const { review: confirming } = await s.recordReview({
+  const { review: critical } = await s.writes.recordReview({ of: analysis, verdict: UNSOUND });
+  const { review: confirming } = await s.writes.recordReview({
     of: analysis,
     verdict: CONFIRMING,
   });
@@ -81,7 +81,7 @@ describe("S-11b: which review retracted it?", () => {
   test("two worlds differing in what the replacement concluded are told apart", async () => {
     const build = (finding: string) => async (s: ResearchSession) => {
       const { enquiry, readings, analysis, critical } = await anAnalysisWithTwoReviews(s);
-      const report = await replaceAnalysis(s, {
+      const report = await replaceAnalysis(s.writes, {
         supersedes: analysis,
         because: critical,
         enquiry,
@@ -89,7 +89,7 @@ describe("S-11b: which review retracted it?", () => {
         from: [readings],
         concludes: [{ proposition: SHIFTS, finding }],
       });
-      const why = await (await afterwards()).whySupported({
+      const why = await (await afterwards()).reads.whySupported({
         claim: claimOf(report.claims, SHIFTS),
       });
       return why.support.map((x) => x.finding).sort();
@@ -106,7 +106,7 @@ describe("S-11b: which review retracted it?", () => {
   test("the reason a finding was superseded is the review that caused it", async () => {
     const build = (pick: "critical" | "confirming") => async (s: ResearchSession) => {
       const w = await anAnalysisWithTwoReviews(s);
-      const report = await replaceAnalysis(s, {
+      const report = await replaceAnalysis(s.writes, {
         supersedes: w.analysis,
         because: pick === "critical" ? w.critical : w.confirming,
         enquiry: w.enquiry,
@@ -114,7 +114,7 @@ describe("S-11b: which review retracted it?", () => {
         from: [w.readings],
         concludes: [{ proposition: SHIFTS, finding: "onset moves by 2.8 K" }],
       });
-      const why = await (await afterwards()).whySupported({
+      const why = await (await afterwards()).reads.whySupported({
         claim: claimOf(report.claims, SHIFTS),
       });
       return why.superseded
@@ -142,7 +142,7 @@ describe("S-11b: which review retracted it?", () => {
   test("one supersession is reported once, with the reason that caused it", async () => {
     const reasons = await inOneWorld(async (s) => {
       const w = await anAnalysisWithTwoReviews(s);
-      const report = await replaceAnalysis(s, {
+      const report = await replaceAnalysis(s.writes, {
         supersedes: w.analysis,
         because: w.critical,
         enquiry: w.enquiry,
@@ -150,7 +150,7 @@ describe("S-11b: which review retracted it?", () => {
         from: [w.readings],
         concludes: [{ proposition: SHIFTS, finding: "onset moves by 2.8 K" }],
       });
-      const why = await (await afterwards()).whySupported({
+      const why = await (await afterwards()).reads.whySupported({
         claim: claimOf(report.claims, SHIFTS),
       });
       return why.superseded.map((x) => x.reason);

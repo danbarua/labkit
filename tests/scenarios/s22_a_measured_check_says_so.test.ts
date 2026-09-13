@@ -36,18 +36,18 @@ const HEALTH = "the evolution pipeline runs clean at scale";
 
 /** A gate over one prespecified check, and the observations that decide it. */
 async function aGoNoGoGate() {
-  const { enquiry } = await session.openEnquiry("is stage 2A safe to start?");
-  const { work } = await session.planWork({
+  const { enquiry } = await session.writes.openEnquiry("is stage 2A safe to start?");
+  const { work } = await session.writes.planWork({
     objective: "run stage 2A",
     acceptance: "the pipeline is healthy",
   });
-  const { criterion } = await session.stateCriterion(HEALTH);
-  const { gate } = await session.declareGate({
+  const { criterion } = await session.writes.stateCriterion(HEALTH);
+  const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "stage 2A does not start",
     protecting: [work],
   });
-  const { observations } = await session.recordObservations({
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "stage2a_go_no_go",
     finding: "0/240,000 evolutions failed, 0 non-finite features, 270/270 fits converged",
@@ -59,7 +59,7 @@ describe("S-22: a check decided by measurement says so", () => {
   test("a verdict rests on the observations that decided it", async () => {
     const { criterion, gate, observations } = await aGoNoGoGate();
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "0 failures of 240,000",
@@ -69,7 +69,7 @@ describe("S-22: a check decided by measurement says so", () => {
 
     // Afterward: the check reports what it was decided against, so a reader
     // can tell this from a verdict somebody simply asserted.
-    const standing = await (await afterwards()).criterionStanding({ criterion });
+    const standing = await (await afterwards()).reads.criterionStanding({ criterion });
     const [verdict] = standing.evaluations;
     expect(verdict!.basis).toHaveLength(1);
     expect(verdict!.basis[0]!.states).toContain("0/240,000");
@@ -78,27 +78,27 @@ describe("S-22: a check decided by measurement says so", () => {
   test("citing nothing still reads as asserted, which is the contrast", async () => {
     const { criterion, gate } = await aGoNoGoGate();
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "looks fine",
       outcome: "pass",
     });
 
-    const standing = await (await afterwards()).criterionStanding({ criterion });
+    const standing = await (await afterwards()).reads.criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis).toEqual([]);
   });
 
   test("a claim is still a route to the finding under it", async () => {
     const { enquiry, criterion, gate, observations } = await aGoNoGoGate();
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "health summary",
       from: [observations],
       concludes: [{ proposition: HEALTH, finding: "no failures observed" }],
     });
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "0 failures",
@@ -106,19 +106,19 @@ describe("S-22: a check decided by measurement says so", () => {
       citing: [claimOf(claims, HEALTH)],
     });
 
-    const standing = await (await afterwards()).criterionStanding({ criterion });
+    const standing = await (await afterwards()).reads.criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis[0]!.states).toBe("no failures observed");
   });
 
   test("a check decided by several measurements rests on all of them", async () => {
     const { enquiry, criterion, gate, observations } = await aGoNoGoGate();
-    const { observations: fits } = await session.recordObservations({
+    const { observations: fits } = await session.writes.recordObservations({
       enquiry,
       name: "stage2a_fits",
       finding: "6/6 hierarchical fits converged",
     });
 
-    await session.evaluateCriterion({
+    await session.writes.evaluateCriterion({
       criterion,
       gate,
       value: "both arms clean",
@@ -128,21 +128,21 @@ describe("S-22: a check decided by measurement says so", () => {
 
     // Both, not one: citing a single measurement would name an arbitrary part
     // as what decided a check that read two.
-    const standing = await (await afterwards()).criterionStanding({ criterion });
+    const standing = await (await afterwards()).reads.criterionStanding({ criterion });
     expect(standing.evaluations[0]!.basis).toHaveLength(2);
   });
 
   test("citing an observations record that recorded no finding is refused", async () => {
     const { criterion, gate, work } = { ...(await aGoNoGoGate()), work: undefined };
-    const { analysis } = await session.recordAnalysis({
-      enquiry: (await session.openEnquiry("anything else?")).enquiry,
+    const { analysis } = await session.writes.recordAnalysis({
+      enquiry: (await session.writes.openEnquiry("anything else?")).enquiry,
       method: "a run with no output read back",
       from: [],
     });
     void work;
 
     await expect(
-      session.evaluateCriterion({
+      session.writes.evaluateCriterion({
         criterion,
         gate,
         value: "?",

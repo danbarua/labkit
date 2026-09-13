@@ -49,24 +49,24 @@ const NARROWER = "the sampler stalls at the batch boundary above eight workers";
  */
 async function twoChains() {
   const chain = async (opens: string, first: string, middle: string, last: string) => {
-    const { enquiry } = await session.openEnquiry(opens);
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry(opens);
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: `${opens} readings`,
       finding: "measured",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "fit",
       from: [observations],
       concludes: [{ proposition: first, finding: `${first}, on the fit` }],
     });
-    const narrowed = await session.reinterpret({
+    const narrowed = await session.writes.reinterpret({
       of: claimOf(claims, first),
       as: middle,
       because: "the fit only covers condition X",
     });
-    const narrower = await session.reinterpret({
+    const narrower = await session.writes.reinterpret({
       of: narrowed.nowClaims.claim,
       as: last,
       because: "and only in that subgroup",
@@ -99,13 +99,13 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
       events: inMemoryEventLog(),
     });
 
-    const historyA = await later.interpretationHistory({ claim: a.last.claim });
+    const historyA = await later.reads.interpretationHistory({ claim: a.last.claim });
     expect(historyA.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, A3]);
     expect(historyA.originally.map((c) => c.claim)).toEqual([a.first]);
     // The step through the shared wording is A's record, not B's.
     expect(historyA.revisions[1]!.previously.map((c) => c.claim)).toEqual([a.middle.claim]);
 
-    const historyB = await later.interpretationHistory({ claim: b.last.claim });
+    const historyB = await later.reads.interpretationHistory({ claim: b.last.claim });
     expect(historyB.revisions.map((r) => r.nowClaims.asserts)).toEqual([SHARED, B3]);
     expect(historyB.originally.map((c) => c.claim)).toEqual([b.first]);
     expect(historyB.revisions[1]!.previously.map((c) => c.claim)).toEqual([b.middle.claim]);
@@ -117,13 +117,13 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
  * then narrowed again together.
  */
 async function twoBranchesThatMeet() {
-  const { enquiry } = await session.openEnquiry("why does the sampler stall?");
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry("why does the sampler stall?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "stall traces",
     finding: "measured",
   });
-  const { claims } = await recordAnalysis(session, {
+  const { claims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "fit",
     from: [observations],
@@ -132,17 +132,17 @@ async function twoBranchesThatMeet() {
       { proposition: RIGHT, finding: `${RIGHT}, on the fit` },
     ],
   });
-  const viaLeft = await session.reinterpret({
+  const viaLeft = await session.writes.reinterpret({
     of: claimOf(claims, LEFT),
     as: MET,
     because: "the queue only fills at the boundary",
   });
-  const viaRight = await session.reinterpret({
+  const viaRight = await session.writes.reinterpret({
     of: claimOf(claims, RIGHT),
     as: MET,
     because: "the lock is only held at the boundary",
   });
-  const after = await session.reinterpret({
+  const after = await session.writes.reinterpret({
     of: viaLeft.nowClaims.claim,
     as: NARROWER,
     because: "and only above eight workers",
@@ -168,7 +168,7 @@ describe("S-12b — a history that merges", () => {
       events: inMemoryEventLog(),
     });
 
-    const history = await later.interpretationHistory({ claim: after.claim });
+    const history = await later.reads.interpretationHistory({ claim: after.claim });
 
     // The last act withdrew both branches at once, which is what makes this a
     // merge rather than two histories.
@@ -189,13 +189,13 @@ describe("S-12b — a history that merges", () => {
    * for it and drops it out of `originally` without saying so.
    */
   test("a branch that was never narrowed is still where the reading started", async () => {
-    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "stall traces",
       finding: "measured",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "fit",
       from: [observations],
@@ -204,12 +204,12 @@ describe("S-12b — a history that merges", () => {
         { proposition: MET, finding: `${MET}, read straight off the fit` },
       ],
     });
-    const narrowed = await session.reinterpret({
+    const narrowed = await session.writes.reinterpret({
       of: claimOf(claims, LEFT),
       as: MET,
       because: "the queue only fills at the boundary",
     });
-    const after = await session.reinterpret({
+    const after = await session.writes.reinterpret({
       of: narrowed.nowClaims.claim,
       as: NARROWER,
       because: "and only above eight workers",
@@ -219,7 +219,7 @@ describe("S-12b — a history that merges", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.interpretationHistory({ claim: after.nowClaims.claim });
+    const history = await later.reads.interpretationHistory({ claim: after.nowClaims.claim });
 
     // Two readings were withdrawn together: the one this chain narrowed to, and
     // one an analysis concluded outright. The second was never narrowed, so no
@@ -235,13 +235,13 @@ describe("S-12b — a history that merges", () => {
    * narrowed started from nothing, because nothing was withdrawn to reach it.
    */
   test("a claim nobody narrowed has no revisions and nothing behind it", async () => {
-    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "stall traces",
       finding: "measured",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "fit",
       from: [observations],
@@ -252,7 +252,7 @@ describe("S-12b — a history that merges", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.interpretationHistory({ claim: claimOf(claims, LEFT) });
+    const history = await later.reads.interpretationHistory({ claim: claimOf(claims, LEFT) });
     expect(history.revisions).toEqual([]);
     expect(history.originally).toEqual([]);
     expect(history.nowClaims.claim).toBe(claimOf(claims, LEFT));
@@ -270,27 +270,27 @@ describe("S-12b — a reading is narrowed once", () => {
    * again?
    */
   test("a reading that has already been narrowed is refused, naming what stands instead", async () => {
-    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "stall traces",
       finding: "measured",
     });
-    const { claims } = await recordAnalysis(session, {
+    const { claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "fit",
       from: [observations],
       concludes: [{ proposition: ONCE, finding: `${ONCE}, on the fit` }],
     });
     const original = claimOf(claims, ONCE);
-    const narrowed = await session.reinterpret({
+    const narrowed = await session.writes.reinterpret({
       of: original,
       as: NARROWED_ONCE,
       because: "the fit only covers the boundary",
     });
 
     await expect(
-      session.reinterpret({
+      session.writes.reinterpret({
         of: original,
         as: NARROWED_AGAIN,
         because: "and only above eight workers",
@@ -302,7 +302,7 @@ describe("S-12b — a reading is narrowed once", () => {
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.interpretationHistory({ claim: narrowed.nowClaims.claim });
+    const history = await later.reads.interpretationHistory({ claim: narrowed.nowClaims.claim });
     expect(history.revisions).toHaveLength(1);
     expect(history.originally.map((c) => c.claim)).toEqual([original]);
   });
@@ -311,26 +311,26 @@ describe("S-12b — a reading is narrowed once", () => {
    * Why only the named claim is checked, and not every claim the wording match returns.
    */
   test("a withdrawn reading cannot be put back, so the match never mixes the two", async () => {
-    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "stall traces",
       finding: "measured",
     });
-    const { claims: first } = await recordAnalysis(session, {
+    const { claims: first } = await recordAnalysis(session.writes, {
       enquiry,
       method: "fit",
       from: [observations],
       concludes: [{ proposition: ONCE, finding: `${ONCE}, on the first fit` }],
     });
-    const narrowed = await session.reinterpret({
+    const narrowed = await session.writes.reinterpret({
       of: claimOf(first, ONCE),
       as: NARROWED_ONCE,
       because: "the fit only covers the boundary",
     });
 
     await expect(
-      recordAnalysis(session, {
+      recordAnalysis(session.writes, {
         enquiry,
         method: "refit",
         from: [observations],
@@ -347,23 +347,23 @@ describe("S-12b — a reading is narrowed once", () => {
    * no edge alternation, so the two predicates are two clauses and reading one is silent.
    */
   test("a reading whose finding was superseded is refused too, not only a narrowed one", async () => {
-    const { enquiry } = await session.openEnquiry("why does the sampler stall?");
-    const { observations } = await session.recordObservations({
+    const { enquiry } = await session.writes.openEnquiry("why does the sampler stall?");
+    const { observations } = await session.writes.recordObservations({
       enquiry,
       name: "stall traces",
       finding: "measured",
     });
-    const { analysis, claims } = await recordAnalysis(session, {
+    const { analysis, claims } = await recordAnalysis(session.writes, {
       enquiry,
       method: "fit",
       from: [observations],
       concludes: [{ proposition: ONCE, finding: `${ONCE}, on the fit` }],
     });
-    const { review } = await session.recordReview({
+    const { review } = await session.writes.recordReview({
       of: analysis,
       verdict: "the fit was taken over the wrong window",
     });
-    const replacement = await replaceAnalysis(session, {
+    const replacement = await replaceAnalysis(session.writes, {
       supersedes: analysis,
       because: review,
       enquiry,
@@ -373,7 +373,7 @@ describe("S-12b — a reading is narrowed once", () => {
     });
 
     await expect(
-      session.reinterpret({
+      session.writes.reinterpret({
         of: claimOf(claims, ONCE),
         as: NARROWED_ONCE,
         because: "narrowing a finding that no longer stands",

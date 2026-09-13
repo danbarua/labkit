@@ -86,29 +86,29 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
   test("closing one pursuit no longer reports the other as having produced it", async () => {
     const s = await session();
     try {
-      const { question } = await s.pose({ question: "does depth move convergence?" });
-      const { enquiry: anasSweep } = await s.pursue({ question, approach: "seed sweep" });
-      const { enquiry: brunosAblation } = await s.pursue({ question, approach: "ablation" });
+      const { question } = await s.writes.pose({ question: "does depth move convergence?" });
+      const { enquiry: anasSweep } = await s.writes.pursue({ question, approach: "seed sweep" });
+      const { enquiry: brunosAblation } = await s.writes.pursue({ question, approach: "ablation" });
 
-      const { observations: readings } = await s.recordObservations({
+      const { observations: readings } = await s.writes.recordObservations({
         enquiry: anasSweep,
         name: "seed sweep readings",
         finding: "five seeds, consistent",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry: anasSweep,
         method: "paired comparison",
         from: [readings],
         concludes: [{ proposition: MOVES, finding: "about three steps" }],
       });
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry: anasSweep,
         answeredBy: claimOf(analysisClaims, MOVES),
       });
 
       const later = new ResearchSession(await scenario.current(), { clock });
-      const ana = await later.enquiryStatus({ enquiry: anasSweep });
-      const bruno = await later.enquiryStatus({ enquiry: brunosAblation });
+      const ana = await later.reads.enquiryStatus({ enquiry: anasSweep });
+      const bruno = await later.reads.enquiryStatus({ enquiry: brunosAblation });
 
       // Both reports name the same motivating question, but closure belongs to the pursuit.
       expect(ana.question!.question).toBe(bruno.question!.question);
@@ -129,9 +129,9 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       // Summing findings over every pursuit must not double-count.
       const counted = [ana, bruno].flatMap((st) => st.contributed.map((e) => e.evidence));
       expect(counted.length).toBe(new Set(counted).size);
-      await s.closeEnquiry({ enquiry: brunosAblation });
-      const afterAna = await later.enquiryStatus({ enquiry: anasSweep });
-      const afterBruno = await later.enquiryStatus({ enquiry: brunosAblation });
+      await s.writes.closeEnquiry({ enquiry: brunosAblation });
+      const afterAna = await later.reads.enquiryStatus({ enquiry: anasSweep });
+      const afterBruno = await later.reads.enquiryStatus({ enquiry: brunosAblation });
       expect(afterAna.closure).toBe("answered");
       expect(afterBruno.closure).toBe("abandoned");
     } finally {
@@ -144,33 +144,33 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
     // keeps the shared question unresolved while either pursuit remains open.
     const s = await session();
     try {
-      const { question } = await s.pose({ question: "does width matter?" });
-      const { enquiry: worked } = await s.pursue({ question, approach: "width sweep" });
-      const { enquiry: untouched } = await s.pursue({
+      const { question } = await s.writes.pose({ question: "does width matter?" });
+      const { enquiry: worked } = await s.writes.pursue({ question, approach: "width sweep" });
+      const { enquiry: untouched } = await s.writes.pursue({
         question,
         approach: "second opinion",
       });
 
-      const { observations: readings } = await s.recordObservations({
+      const { observations: readings } = await s.writes.recordObservations({
         enquiry: worked,
         name: "width readings",
         finding: "it does",
       });
-      const { claims: analysisClaims } = await recordAnalysis(s, {
+      const { claims: analysisClaims } = await recordAnalysis(s.writes, {
         enquiry: worked,
         method: "sweep",
         from: [readings],
         concludes: [{ proposition: WIDTH, finding: "it does" }],
       });
-      await s.closeEnquiry({
+      await s.writes.closeEnquiry({
         enquiry: worked,
         answeredBy: claimOf(analysisClaims, WIDTH),
       });
 
       const later = new ResearchSession(await scenario.current(), { clock });
-      const status = await later.enquiryStatus({ enquiry: untouched });
+      const status = await later.reads.enquiryStatus({ enquiry: untouched });
 
-      const known = await later.whatIsKnown();
+      const known = await later.reads.whatIsKnown();
       expect(status.question!.question).toBe(question);
       expect(status.open).toBe(true);
       expect(status.closure).toBeNull();
@@ -196,13 +196,13 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
   test("observations and an analysis's output share one identity space", async () => {
     const s = await session();
     try {
-      const { enquiry } = await s.openEnquiry("does it hold?");
-      const { observations } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry("does it hold?");
+      const { observations } = await s.writes.recordObservations({
         enquiry,
         name: "raw readings",
         finding: "twelve runs",
       });
-      const { analysis } = await recordAnalysis(s, {
+      const { analysis } = await recordAnalysis(s.writes, {
         enquiry,
         method: "stage one",
         from: [observations],
@@ -239,19 +239,19 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
     // verb takes it to mean the artefact the computation produced.
     const s = await session();
     try {
-      const { enquiry } = await s.openEnquiry("two stage?");
-      const { observations: raw } = await s.recordObservations({
+      const { enquiry } = await s.writes.openEnquiry("two stage?");
+      const { observations: raw } = await s.writes.recordObservations({
         enquiry,
         name: "raw",
         finding: "f",
       });
-      const { analysis: stageOne } = await recordAnalysis(s, {
+      const { analysis: stageOne } = await recordAnalysis(s.writes, {
         enquiry,
         method: "stage one",
         from: [raw],
         concludes: [{ proposition: "p1", finding: "f1" }],
       });
-      const { analysis: viaAnalysis } = await recordAnalysis(s, {
+      const { analysis: viaAnalysis } = await recordAnalysis(s.writes, {
         enquiry,
         method: "stage two, by analysis ref",
         from: [stageOne],
@@ -263,7 +263,7 @@ describe("2. an artefact id does not say what kind of artefact it is", () => {
       const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
       expect(outputOfStageOne?.startsWith("ART_")).toBe(true);
 
-      const { analysis: viaArtefact } = await recordAnalysis(s, {
+      const { analysis: viaArtefact } = await recordAnalysis(s.writes, {
         enquiry,
         method: "stage two, by artefact id",
         from: [outputOfStageOne!],
@@ -293,24 +293,24 @@ describe("4. the read models drop identifiers the graph already minted", () => {
 
   async function programme() {
     const s = await session();
-    const { question } = await s.pose({ question: "does depth move convergence?" });
-    const { enquiry } = await s.pursue({ question, approach: "seed sweep" });
-    const { criterion } = await s.stateCriterion("holds at five seeds");
-    const { work } = await s.planWork({
+    const { question } = await s.writes.pose({ question: "does depth move convergence?" });
+    const { enquiry } = await s.writes.pursue({ question, approach: "seed sweep" });
+    const { criterion } = await s.writes.stateCriterion("holds at five seeds");
+    const { work } = await s.writes.planWork({
       objective: "publish the result",
       acceptance: "the check passes",
     });
-    const { gate } = await s.declareGate({
+    const { gate } = await s.writes.declareGate({
       governedBy: [criterion],
       consequence: "may it be published?",
       protecting: [work],
     });
-    const { observations } = await s.recordObservations({
+    const { observations } = await s.writes.recordObservations({
       enquiry,
       name: "sweep readings",
       finding: "five seeds, consistent",
     });
-    const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+    const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -324,14 +324,14 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       implementing: work,
       heldTo: [criterion],
     });
-    await s.evaluateCriterion({
+    await s.writes.evaluateCriterion({
       criterion,
       gate,
       value: "5/5 seeds",
       outcome: "pass",
       citing: [claimOf(analysisClaims, MOVES)],
     });
-    await s.closeEnquiry({
+    await s.writes.closeEnquiry({
       enquiry,
       answeredBy: claimOf(analysisClaims, MOVES),
     });

@@ -32,30 +32,30 @@ const afterwards = async () => new ResearchSession(await scenario.current(), { c
 
 /** One handle of as many kinds as a plain arc of work mints. */
 async function anArcOfWork() {
-  const { question, enquiry } = await session.openEnquiry("does T beat the control?");
-  const { observations } = await session.recordObservations({
+  const { question, enquiry } = await session.writes.openEnquiry("does T beat the control?");
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "stage 1 results",
     finding: "per-image accuracy",
   });
-  const { claims, analysis } = await recordAnalysis(session, {
+  const { claims, analysis } = await recordAnalysis(session.writes, {
     enquiry,
     method: "paired comparison",
     from: [observations],
     concludes: [{ proposition: "T beats the control", finding: "p = 0.004" }],
   });
   const claim = claims[0]!.claim;
-  const { criterion } = await session.stateCriterion("the median must agree");
-  const { work } = await session.planWork({ objective: "run stage 2", acceptance: "a table" });
-  const { gate } = await session.declareGate({
+  const { criterion } = await session.writes.stateCriterion("the median must agree");
+  const { work } = await session.writes.planWork({ objective: "run stage 2", acceptance: "a table" });
+  const { gate } = await session.writes.declareGate({
     governedBy: [criterion],
     consequence: "stage 2 does not start",
     protecting: [work],
   });
-  await session.evaluateCriterion({ criterion, gate, value: "median p = 0.21", outcome: "fail" });
-  const { note } = await session.note({ on: question, text: "the locked parameters live here" });
-  const { review } = await session.recordReview({ of: analysis, verdict: "the method is sound" });
-  const { decision } = await session.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.evaluateCriterion({ criterion, gate, value: "median p = 0.21", outcome: "fail" });
+  const { note } = await session.writes.note({ on: question, text: "the locked parameters live here" });
+  const { review } = await session.writes.recordReview({ of: analysis, verdict: "the method is sound" });
+  const { decision } = await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
   return {
     question,
     enquiry,
@@ -84,7 +84,7 @@ describe("S-27: why explains every kind", () => {
     expect(kinds.size).toBeGreaterThanOrEqual(10);
 
     for (const handle of handles) {
-      const explained = await reader.why({ subject: handle });
+      const explained = await reader.reads.why({ subject: handle });
       expect(explained.subject as AnyRef).toBe(handle);
       expect(explained.kind).toBe(kindOf(handle) as Kind);
       // A sentence, not an empty string: every kind says what it is even when
@@ -96,7 +96,7 @@ describe("S-27: why explains every kind", () => {
   test("Afterward: a decision says what it settled — the kind with the most edges, once refused", async () => {
     const { decision, enquiry, claim } = await anArcOfWork();
 
-    const explained = await (await afterwards()).why({ subject: decision });
+    const explained = await (await afterwards()).reads.why({ subject: decision });
 
     // Its own reason, which is the only place a person's words for an act live.
     expect(explained.is).toContain("T beats the control");
@@ -111,7 +111,7 @@ describe("S-27: why explains every kind", () => {
   test("Afterward: a note concerns what it was written on, and says so", async () => {
     const { note, question } = await anArcOfWork();
 
-    const explained = await (await afterwards()).why({ subject: note });
+    const explained = await (await afterwards()).reads.why({ subject: note });
 
     expect(explained.is).toBe("the locked parameters live here");
     expect(explained.because.map((c) => c.handle)).toEqual([question]);
@@ -124,7 +124,7 @@ describe("S-27: why explains every kind", () => {
 
     const labels = Object.values(LABEL_BY_KIND);
     for (const handle of Object.values(built) as AnyRef[]) {
-      const explained = await reader.why({ subject: handle });
+      const explained = await reader.reads.why({ subject: handle });
       const text = [explained.is, ...explained.because.map((c) => c.wording)].join(" ");
       // Not the node labels, and not the edge labels either: an edge is
       // rendered as a phrase, so nothing SHOUTING reaches a reader.

@@ -27,49 +27,49 @@ describe("enumerating gates and work", () => {
    * A gate in each of the four states, plus work in each of the three.
    */
   async function fixture(s: ResearchSession) {
-    const { question } = await s.pose({ question: "does the enumeration hold?" });
-    const { enquiry } = await s.pursue({ question, approach: "build one of each" });
+    const { question } = await s.writes.pose({ question: "does the enumeration hold?" });
+    const { enquiry } = await s.writes.pursue({ question, approach: "build one of each" });
 
     // 1. never-evaluated: a criterion nobody has checked, and work behind it.
-    const { criterion: untouched } = await s.stateCriterion("nobody has looked at this");
-    const { work: waitingWork } = await s.planWork({
+    const { criterion: untouched } = await s.writes.stateCriterion("nobody has looked at this");
+    const { work: waitingWork } = await s.writes.planWork({
       objective: "behind an unchecked gate",
       acceptance: "done",
     });
-    const { gate: neverGate } = await s.declareGate({
+    const { gate: neverGate } = await s.writes.declareGate({
       governedBy: [untouched],
       consequence: "unchecked",
       protecting: [waitingWork],
     });
 
     // Ungated and untouched: the only work here that is actually ready.
-    const { work: readyWork } = await s.planWork({
+    const { work: readyWork } = await s.writes.planWork({
       objective: "ready to start",
       acceptance: "done",
     });
 
     // 2. blocked: a criterion evaluated and failed.
-    const { criterion: failing } = await s.stateCriterion("this one fails");
-    const { work: blockedWork } = await s.planWork({ objective: "held up", acceptance: "done" });
-    const { gate: blockedGate } = await s.declareGate({
+    const { criterion: failing } = await s.writes.stateCriterion("this one fails");
+    const { work: blockedWork } = await s.writes.planWork({ objective: "held up", acceptance: "done" });
+    const { gate: blockedGate } = await s.writes.declareGate({
       governedBy: [failing],
       consequence: "cannot proceed",
       protecting: [blockedWork],
     });
 
-    const { observations: readings } = await s.recordObservations({
+    const { observations: readings } = await s.writes.recordObservations({
       enquiry,
       name: "the readings",
       finding: "measured",
     });
-    const { claims } = await recordAnalysis(s, {
+    const { claims } = await recordAnalysis(s.writes, {
       enquiry,
       method: "comparison",
       from: [readings],
       concludes: [{ proposition: HOLDS, finding: "it holds" }],
       heldTo: [failing],
     });
-    await s.evaluateCriterion({
+    await s.writes.evaluateCriterion({
       criterion: failing,
       value: "no",
       outcome: "fail",
@@ -78,17 +78,17 @@ describe("enumerating gates and work", () => {
     });
 
     // 3. satisfied: a criterion evaluated and passed, with work implementing it.
-    const { criterion: passing } = await s.stateCriterion("this one passes");
-    const { work: doneWork } = await s.planWork({
+    const { criterion: passing } = await s.writes.stateCriterion("this one passes");
+    const { work: doneWork } = await s.writes.planWork({
       objective: "already carried out",
       acceptance: "done",
     });
-    const { gate: okGate } = await s.declareGate({
+    const { gate: okGate } = await s.writes.declareGate({
       governedBy: [passing],
       consequence: "fine",
       protecting: [doneWork],
     });
-    const { claims: more } = await recordAnalysis(s, {
+    const { claims: more } = await recordAnalysis(s.writes, {
       enquiry,
       method: "second comparison",
       from: [readings],
@@ -96,7 +96,7 @@ describe("enumerating gates and work", () => {
       implementing: doneWork,
       heldTo: [passing],
     });
-    await s.evaluateCriterion({
+    await s.writes.evaluateCriterion({
       criterion: passing,
       value: "yes",
       outcome: "pass",
@@ -105,25 +105,25 @@ describe("enumerating gates and work", () => {
     });
 
     // 4. incomplete: two criteria, one checked and one not.
-    const { criterion: half } = await s.stateCriterion("half-checked");
-    const { criterion: alsoHalf } = await s.stateCriterion("the unchecked half");
-    const { work: partialWork } = await s.planWork({
+    const { criterion: half } = await s.writes.stateCriterion("half-checked");
+    const { criterion: alsoHalf } = await s.writes.stateCriterion("the unchecked half");
+    const { work: partialWork } = await s.writes.planWork({
       objective: "partly gated",
       acceptance: "done",
     });
-    const { gate: partialGate } = await s.declareGate({
+    const { gate: partialGate } = await s.writes.declareGate({
       governedBy: [half, alsoHalf],
       consequence: "partly checked",
       protecting: [partialWork],
     });
-    const { claims: third } = await recordAnalysis(s, {
+    const { claims: third } = await recordAnalysis(s.writes, {
       enquiry,
       method: "third comparison",
       from: [readings],
       concludes: [{ proposition: PARTLY, finding: "partly" }],
       heldTo: [half],
     });
-    await s.evaluateCriterion({
+    await s.writes.evaluateCriterion({
       criterion: half,
       value: "yes",
       outcome: "pass",
@@ -148,7 +148,7 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       const built = await fixture(s);
-      const states = new Map((await s.gateList({})).map((g) => [g.gate as string, g.state]));
+      const states = new Map((await s.reads.gateList({})).map((g) => [g.gate as string, g.state]));
 
       // **The control for every filter test below.** Without it a filter that
       // returned nothing would pass by matching nothing, which is the same
@@ -166,14 +166,14 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       await fixture(s);
-      const all = await s.gateList({});
+      const all = await s.reads.gateList({});
 
       // Every state the fixture actually produces, so this cannot pass by
       // filtering to nothing: a filter that always returned `[]` would agree
       // with an `all` that had no gates in that state, and would not agree
       // with the count.
       for (const state of new Set(all.map((g) => g.state))) {
-        const filtered = await s.gateList({ state });
+        const filtered = await s.reads.gateList({ state });
         expect(filtered.map((g) => g.gate).sort()).toEqual(
           all
             .filter((g) => g.state === state)
@@ -188,7 +188,7 @@ describe("enumerating gates and work", () => {
       const unused = (["never-evaluated", "incomplete", "blocked", "satisfied"] as const).find(
         (st) => !all.some((g) => g.state === st),
       );
-      if (unused) expect(await s.gateList({ state: unused })).toEqual([]);
+      if (unused) expect(await s.reads.gateList({ state: unused })).toEqual([]);
     } finally {
       await scenario.end();
     }
@@ -198,7 +198,7 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       await fixture(s);
-      const listed = await s.gateList({});
+      const listed = await s.reads.gateList({});
       expect(listed.length).toBeGreaterThan(3);
 
       // The property the shared `gateStateFrom` exists for: a reader who lists
@@ -206,7 +206,7 @@ describe("enumerating gates and work", () => {
       // over every gate rather than a chosen one, so a scoping mistake in
       // either reader shows up wherever it is.
       for (const row of listed) {
-        const full = await s.gateStatus({ gate: row.gate });
+        const full = await s.reads.gateStatus({ gate: row.gate });
         expect(full.state).toBe(row.state);
         expect(full.consequence).toBe(row.consequence);
       }
@@ -222,35 +222,35 @@ describe("enumerating gates and work", () => {
       // grained by criterion, so folding an all-gates result by criterion would
       // give both gates one answer. Here the same criterion is evaluated for
       // one gate and not the other.
-      const { criterion: shared } = await s.stateCriterion("one check, two gates");
-      const { work: workA } = await s.planWork({ objective: "A", acceptance: "done" });
-      const { work: workB } = await s.planWork({ objective: "B", acceptance: "done" });
-      const { gate: gateA } = await s.declareGate({
+      const { criterion: shared } = await s.writes.stateCriterion("one check, two gates");
+      const { work: workA } = await s.writes.planWork({ objective: "A", acceptance: "done" });
+      const { work: workB } = await s.writes.planWork({ objective: "B", acceptance: "done" });
+      const { gate: gateA } = await s.writes.declareGate({
         governedBy: [shared],
         consequence: "A",
         protecting: [workA],
       });
-      const { gate: gateB } = await s.declareGate({
+      const { gate: gateB } = await s.writes.declareGate({
         governedBy: [shared],
         consequence: "B",
         protecting: [workB],
       });
 
-      const { question } = await s.pose({ question: "does the scope hold?" });
-      const { enquiry } = await s.pursue({ question, approach: "evaluate one side" });
-      const { observations: readings } = await s.recordObservations({
+      const { question } = await s.writes.pose({ question: "does the scope hold?" });
+      const { enquiry } = await s.writes.pursue({ question, approach: "evaluate one side" });
+      const { observations: readings } = await s.writes.recordObservations({
         enquiry,
         name: "readings",
         finding: "measured",
       });
-      const { claims } = await recordAnalysis(s, {
+      const { claims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "comparison",
         from: [readings],
         concludes: [{ proposition: HOLDS, finding: "it holds" }],
         heldTo: [shared],
       });
-      await s.evaluateCriterion({
+      await s.writes.evaluateCriterion({
         criterion: shared,
         value: "no",
         outcome: "fail",
@@ -258,7 +258,7 @@ describe("enumerating gates and work", () => {
         citing: [claimOf(claims, HOLDS)],
       });
 
-      const states = new Map((await s.gateList({})).map((g) => [g.gate as string, g.state]));
+      const states = new Map((await s.reads.gateList({})).map((g) => [g.gate as string, g.state]));
       expect(states.get(gateA)).toBe("blocked");
       // Blocked too: the condition failed, and gate A was the work whoever
       // recorded it was trying to unblock, not the only gate allowed to know.
@@ -273,7 +273,7 @@ describe("enumerating gates and work", () => {
     const s = await session();
     try {
       const built = await fixture(s);
-      const states = new Map((await s.workList({})).map((w) => [w.work as string, w.state]));
+      const states = new Map((await s.reads.workList({})).map((w) => [w.work as string, w.state]));
 
       // Ready means nothing done and nothing in the way. Work behind a gate
       // nobody has finished checking — never evaluated, or half-checked with
@@ -314,22 +314,22 @@ describe("enumerating gates and work", () => {
       // branch order.** An analysis implements this task AND its gate failed.
       // The other reading -- that work already carried out is not "blocked"
       // whatever its gate says -- is defensible, so this pins which was chosen.
-      const { criterion } = await s.stateCriterion("fails after the work is done");
-      const { work } = await s.planWork({ objective: "done but held", acceptance: "done" });
-      const { gate } = await s.declareGate({
+      const { criterion } = await s.writes.stateCriterion("fails after the work is done");
+      const { work } = await s.writes.planWork({ objective: "done but held", acceptance: "done" });
+      const { gate } = await s.writes.declareGate({
         governedBy: [criterion],
         consequence: "cannot be built on",
         protecting: [work],
       });
 
-      const { question } = await s.pose({ question: "does precedence hold?" });
-      const { enquiry } = await s.pursue({ question, approach: "do the work, fail the check" });
-      const { observations: readings } = await s.recordObservations({
+      const { question } = await s.writes.pose({ question: "does precedence hold?" });
+      const { enquiry } = await s.writes.pursue({ question, approach: "do the work, fail the check" });
+      const { observations: readings } = await s.writes.recordObservations({
         enquiry,
         name: "readings",
         finding: "measured",
       });
-      const { claims } = await recordAnalysis(s, {
+      const { claims } = await recordAnalysis(s.writes, {
         enquiry,
         method: "comparison",
         from: [readings],
@@ -337,7 +337,7 @@ describe("enumerating gates and work", () => {
         implementing: work,
         heldTo: [criterion],
       });
-      await s.evaluateCriterion({
+      await s.writes.evaluateCriterion({
         criterion,
         value: "no",
         outcome: "fail",
@@ -345,12 +345,12 @@ describe("enumerating gates and work", () => {
         citing: [claimOf(claims, HOLDS)],
       });
 
-      const states = new Map((await s.workList({})).map((w) => [w.work as string, w.state]));
+      const states = new Map((await s.reads.workList({})).map((w) => [w.work as string, w.state]));
       expect(states.get(work)).toBe("blocked");
 
       // And the control: the analysis really did implement it, so this is a
       // precedence choice and not a missing IMPLEMENTS edge.
-      const unblocked = await s.workList({ state: "carried-out" });
+      const unblocked = await s.reads.workList({ state: "carried-out" });
       expect(unblocked.map((w) => w.work as string)).not.toContain(work as string);
     } finally {
       await scenario.end();
@@ -363,11 +363,11 @@ describe("enumerating gates and work", () => {
       // `planWork` requires no gate, so this task hangs off nothing at all --
       // reachable from no other verb in the read surface. It is also the
       // commonest thing in a standup.
-      const { work: orphan } = await s.planWork({
+      const { work: orphan } = await s.writes.planWork({
         objective: "nobody has touched this",
         acceptance: "done",
       });
-      const planned = await s.workList({ state: "planned" });
+      const planned = await s.reads.workList({ state: "planned" });
       expect(planned.map((w) => w.work as string)).toContain(orphan as string);
       expect(planned.find((w) => w.work === orphan)?.objective).toBe("nobody has touched this");
     } finally {

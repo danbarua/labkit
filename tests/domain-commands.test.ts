@@ -44,21 +44,21 @@ const clock: Clock = (() => {
 describe("commands are values a caller can hold", () => {
   test("a command built ahead of time issues the same act as an inline argument", async () => {
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
-    const { question } = await s.pose({ question: "does the pruning schedule move convergence?" });
+    const { question } = await s.writes.pose({ question: "does the pruning schedule move convergence?" });
 
     // Built and held, not passed inline. The type annotation is the point:
     // it names a shape that had no name before this commit.
     const pursuing: PursueCommand = { question, approach: "paired sweep" };
-    const { enquiry } = await s.pursue(pursuing);
+    const { enquiry } = await s.writes.pursue(pursuing);
 
     const observing: RecordObservationsCommand = {
       enquiry,
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     };
-    const { observations } = await s.recordObservations(observing);
+    const { observations } = await s.writes.recordObservations(observing);
 
-    const { claims: analysisClaims } = await recordAnalysis(s, {
+    const { claims: analysisClaims } = await recordAnalysis(s.writes, {
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -71,13 +71,13 @@ describe("commands are values a caller can hold", () => {
       claim: claimOf(analysisClaims, PROP),
       because: "checked against the held-out split",
     };
-    await s.isConfirmed(promoting);
+    await s.writes.isConfirmed(promoting);
 
     const closing: CloseEnquiryCommand = {
       enquiry,
       answeredBy: claimOf(analysisClaims, PROP),
     };
-    await s.closeEnquiry(closing);
+    await s.writes.closeEnquiry(closing);
 
     const read = new ReadSurface(await scenario.current());
     const why = await read.whySupported({ claim: await claimNamed(read, PROP) });
@@ -93,18 +93,18 @@ describe("commands are values a caller can hold", () => {
   const PROP = "the pruning schedule moves convergence";
   test("recordAnalysis reports the exact criteria bound to its analysis", async () => {
     const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
-    const { enquiry } = await s.openEnquiry("does the pruning schedule move convergence?");
-    const { observations } = await s.recordObservations({
+    const { enquiry } = await s.writes.openEnquiry("does the pruning schedule move convergence?");
+    const { observations } = await s.writes.recordObservations({
       enquiry,
       name: "sweep readings",
       finding: "twelve runs at five seeds",
     });
     // The criteria intentionally have the same wording: only their handles can identify which
     // prespecified conditions the analysis is held to.
-    const { criterion: first } = await s.stateCriterion("the result clears the held-out check");
-    const { criterion: second } = await s.stateCriterion("the result clears the held-out check");
+    const { criterion: first } = await s.writes.stateCriterion("the result clears the held-out check");
+    const { criterion: second } = await s.writes.stateCriterion("the result clears the held-out check");
 
-    const recorded = await s.recordAnalysis({
+    const recorded = await s.writes.recordAnalysis({
       enquiry,
       method: "paired comparison",
       from: [observations],
@@ -112,7 +112,7 @@ describe("commands are values a caller can hold", () => {
     });
     expect(recorded.heldTo).toEqual([first, second]);
 
-    const concluded = await s.conclude({
+    const concluded = await s.writes.conclude({
       analysis: recorded.analysis,
       proposition: "the pruning schedule moves convergence",
       finding: "moves by ~3 steps",

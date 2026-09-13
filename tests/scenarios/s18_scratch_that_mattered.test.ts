@@ -48,13 +48,13 @@ const PROPOSITION = "the pruning schedule shifts the convergence point";
  * Researcher: "I poked at this in a notebook over lunch. Nothing careful."
  */
 async function scratchExploration() {
-  const { enquiry } = await session.openEnquiry(QUESTION);
-  const { observations } = await session.recordObservations({
+  const { enquiry } = await session.writes.openEnquiry(QUESTION);
+  const { observations } = await session.writes.recordObservations({
     enquiry,
     name: "lunchtime sweep",
     finding: "twelve runs, no seed control",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(session, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(session.writes, {
     enquiry,
     method: "notebook-sweep",
     from: [observations],
@@ -76,18 +76,18 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    */
   test("Afterward 1: a question settled on scratch is answered provisionally, not established", async () => {
     const { enquiry, analysisClaims } = await scratchExploration();
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry,
       answeredBy: claimOf(analysisClaims, PROPOSITION),
     });
 
     const reader = await afterwards();
-    const status = await reader.enquiryStatus({ enquiry });
+    const status = await reader.reads.enquiryStatus({ enquiry });
     expect(status.closure).toBe("answered");
     expect(status.answer).toBe("yes");
     expect(status.restsOn).toBe("exploratory");
 
-    const known = await reader.whatIsKnown();
+    const known = await reader.reads.whatIsKnown();
     expect(known.established).toEqual([]);
     expect(known.provisional.map((q) => q.asks)).toEqual([QUESTION]);
   });
@@ -100,23 +100,23 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   test("Afterward 2: promoting is an act taken later, with a reason", async () => {
     const { enquiry, analysisClaims } = await scratchExploration();
 
-    await session.isConfirmed({
+    await session.writes.isConfirmed({
       claim: claimOf(analysisClaims, PROPOSITION),
       because: "re-run under seed control on the held-out split, same direction and magnitude",
     });
 
     const reader = await afterwards();
-    const why = await reader.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
+    const why = await reader.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) });
     expect(why.standing).toBe("confirmatory");
     expect(why.promotedBecause).toBe(
       "re-run under seed control on the held-out split, same direction and magnitude",
     );
 
-    await session.closeEnquiry({
+    await session.writes.closeEnquiry({
       enquiry,
       answeredBy: claimOf(analysisClaims, PROPOSITION),
     });
-    const known = await (await afterwards()).whatIsKnown();
+    const known = await (await afterwards()).reads.whatIsKnown();
     expect(known.established.map((q) => q.asks)).toEqual([QUESTION]);
     expect(known.provisional).toEqual([]);
   });
@@ -128,12 +128,12 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
    */
   test("Afterward 3: promotion does not erase what the finding actually rests on", async () => {
     const { analysisClaims } = await scratchExploration();
-    await session.isConfirmed({
+    await session.writes.isConfirmed({
       claim: claimOf(analysisClaims, PROPOSITION),
       because: "re-run under seed control on the held-out split, same direction and magnitude",
     });
 
-    const why = await (await afterwards()).whySupported({
+    const why = await (await afterwards()).reads.whySupported({
       claim: claimOf(analysisClaims, PROPOSITION),
     });
     expect(why.support.map((s) => ({ finding: s.finding, method: s.method }))).toEqual([
@@ -158,7 +158,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   test("scratch that nobody promotes is provisional, not wrong", async () => {
     const { analysisClaims } = await scratchExploration();
 
-    const why = await (await afterwards()).whySupported({
+    const why = await (await afterwards()).reads.whySupported({
       claim: claimOf(analysisClaims, PROPOSITION),
     });
     expect(why.verdict).toBe("supported");
@@ -176,15 +176,15 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
   test("promoting one line of enquiry's finding does not promote another's", async () => {
     const { analysisClaims } = await scratchExploration();
 
-    const { enquiry: other } = await session.openEnquiry(
+    const { enquiry: other } = await session.writes.openEnquiry(
       "does the pruning schedule change convergence on the small model?",
     );
-    const { observations: otherObservations } = await session.recordObservations({
+    const { observations: otherObservations } = await session.writes.recordObservations({
       enquiry: other,
       name: "small-model sweep",
       finding: "eight runs, small model",
     });
-    const { claims: otherAnalysisClaims } = await recordAnalysis(session, {
+    const { claims: otherAnalysisClaims } = await recordAnalysis(session.writes, {
       enquiry: other,
       method: "notebook-sweep",
       from: [otherObservations],
@@ -196,17 +196,17 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
       ],
     });
 
-    await session.isConfirmed({
+    await session.writes.isConfirmed({
       claim: claimOf(analysisClaims, PROPOSITION),
       because: "re-run under seed control on the held-out split",
     });
 
     const reader = await afterwards();
     expect(
-      (await reader.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).standing,
+      (await reader.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).standing,
     ).toBe("confirmatory");
     expect(
-      (await reader.whySupported({ claim: claimOf(otherAnalysisClaims, PROPOSITION) })).standing,
+      (await reader.reads.whySupported({ claim: claimOf(otherAnalysisClaims, PROPOSITION) })).standing,
     ).toBe("exploratory");
   });
 });

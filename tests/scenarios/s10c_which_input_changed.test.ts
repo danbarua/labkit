@@ -42,27 +42,27 @@ const HOLDS = "the effect holds against the control";
  * against the regenerated one — same name, different series."
  */
 async function aReVerificationAgainstTheRegeneratedControl(s: ResearchSession) {
-  const { enquiry } = await s.openEnquiry("does the effect hold against the control?");
-  const { observations: original } = await s.recordObservations({
+  const { enquiry } = await s.writes.openEnquiry("does the effect hold against the control?");
+  const { observations: original } = await s.writes.recordObservations({
     enquiry,
     name: NAME,
     finding: "the original series",
     contentHash: "sha256:original",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(s, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(s.writes, {
     enquiry,
     method: "effect-test",
     from: [original],
     concludes: [{ proposition: HOLDS, finding: "effect survives the control" }],
   });
 
-  const { observations: regenerated } = await s.recordObservations({
+  const { observations: regenerated } = await s.writes.recordObservations({
     enquiry,
     name: NAME,
     finding: "regenerated from an inferred algorithm",
     contentHash: "sha256:regenerated",
   });
-  const { verification } = await s.reverify({
+  const { verification } = await s.writes.reverify({
     historical: analysis,
     enquiry,
     method: "effect-test, re-run",
@@ -87,7 +87,7 @@ describe("S-10c: which input changed?", () => {
    */
   test("swapping an input for a same-named one is reported as two differences", async () => {
     const { verification } = await aReVerificationAgainstTheRegeneratedControl(session);
-    const report = await (await afterwards()).reproductionOf({ verification });
+    const report = await (await afterwards()).reads.reproductionOf({ verification });
     expect(report.differs).toHaveLength(2);
   });
 
@@ -98,7 +98,7 @@ describe("S-10c: which input changed?", () => {
     const { original, regenerated, verification } =
       await aReVerificationAgainstTheRegeneratedControl(session);
 
-    const report = await (await afterwards()).reproductionOf({ verification });
+    const report = await (await afterwards()).reads.reproductionOf({ verification });
 
     expect(report.differs.map((d) => d.what.name)).toEqual([NAME, NAME]);
     expect(report.differs.map((d) => d.what.part).sort()).toEqual([original, regenerated].sort());
@@ -119,11 +119,11 @@ describe("S-10c: which input changed?", () => {
     const reader = await afterwards();
 
     // Name: refused, with the count that makes the refusal actionable.
-    await expect(reader.whatDependsOn({ subject: NAME })).rejects.toThrow(/2 artefacts are named/);
+    await expect(reader.reads.whatDependsOn({ subject: NAME })).rejects.toThrow(/2 artefacts are named/);
 
     // Reference: answered, separately, for each.
     for (const part of [original, regenerated]) {
-      const rests = await reader.whatDependsOn({ subject: part });
+      const rests = await reader.reads.whatDependsOn({ subject: part });
       expect(rests.claims.map((c) => c.asserts)).toEqual([HOLDS]);
     }
   });
