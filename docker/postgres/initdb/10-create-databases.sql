@@ -18,8 +18,3 @@
 -- database and stops, which is the whole of what makes the image a convenience
 -- rather than a dependency.
 CREATE DATABASE labkit_tests;
-
--- Durable overseer database. `test:pg` must never point at it: the suite's
--- reset() truncates every table outside four system schemas, and a run that
--- pointed here would empty the copy this file exists to keep.
-CREATE DATABASE labkit;

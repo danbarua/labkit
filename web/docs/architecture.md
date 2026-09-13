@@ -10,7 +10,7 @@ The overseer is a read-only HTTP module in front of one LabKit AGE graph. It is 
 |---------|------|---------|
 | Hypermedia API | `127.0.0.1:$LABKIT_PORT_WEB` (8899 on main) | `bun run server` → `src/server/main.ts` |
 | Explorer UI | `127.0.0.1:$LABKIT_PORT_EXPLORER` (8850 on main) | `bun run dev` → Vite, proxies collections to the API |
-| Graph store | host `$LABKIT_PORT_DB` → container 5432 | `bash ../scripts/compose.sh up -d db` |
+| Graph store | host `$LABKIT_PORT_DB` → container 5432 | `bun run db:up` |
 
 `GET /healthz` returns `{ ok, worktree, tenant }`. Use `worktree` to see which checkout answered. Two agents on one machine must not share 5432/8899/8850. See [infra.md](infra.md).
 
