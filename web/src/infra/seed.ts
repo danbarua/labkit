@@ -278,6 +278,86 @@ async function createRawEdge(graph: TenantGraph, dumped: DumpedEdge): Promise<vo
   }
 }
 
+type DumpedEvent = {
+  seq: number;
+  tenant_id: number;
+  at: string;
+  operation: string;
+  subject: string;
+  changes: unknown;
+  attribution_label: string;
+  attribution_id: string;
+  attribution_how: string | null;
+  git_hash: string | null;
+  reconstructed_from: string | null;
+  command: unknown;
+};
+
+async function dumpEvents(src: LabKitDBConnection): Promise<DumpedEvent[]> {
+  const rows = await src.db.query<DumpedEvent>(
+    `SELECT seq, tenant_id, at, operation, subject, changes,
+            attribution_label, attribution_id, attribution_how,
+            git_hash, reconstructed_from, command
+     FROM ${LABKIT_SCHEMA}.labkit_event
+     ORDER BY seq`,
+  );
+  return rows.rows;
+}
+
+async function destEventMax(url: string): Promise<number> {
+  const client = new Client({ connectionString: url });
+  await client.connect();
+  try {
+    const rows = await client.query<{ seq: string | number }>(
+      `SELECT COALESCE(max(seq), 0) AS seq FROM ${LABKIT_SCHEMA}.labkit_event`,
+    );
+    return Number(rows.rows[0]?.seq ?? 0);
+  } finally {
+    await client.end();
+  }
+}
+
+async function copyEvents(url: string, tenantId: number, events: DumpedEvent[]): Promise<void> {
+  const client = new Client({ connectionString: url });
+  await client.connect();
+  try {
+    await client.query(`TRUNCATE ${LABKIT_SCHEMA}.labkit_event RESTART IDENTITY`);
+    for (const e of events) {
+      await client.query(
+        `INSERT INTO ${LABKIT_SCHEMA}.labkit_event (
+           seq, tenant_id, at, operation, subject, changes,
+           attribution_label, attribution_id, attribution_how,
+           git_hash, reconstructed_from, command
+         ) OVERRIDING SYSTEM VALUE
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12::jsonb)`,
+        [
+          e.seq,
+          tenantId,
+          e.at,
+          e.operation,
+          e.subject,
+          JSON.stringify(e.changes ?? []),
+          e.attribution_label,
+          e.attribution_id,
+          e.attribution_how,
+          e.git_hash,
+          e.reconstructed_from,
+          JSON.stringify(e.command ?? {}),
+        ],
+      );
+    }
+    if (events.length > 0) {
+      const max = events[events.length - 1]!.seq;
+      await client.query(
+        `SELECT setval(pg_get_serial_sequence('public.labkit_event', 'seq'), $1, true)`,
+        [max],
+      );
+    }
+  } finally {
+    await client.end();
+  }
+}
+
 export async function ensureOverlapBench(): Promise<void> {
   const destUrl = process.env.LABKIT_DB_URL ?? DEFAULT_DEST;
   databaseName(destUrl);
@@ -287,9 +367,10 @@ export async function ensureOverlapBench(): Promise<void> {
 
   await withSource(async (src) => {
     const sourceSeq = await maxEventSeq(src.db);
-    const stamped = await destStamp(destUrl);
-    if (stamped === sourceSeq) {
-      console.log(`labkit-web seed: overlap-bench seq ${sourceSeq} already imported`);
+    const destMax = await destEventMax(destUrl);
+    if (destMax === sourceSeq && destMax > 0) {
+      await writeStamp(destUrl, sourceSeq);
+      console.log(`labkit-web seed: ${destMax} events already imported`);
       return;
     }
 
@@ -299,35 +380,30 @@ export async function ensureOverlapBench(): Promise<void> {
       const ctx = await resolveTenantContext(dest.db, dest.tx, TENANT);
       const graph = new TenantGraph(ctx, dest.db, dest.tx);
 
-      if (await nodeExists(graph, WALK_START)) {
-        if (!(await nodeExists(graph, WALK_END))) {
-          throw new Error(`${WALK_START} exists on dest but ${WALK_END} does not`);
+      if (!(await nodeExists(graph, WALK_START))) {
+        const { nodes, edges } = await dumpGraph(src);
+        await graph.inTransaction(async () => {
+          for (const node of nodes) {
+            await graph.createNode(node.label, node.props as never, node.natural_id);
+          }
+          await bumpSequences(dest.db, nodes);
+          for (const edge of edges) {
+            await createRawEdge(graph, edge);
+          }
+        });
+        if (!(await nodeExists(graph, WALK_START))) {
+          throw new Error(`dest is missing ${WALK_START} after copy`);
         }
-        await writeStamp(destUrl, sourceSeq);
-        console.log(`labkit-web seed: graph present, stamped seq ${sourceSeq}`);
-        return;
+        if (!(await nodeExists(graph, WALK_END))) {
+          throw new Error(`dest is missing ${WALK_END} after copy`);
+        }
+        console.log(`labkit-web seed: copied ${nodes.length} nodes ${edges.length} edges`);
       }
 
-      const { nodes, edges } = await dumpGraph(src);
-      await graph.inTransaction(async () => {
-        for (const node of nodes) {
-          await graph.createNode(node.label, node.props as never, node.natural_id);
-        }
-        await bumpSequences(dest.db, nodes);
-        for (const edge of edges) {
-          await createRawEdge(graph, edge);
-        }
-      });
-      if (!(await nodeExists(graph, WALK_START))) {
-        throw new Error(`dest is missing ${WALK_START} after copy`);
-      }
-      if (!(await nodeExists(graph, WALK_END))) {
-        throw new Error(`dest is missing ${WALK_END} after copy`);
-      }
+      const events = await dumpEvents(src);
+      await copyEvents(destUrl, ctx.tenantId, events);
       await writeStamp(destUrl, sourceSeq);
-      console.log(
-        `labkit-web seed: copied ${nodes.length} nodes ${edges.length} edges seq ${sourceSeq}`,
-      );
+      console.log(`labkit-web seed: copied ${events.length} events seq ${sourceSeq}`);
     } finally {
       await dest.close();
     }
