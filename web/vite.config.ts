@@ -1,7 +1,7 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { labkitDev } from "./src/infra/dev-plugin";
+import { labkitDev } from "./src/infra/dev-plugin.ts";
 
 const explorerPort = Number(process.env.LABKIT_PORT_EXPLORER ?? "8850");
 
