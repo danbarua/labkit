@@ -98,7 +98,7 @@ export const EDGE_LABELS = [
   "RESTS_ON", // Claim -> Claim (a synthesis over findings it does not re-run)
   "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
   "MENTIONS", // Note -> any entity mentioned in the note text (by natural_id regex)
- ] as const;
+] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
 
 /**
