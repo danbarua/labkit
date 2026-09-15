@@ -10,7 +10,11 @@ import { createColors } from "picocolors";
 export interface Palette {
   /** A section heading — `Established`, `Conditions`, `Supported by`. */
   heading(text: string): string;
-  /** A handle: `Q_1`, `CLM_4`, `GATE_2`. What the next command takes. */
+  /**
+   * A handle: `Q_1`, `CLM_4`, `GATE_2`. What the next command takes.
+   *
+   * Applied once to a finished report, not by each view — see `colourHandles`.
+   */
   handle(text: string): string;
   /** It holds: established, passed, supported, agrees. */
   settled(text: string): string;

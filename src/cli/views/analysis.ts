@@ -46,8 +46,8 @@ export function renderAffects(report: DependencyReport, p: Palette): string {
 export function renderReproduction(report: ReproductionReport, p: Palette): string {
   const verdict = report.conclusion === "agrees" ? p.settled : p.contested;
   return [
-    `${p.heading(report.verificationMethod)}  ${p.handle(`(${report.verification})`)}`,
-    `  re-checking ${report.ofMethod}  ${p.handle(`(${report.of})`)}`,
+    `${p.heading(report.verificationMethod)}  ${`(${report.verification})`}`,
+    `  re-checking ${report.ofMethod}  ${`(${report.of})`}`,
     `  the two runs' findings ${verdict(report.conclusion)} — this ${verdict(report.bearing)} confidence`,
     "",
     p.heading("The re-run read"),
@@ -79,7 +79,7 @@ export function renderReproduction(report: ReproductionReport, p: Palette): stri
  */
 export function renderReproducibility(report: ReproducibilityReport, p: Palette): string {
   return [
-    `${p.handle(report.analysis)} — ${report.reproducible ? p.settled("accounted for") : p.contested("not accounted for")}`,
+    `${report.analysis} — ${report.reproducible ? p.settled("accounted for") : p.contested("not accounted for")}`,
     "",
     p.settled("Rebuilt and identical"),
     bullets(
@@ -115,24 +115,24 @@ export function renderReproducibility(report: ReproducibilityReport, p: Palette)
 export function renderInterpretation(history: InterpretationHistory, p: Palette): string {
   const revision = (r: Revision): string =>
     [
-      p.handle(r.revision),
-      `  ${p.provisional("withdrew")}: ${r.previously.map((c) => `"${c.asserts}" ${p.handle(`(${c.claim})`)}`).join("; ")}`,
-      `  now claims: "${r.nowClaims.asserts}"  ${p.handle(`(${r.nowClaims.claim})`)}`,
+      r.revision,
+      `  ${p.provisional("withdrew")}: ${r.previously.map((c) => `"${c.asserts}" ${`(${c.claim})`}`).join("; ")}`,
+      `  now claims: "${r.nowClaims.asserts}"  ${`(${r.nowClaims.claim})`}`,
       `  because: ${r.reason}`,
       r.restingOnTheOldReading.length
         ? `  ${p.contested("resting on the old reading")}: ${r.restingOnTheOldReading
-            .map((q) => `"${q.asks}" ${p.handle(`(${q.question})`)}`)
+            .map((q) => `"${q.asks}" ${`(${q.question})`}`)
             .join("; ")}`
         : "",
     ]
       .filter(Boolean)
       .join("\n");
   return [
-    `${p.heading(`Now claims "${history.nowClaims.asserts}"`)}  ${p.handle(`(${history.nowClaims.claim})`)}`,
+    `${p.heading(`Now claims "${history.nowClaims.asserts}"`)}  ${`(${history.nowClaims.claim})`}`,
     "",
     p.heading("Originally"),
     bullets(
-      history.originally.map((c) => `${c.asserts}  ${p.handle(`(${c.claim})`)}`),
+      history.originally.map((c) => `${c.asserts}  ${`(${c.claim})`}`),
       p.untested("nothing was withdrawn to reach this reading"),
     ),
     "",

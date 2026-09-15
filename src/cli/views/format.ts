@@ -12,15 +12,15 @@ export function bullets(items: string[], empty: string): string {
 /**
  * Questions, each with its handle.
  */
-export function questionLines(questions: QuestionStanding[], p: Palette): string[] {
-  return questions.map((q) => `${q.asks}  ${p.handle(`(${q.question})`)}`);
+export function questionLines(questions: QuestionStanding[]): string[] {
+  return questions.map((q) => `${q.asks}  ${`(${q.question})`}`);
 }
 
 export function partLine(a: IdentifiedArtefact, p: Palette): string {
   // `invalidated` is contested rather than quiet: the record has actively
   // withdrawn this part, which is a finding and not an absence.
   const flag = a.invalidated ? `  ${p.contested("invalidated")}` : "";
-  return `${a.name}  ${p.handle(`(${a.part})`)}${flag}`;
+  return `${a.name}  ${`(${a.part})`}${flag}`;
 }
 
 /** Terminal width to lay a report out in, clamped so it stays readable. */
@@ -117,4 +117,29 @@ function lastSpaceWithin(line: string, columns: number): number {
     visible += 1;
   }
   return space;
+}
+
+/** `Q_1`, `CLM_4`, `GATE_2` — what the next command takes. */
+const HANDLE = /\b[A-Z][A-Z]*_\d+\b/g;
+
+/** Output that is only handles, one per line: what `$(labkit pose ...)` reads. */
+const ONLY_HANDLES = /^(?:[A-Z][A-Z]*_\d+\n?)+$/;
+
+/**
+ * Colours every handle in a rendered report.
+ *
+ * Once here rather than in each view, because a view that forgot left the
+ * handle plain and no two reports agreed. Skipped when the whole output is
+ * bare handles, which is what a write command answers with and what command
+ * substitution reads.
+ */
+export function colourHandles(text: string, paint: (t: string) => string): string {
+  if (ONLY_HANDLES.test(text)) return text;
+  // Between the escapes, never across one. A colour sequence ends in `m`, a
+  // word character, so a `\b` right after it does not match and the handle
+  // beside an already-coloured word was left plain.
+  return text
+    .split(new RegExp(`(${String.fromCharCode(27)}\\[[0-9;]*m)`))
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(HANDLE, (handle) => paint(handle))))
+    .join("");
 }

@@ -532,22 +532,6 @@ describe("the tool documentation resource", () => {
    * The property worth testing is not that the markdown looks right -- it is that it is
    * *derived*.
    */
-  /** Every property name in a JSON Schema, at any depth. */
-  function leafNames(schema: unknown, depth = 0): string[] {
-    const s = schema as {
-      properties?: Record<string, unknown>;
-      items?: unknown;
-      anyOf?: unknown[];
-    };
-    if (!s || depth > 4) return [];
-    const here = Object.keys(s.properties ?? {});
-    const nested = [
-      ...Object.values(s.properties ?? {}),
-      ...(s.items ? [s.items] : []),
-      ...(s.anyOf ?? []),
-    ].flatMap((child) => leafNames(child, depth + 1));
-    return [...here, ...nested];
-  }
 
   /** The one content block, narrowed to the text variant a markdown resource returns. */
   const markdown = (contents: ReadonlyArray<{ mimeType?: string } & Record<string, unknown>>) => {

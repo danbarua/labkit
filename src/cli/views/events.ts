@@ -19,15 +19,15 @@ export function renderNotes(notes: readonly ListedNote[], p: Palette): string {
   return notes
     .map((n) => {
       const about = n.concerns.length
-        ? p.quiet(" on ") + n.concerns.map((h) => p.handle(h)).join(p.quiet(", "))
+        ? p.quiet(" on ") + n.concerns.map((h) => h).join(p.quiet(", "))
         : "";
       const supersededMark = n.supersededBy.length
-        ? p.quiet(` (superseded by ${n.supersededBy.map((h) => p.handle(h)).join(p.quiet(", "))})`)
+        ? p.quiet(` (superseded by ${n.supersededBy.map((h) => h).join(p.quiet(", "))})`)
         : "";
       // Its own line, and only when there is one: this is the fact that makes
       // the note an origin rather than a remark beside the record.
-      const why = n.prompted ? [`         ${p.quiet("prompted ")}${p.handle(n.prompted)}`] : [];
-      return [`${p.handle(n.note)}${about}${supersededMark}`, `  ${n.says}`, ...why].join("\n");
+      const why = n.prompted ? [`         ${p.quiet("prompted ")}${n.prompted}`] : [];
+      return [`${n.note}${about}${supersededMark}`, `  ${n.says}`, ...why].join("\n");
     })
     .join("\n\n");
 }
@@ -65,13 +65,13 @@ export function renderHappened({ acts: events, more }: EventPage, p: Palette): s
         : p.quiet(" (not captured)");
       const created = createdIn(e);
       const minted = created.length
-        ? p.quiet(", minting ") + created.map((h) => p.handle(h)).join(p.quiet(", "))
+        ? p.quiet(", minting ") + created.map((h) => h).join(p.quiet(", "))
         : "";
       // Its own lines, not appended to the `minting` one. An act that writes
       // five nodes writes eight edges, and both on one line pushes past a
       // terminal -- the reason the commit hash above is already truncated.
       const wired = edgesIn(e).map(
-        (x) => `           ${p.handle(x.from)} ${p.quiet(`-[${x.label}]->`)} ${p.handle(x.to)}`,
+        (x) => `           ${x.from} ${p.quiet(`-[${x.label}]->`)} ${x.to}`,
       );
       // Its own line, and only when there is one. An absence here means nobody
       // said what the act was read off, which is not a claim that it was watched.
@@ -79,7 +79,7 @@ export function renderHappened({ acts: events, more }: EventPage, p: Palette): s
         ? [`         ${p.quiet(`read off ${e.reconstructedFrom}`)}`]
         : [];
       return [
-        `${p.quiet(String(e.seq ?? 0).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${p.handle(e.subject)}`,
+        `${p.quiet(String(e.seq ?? 0).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${e.subject}`,
         `         ${p.quiet(`by ${who}`)}${how}${p.quiet(commit)}${minted}`,
         ...source,
         ...(wired.length ? [`         ${p.quiet("connecting")}`, ...wired] : []),

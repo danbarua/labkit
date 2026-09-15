@@ -28,7 +28,7 @@ import { bullets, gist, questionLines } from "./format";
 function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
   return qs.map(
     (q) =>
-      `${q.asks}  ${p.handle(`(${q.question})`)}\n      accepted because: ${gist(q.acceptedBecause)}\n      reopens if: ${gist(q.reopensIf)}\n      ${p.quiet(`\`why ${q.question}\` has the whole of it`)}`,
+      `${q.asks}  ${`(${q.question})`}\n      accepted because: ${gist(q.acceptedBecause)}\n      reopens if: ${gist(q.reopensIf)}\n      ${p.quiet(`\`why ${q.question}\` has the whole of it`)}`,
   );
 }
 
@@ -37,12 +37,9 @@ function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => {
     const parked = q.reopensIf ? p.quiet(`  (was parked until: ${q.reopensIf})`) : "";
     const answers = q.answers
-      .map(
-        (answer) =>
-          `${answer.answer} via ${p.handle(answer.enquiry)} ${p.handle(`(${answer.claim})`)}`,
-      )
+      .map((answer) => `${answer.answer} via ${answer.enquiry} ${`(${answer.claim})`}`)
       .join("; ");
-    return `${q.asks}  ${p.handle(`(${q.question})`)}  — ${answers}${parked}`;
+    return `${q.asks}  ${`(${q.question})`}  — ${answers}${parked}`;
   });
 }
 
@@ -60,17 +57,17 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
     ...section(p.provisional("Accepted as unresolved"), acceptedLines(survey.accepted, p)),
     ...section(
       p.untested("Unresolved (active or closed without a complete answer)"),
-      questionLines(survey.unresolved, p),
+      questionLines(survey.unresolved),
     ),
     ...section(
       p.untested("Untested (nothing has been run and no pursuit has closed)"),
-      questionLines(survey.untested, p),
+      questionLines(survey.untested),
     ),
     ...section(
       p.heading("Closed pursuits"),
       survey.closedPursuits.map(
         (pursuit) =>
-          `${pursuit.closure}  ${p.handle(pursuit.enquiry)}  ${pursuit.pursuing}  ${p.handle(`(${pursuit.decision})`)}`,
+          `${pursuit.closure}  ${pursuit.enquiry}  ${pursuit.pursuing}  ${`(${pursuit.decision})`}`,
       ),
     ),
   ]
@@ -79,7 +76,7 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
 }
 
 export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
-  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, p), "nothing");
+  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs), "nothing");
   return [
     p.heading(`As of ${survey.at}:`),
     "",
@@ -133,7 +130,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
     `  ${verdict}, ${why.standing}`,
     why.promotedBecause ? `  confirmed because: ${why.promotedBecause}` : "",
     why.replacedBy
-      ? `  replaced by: "${why.replacedBy.asserts}"  ${p.handle(`(${why.replacedBy.claim})`)}`
+      ? `  replaced by: "${why.replacedBy.asserts}"  ${`(${why.replacedBy.claim})`}`
       : "",
     "",
     // **One word, one meaning.** This list is the supporting *findings*; the inputs they rest
@@ -146,7 +143,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       : bullets(
           (undecided ? [...why.support, ...why.against] : why.support).map(
             (s) =>
-              `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${p.handle(s.analysis)}${p.quiet(")")}` +
+              `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${s.analysis}${p.quiet(")")}` +
               (undecided && why.against.includes(s as (typeof why.against)[number])
                 ? `  ${p.quiet("recorded as bearing against")}`
                 : ""),
@@ -164,7 +161,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
     // supporting findings" for one, which is true — it measured nothing.
     why.drawnAcross.length
       ? `\nDrawn across\n${bullets(
-          why.drawnAcross.map((c) => `${c.asserts}  ${p.handle(`(${c.claim})`)}`),
+          why.drawnAcross.map((c) => `${c.asserts}  ${`(${c.claim})`}`),
           "",
         )}`
       : "",
@@ -184,7 +181,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       ? `\nNot currently met\n${bullets(
           why.unmet.map((u) =>
             [
-              `${u.requires}  ${p.handle(`(${u.criterion})`)}`,
+              `${u.requires}  ${`(${u.criterion})`}`,
               // What the unmet check is holding up, indented beneath it rather
               // than bulleted beside it: these are consequences of the line
               // above, not siblings of it. The consequence is in the words of
@@ -192,10 +189,8 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
               // needs and previously had no way to reach.
               ...u.blocks.map((b) =>
                 [
-                  `      blocks ${p.handle(b.gate)} — ${p.contested(b.consequence)}`,
-                  ...b.gating.map(
-                    (g) => `        holding up ${g.objective}  ${p.handle(`(${g.work})`)}`,
-                  ),
+                  `      blocks ${b.gate} — ${p.contested(b.consequence)}`,
+                  ...b.gating.map((g) => `        holding up ${g.objective}  ${`(${g.work})`}`),
                 ].join("\n"),
               ),
             ].join("\n"),
@@ -223,14 +218,14 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
 /**
  * The `Work`/`LineOfEnquiry` cases of `why` — one sentence, then the causes behind it.
  */
-function renderExplanation(explanation: Explanation, p: Palette): string {
-  const sentence = `${p.handle(explanation.subject)} is ${explanation.is}`;
+function renderExplanation(explanation: Explanation): string {
+  const sentence = `${explanation.subject} is ${explanation.is}`;
   if (explanation.because.length === 0) return sentence;
   return [
     `${sentence} because`,
     bullets(
       explanation.because.map(
-        (c) => `${c.wording}  ${p.handle(`(${c.handle})`)}${c.when ? `  on ${c.when}` : ""}`,
+        (c) => `${c.wording}  ${`(${c.handle})`}${c.when ? `  on ${c.when}` : ""}`,
       ),
       "",
     ),
@@ -265,7 +260,7 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
     case "review":
     case "observations":
     case "note":
-      return renderExplanation(explanation, p);
+      return renderExplanation(explanation);
     default: {
       const check: never = explanation;
       throw new Error(`unreached why kind: ${JSON.stringify(check)}`);
@@ -280,7 +275,7 @@ export function renderClaims(claims: ConcludedClaim[], proposition: string, p: P
   return [
     p.heading(`Claims asserting "${proposition}" — ${claims.length}`),
     bullets(
-      claims.map((c) => `${c.asserts}  ${p.handle(`(${c.claim})`)}`),
+      claims.map((c) => `${c.asserts}  ${`(${c.claim})`}`),
       p.untested("none — nothing on the record asserts this wording"),
     ),
     claims.length > 1
@@ -304,7 +299,7 @@ export function renderSearch(groups: SearchGroup[], text: string, p: Palette): s
             [
               p.quiet(`${g.label}:`),
               bullets(
-                g.matches.map((m) => `${m.wording}  ${p.handle(`(${m.handle})`)}`),
+                g.matches.map((m) => `${m.wording}  ${`(${m.handle})`}`),
                 "nothing",
               ),
             ].join("\n"),
@@ -321,8 +316,8 @@ export function renderSearch(groups: SearchGroup[], text: string, p: Palette): s
 export function renderConflict(verdict: ConflictVerdict, p: Palette): string {
   const side = (s: ConflictSide): string =>
     [
-      `"${s.proposition}"  ${p.handle(`(${s.claim})`)}`,
-      `  asking "${s.asks}"  ${p.handle(`(${s.question})`)}`,
+      `"${s.proposition}"  ${`(${s.claim})`}`,
+      `  asking "${s.asks}"  ${`(${s.question})`}`,
       s.supportedBy.length
         ? `  ${p.settled("supported by")}: ${s.supportedBy.map((f) => f.states).join("; ")}`
         : "",
@@ -346,15 +341,15 @@ export function renderConflict(verdict: ConflictVerdict, p: Palette): string {
 export function renderHow(how: How, p: Palette): string {
   if (how.steps.length === 0) return p.untested("No steps.");
   const lines = how.steps.map((s: How["steps"][number]) => {
-    let line = `${p.handle(s.handle)}  ${s.what}`;
+    let line = `${s.handle}  ${s.what}`;
     if (s.superseded) {
       line += p.contested(" (superseded");
-      if (s.successor) line += ` → ${p.handle(s.successor)}`;
+      if (s.successor) line += ` → ${s.successor}`;
       line += ")";
     }
     if (s.because) line += ` — ${s.because}`;
     if (s.seq !== undefined) line += ` [seq ${s.seq}]`;
     return line;
   });
-  return [p.heading(`How ${p.handle(how.subject)} — ${how.steps.length}`), ...lines].join("\n");
+  return [p.heading(`How ${how.subject} — ${how.steps.length}`), ...lines].join("\n");
 }

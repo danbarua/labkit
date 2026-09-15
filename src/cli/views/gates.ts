@@ -33,19 +33,19 @@ export function renderGate(status: GateStatus, p: Palette): string {
   const check = (c: CheckStatus): string => {
     // The verdict's own sentence is not here -- see `DecidingEvaluation`. The handle is, so a
     // reader can reach it.
-    const about = c.decidedBy?.about ? ` about ${p.handle(c.decidedBy.about)}` : "";
+    const about = c.decidedBy?.about ? ` about ${c.decidedBy.about}` : "";
     const decided = c.decidedBy
-      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")}${about} ${p.quiet(c.decidedBy.at)} ${p.handle(`(${c.decidedBy.evaluation})`)}`
+      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")}${about} ${p.quiet(c.decidedBy.at)} ${`(${c.decidedBy.evaluation})`}`
       : "";
     // Padded before colouring: an escape sequence has length and would throw
     // the column off by exactly the bytes nobody can see.
-    return `${state(c.state, c.state.padEnd(19))} ${c.proposition}  ${p.handle(`(${c.criterion})`)}${decided}`;
+    return `${state(c.state, c.state.padEnd(19))} ${c.proposition}  ${`(${c.criterion})`}${decided}`;
   };
   return [
-    `${p.handle(status.gate)} — ${state(status.state)}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
+    `${status.gate} — ${state(status.state)}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
     `  consequence: ${status.consequence}`,
     status.closure
-      ? `  closed: ${status.closure.kind} by ${p.handle(status.closure.decision)}\n  because: ${status.closure.because}`
+      ? `  closed: ${status.closure.kind} by ${status.closure.decision}\n  because: ${status.closure.because}`
       : "",
     "",
     `${p.heading("Conditions by state")}\n${bullets(
@@ -76,9 +76,9 @@ export function renderGate(status: GateStatus, p: Palette): string {
 
 export function renderCriteria(criteria: CriterionRef[], gate: GateRef, p: Palette): string {
   return [
-    p.heading(`Conditions governing ${p.handle(gate)}`),
+    p.heading(`Conditions governing ${gate}`),
     bullets(
-      criteria.map((c) => p.handle(c)),
+      criteria.map((c) => c),
       p.untested("none — this gate is bound to no prespecified condition"),
     ),
     "",
@@ -93,20 +93,20 @@ export function renderCriteria(criteria: CriterionRef[], gate: GateRef, p: Palet
 export function renderDesign(history: DesignHistory, p: Palette): string {
   const amendment = (a: AmendmentRecord): string =>
     [
-      `${a.nature === "scientific" ? p.contested(a.nature) : p.provisional(a.nature)}  ${p.handle(`(${a.amendment})`)}`,
+      `${a.nature === "scientific" ? p.contested(a.nature) : p.provisional(a.nature)}  ${`(${a.amendment})`}`,
       `  was: ${a.replaced.requires}`,
       `  now: ${a.nowRequires.requires}`,
       `  because: ${a.reason}`,
       a.citing.length ? `  citing: ${a.citing.map((f) => f.states).join("; ")}` : "",
       a.rerun.length
-        ? `  ${p.contested("needs re-running")}: ${a.rerun.map((w) => `${w.objective} ${p.handle(`(${w.work})`)}`).join("; ")}`
+        ? `  ${p.contested("needs re-running")}: ${a.rerun.map((w) => `${w.objective} ${`(${w.work})`}`).join("; ")}`
         : "",
     ]
       .filter(Boolean)
       .join("\n");
   const condition = (c: ConditionHistory): string =>
     [
-      `${p.handle(c.criterion)}`,
+      `${c.criterion}`,
       `  originally: ${c.originally.requires}`,
       `  now requires: ${c.nowRequires.requires}`,
       "",
@@ -122,7 +122,7 @@ export function renderDesign(history: DesignHistory, p: Palette): string {
         : `  ${p.untested("not amended — the condition still reads as it was first stated")}`,
     ].join("\n");
   return [
-    p.handle(history.gate),
+    history.gate,
     "",
     p.heading("Conditions"),
     history.conditions.map(condition).join("\n\n"),
@@ -136,12 +136,12 @@ export function renderDesign(history: DesignHistory, p: Palette): string {
  */
 export function renderContract(contract: TaskContract, p: Palette): string {
   return [
-    `${p.heading(contract.objective)}  ${p.handle(`(${contract.work})`)}`,
+    `${p.heading(contract.objective)}  ${`(${contract.work})`}`,
     `  meeting it means: ${contract.acceptance}`,
     ...(contract.addressing
       ? [
-          `  addressing: ${p.handle(contract.addressing.enquiry)} "${contract.addressing.pursuing}"`,
-          `  pursuing: ${p.handle(contract.addressing.question)} "${contract.addressing.asks}"`,
+          `  addressing: ${contract.addressing.enquiry} "${contract.addressing.pursuing}"`,
+          `  pursuing: ${contract.addressing.question} "${contract.addressing.asks}"`,
         ]
       : []),
     "",
@@ -171,7 +171,7 @@ export function renderGateList(gates: ListedGate[], p: Palette, heading = false)
             : g.state === "never-evaluated"
               ? p.untested(padded)
               : p.provisional(padded);
-      return `${state}  ${p.handle(g.gate)}  ${g.consequence}`;
+      return `${state}  ${g.gate}  ${g.consequence}`;
     })
     .join("\n");
   return title ? `${title}\n${rows}` : rows;
@@ -200,7 +200,7 @@ export function renderWorkList(work: ListedWork[], p: Palette, heading = false):
                 w.state === "abandoned"
                 ? p.quiet(padded)
                 : p.untested(padded);
-      return `${state}  ${p.handle(w.work)}  ${w.objective}`;
+      return `${state}  ${w.work}  ${w.objective}`;
     })
     .join("\n");
   return title ? `${title}\n${rows}` : rows;
