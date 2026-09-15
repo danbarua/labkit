@@ -13,7 +13,7 @@ import type { Clock } from "../domain";
 import { asJson, type Answer } from "./output";
 import { isColorSupported } from "picocolors";
 import { type Palette, palette } from "./palette";
-import { colourHandles, wrap } from "./views/format";
+import { colourHandles, shortenInstants, wrap } from "./views/format";
 import { colourVocabulary } from "./vocabulary";
 
 /** The global options, after parsing. */
@@ -94,7 +94,10 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
         opts.json
           ? asJson(answered.value)
           : wrap(
-              colourVocabulary(colourHandles(answered.render(colours), colours.handle), colours),
+              shortenInstants(
+                colourVocabulary(colourHandles(answered.render(colours), colours.handle), colours),
+                colours,
+              ),
             ),
       );
     } finally {

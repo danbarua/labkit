@@ -7,7 +7,7 @@
  * that reads the whole of it.
  */
 
-import { IDENTITY_FIELDS, PROSE_FIELDS, TIMESTAMP_FIELDS } from "../domain/reports";
+import { IDENTITY_FIELDS, PROSE_FIELDS } from "../domain/reports";
 import type { Palette } from "./palette";
 
 /** How much prose a summary keeps before it starts costing the reader. */
@@ -55,15 +55,8 @@ export function forReading<T>(report: T, p: Palette): T {
   for (const [name, value] of Object.entries(record)) {
     if (typeof value !== "string") out[name] = forReading(value, p);
     else if (PROSE_FIELDS.has(name)) out[name] = cut(value, handle);
-    else if (TIMESTAMP_FIELDS.has(name)) out[name] = p.quiet(shortInstant(value));
     else if (IDENTITY_FIELDS.has(name)) out[name] = p.quiet(value);
     else out[name] = value;
   }
   return out as T;
-}
-
-/** `2026-09-09T01:33:50.277Z` reads as `2026-09-09 01:33`. Seconds decide nothing. */
-function shortInstant(value: string): string {
-  const iso = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(value);
-  return iso ? `${iso[1]} ${iso[2]}` : value;
 }
