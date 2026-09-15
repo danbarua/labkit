@@ -97,7 +97,8 @@ export const EDGE_LABELS = [
   "IMPLEMENTS", // Task -> EvidenceUnit
   "RESTS_ON", // Claim -> Claim (a synthesis over findings it does not re-run)
   "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
-] as const;
+  "MENTIONS", // Note -> any entity mentioned in the note text (by natural_id regex)
+ ] as const;
 export type EdgeLabel = (typeof EDGE_LABELS)[number];
 
 /**
@@ -279,6 +280,7 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * something specific about both.
    */
   CONCERNS: NODE_LABELS.map((label) => ["Note", label] as const),
+  MENTIONS: NODE_LABELS.map((label) => ["Note", label] as const),
 };
 
 // **What LabKit does with a stored string — five names instead of one.**  Every property below

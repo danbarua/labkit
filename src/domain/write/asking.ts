@@ -99,6 +99,24 @@ export class Asking extends SessionCore {
       if (input.prompted) await this.hasNoOriginYet(input.prompted);
       const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
+      // Extract and create MENTIONS edges for entities referenced in the note text
+      const mentionPattern = /([A-Z]+)_(\d+)/g;
+      const mentions = new Set<string>();
+      let match;
+      while ((match = mentionPattern.exec(input.text)) !== null) {
+        mentions.add(match[0]);
+      }
+      for (const handle of mentions) {
+        const entity = await this.graph.query(
+          `MATCH (e { natural_id: $id }) RETURN e`,
+          { e: vertexProps<{ natural_id: string }>() },
+          { id: handle },
+        );
+        if (entity.length > 0) {
+          const kind = labelForNaturalId(handle);
+          unitOfWork.edge(noted, "MENTIONS", ref(KIND_BY_LABEL[kind]!, handle));
+        }
+      }
       if (input.prompted) unitOfWork.edge(noted, "MOTIVATES", input.prompted);
       for (const old of input.supersedes ?? []) {
         // Mint first: a target equal to this note's new id is self, not "missing".

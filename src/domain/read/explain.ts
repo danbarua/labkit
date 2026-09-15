@@ -757,6 +757,7 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   IMPLEMENTS: { out: "carried out", in: "was carried out by" },
   RESTS_ON: { out: "is drawn from", in: "was drawn on by" },
   CONCERNS: { out: "concerns", in: "has a note on it" },
+  MENTIONS: { out: "mentions", in: "is mentioned by" },
 };
 
 /**
