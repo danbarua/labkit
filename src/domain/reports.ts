@@ -942,6 +942,8 @@ const listedGate = z.strictObject({
   gate: ref("gate"),
   consequence: prose(),
   state: z.enum(GATE_STATES),
+  /** When its state was last decided — absent for a gate no evaluation has ever reached. */
+  lastTouched: timestamp().optional(),
 });
 
 /** `gate_list` — an array, wrapped because `structuredContent` must be an object. */

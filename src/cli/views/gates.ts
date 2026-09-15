@@ -15,7 +15,7 @@ import type {
   TaskContract,
 } from "../../domain";
 import type { Palette } from "../palette";
-import { bullets } from "./format";
+import { bullets, relativeAge } from "./format";
 
 /**
  * A gate, itemised per condition.
@@ -151,7 +151,9 @@ export function renderGateList(gates: ListedGate[], p: Palette, heading = false)
     .map((g) => {
       // Coloured centrally by `colourVocabulary`; padding is the alignment.
       const state = g.state.padEnd(width);
-      return `${state}  ${g.gate}  ${g.consequence}`;
+      // Absent for a gate no evaluation has ever reached — nothing to date.
+      const age = g.lastTouched ? `  ${p.quiet(`(${relativeAge(g.lastTouched)})`)}` : "";
+      return `${state}  ${g.gate}  ${g.consequence}${age}`;
     })
     .join("\n");
   return title ? `${title}\n${rows}` : rows;
