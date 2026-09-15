@@ -18,7 +18,7 @@ import type {
   Verdict,
 } from "../../domain";
 import type { Palette } from "../palette";
-import { bullets, gist, questionLines } from "./format";
+import { bullets, gist, questionLines, relativeAge } from "./format";
 
 /**
  * `AcceptedQuestion`'s own line — `asks` and the handle, plus why it was
@@ -28,7 +28,7 @@ import { bullets, gist, questionLines } from "./format";
 function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
   return qs.map(
     (q) =>
-      `${q.asks}  ${`(${q.question})`}\n      accepted because: ${gist(q.acceptedBecause)}\n      reopens if: ${gist(q.reopensIf)}\n      ${p.quiet(`\`why ${q.question}\` has the whole of it`)}`,
+      `${`(${q.question})`}  ${q.asks}\n      accepted because: ${gist(q.acceptedBecause)}\n      reopens if: ${gist(q.reopensIf)}\n      ${p.quiet(`\`why ${q.question}\` has the whole of it`)}`,
   );
 }
 
@@ -37,9 +37,9 @@ function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => {
     const parked = q.reopensIf ? p.quiet(`  (was parked until: ${q.reopensIf})`) : "";
     const answers = q.answers
-      .map((answer) => `${answer.answer} via ${answer.enquiry} ${`(${answer.claim})`}`)
+      .map((answer) => `${answer.answer} via ${`(${answer.claim})`}  ${answer.enquiry}`)
       .join("; ");
-    return `${q.asks}  ${`(${q.question})`}  — ${answers}${parked}`;
+    return `${`(${q.question})`}  ${q.asks}  — ${answers}${parked}`;
   });
 }
 
@@ -67,7 +67,7 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
       p.heading("Closed pursuits"),
       survey.closedPursuits.map(
         (pursuit) =>
-          `${pursuit.closure}  ${pursuit.enquiry}  ${pursuit.pursuing}  ${`(${pursuit.decision})`}`,
+          `${pursuit.closure}  ${pursuit.enquiry}  ${`(${pursuit.decision})`}  ${pursuit.pursuing}`,
       ),
     ),
   ]
@@ -159,13 +159,13 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
     // supporting findings" for one, which is true — it measured nothing.
     why.drawnAcross.length
       ? `\nDrawn across\n${bullets(
-          why.drawnAcross.map((c) => `${c.asserts}  ${`(${c.claim})`}`),
+          why.drawnAcross.map((c) => `${`(${c.claim})`}  ${c.asserts}`),
           "",
         )}`
       : "",
     why.reverifiedBy.length
       ? `\nRe-checked by\n${bullets(
-          why.reverifiedBy.map((r) => `${r.method}  (${r.analysis})`),
+          why.reverifiedBy.map((r) => `(${r.analysis})  ${r.method}`),
           "",
         )}`
       : "",
@@ -179,7 +179,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       ? `\nNot currently met\n${bullets(
           why.unmet.map((u) =>
             [
-              `${u.requires}  ${`(${u.criterion})`}`,
+              `${`(${u.criterion})`}  ${u.requires}`,
               // What the unmet check is holding up, indented beneath it rather
               // than bulleted beside it: these are consequences of the line
               // above, not siblings of it. The consequence is in the words of
@@ -188,7 +188,7 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
               ...u.blocks.map((b) =>
                 [
                   `      blocks ${b.gate} — ${p.contested(b.consequence)}`,
-                  ...b.gating.map((g) => `        holding up ${g.objective}  ${`(${g.work})`}`),
+                  ...b.gating.map((g) => `        holding up ${`(${g.work})`}  ${g.objective}`),
                 ].join("\n"),
               ),
             ].join("\n"),
@@ -222,8 +222,10 @@ function renderExplanation(explanation: Explanation): string {
   return [
     `${sentence} because`,
     bullets(
+      // Handle first. It was at the end, so finding out that GATE_2 is what
+      // blocks you meant reading to the end of the wording that explains it.
       explanation.because.map(
-        (c) => `${c.wording}  ${`(${c.handle})`}${c.when ? `  on ${c.when}` : ""}`,
+        (c) => `(${c.handle}${c.when ? `, ${relativeAge(c.when)}` : ""})  ${c.wording}`,
       ),
       "",
     ),
@@ -273,7 +275,7 @@ export function renderClaims(claims: ConcludedClaim[], proposition: string, p: P
   return [
     p.heading(`Claims asserting "${proposition}" — ${claims.length}`),
     bullets(
-      claims.map((c) => `${c.asserts}  ${`(${c.claim})`}`),
+      claims.map((c) => `${`(${c.claim})`}  ${c.asserts}`),
       p.untested("none — nothing on the record asserts this wording"),
     ),
     claims.length > 1
@@ -297,7 +299,7 @@ export function renderSearch(groups: SearchGroup[], text: string, p: Palette): s
             [
               p.quiet(`${g.label}:`),
               bullets(
-                g.matches.map((m) => `${m.wording}  ${`(${m.handle})`}`),
+                g.matches.map((m) => `${`(${m.handle})`}  ${m.wording}`),
                 "nothing",
               ),
             ].join("\n"),

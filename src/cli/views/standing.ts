@@ -17,8 +17,9 @@ export function renderStanding(standing: Standing, p: Palette): string {
   return [
     p.heading(scope),
     "",
+    // The blocked work prints under the gate holding it, inside this section.
+    // Two lists meant reading `why` once per task to learn which gate was which.
     ...section(p.contested("Blocked gates"), renderGateList(standing.blocked.gates, p)),
-    ...section(p.contested("Blocked work"), renderWorkList(standing.blocked.work, p)),
     ...section(p.untested("Incomplete gates"), renderGateList(standing.unevaluated.gates, p)),
     ...section(
       p.provisional("Waiting work — behind a gate nobody has finished checking"),

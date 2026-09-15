@@ -3,7 +3,7 @@ import type { ClaimProps } from "../../db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
-import { ref } from "../report";
+import { byHandle, ref } from "../report";
 import type { KnownAtQuery } from "../queries";
 import { BEARINGS, checksMetBearing, standingAsOf } from "../survey-facts";
 
@@ -197,7 +197,7 @@ export class StandingGroup extends SessionCore {
       accepted: [],
       closedPursuits: [],
     };
-    for (const [question, entry] of [...seen].sort(([a], [b]) => a.localeCompare(b))) {
+    for (const [question, entry] of [...seen].sort(([a], [b]) => byHandle(a, b))) {
       const standing: QuestionStanding = { question: ref("question", question), asks: entry.asks };
       const liveAnswers: Answer[] = [];
       for (const answer of entry.answers.values()) {
@@ -210,9 +210,7 @@ export class StandingGroup extends SessionCore {
           vouchedFor: kinds.get(live) === "confirmatory",
         });
       }
-      liveAnswers.sort(
-        (a, b) => a.enquiry.localeCompare(b.enquiry) || a.claim.localeCompare(b.claim),
-      );
+      liveAnswers.sort((a, b) => byHandle(a.enquiry, b.enquiry) || byHandle(a.claim, b.claim));
       const answerReport = liveAnswers.map((answer) => ({
         enquiry: ref("enquiry", answer.enquiry),
         claim: ref("claim", answer.claim),
@@ -268,7 +266,7 @@ export class StandingGroup extends SessionCore {
       } else if (entry.pursuits.size > 0) survey.unresolved.push(standing);
       else survey.untested.push(standing);
     }
-    survey.closedPursuits.sort((a, b) => a.enquiry.localeCompare(b.enquiry));
+    survey.closedPursuits.sort((a, b) => byHandle(a.enquiry, b.enquiry));
     return survey;
   }
 

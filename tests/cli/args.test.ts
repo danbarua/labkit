@@ -231,7 +231,7 @@ test("main prints one labkit line when closing an enquiry twice", async () => {
     const code = await main(["--db", db, "close", "enquiry", "LOE_1"]);
     const stderr = chunks.join("");
     expect(code).toBe(1);
-    expect(stderr).toContain("labkit: enquiry LOE_1 is already closed by decision");
+    expect(stderr).toContain("labkit: LOE_1 is already closed by DEC_");
     expect(stderr.match(/^labkit:/gm) ?? []).toHaveLength(1);
     expect(stderr).not.toContain('"labkit":"request-failed"');
   } finally {

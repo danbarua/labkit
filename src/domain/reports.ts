@@ -944,6 +944,8 @@ const listedGate = z.strictObject({
   state: z.enum(GATE_STATES),
   /** When its state was last decided — absent for a gate no evaluation has ever reached. */
   lastTouched: timestamp().optional(),
+  /** The work it holds up, so a reader need not join two lists by hand. */
+  gating: z.array(gatedWork),
 });
 
 /** `gate_list` — an array, wrapped because `structuredContent` must be an object. */

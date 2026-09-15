@@ -18,13 +18,13 @@ export function renderAffects(report: DependencyReport, p: Palette): string {
     // Id and wording both. A person reading this needs the sentence; a person
     // acting on it needs the handle every other command takes.
     bullets(
-      report.claims.map((c) => `${c.asserts}  (${c.claim})`),
+      report.claims.map((c) => `(${c.claim})  ${c.asserts}`),
       "none found",
     ),
     "",
     p.heading("Lines of enquiry"),
     bullets(
-      report.enquiries.map((e) => `${e.pursuing}  (${e.enquiry})`),
+      report.enquiries.map((e) => `(${e.enquiry})  ${e.pursuing}`),
       "none found",
     ),
     "",
@@ -47,7 +47,7 @@ export function renderReproduction(report: ReproductionReport, p: Palette): stri
   const verdict = report.conclusion === "agrees" ? p.settled : p.contested;
   return [
     `${p.heading(report.verificationMethod)}  ${`(${report.verification})`}`,
-    `  re-checking ${report.ofMethod}  ${`(${report.of})`}`,
+    `  re-checking ${`(${report.of})`}  ${report.ofMethod}`,
     `  the two runs' findings ${verdict(report.conclusion)} — this ${verdict(report.bearing)} confidence`,
     "",
     p.heading("The re-run read"),
@@ -132,7 +132,7 @@ export function renderInterpretation(history: InterpretationHistory, p: Palette)
     "",
     p.heading("Originally"),
     bullets(
-      history.originally.map((c) => `${c.asserts}  ${`(${c.claim})`}`),
+      history.originally.map((c) => `${`(${c.claim})`}  ${c.asserts}`),
       p.untested("nothing was withdrawn to reach this reading"),
     ),
     "",

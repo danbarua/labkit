@@ -59,7 +59,7 @@ describe("S-24 — a mistaken act taken back", () => {
 
     await expect(
       session.writes.undo({ event: seq, because: "changed my mind about undoing this" }),
-    ).rejects.toThrow(/set a property in place/);
+    ).rejects.toThrow(/overwrote a value/);
   });
 
   test("refuses to undo an act something else already rests on", async () => {

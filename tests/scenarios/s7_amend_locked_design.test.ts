@@ -466,7 +466,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
         because: "amending the superseded setting by mistake",
         citing: cites,
       }),
-    ).rejects.toThrow(/has already been amended; amend the one now in force/);
+    ).rejects.toThrow(/has already been amended/);
 
     // The history still reads, and reads exactly as it did before.
     const later = new ResearchSession(await scenario.current(), {

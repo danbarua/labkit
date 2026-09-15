@@ -28,10 +28,7 @@ function supersededRefString() {
       const id = raw.toUpperCase();
       if (id.startsWith("CLM_")) return ref("claim", id);
       if (id.startsWith("EV_")) return ref("evidence", id);
-      throw new Error(
-        `\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…); ` +
-          `both come back from the act that recorded them, and 'why' names them for a claim already on the record`,
-      );
+      throw new Error(`\`${raw}\` is neither a claim (CLM_…) nor a finding (EV_…)`);
     }),
   );
 }
@@ -44,8 +41,7 @@ function citedBasisString() {
       if (id.startsWith("ART_")) return ref("observations", id);
       if (id.startsWith("EV_")) return ref("evidence", id);
       throw new Error(
-        `\`${raw}\` is not a claim (CLM_…), an observations record (ART_…) or a finding (EV_…); ` +
-          `a verdict rests on evidence, and each of those names some`,
+        `\`${raw}\` is not a claim (CLM_…), an observations record (ART_…) or a finding (EV_…)`,
       );
     }),
   );

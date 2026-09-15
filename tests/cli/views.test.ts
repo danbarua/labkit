@@ -256,12 +256,12 @@ test("every question in the survey carries its handle", () => {
   };
   const out = renderKnown(survey, PLAIN);
   // Two questions may share wording, so the handle is what tells them apart.
-  expect(out).toContain("does it converge?  (Q_1)");
-  expect(out).toContain("does it converge?  (Q_2)");
+  expect(out).toContain("(Q_1)  does it converge?");
+  expect(out).toContain("(Q_2)  does it converge?");
   // And the unambiguous one carries its handle too, because a handle is not a
   // disambiguator — it is what the next command takes. A row without one can
   // be read and not acted on.
-  expect(out).toContain("does depth matter?  (Q_3)");
+  expect(out).toContain("(Q_3)  does depth matter?");
 });
 
 test("a gate that failed and was re-checked does not read as though it never failed", () => {

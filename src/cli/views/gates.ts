@@ -32,7 +32,7 @@ export function renderGate(status: GateStatus, p: Palette): string {
       : "";
     // Padded before colouring: an escape sequence has length and would throw
     // the column off by exactly the bytes nobody can see.
-    return `${state(c.state, c.state.padEnd(19))} ${c.proposition}  ${`(${c.criterion})`}${decided}`;
+    return `${state(c.state, c.state.padEnd(19))} ${`(${c.criterion})`}  ${c.proposition}${decided}`;
   };
   return [
     `${status.gate} — ${state(status.state)}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
@@ -52,13 +52,13 @@ export function renderGate(status: GateStatus, p: Palette): string {
     bullets(status.checks.map(check), "none"),
     status.unmet.length
       ? `\nNot currently met\n${bullets(
-          status.unmet.map((u) => `${u.requires}  (${u.criterion})`),
+          status.unmet.map((u) => `(${u.criterion})  ${u.requires}`),
           "",
         )}`
       : "",
     status.gating.length
       ? `\nGating\n${bullets(
-          status.gating.map((w) => `${w.objective}  (${w.work})`),
+          status.gating.map((w) => `(${w.work})  ${w.objective}`),
           "",
         )}`
       : "",
@@ -85,13 +85,13 @@ export function renderCriteria(criteria: CriterionRef[], gate: GateRef, p: Palet
 export function renderDesign(history: DesignHistory, p: Palette): string {
   const amendment = (a: AmendmentRecord): string =>
     [
-      `${a.nature}  ${`(${a.amendment})`}`,
+      `${`(${a.amendment})`}  ${a.nature}`,
       `  was: ${a.replaced.requires}`,
       `  now: ${a.nowRequires.requires}`,
       `  because: ${a.reason}`,
       a.citing.length ? `  citing: ${a.citing.map((f) => f.states).join("; ")}` : "",
       a.rerun.length
-        ? `  ${p.contested("needs re-running")}: ${a.rerun.map((w) => `${w.objective} ${`(${w.work})`}`).join("; ")}`
+        ? `  ${p.contested("needs re-running")}: ${a.rerun.map((w) => `${`(${w.work})`}  ${w.objective}`).join("; ")}`
         : "",
     ]
       .filter(Boolean)
@@ -147,13 +147,18 @@ export function renderGateList(gates: ListedGate[], p: Palette, heading = false)
   const title = heading ? p.heading(`Gates — ${gates.length}`) : "";
   if (gates.length === 0) return title ? `${title}\nnothing` : "nothing";
   const width = Math.max(...gates.map((g) => g.state.length));
+  const handles = Math.max(...gates.map((g) => g.gate.length));
   const rows = gates
     .map((g) => {
       // Coloured centrally by `colourVocabulary`; padding is the alignment.
       const state = g.state.padEnd(width);
       // Absent for a gate no evaluation has ever reached — nothing to date.
       const age = g.lastTouched ? `  ${p.quiet(`(${relativeAge(g.lastTouched)})`)}` : "";
-      return `${state}  ${g.gate}  ${g.consequence}${age}`;
+      // The work underneath it, so the reader is not joining two lists by hand.
+      const holding = g.gating.map(
+        (w) => `\n${" ".repeat(width + 2)}  holding up  ${w.work}  ${w.objective}`,
+      );
+      return `${state}  ${g.gate.padEnd(handles)}  ${g.consequence}${age}${holding.join("")}`;
     })
     .join("\n");
   return title ? `${title}\n${rows}` : rows;
@@ -166,11 +171,14 @@ export function renderWorkList(work: ListedWork[], p: Palette, heading = false):
   const title = heading ? p.heading(`Work — ${work.length}`) : "";
   if (work.length === 0) return title ? `${title}\nnothing` : "nothing";
   const width = Math.max(...work.map((w) => w.state.length));
+  // The handle column too, so every objective starts at the same column
+  // whether its handle is TASK_1 or TASK_11.
+  const handles = Math.max(...work.map((w) => w.work.length));
   const rows = work
     .map((w) => {
       // Coloured centrally by `colourVocabulary`; padding is the alignment.
       const state = w.state.padEnd(width);
-      return `${state}  ${w.work}  ${w.objective}`;
+      return `${state}  ${w.work.padEnd(handles)}  ${w.objective}`;
     })
     .join("\n");
   return title ? `${title}\n${rows}` : rows;

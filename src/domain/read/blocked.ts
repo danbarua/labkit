@@ -2,7 +2,7 @@ import { optional, vertexProps } from "../../db/cypher";
 import type { TenantGraph } from "../../db/graph";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
-import { ref } from "../report";
+import { byHandle, ref } from "../report";
 import type {
   AmendmentRecord,
   BlockedWork,
@@ -13,10 +13,11 @@ import type {
   DesignHistory,
   EvidenceRef,
   GateStatus,
+  GatedWork,
   ListedGate,
   ListedWork,
-  TaskContract,
   StoppedReason,
+  TaskContract,
   WorkState,
 } from "../report";
 import type {
@@ -185,10 +186,7 @@ export class BlockedGroup extends SessionCore {
       },
       { id: gate },
     );
-    if (governing.length === 0)
-      throw new Error(
-        `gate ${gate} is governed by no condition; a design history is the record of its conditions being amended, and this gate has none to amend`,
-      );
+    if (governing.length === 0) throw new Error(`${gate} is governed by no condition`);
 
     // A condition an amendment withdrew still `GOVERNS` the gate -- that is how
     // the original stays readable. What is in force is what nothing changed.
@@ -259,7 +257,7 @@ export class BlockedGroup extends SessionCore {
         replaced,
         nowRequires,
         reason: first.d.reason,
-        citing: [...citing.values()].sort((a, b) => a.evidence.localeCompare(b.evidence)),
+        citing: [...citing.values()].sort((a, b) => byHandle(a.evidence, b.evidence)),
       });
       nowRequires = replaced;
     }
@@ -405,6 +403,30 @@ export class BlockedGroup extends SessionCore {
       byGate.set(gate.natural_id, bucket);
     }
 
+    // The work each gate holds up, so a reader is not left joining two lists by
+    // hand. `now` printed blocked gates and blocked work as separate sections
+    // and nothing said which gate held which task.
+    const gatedRows = await this.graph.query(
+      `MATCH (g:Gate)-[:GATES]->(w)
+       OPTIONAL MATCH (stopped:Decision)-[:RESOLVES]->(w)
+       RETURN g, w, stopped`,
+      {
+        g: vertexProps<{ natural_id: string }>(),
+        w: vertexProps<{ natural_id: string; objective?: string }>(),
+        stopped: optional(vertexProps<{ natural_id: string }>()),
+      },
+      {},
+    );
+    const gating = new Map<string, GatedWork[]>();
+    for (const row of gatedRows) {
+      // Work somebody stopped is not what this gate is holding up.
+      if (row.stopped) continue;
+      gating.set(row.g.natural_id, [
+        ...(gating.get(row.g.natural_id) ?? []),
+        { work: ref("work", row.w.natural_id), objective: row.w.objective ?? "" },
+      ]);
+    }
+
     const closedRows = await this.graph.query(
       `MATCH (closing:Decision)-[:RESOLVES]->(g:Gate) RETURN closing, g`,
       {
@@ -438,9 +460,10 @@ export class BlockedGroup extends SessionCore {
           consequence,
           state: closed.get(id) ?? gateStateFrom(checks),
           ...(decidedAt ? { lastTouched: decidedAt } : {}),
+          gating: (gating.get(id) ?? []).sort((a, b) => byHandle(a.work, b.work)),
         };
       })
-      .sort((a, b) => a.gate.localeCompare(b.gate));
+      .sort((a, b) => byHandle(a.gate, b.gate));
 
     // Filtering here rather than in Cypher, because the state is computed and
     // there is nothing in the graph to filter on -- which is the same reason
@@ -528,7 +551,7 @@ export class BlockedGroup extends SessionCore {
         state: workStateFrom(t, gateStates),
         gates: [...t.gates].map((g) => ref("gate", g)),
       }))
-      .sort((a, b) => a.work.localeCompare(b.work));
+      .sort((a, b) => byHandle(a.work, b.work));
 
     return state ? listed.filter((w) => w.state === state) : listed;
   }

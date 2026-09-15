@@ -32,7 +32,7 @@ import type {
   GatedWork,
   Ref,
 } from "./report";
-import { ref } from "./report";
+import { byHandle, ref } from "./report";
 
 /**
  * What a surface is constructed with: a command's execution context, plus where its events go.
@@ -234,7 +234,7 @@ export class SessionCore {
         found.set(work, { work, objective: row.t.objective });
       }
     }
-    return [...found.values()].sort((a, b) => a.work.localeCompare(b.work));
+    return [...found.values()].sort((a, b) => byHandle(a.work, b.work));
   }
 
   /**
@@ -267,7 +267,7 @@ export class SessionCore {
         }
       }
     }
-    return [...affected.values()].sort((a, b) => a.claim.localeCompare(b.claim));
+    return [...affected.values()].sort((a, b) => byHandle(a.claim, b.claim));
   }
 
   /**
@@ -419,7 +419,7 @@ export class SessionCore {
         asked.set(question, { question, asks: row.q.name });
       }
     }
-    return [...asked.values()].sort((a, b) => a.question.localeCompare(b.question));
+    return [...asked.values()].sort((a, b) => byHandle(a.question, b.question));
   }
 
   protected async scopeOf(

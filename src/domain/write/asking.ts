@@ -131,10 +131,7 @@ export class Asking extends SessionCore {
     if (asked.length === 0) throw new Error(`${question} not found`);
 
     const origin = await this.originAlready(question);
-    if (origin)
-      throw new Error(
-        `${question} already came from ${origin}; a question has one origin, and a second would leave a reader two answers to why it was asked`,
-      );
+    if (origin) throw new Error(`${question} already came from ${origin}`);
   }
 
   /** What a question already says it came from — a note, or the decision that sharpened it. */

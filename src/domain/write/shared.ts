@@ -68,10 +68,7 @@ export class Shared extends SessionCore {
       { id: analysis },
     );
     const found = rows[0];
-    if (!found)
-      throw new Error(
-        `analysis ${analysis} has no inferential unit; every recorded analysis has one, so this handle names something recorded another way`,
-      );
+    if (!found) throw new Error(`${analysis} has no inferential unit`);
     return ref("unit", found.u.natural_id);
   }
 
@@ -190,10 +187,7 @@ export class Shared extends SessionCore {
       { id: analysis },
     );
     const found = rows[0];
-    if (!found)
-      throw new Error(
-        `analysis ${analysis} has no output record; every recorded analysis produces one, so this handle names something recorded another way`,
-      );
+    if (!found) throw new Error(`${analysis} has no output record`);
     return ref("observations", found.a.natural_id);
   }
 
@@ -321,8 +315,7 @@ export class Shared extends SessionCore {
         );
         if (spent)
           throw new Error(
-            `analysis ${input.analysis} has been superseded and takes no further conclusions; ` +
-              `record this on ${spent.instead ? spent.instead.natural_id : "the analysis that replaced it"}`,
+            `${input.analysis} has been superseded. Record this on ${spent.instead ? spent.instead.natural_id : "the analysis that replaced it"}.`,
           );
 
         // What is being superseded, if anything — matched on whichever handle
@@ -341,8 +334,7 @@ export class Shared extends SessionCore {
           const revised = revision?.old;
           if (revised === undefined)
             throw new Error(
-              `analysis ${input.analysis} replaces nothing, so ${input.replacing} is not its ` +
-                `to supersede; record a replacement first, or conclude without --replacing`,
+              `${input.analysis} replaces nothing, so ${input.replacing} is not its to supersede.`,
             );
           const already = await this.conclusionsOf(revised);
           superseded = already.find(
@@ -353,8 +345,7 @@ export class Shared extends SessionCore {
               ? already.map((c) => `${c.claim} "${c.proposition}"`).join(", ")
               : "nothing at all";
             throw new Error(
-              `analysis ${revised} did not conclude ${input.replacing}, so there is nothing ` +
-                `here to supersede; it concluded: ${named}`,
+              `${revised} did not conclude ${input.replacing}. It concluded: ${named}`,
             );
           }
 
@@ -364,11 +355,7 @@ export class Shared extends SessionCore {
           // What is refused is naming a finding that some OTHER act withdrew.
           const gone = await this.supersessionOf(superseded.claim);
           if (gone !== undefined && gone !== revision?.decision)
-            throw new Error(
-              `${superseded.claim} was superseded by a different act; a finding falls once, ` +
-                `so this conclusion cannot stand in its place. Name a finding the revision ` +
-                `this analysis records superseded, or conclude without naming one`,
-            );
+            throw new Error(`${superseded.claim} was superseded by a different act`);
         }
 
         // Inherited from what is being superseded, overridden when given. A
@@ -377,17 +364,14 @@ export class Shared extends SessionCore {
         const proposition = input.proposition ?? superseded?.proposition;
         if (proposition === undefined)
           throw new Error(
-            `conclude needs the proposition this finding bears on and none was given; ` +
-              `pass it, or pass the claim or finding being superseded so it can be inherited`,
+            `conclude needs --proposition, or a claim or finding to inherit it from.`,
           );
         // **A challenging bearing is never inherited in silence.** Inheriting `supports` is
         // indistinguishable from the default, so nothing is being assumed on the caller's
         // behalf.
         if (input.bearing === undefined && superseded?.bearing === "challenges")
           throw new Error(
-            `${superseded.claim} challenges "${superseded.proposition}", and a replacement ` +
-              `does not inherit that: say which way this finding cuts with --bearing ` +
-              `supports or --bearing challenges`,
+            `${superseded.claim} challenges its proposition. Pass --bearing supports or --bearing challenges.`,
           );
         const bearing = input.bearing ?? superseded?.bearing ?? "supports";
 

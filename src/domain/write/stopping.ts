@@ -61,9 +61,7 @@ export class Stopping extends SessionCore {
       if (target.d)
         throw new DomainRefusal({
           kind: "invariant",
-          message:
-            `enquiry ${input.enquiry} is already closed by decision ` +
-            `${target.d.natural_id} (${target.d.reason}); closing it again would leave two decisions resolving one enquiry`,
+          message: `${input.enquiry} is already closed by ${target.d.natural_id} (${target.d.reason})`,
           subject: input.enquiry,
         });
 
@@ -104,7 +102,7 @@ export class Stopping extends SessionCore {
         if (addresses.length === 0) {
           throw new DomainRefusal({
             kind: "invariant",
-            message: `claim ${input.answeredBy} does not belong to enquiry ${input.enquiry}; it cannot answer its question — cite a claim this enquiry concluded, or close the enquiry that concluded this one`,
+            message: `${input.answeredBy} does not belong to enquiry ${input.enquiry}.`,
             subject: input.answeredBy,
           });
         }
@@ -195,7 +193,7 @@ export class Stopping extends SessionCore {
       if (!question)
         throw new DomainRefusal({
           kind: "invariant",
-          message: `enquiry ${input.enquiry} pursues no question; an enquiry is opened against a question, and accepting it as unresolved leaves that question open on purpose`,
+          message: `${input.enquiry} pursues no question`,
           subject: input.enquiry,
         });
 
@@ -251,7 +249,7 @@ export class Stopping extends SessionCore {
       if (target.d)
         throw new DomainRefusal({
           kind: "invariant",
-          message: `gate ${input.gate} is already ${target.d.reason} by ${target.d.natural_id}; one decision closes a gate`,
+          message: `${input.gate} is already ${target.d.reason} by ${target.d.natural_id}`,
           subject: input.gate,
         });
 
@@ -294,9 +292,7 @@ export class Stopping extends SessionCore {
       if (task.d)
         throw new DomainRefusal({
           kind: "invariant",
-          message:
-            `work ${input.work} was already stopped, because "${task.d.reason}"; a piece of work is ` +
-            `stopped once, and nothing re-opens one yet`,
+          message: `${input.work} was already stopped: "${task.d.reason}"`,
           subject: input.work,
         });
 

@@ -2,7 +2,7 @@ import { vertexProps } from "../../db/cypher";
 import { NODE_LABELS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } from "../../db/domain";
 import type { ClaimsAssertingQuery, OriginOfQuery, PursuitsOfQuery, SearchQuery } from "../queries";
 import { SessionCore } from "../core";
-import { ref, KIND_BY_LABEL } from "../report";
+import { KIND_BY_LABEL, byHandle, ref } from "../report";
 import type {
   ConcludedClaim,
   EnquiryRef,
@@ -76,7 +76,7 @@ export class FindingGroup extends SessionCore {
           states: r.e.statement,
         })),
         (f) => f.evidence,
-      ).sort((a, b) => a.evidence.localeCompare(b.evidence)),
+      ).sort((a, b) => byHandle(a.evidence, b.evidence)),
     };
   }
 

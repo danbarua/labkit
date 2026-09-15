@@ -383,7 +383,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
         from: [observations],
         concludes: [{ proposition: "T beats rewired", finding: "p = 0.049" }],
       }),
-    ).rejects.toThrow(/does not review analysis/);
+    ).rejects.toThrow(/does not review/);
 
     // ...and nothing was invalidated on the way to failing.
     // The replacement was refused, so the original claim is the only one.
@@ -465,9 +465,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
         proposition: "one more thing the old run showed",
         finding: "noticed afterwards",
       }),
-    ).rejects.toThrow(
-      new RegExp(`superseded and takes no further conclusions.*${report.replacement}`),
-    );
+    ).rejects.toThrow(new RegExp(`has been superseded. Record this on ${report.replacement}`));
 
     // The replacement still takes them, which is what makes the refusal about
     // supersession rather than about analyses in general.
