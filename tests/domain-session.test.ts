@@ -771,7 +771,7 @@ test("closing a blocked gate releases work without changing its failed check", a
       closure: "retired",
       because: "missing",
     }),
-  ).rejects.toThrow(/no gate/);
+  ).rejects.toThrow(/not found/);
 });
 
 test("criterion report refuses an evaluation with no stored outcome", async () => {

@@ -1076,8 +1076,61 @@ export type RegisteredSession = z.infer<typeof registeredSession>;
 export type GateList = z.infer<typeof gateList>;
 export type WorkList = z.infer<typeof workList>;
 
+export const listedClaim = z.strictObject({
+  claim: ref("claim"),
+  asserts: prose(),
+  /** Findings resting under it, and findings bearing against it. */
+  supports: z.number(),
+  challenges: z.number(),
+  /** A decision promoted it: others may build on it. */
+  confirmed: z.boolean(),
+});
+export type ListedClaim = z.infer<typeof listedClaim>;
+
+export const listedEnquiry = z.strictObject({
+  enquiry: ref("enquiry"),
+  approach: prose(),
+  question: ref("question").optional(),
+  pursuing: prose(),
+  /** Evidence units addressing it — how much has actually been run. */
+  runs: z.number(),
+  closed: z.boolean(),
+});
+export type ListedEnquiry = z.infer<typeof listedEnquiry>;
+
+export const listedAnalysis = z.strictObject({
+  analysis: ref("analysis"),
+  method: prose(),
+  enquiry: ref("enquiry").optional(),
+  findings: z.number(),
+});
+export type ListedAnalysis = z.infer<typeof listedAnalysis>;
+
+export const listedCriterion = z.strictObject({
+  criterion: ref("criterion"),
+  requires: prose(),
+  governs: z.number(),
+  evaluations: z.number(),
+  state: z.enum(["passed", "failed", "never-run"]),
+  amended: z.boolean(),
+});
+export type ListedCriterion = z.infer<typeof listedCriterion>;
+
+export const claimList = z.strictObject({ claims: z.array(listedClaim) });
+export const enquiryList = z.strictObject({ enquiries: z.array(listedEnquiry) });
+export const analysisList = z.strictObject({ analyses: z.array(listedAnalysis) });
+export const criterionList = z.strictObject({ criteria: z.array(listedCriterion) });
+
 /** Every exported schema in this module, so PROSE_FIELDS can walk them all. */
 const SCHEMAS = {
+  claimList,
+  enquiryList,
+  analysisList,
+  criterionList,
+  listedClaim,
+  listedEnquiry,
+  listedAnalysis,
+  listedCriterion,
   claimsAsserting,
   search,
   notes,

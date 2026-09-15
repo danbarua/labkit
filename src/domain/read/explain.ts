@@ -428,10 +428,7 @@ async function explainWork(self: ReadSurface, subject: string): Promise<WorkExpl
   const work = ref("work", subject);
   const report = await self.contractFor({ work });
   const listed = (await self.workList({})).find((row) => row.work === work);
-  if (!listed)
-    throw new Error(
-      `no planned work ${work}; work is planned before it can be read back, and 'search' finds its handle by the objective`,
-    );
+  if (!listed) throw new Error(`${work} not found`);
 
   const lineage: Cause[] = report.addressing
     ? [

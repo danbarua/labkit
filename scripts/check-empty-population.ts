@@ -44,6 +44,9 @@ import pkg from "../package.json";
  *   Minutes, not seconds, and their population is one record they create.
  * - `all-checks` — its population is the check scripts themselves, which the
  *   scaffold does not have; it is the one check whose empty case is this file.
+ * - `version` — its population is one field in one file, always present, and
+ *   it carries its own guard for the failure this file exists to catch: under
+ *   `CI` it fails when nobody passes it a pull request number.
  * - `empty-population` — this one. Running it inside itself proves nothing.
  */
 const NOT_SCANNED = new Set([
@@ -55,6 +58,7 @@ const NOT_SCANNED = new Set([
   "check:cli",
   "check:compositions",
   "check:all-checks",
+  "check:version",
   "check:empty-population",
 ]);
 

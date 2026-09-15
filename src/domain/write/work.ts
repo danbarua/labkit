@@ -109,11 +109,7 @@ export class Work extends Shared {
       );
       const present = new Set(found.map((r) => r.c.natural_id));
       const missing = input.restingOn.filter((c) => !present.has(c));
-      if (missing.length > 0)
-        throw new Error(
-          `no claim ${missing.join(", ")} to rest on; a claim exists once an analysis has ` +
-            `concluded it, and 'search' finds one by its wording`,
-        );
+      if (missing.length > 0) throw new Error(`${missing.join(", ")} not found`);
 
       const claim = ref(
         "claim",

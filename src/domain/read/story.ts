@@ -71,7 +71,7 @@ export class StoryGroup extends SessionCore {
     if (!loe)
       throw new DomainRefusal({
         kind: "not-found",
-        message: `no enquiry ${enquiry}. \`search\` finds it by the approach it was opened with.`,
+        message: `${enquiry} not found`,
         subject: enquiry,
       });
 
@@ -405,8 +405,7 @@ export class StoryGroup extends SessionCore {
     // -CHANGES-> each withdrawn claim`, both carrying natural ids, so every step is reachable
     // by identity.
     const proposition = await this.assertedBy(claim);
-    if (proposition === undefined)
-      throw new Error(`no claim ${claim}. \`search\` finds it by the proposition it asserts.`);
+    if (proposition === undefined) throw new Error(`${claim} not found`);
 
     // Depth from the claim asked about, so the deepest revisions are the
     // oldest. A claim reached by two paths of different lengths keeps the
@@ -814,10 +813,7 @@ export class StoryGroup extends SessionCore {
       { c: vertexProps<{ natural_id: string }>() },
       { id: analysis },
     );
-    if (subject.length === 0)
-      throw new Error(
-        `no analysis ${analysis}; an analysis is recorded before it can be read back, and its handle comes back from the act that recorded it`,
-      );
+    if (subject.length === 0) throw new Error(`${analysis} not found`);
 
     const parts = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})-[:CONSUMES]->(a:Artefact) RETURN a`,

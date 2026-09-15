@@ -105,7 +105,7 @@ test("--since is a cursor: only later seqs, including dropping the named handle"
 });
 
 test("how refuses unknown handle like why", async () => {
-  await expect(session.reads.how({ subject: "NOTE_999999" })).rejects.toThrow(/not on this record/);
+  await expect(session.reads.how({ subject: "NOTE_999999" })).rejects.toThrow(/not found/);
 });
 
 test("how dispatches on NOTE, CLM, Q, TASK handles", async () => {

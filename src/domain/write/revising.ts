@@ -198,8 +198,7 @@ export class Revising extends Shared {
       // — checked explicitly rather than trusted, because a `since` filter finds the *next*
       // event whether or not this one exists.
       const [found] = await this.events.select({ since: input.event - 1, limit: 1 });
-      if (found?.seq !== input.event)
-        throw new Error(`no event ${input.event}; 'labkit happened' names the acts on the record`);
+      if (found?.seq !== input.event) throw new Error(`${input.event} not found`);
 
       const retracting = createdIn(found);
       if (retracting.length === 0)
@@ -495,10 +494,7 @@ export class Revising extends Shared {
           ...this.scopeParams(scope),
         },
       );
-      if (claims.length === 0)
-        throw new Error(
-          `no claim ${input.of} to reinterpret; a claim exists once an analysis concludes it`,
-        );
+      if (claims.length === 0) throw new Error(`${input.of} not found`);
 
       // Every record this act withdraws, by handle. The reading is one sentence
       // and the records asserting it are several -- reporting the sentence alone

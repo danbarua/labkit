@@ -75,8 +75,7 @@ export function renderCriteria(criteria: CriterionRef[], gate: GateRef, p: Palet
       p.untested("none — this gate is bound to no prespecified condition"),
     ),
     "",
-    p.quiet("Handles only. `labkit gate` gives the same conditions with their wording and"),
-    p.quiet("their current standing."),
+    p.quiet("`labkit gate` gives the same conditions with their wording and standing."),
   ].join("\n");
 }
 
@@ -119,8 +118,6 @@ export function renderDesign(history: DesignHistory, p: Palette): string {
     "",
     p.heading("Conditions"),
     history.conditions.map(condition).join("\n\n"),
-    "",
-    p.quiet("Ordered from the record itself, not from timestamps."),
   ].join("\n");
 }
 
@@ -138,11 +135,8 @@ export function renderContract(contract: TaskContract, p: Palette): string {
         ]
       : []),
     "",
-    p.heading("May read"),
+    p.heading("May read (not enforced)"),
     bullets(contract.mayRead, p.untested("nothing named")),
-    "",
-    p.provisional("Not enforced. The record states what this work may look at; nothing stops"),
-    p.provisional("a computation reading elsewhere."),
   ].join("\n");
 }
 

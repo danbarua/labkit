@@ -53,10 +53,7 @@ export class Asking extends SessionCore {
       { n: vertexProps<{ text: string }>() },
       { id: note },
     );
-    if (rows.length === 0)
-      throw new Error(
-        `no note ${note} for this question to come out of; write it with 'note' first, or pose the question without one`,
-      );
+    if (rows.length === 0) throw new Error(`${note} not found`);
   }
 
   /**
@@ -69,10 +66,7 @@ export class Asking extends SessionCore {
       { n: vertexProps<{ text: string }>() },
       { id: note },
     );
-    if (rows.length === 0)
-      throw new Error(
-        `no note ${note} for this note to supersede; write it first, or drop --supersedes`,
-      );
+    if (rows.length === 0) throw new Error(`${note} not found`);
   }
 
   /**
@@ -88,7 +82,7 @@ export class Asking extends SessionCore {
           { n: vertexProps<{ text: string }>() },
           { id: noted },
         );
-        if (rows.length === 0) throw new Error(`no note ${noted}; write it first`);
+        if (rows.length === 0) throw new Error(`${noted} not found`);
         for (const old of input.supersedes) {
           if (old === noted) throw new Error(`a note cannot supersede itself (${noted})`);
           await this.noteExistsToSupersede(old);
@@ -134,10 +128,7 @@ export class Asking extends SessionCore {
       { q: vertexProps<{ name: string }>() },
       { id: question },
     );
-    if (asked.length === 0)
-      throw new Error(
-        `no question ${question} for this note to have prompted; pose it first, or write the note without --prompted`,
-      );
+    if (asked.length === 0) throw new Error(`${question} not found`);
 
     const origin = await this.originAlready(question);
     if (origin)
@@ -228,10 +219,7 @@ export class Asking extends SessionCore {
         { q: vertexProps<{ name: string }>() },
         { id: input.from },
       );
-      if (original.length === 0)
-        throw new Error(
-          `no question ${input.from} to sharpen; pose it first, or name a question already on the record`,
-        );
+      if (original.length === 0) throw new Error(`${input.from} not found`);
 
       const standing = await this.standingFindings();
 

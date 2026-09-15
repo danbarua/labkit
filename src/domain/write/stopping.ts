@@ -48,7 +48,7 @@ export class Stopping extends SessionCore {
       if (!target)
         throw new DomainRefusal({
           kind: "not-found",
-          message: `no enquiry ${input.enquiry}. \`pursue\` returns its handle.`,
+          message: `${input.enquiry} not found`,
           subject: input.enquiry,
         });
       const question = await this.questionBehind(input.enquiry);
@@ -245,7 +245,7 @@ export class Stopping extends SessionCore {
       if (!target)
         throw new DomainRefusal({
           kind: "not-found",
-          message: `no gate ${input.gate}; a gate exists once declare records one, and its handle comes back from that act`,
+          message: `${input.gate} not found`,
           subject: input.gate,
         });
       if (target.d)
@@ -288,7 +288,7 @@ export class Stopping extends SessionCore {
       if (!task)
         throw new DomainRefusal({
           kind: "not-found",
-          message: `no work ${input.work}; a task exists once \`plan\` records one, and its handle comes back from that act`,
+          message: `${input.work} not found`,
           subject: input.work,
         });
       if (task.d)

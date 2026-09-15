@@ -50,6 +50,12 @@ import {
   renderWorkList,
 } from "../views/gates";
 import {
+  renderAnalysisList,
+  renderClaimList,
+  renderCriterionList,
+  renderEnquiryList,
+} from "../views/inventory";
+import {
   renderAffects,
   renderInterpretation,
   renderReproducibility,
@@ -64,11 +70,10 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("What stands")
     .summary("show me what the programme says matters")
     .description(
-      "Blocked gates and the work each protects, gates nobody " +
-        "has finished checking, planned work nothing has touched, and where every question " +
-        "stands. There is deliberately no `--at`: this answers only about now, never about a " +
-        "moment in the past. `--since <seq>` narrows every section to what moved since that " +
-        "seq, and always prints the current `seq`, to pass back next time.",
+      "Blocked gates and the work each protects, gates nobody has finished checking, planned " +
+        "work nothing has touched, and where every question stands. `--since <seq>` narrows " +
+        "every section to what moved since that seq. Always prints the current `seq`. " +
+        "`known --at` answers about a past moment.",
     )
     .option("--since <seq>", "only what moved since this seq -- the one `now` last returned", whole)
     .action(async ({ since }: { since?: number }) => {
@@ -80,11 +85,9 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("What stands")
     .summary("what the programme knows, now or as of a moment")
     .description(
-      "What this research programme currently knows, partitioned by how well each answer is " +
-        "held up: established, provisional, accepted as unresolved, unresolved, untested. " +
-        "Given --at it answers as of that moment instead, from durable state rather than a " +
-        "log — but the historical form cannot split `open` into worked-on and untouched, " +
-        "because nothing records when work began.",
+      "Every question, partitioned by how well its answer is held up: established, " +
+        "provisional, accepted as unresolved, unresolved, untested. `--at <instant>` answers " +
+        "as of that moment, where the partition is `open` instead of the last two.",
     )
     .option("--at <instant>", "ISO instant, e.g. 2026-08-21T09:00:00.000Z")
     .action(async ({ at }: { at?: string }) => {
@@ -138,9 +141,8 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("Finding a handle")
     .summary("every record containing this text — a second seam where wording is resolved")
     .description(
-      "Substring, case-insensitive, across every Prose property in the string taxonomy. " +
-        "Returns every match grouped by label rather than picking one -- narrower than this, " +
-        "and cheaper, is `claims`, which finds a claim by its exact asserted sentence.",
+      "Substring, case-insensitive, across every text property. Groups matches by kind. " +
+        "`claims <sentence>` is the narrower search, by a claim's exact wording.",
     )
     .argument("<text>", "the text to search for")
     .action(async (text: string) => {
@@ -153,14 +155,16 @@ export function registerReads(program: Command, run: Run): void {
   program
     .command("claims")
     .helpGroup("Finding a handle")
-    .summary("which claims assert a sentence — text to handle")
+    .summary("every claim, or the ones asserting a sentence")
     .description(
-      "The one place wording is resolved. Returns every match rather than picking: two lines " +
-        "of enquiry can assert the same sentence about different endpoints, and they are two " +
-        "claims (S-5).",
+      "With no argument, every claim on the record and whether anything bears against it. " +
+        "With one, the claims asserting that sentence — every match rather than one, because " +
+        "two lines of enquiry can assert the same sentence about different endpoints.",
     )
-    .argument("<proposition>", "the sentence, as worded")
-    .action(async (proposition: string) => {
+    .argument("[proposition]", "the sentence, as worded")
+    .action(async (proposition?: string) => {
+      if (proposition === undefined)
+        return run(async ({ read }) => answer(await read.claimList(), renderClaimList));
       const query = parseCommand(claimsAssertingQuery, { proposition });
       return run(async ({ read }) => {
         const claims = await read.claimsAsserting(query);
@@ -188,9 +192,8 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("Finding a handle")
     .summary("where a question came from, if it was sharpened")
     .description(
-      "The question it narrowed, why, and what was known at that moment — frozen when the " +
-        "sharpening was recorded rather than recomputed now. Null for a question somebody " +
-        "simply asked, which is most of them.",
+      "The question it narrowed, why, and what was known at the moment of the sharpening. " +
+        "Null for a question somebody simply asked.",
     )
     .argument("<question-id>", "e.g. Q_12")
     .action(async (question: string) => {
@@ -200,6 +203,30 @@ export function registerReads(program: Command, run: Run): void {
         return answer(origin, (o, p) => renderOrigin(o, query.question, p));
       });
     });
+  program
+    .command("enquiries")
+    .helpGroup("Finding a handle")
+    .summary("every line of enquiry")
+    .description("What is being pursued, and how much of it has actually been run.")
+    .action(async () =>
+      run(async ({ read }) => answer(await read.enquiryList(), renderEnquiryList)),
+    );
+  program
+    .command("analyses")
+    .helpGroup("Finding a handle")
+    .summary("every analysis")
+    .description("What was run, and how many findings came out of it.")
+    .action(async () =>
+      run(async ({ read }) => answer(await read.analysisList(), renderAnalysisList)),
+    );
+  program
+    .command("conditions")
+    .helpGroup("What is blocked")
+    .summary("every condition on the record")
+    .description("What results are held to, and how each condition currently stands.")
+    .action(async () =>
+      run(async ({ read }) => answer(await read.criterionList(), renderCriterionList)),
+    );
   program
     .command("gates")
     .helpGroup("What is blocked")
@@ -269,10 +296,7 @@ export function registerReads(program: Command, run: Run): void {
     .command("design")
     .helpGroup("What is blocked")
     .summary("how a gate's conditions were amended")
-    .description(
-      "Each amendment, its reason, and whether it was mechanical or substantive. Ordered from " +
-        "the record itself rather than from timestamps.",
-    )
+    .description("Each amendment, its reason, and whether it was mechanical or substantive.")
     .argument("<gate-id>", "e.g. GATE_1")
     .action(async (gate: string) => {
       const query = parseCommand(designHistoryQuery, { gate });
@@ -282,10 +306,7 @@ export function registerReads(program: Command, run: Run): void {
     .command("contract")
     .helpGroup("What is blocked")
     .summary("what a piece of planned work is for")
-    .description(
-      "Its objective, what would count as meeting it, and what it may read. Not enforced, and " +
-        "it says so: nothing stops a computation reading elsewhere.",
-    )
+    .description("Its objective, what would count as meeting it, and what it may read.")
     .argument("<work-id>", "e.g. TASK_1")
     .action(async (work: string) => {
       const query = parseCommand(contractForQuery, { work });
@@ -296,10 +317,9 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("One record's story")
     .summary("is this enquiry open, and how did it close")
     .description(
-      "Whether a line of enquiry is still open, and if not how it closed — answered, abandoned, " +
-        "or deliberately left open — with the answer and the evidence behind it. `why <id>` " +
-        "adds which of `known`'s five buckets this enquiry's own question currently sits in — " +
-        "did closing it move the bucket?",
+      "Whether a line of enquiry is still open, and if not how it closed — answered, " +
+        "abandoned, or left open — with the answer and the evidence behind it. `why <id>` " +
+        "adds which of `known`'s buckets its question now sits in.",
     )
     .argument("<enquiry-id>", "e.g. LOE_7")
     .action(async (enquiry: string) => {
@@ -311,8 +331,8 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("One record's story")
     .summary("how a claim's reading was narrowed")
     .description(
-      "The claims each step withdrew, the decision that narrowed them and why. One step can " +
-        "withdraw several claims, so every step names records rather than a sentence.",
+      "The claims each step withdrew, the decision that narrowed them, and why. A step names " +
+        "every claim it withdrew.",
     )
     .argument("<claim-id>", "e.g. CLM_4")
     .action(async (claim: string) => {
@@ -409,9 +429,8 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("What was done")
     .summary("the acts themselves, oldest first, with who ran them")
     .description(
-      "The only command that answers from the event log rather than the record. Every other " +
-        "read tells you what is true now; this tells you what was done to make it so, when, and " +
-        "by which agent against which commit. `seq` is both the order and the cursor.",
+      "What was done, when, by which agent against which commit. `seq` is both the order " +
+        "and the cursor for `--since`.",
     )
     .argument("[id]", "acts about, or minting, this handle")
     .option("--since <seq>", "only acts after this seq — the cursor", whole)

@@ -93,13 +93,13 @@ test("supersedes writes SUPERSEDES edges (repeatable) and why walks both directi
 test("note --supersedes refuses missing target", async () => {
   await expect(
     session.writes.note({ text: "x", supersedes: ["NOTE_999999"] as never }),
-  ).rejects.toThrow(/no note NOTE_999999 for this note to supersede/);
+  ).rejects.toThrow(/NOTE_999999 not found/);
 });
 
 test("note --supersedes refuses non-note handle (treated as missing note target)", async () => {
   const { question } = await session.writes.pose({ question: "some q" });
   await expect(session.writes.note({ text: "x", supersedes: [question] as never })).rejects.toThrow(
-    /no note .* for this note to supersede/,
+    /not found/,
   );
 });
 
@@ -145,7 +145,7 @@ test("historic supersedes refuses a missing standing note", async () => {
   const { note: old } = await session.writes.note({ text: "old" });
   await expect(
     session.writes.note({ note: "NOTE_999999" as never, supersedes: [old] }),
-  ).rejects.toThrow(/no note NOTE_999999; write it first/);
+  ).rejects.toThrow(/NOTE_999999 not found/);
 });
 
 test("historic supersedes refuses self", async () => {

@@ -103,7 +103,7 @@ describe("S-29: the note came after the question", () => {
 
   test("prompting a question nobody posed is refused, and the message says what to do", async () => {
     await expect(session.writes.note({ text: PROBE, prompted: "Q_404" as never })).rejects.toThrow(
-      /no question Q_404/,
+      /Q_404 not found/,
     );
   });
 });

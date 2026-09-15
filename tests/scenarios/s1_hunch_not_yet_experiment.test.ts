@@ -326,7 +326,7 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
         into: "a sharper form of nothing",
         because: "it should not get this far",
       }),
-    ).rejects.toThrow(/no question Q_404 to sharpen/);
+    ).rejects.toThrow(/Q_404 not found/);
 
     const later = new ResearchSession(await scenario.current(), { clock });
     const after = await later.reads.whatIsKnown();

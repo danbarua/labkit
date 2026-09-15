@@ -385,7 +385,7 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
         as: "some narrower version of it",
         because: "it should not get this far",
       }),
-    ).rejects.toThrow(/no claim CLM_9999/);
+    ).rejects.toThrow(/CLM_9999 not found/);
 
     const later = new ResearchSession(await scenario.current(), {
       clock,

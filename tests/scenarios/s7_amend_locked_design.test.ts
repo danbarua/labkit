@@ -491,7 +491,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
         because: "it should not get this far",
         citing: cites,
       }),
-    ).rejects.toThrow(/no condition CRIT_404 to amend/);
+    ).rejects.toThrow(/CRIT_404 not found/);
 
     const later = new ResearchSession(await scenario.current(), {
       clock,

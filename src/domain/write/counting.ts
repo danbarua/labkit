@@ -167,10 +167,7 @@ export class Counting extends SessionCore {
         { id: input.criterion },
       );
       const replaced = existing[0]?.c.proposition;
-      if (!replaced)
-        throw new Error(
-          `no condition ${input.criterion} to amend; state the criterion first, or name one already on the record`,
-        );
+      if (!replaced) throw new Error(`${input.criterion} not found`);
 
       // **`never-run`, not "no standing verdicts".** `stateOf` in survey-facts
       // already tells the two apart, and the difference is the whole rule: a

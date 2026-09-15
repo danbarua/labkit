@@ -311,7 +311,7 @@ describe("S-4: a negative result that closes the question", () => {
         enquiry: specificity,
         answeredBy: claimOf(unrelatedClaims, SPECIFICITY),
       }),
-    ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
+    ).rejects.toThrow(/CLM_99999 not found|does not belong to enquiry/);
 
     // Nothing was written on the way to failing.
     const status = await session.reads.enquiryStatus({ enquiry: specificity });
@@ -343,7 +343,7 @@ describe("S-4: a negative result that closes the question", () => {
         enquiry: specificity,
         answeredBy: ref("claim", "CLM_99999"),
       }),
-    ).rejects.toThrow(/no claim CLM_99999|does not belong to enquiry/);
+    ).rejects.toThrow(/CLM_99999 not found|does not belong to enquiry/);
 
     const status = await session.reads.enquiryStatus({ enquiry: specificity });
     expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(

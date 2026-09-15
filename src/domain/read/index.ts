@@ -4,7 +4,13 @@
 
 import { vertexProps } from "../../db/cypher";
 import { createdIn, edgesIn } from "../events";
-import type { EnquiryRef } from "../report";
+import type {
+  EnquiryRef,
+  ListedAnalysis,
+  ListedClaim,
+  ListedCriterion,
+  ListedEnquiry,
+} from "../report";
 import type {
   AnalysisRevision,
   AnyRef,
@@ -76,6 +82,7 @@ import { HappenedGroup } from "./happened";
 import { FindingGroup } from "./finding";
 import { StandingGroup } from "./standing";
 import { BlockedGroup } from "./blocked";
+import { InventoryGroup } from "./inventory";
 import { StoryGroup } from "./story";
 import { ExplainGroup, EXPLAINERS, enquiryInContext as enquiryInContextOf } from "./explain";
 
@@ -93,6 +100,7 @@ export class ReadSurface extends SessionCore {
   readonly #finding: FindingGroup;
   readonly #standing: StandingGroup;
   readonly #blocked: BlockedGroup;
+  readonly #inventory: InventoryGroup;
   readonly #story: StoryGroup;
   readonly #explain: ExplainGroup;
 
@@ -109,6 +117,7 @@ export class ReadSurface extends SessionCore {
     this.#finding = new FindingGroup(...shared);
     this.#standing = new StandingGroup(...shared);
     this.#blocked = new BlockedGroup(...shared);
+    this.#inventory = new InventoryGroup(...shared);
     this.#story = new StoryGroup(...shared);
     this.#explain = new ExplainGroup(...shared);
   }
@@ -199,6 +208,25 @@ export class ReadSurface extends SessionCore {
   /** Every planned piece of work, with the state a reader is filtering on. */
   async workList(query: WorkListQuery): Promise<ListedWork[]> {
     return this.#blocked.workList(query);
+  }
+  /** Every claim on the record, with what bears on it. */
+  async claimList(): Promise<ListedClaim[]> {
+    return this.#inventory.claimList();
+  }
+
+  /** Every line of enquiry, with the question it pursues. */
+  async enquiryList(): Promise<ListedEnquiry[]> {
+    return this.#inventory.enquiryList();
+  }
+
+  /** Every analysis, with what it produced. */
+  async analysisList(): Promise<ListedAnalysis[]> {
+    return this.#inventory.analysisList();
+  }
+
+  /** Every condition, with what it governs and how it stands. */
+  async criterionList(): Promise<ListedCriterion[]> {
+    return this.#inventory.criterionList();
   }
 
   /** Is this enquiry open, and if not, how did it close? */
@@ -366,7 +394,7 @@ export class ReadSurface extends SessionCore {
       if (!(await this.reachable({ subject: asHandle })))
         throw new DomainRefusal({
           kind: "not-found",
-          message: `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
+          message: `${subject} not found`,
           subject: asHandle,
         });
       return EXPLAINERS[kind](this, asHandle);
@@ -398,7 +426,7 @@ export class ReadSurface extends SessionCore {
     if (!(await this.reachable({ subject: asHandle })))
       throw new DomainRefusal({
         kind: "not-found",
-        message: `${subject} is not on this record; it was never written, or an \`undo\` took back the act that minted it`,
+        message: `${subject} not found`,
         subject: asHandle,
       });
     return this.#story.how(query);
