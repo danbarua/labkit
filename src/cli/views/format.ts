@@ -143,3 +143,22 @@ export function colourHandles(text: string, paint: (t: string) => string): strin
     .map((part, i) => (i % 2 === 1 ? part : part.replace(HANDLE, (handle) => paint(handle))))
     .join("");
 }
+
+/** An ISO-8601 instant, as the record writes them. */
+const INSTANT = /\b(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}(?:\.\d+)?Z\b/g;
+
+/**
+ * Shortens every instant in a rendered report, and dims it.
+ *
+ * At the boundary rather than on the value, so a view still receives the ISO
+ * string it can compute on. Rewriting the value first gave `relativeAge` a
+ * display string to parse, and it answered `NaN days ago`.
+ */
+export function shortenInstants(text: string, p: Palette): string {
+  return text
+    .split(new RegExp(`(${String.fromCharCode(27)}\\[[0-9;]*m)`))
+    .map((part, i) =>
+      i % 2 === 1 ? part : part.replace(INSTANT, (_, day, minute) => p.quiet(`${day} ${minute}`)),
+    )
+    .join("");
+}
