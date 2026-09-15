@@ -343,7 +343,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     const _programme = await twoStages();
 
     await expect(session.reads.whySupported({ claim: ref("claim", "CLM_9999") })).rejects.toThrow(
-      /no claim CLM_9999/,
+      /CLM_9999 not found/,
     );
 
     await expect(
@@ -352,7 +352,7 @@ describe("S-5 — contradiction or dissociation?", () => {
         as: "narrower still",
         because: "it should not get this far",
       }),
-    ).rejects.toThrow(/no claim CLM_9999/);
+    ).rejects.toThrow(/CLM_9999 not found/);
   });
 
   /**

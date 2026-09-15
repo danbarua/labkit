@@ -92,9 +92,7 @@ export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
     p.untested("Open"),
     list(survey.open),
     "",
-    p.quiet("A question posed after this instant is absent, not open. `open` is not"),
-    p.quiet("split into worked-on and untouched: nothing records when work began, so"),
-    p.quiet("that cannot be placed in time."),
+    p.quiet("A question posed after this instant is absent, not open."),
   ].join("\n");
 }
 

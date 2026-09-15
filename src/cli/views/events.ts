@@ -37,8 +37,7 @@ export function renderHappened({ acts: events, more }: EventPage, p: Palette): s
     return [
       p.untested("Nothing matching."),
       "",
-      p.quiet("An empty log is not an empty record: every other command answers from"),
-      p.quiet("the graph, and answers there are durable whether or not an act was logged."),
+      p.quiet("An empty log is not an empty record — every other command reads the graph."),
     ].join("\n");
   const rendered = events
     .map((e) => {

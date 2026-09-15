@@ -403,10 +403,12 @@ test("unverifiable inputs render apart from ones that differ", () => {
   expect(positions).toEqual([...positions].sort((a, b) => a - b));
 });
 
-test("a question nobody sharpened renders as an answer, not a gap", () => {
+test("a question nobody sharpened says so, in one line", () => {
   const out = renderOrigin(null, ref("question", "Q_1"), PLAIN);
-  expect(out).toContain("posed directly");
-  expect(out).toContain("not a gap");
+  expect(out).toBe("Q_1 was posed directly.");
+  // No paragraph defending the answer. It was two lines explaining that an
+  // absent origin is not a gap, printed every time the answer was "directly".
+  expect(out.split("\n")).toHaveLength(1);
 
   const sharpened = renderOrigin(
     {
@@ -441,10 +443,10 @@ test("a question nobody sharpened renders as an answer, not a gap", () => {
   expect(sharpened).toContain("moves by ~3 steps");
   // The frozen-at-the-time caveat, without which a reader takes the list for
   // what is known now.
-  expect(sharpened).toContain("not recomputed now");
+  expect(sharpened).toContain("As it stood at the sharpening");
 });
 
-test("a work contract always says it is not enforced", () => {
+test("a work contract says, once, that it is not enforced", () => {
   const contract: TaskContract = {
     work: ref("work", "TASK_1"),
     objective: "sweep depth 4 through 20",
@@ -454,7 +456,10 @@ test("a work contract always says it is not enforced", () => {
   };
   const out = renderContract(contract, PLAIN);
   expect(out).toContain("sweep-a");
-  expect(out).toContain("Not enforced");
+  // In the heading, not a paragraph under it. It was two lines explaining that
+  // nothing stops a computation reading elsewhere, on every contract.
+  expect(out).toContain("May read (not enforced)");
+  expect(out).not.toContain("nothing stops");
 });
 
 test("two claims asserting one sentence are not rendered as a duplicate", () => {
@@ -527,7 +532,7 @@ test("`known` prints the buckets holding something and nothing else", () => {
 test("an empty event log does not read as an empty record", () => {
   const empty = renderHappened({ acts: [], more: false }, PLAIN);
   expect(empty).toContain("Nothing matching");
-  expect(empty).toContain("every other command answers from");
+  expect(empty).toContain("every other command reads the graph");
 
   const events: DomainEvent[] = [
     domainEvent({

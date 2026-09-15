@@ -57,7 +57,15 @@ export function globalOptions(program: Command): Command {
  */
 export function buildProgram(run: Run): Command {
   const program = new Command("labkit")
-    .description("a research record, from the command line")
+    .description(
+      "A research record, from the command line.\n\n" +
+        "Start with:\n" +
+        "  labkit now              what is blocked, and what is ready to start\n" +
+        "  labkit known            every question, and how well each is answered\n" +
+        "  labkit claims           every conclusion on the record\n" +
+        "  labkit search <text>    find a handle by its wording\n\n" +
+        "Most other commands take a handle. The lists above are where handles come from.",
+    )
     // The worktree is a diagnostic, not a version: two checkouts of one repository run two
     // stacks, and an answer that does not say which one produced it is what made a green
     // `/healthz` describe someone else's server.

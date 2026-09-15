@@ -358,10 +358,7 @@ export function registerWrites(program: Command, run: Run): void {
     .command("evaluate")
     .helpGroup("Saying in advance what counts")
     .summary("record a prespecified check's outcome")
-    .description(
-      "--gate is optional on purpose: a condition can qualify a finding and gate no work, and " +
-        "requiring a gate there would force the caller to mint one protecting nothing.",
-    )
+    .description("`--gate` is optional: a condition can qualify a finding and gate no work.")
     .argument("<criterion-id>", "the condition being checked")
     .requiredOption("--value <text>", "what was measured")
     .requiredOption("--outcome <pass|fail>", "the verdict")
@@ -646,7 +643,7 @@ export function registerWrites(program: Command, run: Run): void {
   program
     .command("accept")
     .helpGroup("Stopping")
-    .summary("leave a question open on purpose, and say what would reopen it")
+    .summary("leave a question open, and say what would reopen it")
     .description(
       "Not the same as abandoning it, and not the same as nobody having got round to it. The " +
         "enquiry still reports itself open — deliberately — with the reason and the reopening " +

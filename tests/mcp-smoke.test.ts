@@ -225,6 +225,17 @@ describe("every tool answers when an agent actually calls it", () => {
       // `gate_status` above about this very gate -- they compute the state
       // through the same function and a disagreement here is the defect the
       // shared helper exists to prevent.
+      // The four inventories, exercised against a record that has one of each:
+      // they are the only route to a handle for an agent that holds none.
+      const claims = await call(c, "claim_list", {});
+      expect((claims.claims as unknown[]).length).toBeGreaterThan(0);
+      const enquiries = await call(c, "enquiry_list", {});
+      expect((enquiries.enquiries as unknown[]).length).toBeGreaterThan(0);
+      const analyses = await call(c, "analysis_list", {});
+      expect((analyses.analyses as unknown[]).length).toBeGreaterThan(0);
+      const criteria = await call(c, "criterion_list", {});
+      expect((criteria.criteria as unknown[]).length).toBeGreaterThan(0);
+
       const gates = await call(c, "gate_list", {});
       const listedGate = (gates.gates as Array<{ gate: string; state: string }>).find(
         (g) => g.gate === id(gate),

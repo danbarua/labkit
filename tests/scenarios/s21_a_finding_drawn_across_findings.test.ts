@@ -154,7 +154,7 @@ describe("S-21: a finding drawn across findings", () => {
 
     await expect(
       session.writes.synthesise({ proposition: HEADLINE, restingOn: [ref("claim", "CLM_999")] }),
-    ).rejects.toThrow(/no claim CLM_999 to rest on/);
+    ).rejects.toThrow(/CLM_999 not found/);
 
     const found = await (await afterwards()).reads.claimsAsserting({ proposition: HEADLINE });
     expect(found).toEqual([]);

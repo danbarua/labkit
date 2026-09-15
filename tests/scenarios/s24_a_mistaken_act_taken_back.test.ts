@@ -186,6 +186,6 @@ describe("S-24 — a mistaken act taken back", () => {
   test("refuses a seq nothing on the record has", async () => {
     await expect(
       session.writes.undo({ event: 999_999, because: "there is nothing at this seq" }),
-    ).rejects.toThrow(/no event/);
+    ).rejects.toThrow(/not found/);
   });
 });

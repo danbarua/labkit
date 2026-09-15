@@ -75,21 +75,11 @@ export function renderOrigin(
   question: QuestionRef,
   p: Palette,
 ): string {
-  if (!origin)
-    return [
-      `${question} was posed directly.`,
-      "",
-      p.quiet("That is an answer, not a gap: a question has an origin here only when it"),
-      p.quiet("was sharpened from an earlier one or posed out of a note."),
-    ].join("\n");
+  if (!origin) return [`${question} was posed directly.`].join("\n");
   if (origin.kind === "noted")
-    return [
-      `${question} came out of a note  ${`(${origin.from})`}`,
-      `  "${origin.said}"`,
-      "",
-      p.quiet("A note records no reason and cites nothing — it was written before there"),
-      p.quiet("was anything to ask. What it carries is when, and who."),
-    ].join("\n");
+    return [`${question} came out of a note  ${`(${origin.from})`}`, `  "${origin.said}"`, ""].join(
+      "\n",
+    );
   return [
     `${question} narrowed "${origin.said}"  ${`(${origin.from})`}`,
     `  because: ${origin.reason}`,
@@ -100,7 +90,6 @@ export function renderOrigin(
       p.untested("nothing"),
     ),
     "",
-    p.quiet("Frozen when the sharpening was recorded, not recomputed now. Evidence that"),
-    p.quiet("arrived later is deliberately absent from this list."),
+    p.quiet("As it stood at the sharpening. Later evidence is not here."),
   ].join("\n");
 }

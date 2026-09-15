@@ -132,10 +132,7 @@ export class BlockedGroup extends SessionCore {
       { id: work },
     );
     const task = rows[0]?.t;
-    if (!task)
-      throw new Error(
-        `no planned work ${work}; work is planned before it can be read back, and 'search' finds its handle by the objective`,
-      );
+    if (!task) throw new Error(`${work} not found`);
 
     // No fallback, and that is checked rather than assumed: `planWork` writes
     // `mayRead: input.mayRead ?? []`, so the property is always present and an
@@ -286,10 +283,7 @@ export class BlockedGroup extends SessionCore {
       { id: gate },
     );
     const found = declared[0];
-    if (!found)
-      throw new Error(
-        `no gate ${gate}; a gate is declared over a criterion and the work it protects, and 'search' finds its handle by the consequence`,
-      );
+    if (!found) throw new Error(`${gate} not found`);
 
     // Every governing criterion with the evaluations that pertain to THIS gate. Two scopes are
     // deliberately kept apart:  gate-scoped  (here) -- has this condition been checked FOR this
