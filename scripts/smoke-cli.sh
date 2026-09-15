@@ -250,5 +250,22 @@ refute "an observed one is not marked, being the ordinary case" \
 # this names is the point of the assertion, so it is not a detail.
 expect "an act is findable by what it minted" "$(lab happened "$claim")" "conclude"
 
+# **Coloured, which is the only shape a person ever sees.** Every assertion
+# above reads piped output, where the palette is off. A value rewritten for
+# display and then computed on came back `NaN days ago` in a terminal and
+# correct through a pipe, so the suite and CI both passed it (#429, #431).
+for view in now known gates work claims conditions enquiries analyses "happened --limit 20"; do
+  # shellcheck disable=SC2086
+  painted=$(FORCE_COLOR=1 lab $view 2>&1)
+  for rubbish in NaN undefined "Invalid Date" "[object Object]" "\${"; do
+    if [[ "$painted" == *"$rubbish"* ]]; then
+      printf '\nFAILED: `%s` prints %s with colour on\n%s\n' "$view" "$rubbish" "$painted" >&2
+      exit 1
+    fi
+  done
+  step=$((step + 1))
+done
+printf '  ok  nine views render with colour on and print nothing broken\n'
+
 echo
 echo "OK: $step assertions over a real database, all passed."
