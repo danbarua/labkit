@@ -4,6 +4,7 @@
  */
 
 import pkg from "../../package.json" with { type: "json" };
+import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "../request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -34,6 +35,20 @@ export type WithSurfaces = <T>(
  * Registers every tool against a **scope** that yields both surfaces. Transport-free, so a test
  * can drive it over `InMemoryTransport` without a subprocess.
  */
+/**
+ * A tool's `outputSchema`, only when the caller asked for it.
+ *
+ * The schemas are 87KB of the 133KB an agent receives from `tools/list`, and
+ * no caller reads them as documentation. Set `LABKIT_MCP_OUTPUT_SCHEMA=1` to
+ * declare them, which a client validating structured results wants.
+ */
+function declaredOutput(schema: z.ZodType | undefined): { outputSchema?: z.ZodType } {
+  const wanted = process.env.LABKIT_MCP_OUTPUT_SCHEMA;
+  if (schema === undefined) return {};
+  if (wanted === undefined || wanted === "" || wanted === "0" || wanted === "false") return {};
+  return { outputSchema: schema };
+}
+
 export function buildServer(
   withSurfaces: WithSurfaces,
   session: SessionRegistry,
@@ -96,7 +111,7 @@ export function buildServer(
           title: definition.title,
           description: definition.description,
           inputSchema: definition.inputSchema,
-          outputSchema: definition.outputSchema,
+          ...declaredOutput(definition.outputSchema),
           // No `readOnlyHint`, matching the writes. It changes nothing in the
           // record and is not a read either; an absent hint is the honest thing
           // to say about a tool that is neither.
@@ -113,7 +128,7 @@ export function buildServer(
         title: definition.title,
         description: definition.description,
         inputSchema: definition.inputSchema,
-        outputSchema: definition.outputSchema,
+        ...declaredOutput(definition.outputSchema),
         // Only on the reads. An absent hint is not a claim either way, which is
         // the honest thing to say about a tool that changes the record.
         annotations: { readOnlyHint: true },
@@ -140,7 +155,7 @@ export function buildServer(
         title: definition.title,
         description: definition.description,
         inputSchema: definition.inputSchema,
-        outputSchema: definition.outputSchema,
+        ...declaredOutput(definition.outputSchema),
       },
       // A surface per call, so each write records the attribution and commit in force at the
       // moment it ran rather than at server start.
