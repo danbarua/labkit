@@ -13,6 +13,7 @@ import type { Clock } from "../domain";
 import { asJson, type Answer } from "./output";
 import { isColorSupported } from "picocolors";
 import { type Palette, palette } from "./palette";
+import { wrap } from "./views/format";
 
 /** The global options, after parsing. */
 export interface Globals {
@@ -85,7 +86,9 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
           events,
         }),
       });
-      write(opts.json ? asJson(answered.value) : answered.render(coloursFor(opts)));
+      // Wrapped here, not in each view: every report goes out through this
+      // line, and a view that forgot was a 1,300-column line in `now`.
+      write(opts.json ? asJson(answered.value) : wrap(answered.render(coloursFor(opts))));
     } finally {
       await connection.close();
     }

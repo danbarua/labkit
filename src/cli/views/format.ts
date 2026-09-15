@@ -22,3 +22,81 @@ export function partLine(a: IdentifiedArtefact, p: Palette): string {
   const flag = a.invalidated ? `  ${p.contested("invalidated")}` : "";
   return `${a.name}  ${p.handle(`(${a.part})`)}${flag}`;
 }
+
+/** Terminal width to lay a report out in, clamped so it stays readable. */
+export function width(): number {
+  const columns = process.stdout.columns ?? 0;
+  if (columns === 0) return 100;
+  return Math.max(60, Math.min(columns, 120));
+}
+
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
+/** Visible length, ignoring the colour a palette already applied. */
+const bare = (text: string): string => text.replace(ANSI, "");
+
+/**
+ * One long field, cut to its first sentence and a budget.
+ *
+ * A summary view names a record and says where it stands. A reason running to
+ * 1,300 characters buries every other line in the report; `why <handle>`
+ * carries the whole of it.
+ */
+export function gist(text: string, budget = 180): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= budget) return trimmed;
+  const stop = trimmed.slice(0, budget).search(/[.!?](\s|$)/);
+  if (stop > 40) return trimmed.slice(0, stop + 1);
+  // No sentence ends inside the budget, so cut at the last whole word.
+  const head = trimmed.slice(0, budget);
+  const space = head.lastIndexOf(" ");
+  return `${(space > 40 ? head.slice(0, space) : head).trimEnd()}...`;
+}
+
+/**
+ * Wraps to the terminal, keeping a wrapped line under its own first indent.
+ *
+ * Splits on the bare text so a colour escape is never counted as a column and
+ * never cut in half.
+ */
+export function wrap(text: string, columns = width()): string {
+  return text
+    .split("\n")
+    .flatMap((line) => {
+      if (bare(line).length <= columns) return [line];
+      // Broken at a space rather than rebuilt from words, so the runs of
+      // spaces the list views align their columns with survive. The remainder
+      // sits two inside the line's own indent, so a bullet's continuation
+      // cannot read as a sibling bullet.
+      const lead = line.match(/^\s*(?:- )?/)?.[0] ?? "";
+      const indent = " ".repeat(lead.length + 2);
+      const out: string[] = [];
+      let rest = line;
+      while (bare(rest).length > columns) {
+        const at = lastSpaceWithin(rest, columns);
+        if (at <= lead.length) break;
+        out.push(rest.slice(0, at));
+        rest = indent + rest.slice(at + 1).replace(/^ +/, "");
+      }
+      out.push(rest);
+      return out;
+    })
+    .join("\n");
+}
+
+/** Index of the last space inside the first `columns` VISIBLE characters. */
+function lastSpaceWithin(line: string, columns: number): number {
+  let visible = 0;
+  let space = -1;
+  for (let i = 0; i < line.length; i += 1) {
+    const skip = new RegExp(`^${String.fromCharCode(27)}\\[[0-9;]*m`).exec(line.slice(i));
+    if (skip) {
+      i += skip[0].length - 1;
+      continue;
+    }
+    if (visible >= columns) break;
+    if (line[i] === " ") space = i;
+    visible += 1;
+  }
+  return space;
+}

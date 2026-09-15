@@ -18,7 +18,7 @@ import type {
   Verdict,
 } from "../../domain";
 import type { Palette } from "../palette";
-import { bullets, questionLines } from "./format";
+import { bullets, gist, questionLines } from "./format";
 
 /**
  * `AcceptedQuestion`'s own line — `asks` and the handle, plus why it was
@@ -28,7 +28,7 @@ import { bullets, questionLines } from "./format";
 function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
   return qs.map(
     (q) =>
-      `${q.asks}  ${p.handle(`(${q.question})`)}  — accepted because: ${q.acceptedBecause}; reopens if: ${q.reopensIf}`,
+      `${q.asks}  ${p.handle(`(${q.question})`)}\n      accepted because: ${gist(q.acceptedBecause)}\n      reopens if: ${gist(q.reopensIf)}\n      ${p.quiet(`\`why ${q.question}\` has the whole of it`)}`,
   );
 }
 
@@ -47,37 +47,35 @@ function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
 }
 
 export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
-  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs, p), "nothing");
+  // Only the buckets holding something. Six headings over "nothing" is the
+  // shape that hid the one question that was not.
+  const section = (title: string, lines: string[]) =>
+    lines.length === 0 ? [] : [title, bullets(lines, "nothing"), ""];
   return [
-    // The five headings carry the distinction the buckets exist for, so they
-    // are coloured by what the bucket means rather than uniformly.
-    p.settled("Established"),
-    bullets(answeredLines(survey.established, p), "nothing"),
-    "",
-    p.provisional("Provisional (answered, but not something to build on yet)"),
-    bullets(answeredLines(survey.provisional, p), "nothing"),
-    "",
-    p.provisional("Accepted as unresolved"),
-    bullets(acceptedLines(survey.accepted, p), "nothing"),
-    "",
-    p.untested("Unresolved (active or closed without a complete answer)"),
-    list(survey.unresolved),
-    "",
-    p.untested("Untested (nothing has been run and no pursuit has closed)"),
-    list(survey.untested),
-    "",
-    p.heading("Closed pursuits"),
-    bullets(
+    ...section(p.settled("Established"), answeredLines(survey.established, p)),
+    ...section(
+      p.provisional("Provisional (answered, but not something to build on yet)"),
+      answeredLines(survey.provisional, p),
+    ),
+    ...section(p.provisional("Accepted as unresolved"), acceptedLines(survey.accepted, p)),
+    ...section(
+      p.untested("Unresolved (active or closed without a complete answer)"),
+      questionLines(survey.unresolved, p),
+    ),
+    ...section(
+      p.untested("Untested (nothing has been run and no pursuit has closed)"),
+      questionLines(survey.untested, p),
+    ),
+    ...section(
+      p.heading("Closed pursuits"),
       survey.closedPursuits.map(
         (pursuit) =>
           `${pursuit.closure}  ${p.handle(pursuit.enquiry)}  ${pursuit.pursuing}  ${p.handle(`(${pursuit.decision})`)}`,
       ),
-      "nothing",
     ),
-    "",
-    p.quiet("Evidence or an explicit pursuit closure moves a question from untested to"),
-    p.quiet("unresolved. An open sibling keeps the question unsettled until every pursuit closes."),
-  ].join("\n");
+  ]
+    .join("\n")
+    .replace(/\n+$/, "");
 }
 
 export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {

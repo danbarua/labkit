@@ -71,7 +71,7 @@ export class StoryGroup extends SessionCore {
     if (!loe)
       throw new DomainRefusal({
         kind: "not-found",
-        message: `no enquiry ${enquiry}; an enquiry is opened against a question, and 'search' finds its handle by the approach it was opened with`,
+        message: `no enquiry ${enquiry}. \`search\` finds it by the approach it was opened with.`,
         subject: enquiry,
       });
 
@@ -406,9 +406,7 @@ export class StoryGroup extends SessionCore {
     // by identity.
     const proposition = await this.assertedBy(claim);
     if (proposition === undefined)
-      throw new Error(
-        `no claim ${claim}; a claim exists once an analysis concludes it, and its handle comes back from that act or from looking up the exact proposition it asserts`,
-      );
+      throw new Error(`no claim ${claim}. \`search\` finds it by the proposition it asserts.`);
 
     // Depth from the claim asked about, so the deepest revisions are the
     // oldest. A claim reached by two paths of different lengths keeps the

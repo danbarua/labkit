@@ -497,7 +497,7 @@ test("two claims asserting one sentence are not rendered as a duplicate", () => 
  * who inferred the rule inferred the wrong one — "unresolved" sounds like a judgement about the
  * science and is a fact about whether anything addresses the enquiry.
  */
-test("`known` says what moves a question from untested to unresolved", () => {
+test("`known` prints the buckets holding something and nothing else", () => {
   const empty: KnowledgeSurvey = {
     established: [],
     provisional: [],
@@ -506,11 +506,22 @@ test("`known` says what moves a question from untested to unresolved", () => {
     untested: [],
     closedPursuits: [],
   };
-  const out = renderKnown(empty, PLAIN);
-  expect(out).toContain("moves a question from untested to");
-  expect(out).toContain("unresolved");
-  expect(out).toContain("explicit pursuit closure");
-  expect(out).toContain("open sibling");
+  expect(renderKnown(empty, PLAIN).trim()).toBe("");
+
+  const one = renderKnown(
+    { ...empty, untested: [{ question: ref("question", "Q_1"), asks: "does it hold?" }] },
+    PLAIN,
+  );
+  expect(one).toContain("does it hold?");
+  expect(one).toContain("Untested");
+  // The five buckets with nothing in them do not print, and neither does a
+  // standing explanation of what moves a question between them.
+  expect(one).not.toContain("Established");
+  expect(one).not.toContain("Closed pursuits");
+  // A bucket with no rows renders the word on a line of its own; the heading
+  // "Untested (nothing has been run ...)" legitimately contains it.
+  expect(one.split("\n").map((l) => l.trim())).not.toContain("nothing");
+  expect(one).not.toContain("moves a question");
 });
 
 test("an empty event log does not read as an empty record", () => {

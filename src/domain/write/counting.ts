@@ -329,9 +329,7 @@ export class Counting extends SessionCore {
       { criterion: criterion, gate: gate },
     );
     if (rows.length === 0) {
-      throw new Error(
-        `criterion ${criterion} does not govern gate ${gate}; it cannot be evaluated for it`,
-      );
+      throw new Error(`criterion ${criterion} does not govern gate ${gate}.`);
     }
   }
 }
