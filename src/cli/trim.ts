@@ -7,7 +7,8 @@
  * that reads the whole of it.
  */
 
-import { PROSE_FIELDS } from "../domain/reports";
+import { IDENTITY_FIELDS, PROSE_FIELDS, TIMESTAMP_FIELDS } from "../domain/reports";
+import type { Palette } from "./palette";
 
 /** How much prose a summary keeps before it starts costing the reader. */
 const BUDGET = 240;
@@ -38,16 +39,31 @@ function sentenceOrWord(text: string): string {
   return (space > 60 ? head.slice(0, space) : head).trimEnd();
 }
 
-/** A copy of `report` with every marked prose field cut to its first paragraph. */
-export function trimProse<T>(report: T): T {
-  if (Array.isArray(report)) return report.map((item) => trimProse(item)) as unknown as T;
+/**
+ * A copy of `report` ready for a person to read.
+ *
+ * Prose is cut to its first paragraph. An instant and an outside identity are
+ * both context rather than the finding, so they recede: the schemas say which
+ * fields are which, and no view has to know.
+ */
+export function forReading<T>(report: T, p: Palette): T {
+  if (Array.isArray(report)) return report.map((item) => forReading(item, p)) as unknown as T;
   if (report === null || typeof report !== "object") return report;
   const record = report as Record<string, unknown>;
   const handle = handleBeside(record);
   const out: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(record)) {
-    if (typeof value === "string" && PROSE_FIELDS.has(name)) out[name] = cut(value, handle);
-    else out[name] = trimProse(value);
+    if (typeof value !== "string") out[name] = forReading(value, p);
+    else if (PROSE_FIELDS.has(name)) out[name] = cut(value, handle);
+    else if (TIMESTAMP_FIELDS.has(name)) out[name] = p.quiet(shortInstant(value));
+    else if (IDENTITY_FIELDS.has(name)) out[name] = p.quiet(value);
+    else out[name] = value;
   }
   return out as T;
+}
+
+/** `2026-09-09T01:33:50.277Z` reads as `2026-09-09 01:33`. Seconds decide nothing. */
+function shortInstant(value: string): string {
+  const iso = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(value);
+  return iso ? `${iso[1]} ${iso[2]}` : value;
 }

@@ -27,6 +27,12 @@ const anyRef = () => z.string() as unknown as z.ZodType<AnyRef>;
  */
 const prose = () => z.string().meta({ prose: true });
 
+/** An instant. Context for a finding, not the finding. */
+const timestamp = () => z.string().meta({ timestamp: true });
+
+/** A digest, a URI, another system's id — matched on, never read. */
+const identity = () => z.string().meta({ identity: true });
+
 /** `{claim, asserts}` — the report convention's pair for a claim, in one place. */
 const concludedClaim = z.strictObject({
   claim: ref("claim"),
@@ -123,12 +129,12 @@ export const whatHappened = z.strictObject({
   events: z.array(
     z.strictObject({
       seq: z.number(),
-      at: z.string(),
+      at: timestamp(),
       operation: z.string(),
       subject: z.string(),
       created: z.array(z.string()),
       attribution_label: z.string(),
-      attribution_id: z.string(),
+      attribution_id: identity(),
       // A missing attribution grade is represented as null, not as an absent key.
       attribution_how: z.enum(["observed", "claimed", "unattributed"]).nullable(),
       git_hash: z.string().nullable(),
@@ -180,14 +186,14 @@ const command = z.record(z.string(), z.unknown()) as unknown as z.ZodType<Comman
 
 const recordedAttribution = z.strictObject({
   attribution_label: z.string(),
-  attribution_id: z.string(),
+  attribution_id: identity(),
   attribution_how: z.enum(["observed", "claimed", "unattributed"]).nullable(),
   git_hash: z.string().nullable(),
 });
 
 export const domainEvent = z.strictObject({
   seq: z.number().optional(),
-  at: z.string(),
+  at: timestamp(),
   attribution: recordedAttribution,
   operation,
   subject: z.string(),
@@ -268,7 +274,7 @@ const evaluationRecord = z.strictObject({
   criterion: ref("criterion"),
   value: prose(),
   outcome: z.enum(["pass", "fail"]),
-  at: z.string(),
+  at: timestamp(),
   withdrawn: z.literal(true).optional(),
   about: ref("claim").optional(),
   basis: z.array(citedFinding),
@@ -307,7 +313,7 @@ const condition = z.strictObject({
 const decidingEvaluation = z.strictObject({
   evaluation: ref("evaluation"),
   outcome: z.enum(["pass", "fail"]),
-  at: z.string(),
+  at: timestamp(),
   about: ref("claim").optional(),
 });
 
@@ -349,7 +355,7 @@ export const knowledgeSurvey = z.strictObject({
 });
 
 export const historicalSurvey = z.strictObject({
-  at: z.string(),
+  at: timestamp(),
   established: z.array(questionStanding),
   provisional: z.array(questionStanding),
   accepted: z.array(questionStanding),
@@ -549,7 +555,7 @@ export const gateStatus = z.strictObject({
 const explanationCause = z.strictObject({
   handle: z.string() as unknown as z.ZodType<Ref<Kind>>,
   wording: prose(),
-  when: z.string().optional(),
+  when: timestamp().optional(),
 });
 
 /** One superseded finding and the one standing in its place. */
@@ -827,7 +833,7 @@ export const evaluatedCriterion = z.strictObject({
   outcome: z.enum(["pass", "fail"]),
   value: prose(),
   gates: z.array(ref("gate")),
-  at: z.string(),
+  at: timestamp(),
   gate: ref("gate").optional(),
   about: ref("claim").optional(),
   citing: z.array(z.string()).optional(),
@@ -871,7 +877,7 @@ const unaffectedRecord = z.strictObject({
 });
 
 export const verificationReport = z.strictObject({
-  at: z.string(),
+  at: timestamp(),
   verification: analysisRef,
   of: analysisRef,
   claims: z.array(concludedClaim),
@@ -879,7 +885,7 @@ export const verificationReport = z.strictObject({
 });
 
 export const amendmentReport = z.strictObject({
-  at: z.string(),
+  at: timestamp(),
   amendment: ref("decision"),
   replaced: condition,
   nowRequires: condition,
@@ -890,7 +896,7 @@ export const amendmentReport = z.strictObject({
 });
 
 export const replacementReport = z.strictObject({
-  at: z.string(),
+  at: timestamp(),
   replacement: ref("analysis"),
   decision: ref("decision"),
   supersedes: ref("analysis"),
@@ -900,7 +906,7 @@ export const replacementReport = z.strictObject({
 });
 
 export const reinterpretationReport = z.strictObject({
-  at: z.string(),
+  at: timestamp(),
   previously: z.array(concludedClaim),
   nowClaims: concludedClaim,
   evidenceStanding: z.array(citedFinding),
@@ -1135,16 +1141,31 @@ const SCHEMAS = {
  * Collected once from the declarations rather than written out, so a field
  * added as `prose()` is trimmed by every view without anyone listing it.
  */
-export const PROSE_FIELDS: ReadonlySet<string> = (() => {
+export const PROSE_FIELDS: ReadonlySet<string> = marked("prose");
+
+/** Fields the schemas marked as an instant. See {@link PROSE_FIELDS}. */
+export const TIMESTAMP_FIELDS: ReadonlySet<string> = marked("timestamp");
+
+/** Fields the schemas marked as an outside identity. See {@link PROSE_FIELDS}. */
+export const IDENTITY_FIELDS: ReadonlySet<string> = marked("identity");
+
+/**
+ * Every value any schema's closed vocabulary can take.
+ *
+ * These are the strings the code branches on — `IndexedString` in
+ * `src/db/domain.ts`. Collected from the declarations, so a value added to an
+ * enum shows up here without anyone listing it, and the CLI's own test fails
+ * until it has been given a meaning to read by.
+ */
+export const VOCABULARY: ReadonlySet<string> = (() => {
   const found = new Set<string>();
   const seen = new Set<unknown>();
   const walk = (node: unknown): void => {
     if (node === null || typeof node !== "object" || seen.has(node)) return;
     seen.add(node);
     const record = node as Record<string, unknown>;
-    const properties = record.properties as Record<string, { prose?: boolean }> | undefined;
-    if (properties)
-      for (const [name, field] of Object.entries(properties)) if (field?.prose) found.add(name);
+    if (Array.isArray(record.enum))
+      for (const value of record.enum) if (typeof value === "string") found.add(value);
     for (const value of Object.values(record)) {
       if (Array.isArray(value)) for (const item of value) walk(item);
       else walk(value);
@@ -1154,8 +1175,35 @@ export const PROSE_FIELDS: ReadonlySet<string> = (() => {
     try {
       walk(z.toJSONSchema(schema, { io: "output" }));
     } catch {
-      // A schema JSON Schema cannot express is one with no prose to find.
+      // A schema JSON Schema cannot express has no vocabulary to find.
     }
   }
   return found;
 })();
+
+function marked(mark: "prose" | "timestamp" | "identity"): ReadonlySet<string> {
+  return (() => {
+    const found = new Set<string>();
+    const seen = new Set<unknown>();
+    const walk = (node: unknown): void => {
+      if (node === null || typeof node !== "object" || seen.has(node)) return;
+      seen.add(node);
+      const record = node as Record<string, unknown>;
+      const properties = record.properties as Record<string, Record<string, unknown>> | undefined;
+      if (properties)
+        for (const [name, field] of Object.entries(properties)) if (field?.[mark]) found.add(name);
+      for (const value of Object.values(record)) {
+        if (Array.isArray(value)) for (const item of value) walk(item);
+        else walk(value);
+      }
+    };
+    for (const schema of Object.values(SCHEMAS)) {
+      try {
+        walk(z.toJSONSchema(schema, { io: "output" }));
+      } catch {
+        // A schema JSON Schema cannot express is one with no prose to find.
+      }
+    }
+    return found;
+  })();
+}

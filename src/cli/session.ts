@@ -14,6 +14,7 @@ import { asJson, type Answer } from "./output";
 import { isColorSupported } from "picocolors";
 import { type Palette, palette } from "./palette";
 import { colourHandles, wrap } from "./views/format";
+import { colourVocabulary } from "./vocabulary";
 
 /** The global options, after parsing. */
 export interface Globals {
@@ -92,7 +93,9 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
       write(
         opts.json
           ? asJson(answered.value)
-          : wrap(colourHandles(answered.render(colours), colours.handle)),
+          : wrap(
+              colourVocabulary(colourHandles(answered.render(colours), colours.handle), colours),
+            ),
       );
     } finally {
       await connection.close();

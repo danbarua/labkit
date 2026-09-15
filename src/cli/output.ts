@@ -3,7 +3,7 @@
  */
 
 import type { Palette } from "./palette";
-import { trimProse } from "./trim";
+import { forReading } from "./trim";
 
 /**
  * How one report reads. Pure — it returns text and prints nothing.
@@ -25,7 +25,7 @@ export interface Answer<T = unknown> {
  * `--json` is unaffected.
  */
 export function answer<T>(value: T, view: View<T>): Answer<T> {
-  return { value, render: (palette) => view(trimProse(value), palette) };
+  return { value, render: (palette) => view(forReading(value, palette), palette) };
 }
 
 /**

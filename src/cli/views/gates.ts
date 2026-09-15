@@ -21,15 +21,8 @@ import { bullets } from "./format";
  * A gate, itemised per condition.
  */
 export function renderGate(status: GateStatus, p: Palette): string {
-  // A gate closure is neither a passed nor a failed check. Keep it visibly distinct from both.
-  const state = (key: string, text: string = key) =>
-    key === "passed" || key === "satisfied"
-      ? p.settled(text)
-      : key === "failed" || key === "blocked"
-        ? p.contested(text)
-        : key === "never-run" || key === "never-evaluated"
-          ? p.untested(text)
-          : p.provisional(text);
+  // Coloured centrally by `colourVocabulary`, so this only chooses the word.
+  const state = (key: string, text: string = key) => text;
   const check = (c: CheckStatus): string => {
     // The verdict's own sentence is not here -- see `DecidingEvaluation`. The handle is, so a
     // reader can reach it.
@@ -93,7 +86,7 @@ export function renderCriteria(criteria: CriterionRef[], gate: GateRef, p: Palet
 export function renderDesign(history: DesignHistory, p: Palette): string {
   const amendment = (a: AmendmentRecord): string =>
     [
-      `${a.nature === "scientific" ? p.contested(a.nature) : p.provisional(a.nature)}  ${`(${a.amendment})`}`,
+      `${a.nature}  ${`(${a.amendment})`}`,
       `  was: ${a.replaced.requires}`,
       `  now: ${a.nowRequires.requires}`,
       `  because: ${a.reason}`,
@@ -162,15 +155,8 @@ export function renderGateList(gates: ListedGate[], p: Palette, heading = false)
   const width = Math.max(...gates.map((g) => g.state.length));
   const rows = gates
     .map((g) => {
-      const padded = g.state.padEnd(width);
-      const state =
-        g.state === "satisfied"
-          ? p.settled(padded)
-          : g.state === "blocked"
-            ? p.contested(padded)
-            : g.state === "never-evaluated"
-              ? p.untested(padded)
-              : p.provisional(padded);
+      // Coloured centrally by `colourVocabulary`; padding is the alignment.
+      const state = g.state.padEnd(width);
       return `${state}  ${g.gate}  ${g.consequence}`;
     })
     .join("\n");
@@ -186,20 +172,8 @@ export function renderWorkList(work: ListedWork[], p: Palette, heading = false):
   const width = Math.max(...work.map((w) => w.state.length));
   const rows = work
     .map((w) => {
-      const padded = w.state.padEnd(width);
-      const state =
-        w.state === "carried-out"
-          ? p.settled(padded)
-          : w.state === "blocked"
-            ? p.contested(padded)
-            : w.state === "waiting"
-              ? p.provisional(padded)
-              : // Abandoned work is not waiting on anything, so it reads like the
-                // rest of the record's settled-and-set-aside states rather than
-                // like something a reader still has to act on.
-                w.state === "abandoned"
-                ? p.quiet(padded)
-                : p.untested(padded);
+      // Coloured centrally by `colourVocabulary`; padding is the alignment.
+      const state = w.state.padEnd(width);
       return `${state}  ${w.work}  ${w.objective}`;
     })
     .join("\n");
