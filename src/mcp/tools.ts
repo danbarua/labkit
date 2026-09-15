@@ -688,10 +688,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Ask a question",
     group: "Asking",
     description:
-      "Put a question on the record without starting work on it. It appears in `known` as " +
-      "untested — nothing has been run against it, which is not a failure and not an " +
-      "inconclusive result; pursuing it does not change that, recording work under it does. " +
-      "Use `open_enquiry` instead to ask and start in one act.",
+      "Put a question on the record without starting work on it. `open_enquiry` asks and " +
+      "starts in one act; `pursue` starts on a question already asked.",
     inputSchema: {
       question: z.string().describe("the question, as asked"),
       from: z
@@ -711,8 +709,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Ask a question and start on it",
     group: "Asking",
     description:
-      "Ask and pursue in one act — the usual way work begins. Records one event, not two: " +
-      "a researcher who opened an enquiry did one thing.",
+      "Ask a question and start on it, in one act. `pose` asks without starting; `pursue` " +
+      "starts on a question already asked.",
     inputSchema: {
       question: z.string().describe("the question, as asked"),
       from: z
@@ -737,8 +735,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Open a line of enquiry on an existing question",
     group: "Asking",
     description:
-      "Start work on a question already on the record, naming the approach. A question may " +
-      "be pursued more than once, by different approaches, and they stay distinct.",
+      "Start on a question already on the record, naming the approach. One question can be " +
+      "pursued several times, by different approaches, and they stay distinct.",
     inputSchema: {
       question: z.string().describe(`question id, e.g. ${QUESTION_PREFIX}12`),
       approach: z.string().describe("how this line of enquiry means to answer it"),
