@@ -5,7 +5,10 @@
 # identity may write a log line and nothing else. GITHUB_TOKEN already carries
 # repo write, so the correction costs no new permission.
 #
-# Pushes with GITHUB_TOKEN do not retrigger workflows, so this cannot loop.
+# The bot's own push cannot loop. It does raise a second `pull_request` run,
+# which GitHub blocks as `action_required` and never executes — measured on #427,
+# where the stamp rewrote 0.7.1 to 0.7.427 and the follow-on run sat pending.
+# That pending run is not a required check on main, so it blocks no merge.
 
 name: Version names its pull request
 
