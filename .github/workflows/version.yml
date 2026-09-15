@@ -1,0 +1,56 @@
+# The patch number is the pull request that ships it, written rather than asked for.
+#
+# `labkit --version` then names its own change: 0.7.426 is #426. Cloud Build
+# checks the same rule (`scripts/check-version.ts`) but cannot write it — its
+# identity may write a log line and nothing else. GITHUB_TOKEN already carries
+# repo write, so the correction costs no new permission.
+#
+# Pushes with GITHUB_TOKEN do not retrigger workflows, so this cannot loop.
+
+name: Version names its pull request
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  stamp:
+    # A fork's token is read-only, and this repository takes no fork pull
+    # requests. Skipping is honest: Cloud Build's check still fails such a PR.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          # The default token cannot push; persist it so the commit below can.
+          persist-credentials: true
+
+      - name: Set the patch number to this pull request
+        env:
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          current=$(node -p "require('./package.json').version")
+          wanted="$(echo "$current" | cut -d. -f1-2).$PR"
+          if [ "$current" = "$wanted" ]; then
+            echo "version is already $current"
+            exit 0
+          fi
+          node -e '
+            const fs = require("node:fs");
+            const file = "package.json";
+            const text = fs.readFileSync(file, "utf8");
+            const next = process.argv[1];
+            // Rewritten by hand rather than through JSON.stringify, which would
+            // reformat every other line and bury the one that changed.
+            fs.writeFileSync(file, text.replace(/("version":\s*")[^"]+(")/, `$1${next}$2`));
+          ' "$wanted"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "version-bump: v$wanted"
+          git push origin HEAD:"${{ github.head_ref }}"
+          echo "version $current -> $wanted"
