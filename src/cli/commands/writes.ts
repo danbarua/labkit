@@ -68,7 +68,10 @@ export function registerWrites(program: Command, run: Run): void {
     .command("pose")
     .helpGroup("Asking")
     .summary("put a question on the record")
-    .description("A question, without starting work on it. `open` does both at once.")
+    .description(
+      "Put a question on the record without starting work on it. `open` asks and starts in " +
+        "one act; `pursue` starts on a question already asked.",
+    )
     .argument("<question>", "the question, as worded")
     .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3")
     .action(async (question: string, opts: { from?: string }) => {
@@ -83,9 +86,8 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Asking")
     .summary("pose a question and pursue it, as one act")
     .description(
-      "The common opening move. It records **one** event, not a `pose` and a `pursue`: the " +
-        "event stream is a record of research actions, and a researcher who opened an enquiry " +
-        "did one thing.",
+      "Ask a question and start on it, in one act. `pose` asks without starting; `pursue` " +
+        "starts on a question already asked.",
     )
     .argument("<question>", "the question, as worded")
     .option("--from <note-id>", "the note this question came out of, e.g. NOTE_3")
@@ -102,6 +104,10 @@ export function registerWrites(program: Command, run: Run): void {
     .command("pursue")
     .helpGroup("Asking")
     .summary("open a line of enquiry against a question already on the record")
+    .description(
+      "Start on a question already on the record, naming the approach. One question can be " +
+        "pursued several times, by different approaches, and they stay distinct.",
+    )
     .argument("<question-id>", "e.g. Q_12")
     .requiredOption("--approach <text>", "how this line of enquiry will go about it")
     .action(async (question, { approach }: { approach: string }) =>
