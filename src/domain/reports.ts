@@ -18,10 +18,19 @@ const ref = <K extends string>(_kind: K) => z.string() as unknown as z.ZodType<R
 /** A handle of any kind — `why`'s subject, which is whatever the caller named. */
 const anyRef = () => z.string() as unknown as z.ZodType<AnyRef>;
 
+/**
+ * Free text somebody wrote, as opposed to a handle or a short label.
+ *
+ * Marked rather than merely typed: `Prose` is a string at runtime, so a view
+ * cannot tell a note's 2,000 words from a gate's state without this. Views
+ * trim what is marked and name the command that reads the whole.
+ */
+const prose = () => z.string().meta({ prose: true });
+
 /** `{claim, asserts}` — the report convention's pair for a claim, in one place. */
 const concludedClaim = z.strictObject({
   claim: ref("claim"),
-  asserts: z.string(),
+  asserts: prose(),
   // Populated by `recordAnalysis`/`reverify`/`replaceAnalysis`, absent for a
   // claim reached by wording (`claimsAsserting`) or one narrowing several
   // prior findings (`reinterpret`'s `nowClaims`) — see `ConcludedClaim.finding`.
@@ -52,7 +61,7 @@ type SearchHandle =
 
 const searchMatch = z.strictObject({
   handle: z.string() as unknown as z.ZodType<SearchHandle>,
-  wording: z.string(),
+  wording: prose(),
 });
 
 /** `search` — every match, grouped by label. */
@@ -68,7 +77,7 @@ export const search = z.strictObject({
 /** `notes` — every note on the record, newest first. */
 const listedNote = z.strictObject({
   note: ref("note"),
-  says: z.string(),
+  says: prose(),
   concerns: z.array(anyRef()),
   prompted: ref("question").optional(),
   supersedes: z.array(ref("note")),
@@ -86,11 +95,11 @@ export const notes = z.strictObject({
 export const howStep = z.strictObject({
   handle: z.string(),
   /** Kind label, or the record's own prose when it has any. */
-  what: z.string(),
+  what: prose(),
   superseded: z.boolean(),
   successor: z.string().optional(),
   /** Decision reason when the superseding act carried one. */
-  because: z.string().optional(),
+  because: prose().optional(),
   /** Minting event seq when the log joins; absent when it does not. */
   seq: z.number().optional(),
 });
@@ -189,13 +198,13 @@ export const domainEvent = z.strictObject({
 
 const questionStanding = z.strictObject({
   question: ref("question"),
-  asks: z.string(),
+  asks: prose(),
 });
 
 /** `KnowledgeSurvey.accepted` — `questionStanding` plus what would reopen it. */
 const acceptedQuestion = questionStanding.extend({
-  reopensIf: z.string(),
-  acceptedBecause: z.string(),
+  reopensIf: prose(),
+  acceptedBecause: prose(),
 });
 
 /** Every pursuit that supplied an answer remains visible. */
@@ -206,12 +215,12 @@ const pursuitAnswer = z.strictObject({
 });
 const answeredQuestion = questionStanding.extend({
   answers: z.array(pursuitAnswer),
-  reopensIf: z.string().optional(),
-  acceptedBecause: z.string().optional(),
+  reopensIf: prose().optional(),
+  acceptedBecause: prose().optional(),
 });
 const closedPursuit = z.strictObject({
   enquiry: ref("enquiry"),
-  pursuing: z.string(),
+  pursuing: prose(),
   question: ref("question"),
   decision: ref("decision"),
   closure: z.enum(["answered", "abandoned"]),
@@ -231,33 +240,33 @@ const citedFinding = z.strictObject({
 
 const affectedClaim = z.strictObject({
   claim: ref("claim"),
-  asserts: z.string(),
+  asserts: prose(),
 });
 const affectedEnquiry = z.strictObject({
   enquiry: ref("enquiry"),
-  pursuing: z.string(),
+  pursuing: prose(),
 });
 const confirmatoryResult = z.strictObject({
   claim: ref("claim"),
-  asserts: z.string(),
+  asserts: prose(),
 });
 const decidedQuestion = z.strictObject({
   question: ref("question"),
-  asks: z.string(),
+  asks: prose(),
 });
 const replacementClaim = z.strictObject({
   claim: ref("claim"),
-  asserts: z.string(),
+  asserts: prose(),
 });
 const reverification = z.strictObject({
   analysis: ref("analysis"),
-  method: z.string(),
+  method: prose(),
 });
 
 const evaluationRecord = z.strictObject({
   evaluation: ref("evaluation"),
   criterion: ref("criterion"),
-  value: z.string(),
+  value: prose(),
   outcome: z.enum(["pass", "fail"]),
   at: z.string(),
   withdrawn: z.literal(true).optional(),
@@ -266,22 +275,22 @@ const evaluationRecord = z.strictObject({
 });
 
 const bearingFinding = z.strictObject({
-  finding: z.string(),
+  finding: prose(),
   evidence: ref("evidence"),
-  method: z.string(),
+  method: prose(),
   analysis: ref("analysis"),
 });
 
 const gatedWork = z.strictObject({ work: ref("work"), objective: z.string() });
 const blockedWork = z.strictObject({
   gate: ref("gate"),
-  consequence: z.string(),
+  consequence: prose(),
   gating: z.array(gatedWork),
 });
 
 const unmetCheck = z.strictObject({
   criterion: ref("criterion"),
-  requires: z.string(),
+  requires: prose(),
   blocks: z.array(blockedWork),
 });
 
@@ -291,7 +300,7 @@ const unmetCheck = z.strictObject({
  */
 const condition = z.strictObject({
   criterion: ref("criterion"),
-  requires: z.string(),
+  requires: prose(),
 });
 
 /** No `value` — see `DecidingEvaluation`. */
@@ -305,7 +314,7 @@ const decidingEvaluation = z.strictObject({
 const checkStatus = z.strictObject({
   criterion: ref("criterion"),
   about: ref("claim").optional(),
-  proposition: z.string(),
+  proposition: prose(),
   state: z.enum(["passed", "failed", "never-run", "no-standing-verdict"]),
   decidedBy: decidingEvaluation.optional(),
 });
@@ -314,7 +323,7 @@ const amendmentRecord = z.strictObject({
   amendment: ref("decision"),
   replaced: condition,
   nowRequires: condition,
-  reason: z.string(),
+  reason: prose(),
   citing: z.array(citedFinding),
   rerun: z.array(gatedWork),
   nature: z.enum(["mechanical", "scientific", "prespecification"]),
@@ -324,7 +333,7 @@ const revision = z.strictObject({
   revision: ref("decision"),
   previously: z.array(concludedClaim),
   nowClaims: concludedClaim,
-  reason: z.string(),
+  reason: prose(),
   restingOnTheOldReading: z.array(decidedQuestion),
 });
 
@@ -349,7 +358,7 @@ export const historicalSurvey = z.strictObject({
 
 export const supportExplanation = z.strictObject({
   claim: ref("claim"),
-  proposition: z.string(),
+  proposition: prose(),
   verdict: z.enum([
     "supported",
     "undecided",
@@ -369,7 +378,7 @@ export const supportExplanation = z.strictObject({
   restingOn: z.array(identifiedArtefact),
   superseded: z.array(
     bearingFinding.extend({
-      reason: z.string(),
+      reason: prose(),
       bearing: z.enum(["supports", "challenges"]),
     }),
   ),
@@ -391,15 +400,15 @@ export const dependencyReport = z.strictObject({
 
 export const enquiryQuestion = z.strictObject({
   question: ref("question"),
-  asks: z.string(),
-  reopensIf: z.string().optional(),
-  acceptedBecause: z.string().optional(),
+  asks: prose(),
+  reopensIf: prose().optional(),
+  acceptedBecause: prose().optional(),
   acceptedInLightOf: z.array(citedFinding).optional(),
 });
 
 export const enquiryStatus = z.strictObject({
   enquiry: ref("enquiry"),
-  pursuing: z.string(),
+  pursuing: prose(),
   contributed: z.array(citedFinding),
   open: z.boolean(),
   closure: z.enum(["answered", "abandoned"]).nullable(),
@@ -486,15 +495,15 @@ export const originOf = z.strictObject({
  */
 const addressingSchema = z.strictObject({
   enquiry: ref("enquiry"),
-  pursuing: z.string(),
+  pursuing: prose(),
   question: ref("question"),
-  asks: z.string(),
+  asks: prose(),
 });
 
 export const taskContract = z.strictObject({
   work: ref("work"),
-  objective: z.string(),
-  acceptance: z.string(),
+  objective: prose(),
+  acceptance: prose(),
   mayRead: z.array(z.string()),
   // Literal `false`. The contract records what work may read; nothing stops a
   // computation reading elsewhere, and a caller must not be able to read
@@ -511,13 +520,13 @@ export const criteriaGoverning = z.strictObject({
 
 export const gateStatus = z.strictObject({
   gate: ref("gate"),
-  consequence: z.string(),
+  consequence: prose(),
   state: z.enum(GATE_STATES),
   closure: z
     .strictObject({
       decision: ref("decision"),
       kind: z.enum(["sidestepped", "retired"]),
-      because: z.string(),
+      because: prose(),
     })
     .optional(),
   checks: z.array(checkStatus),
@@ -539,13 +548,13 @@ export const gateStatus = z.strictObject({
  */
 const explanationCause = z.strictObject({
   handle: z.string() as unknown as z.ZodType<Ref<Kind>>,
-  wording: z.string(),
+  wording: prose(),
   when: z.string().optional(),
 });
 
 /** One superseded finding and the one standing in its place. */
 const revisedFinding = z.strictObject({
-  proposition: z.string(),
+  proposition: prose(),
   was: ref("claim"),
   before: z.string(),
   claim: ref("claim"),
@@ -569,14 +578,14 @@ const analysisRevisionSchema = z.strictObject({
  */
 const gateGoverned = z.strictObject({
   gate: ref("gate"),
-  consequence: z.string(),
+  consequence: prose(),
   protecting: z.array(gatedWork),
 });
 
 /** What `why <criterion>` answers — the detail a gate's page no longer carries. */
 export const criterionStanding = z.strictObject({
   criterion: ref("criterion"),
-  requires: z.string(),
+  requires: prose(),
   state: z.enum(["passed", "failed", "never-run", "no-standing-verdict"]),
   evaluations: z.array(evaluationRecord),
   governs: z.array(gateGoverned),
@@ -682,8 +691,8 @@ export const explanation = z.discriminatedUnion("kind", [
 const conflictSide = z.strictObject({
   claim: ref("claim"),
   question: ref("question"),
-  proposition: z.string(),
-  asks: z.string(),
+  proposition: prose(),
+  asks: prose(),
   supportedBy: z.array(citedFinding),
   challengedBy: z.array(citedFinding),
 });
@@ -816,7 +825,7 @@ export const evaluatedCriterion = z.strictObject({
   evaluation: ref("evaluation"),
   criterion: ref("criterion"),
   outcome: z.enum(["pass", "fail"]),
-  value: z.string(),
+  value: prose(),
   gates: z.array(ref("gate")),
   at: z.string(),
   gate: ref("gate").optional(),
@@ -842,7 +851,7 @@ export const undone = z.strictObject({
 });
 
 const changedConclusion = z.strictObject({
-  proposition: z.string(),
+  proposition: prose(),
   was: ref("claim"),
   before: z.string(),
   claim: ref("claim"),
@@ -925,7 +934,7 @@ export const registeredSession = z.strictObject({
 /** One gate in a list of them. */
 const listedGate = z.strictObject({
   gate: ref("gate"),
-  consequence: z.string(),
+  consequence: prose(),
   state: z.enum(GATE_STATES),
 });
 
@@ -937,7 +946,7 @@ export const gateList = z.strictObject({
 /** One task in a list of them. */
 const listedWork = z.strictObject({
   work: ref("work"),
-  objective: z.string(),
+  objective: prose(),
   state: z.enum(WORK_STATES),
   gates: z.array(ref("gate")),
 });
@@ -1060,3 +1069,93 @@ export type Pursuits = z.infer<typeof pursuits>;
 export type RegisteredSession = z.infer<typeof registeredSession>;
 export type GateList = z.infer<typeof gateList>;
 export type WorkList = z.infer<typeof workList>;
+
+/** Every exported schema in this module, so PROSE_FIELDS can walk them all. */
+const SCHEMAS = {
+  claimsAsserting,
+  search,
+  notes,
+  howStep,
+  how,
+  whatHappened,
+  domainEvent,
+  knowledgeSurvey,
+  historicalSurvey,
+  supportExplanation,
+  dependencyReport,
+  enquiryQuestion,
+  enquiryStatus,
+  enquiryInContext,
+  designHistory,
+  interpretationHistory,
+  reproductionReport,
+  questionOrigin,
+  originOf,
+  taskContract,
+  criteriaGoverning,
+  gateStatus,
+  criterionStanding,
+  explanation,
+  conflictVerdict,
+  reproducibilityReport,
+  recordedAnalysis,
+  posed,
+  noted,
+  pursued,
+  openedEnquiry,
+  recordedObservations,
+  sharpenedQuestion,
+  synthesised,
+  recordedReview,
+  closedEnquiry,
+  stoppedWork,
+  closedGate,
+  plannedWork,
+  statedCriterion,
+  declaredGate,
+  evaluatedCriterion,
+  acceptedAsUnresolved,
+  restated,
+  undone,
+  verificationReport,
+  amendmentReport,
+  replacementReport,
+  reinterpretationReport,
+  pursuits,
+  registeredSession,
+  gateList,
+  workList,
+  transcription,
+  standing,
+};
+
+/**
+ * Every field name the schemas above marked as prose.
+ *
+ * Collected once from the declarations rather than written out, so a field
+ * added as `prose()` is trimmed by every view without anyone listing it.
+ */
+export const PROSE_FIELDS: ReadonlySet<string> = (() => {
+  const found = new Set<string>();
+  const seen = new Set<unknown>();
+  const walk = (node: unknown): void => {
+    if (node === null || typeof node !== "object" || seen.has(node)) return;
+    seen.add(node);
+    const record = node as Record<string, unknown>;
+    const properties = record.properties as Record<string, { prose?: boolean }> | undefined;
+    if (properties)
+      for (const [name, field] of Object.entries(properties)) if (field?.prose) found.add(name);
+    for (const value of Object.values(record)) {
+      if (Array.isArray(value)) for (const item of value) walk(item);
+      else walk(value);
+    }
+  };
+  for (const schema of Object.values(SCHEMAS)) {
+    try {
+      walk(z.toJSONSchema(schema, { io: "output" }));
+    } catch {
+      // A schema JSON Schema cannot express is one with no prose to find.
+    }
+  }
+  return found;
+})();

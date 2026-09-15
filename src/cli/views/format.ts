@@ -68,8 +68,8 @@ export function wrap(text: string, columns = width()): string {
       // spaces the list views align their columns with survive. The remainder
       // sits two inside the line's own indent, so a bullet's continuation
       // cannot read as a sibling bullet.
-      const lead = line.match(/^\s*(?:- )?/)?.[0] ?? "";
-      const indent = " ".repeat(lead.length + 2);
+      const lead = bare(line).match(/^\s*(?:- )?/)?.[0] ?? "";
+      const indent = " ".repeat(hangAt(bare(line), lead));
       const out: string[] = [];
       let rest = line;
       while (bare(rest).length > columns) {
@@ -82,6 +82,24 @@ export function wrap(text: string, columns = width()): string {
       return out;
     })
     .join("\n");
+}
+
+/**
+ * The column a wrapped remainder starts at, so it reads as the same row.
+ *
+ * Under the text of a list row (`blocked  GATE_2  the prose`), under the value
+ * of a labelled line (`accepted because: the reason`), and otherwise under the
+ * line's own first character.
+ */
+function hangAt(line: string, lead: string): number {
+  const columns = line.match(/^\s*(?:- )?(?:\S+ {2,})+/)?.[0];
+  if (columns) return columns.length;
+  // A short leading label only. Prose that happens to contain a colon is not
+  // a label, and hanging the remainder under it reads as a column that is not
+  // there.
+  const label = line.match(/^\s*(?:- )?[A-Za-z][A-Za-z ]{0,22}: /)?.[0];
+  if (label) return label.length;
+  return lead.length;
 }
 
 /** Index of the last space inside the first `columns` VISIBLE characters. */

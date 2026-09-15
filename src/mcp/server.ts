@@ -32,10 +32,6 @@ export type WithSurfaces = <T>(
 ) => Promise<T>;
 
 /**
- * Registers every tool against a **scope** that yields both surfaces. Transport-free, so a test
- * can drive it over `InMemoryTransport` without a subprocess.
- */
-/**
  * A tool's `outputSchema`, only when the caller asked for it.
  *
  * The schemas are 87KB of the 133KB an agent receives from `tools/list`, and
@@ -49,6 +45,10 @@ function declaredOutput(schema: z.ZodType | undefined): { outputSchema?: z.ZodTy
   return { outputSchema: schema };
 }
 
+/**
+ * Registers every tool against a **scope** that yields both surfaces. Transport-free, so a test
+ * can drive it over `InMemoryTransport` without a subprocess.
+ */
 export function buildServer(
   withSurfaces: WithSurfaces,
   session: SessionRegistry,
