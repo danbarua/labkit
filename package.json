@@ -20,6 +20,7 @@
 		"typecheck": "bunx --bun tsc --noEmit",
 		"check": "bun scripts/check-all.ts",
 		"check:all-checks": "bun scripts/check-all-checks.ts",
+		"check:version": "bun scripts/check-version.ts",
 		"check:format": "biome format .",
 		"check:lint": "biome lint .",
 		"format": "biome format --write .",
