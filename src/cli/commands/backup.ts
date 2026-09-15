@@ -2,10 +2,10 @@
  * `labkit backup` — the whole record, in one file, before something changes it.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import type { Command } from "commander";
-import { connectDb } from "../../db/connect";
+import { connectDb, dataDirFor } from "../../db/connect";
 import type { Globals } from "../session";
 
 /** What a dump of a PGlite data directory is, so a name cannot claim otherwise. */
@@ -16,13 +16,7 @@ export function registerBackup(program: Command): void {
     .command("backup")
     .helpGroup("Operating LabKit")
     .summary("copy the whole record to one file, before something changes it")
-    .description(
-      "Writes the record's data directory as a gzip tarball — every tenant, the event log " +
-        "included. Restore by unpacking it over an empty `.labkit/pglite`. It is not a " +
-        "`pg_dump`: PGlite has no such thing, and a `.sql` path is refused rather than " +
-        "answered with a file that is not SQL. Refuses to overwrite, because a backup names " +
-        "the moment it was taken.",
-    )
+    .description("Writes the record's data directory as a gzip tarball. `restore` reads it back.")
     .requiredOption("--path <file>", `where to write it (must end ${EXTENSION})`)
     .action(async (opts: { path: string }) => {
       const globals = program.opts<Globals>();
@@ -62,5 +56,39 @@ export function registerBackup(program: Command): void {
       } finally {
         await connection.close();
       }
+    });
+}
+
+export function registerRestore(program: Command): void {
+  program
+    .command("restore")
+    .helpGroup("Operating LabKit")
+    .summary("read a backup back into a record")
+    .description(
+      "Unpacks a `backup` tarball into a record directory, which must not already hold one.",
+    )
+    .requiredOption("--path <file>", `the backup to read (${EXTENSION})`)
+    .option("--into <dir>", "where to put it (default: where --db points, else this project)")
+    .action(async (opts: { path: string; into?: string }) => {
+      const globals = program.opts<Globals>();
+      const source = resolve(opts.path);
+      if (!existsSync(source)) throw new Error(`no backup at ${source}`);
+
+      const dataDir = dataDirFor(opts.into ?? globals.db);
+      if (existsSync(dataDir) && readdirSync(dataDir).length > 0)
+        throw new Error(
+          `${dataDir} already holds a record — restore into an empty directory, ` +
+            `or move that one aside first`,
+        );
+      mkdirSync(dataDir, { recursive: true });
+
+      const tar = Bun.spawnSync(["tar", "xzf", source, "-C", dataDir]);
+      if (tar.exitCode !== 0)
+        throw new Error(`could not unpack ${source}: ${new TextDecoder().decode(tar.stderr)}`);
+      if (!existsSync(join(dataDir, "PG_VERSION")))
+        throw new Error(`${source} unpacked, but ${dataDir} is not a database directory`);
+
+      process.stderr.write(`labkit: restored ${source} to ${dataDir}\n`);
+      process.stderr.write(`labkit: read it with \`labkit --db ${dataDir}\`\n`);
     });
 }
