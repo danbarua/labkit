@@ -44,6 +44,10 @@ steps:
     # substitution is empty on a merge build, where the check passes and says so.
     env:
       - _PR_NUMBER=$_PR_NUMBER
+      # `check:version` refuses to pass without a pull request number when this
+      # is set, so a step that quietly stops passing one fails here rather than
+      # reporting success over nothing.
+      - CI=true
     args:
       - -c
       - |

@@ -6,9 +6,10 @@
  * the bump is a step somebody remembers, and the last one was written to a file
  * called `package.jsony` and went unnoticed for two days.
  *
- * Runs only where the pull request number is known — `_PR_NUMBER` on Cloud
- * Build, `GITHUB_REF` elsewhere. On a machine with neither, it says so and
- * passes, because a local `bun run check` has no pull request to compare to.
+ * Needs the pull request number — `_PR_NUMBER` on Cloud Build, `GITHUB_REF`
+ * elsewhere. A local `bun run check` has no pull request, so it says so and
+ * passes; under `CI` the number's absence is itself the failure, because a
+ * check that quietly stops being given its input prints success forever.
  *
  * retire-when: the version is written by the merge rather than by hand.
  */
@@ -23,7 +24,15 @@ const pr =
 const { version } = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
 
 if (!pr) {
-  console.log(`OK: version ${version}; no pull request number here to hold it to.`);
+  if (process.env.CI) {
+    console.error(
+      `FAILED: no pull request number, and this is CI.\n` +
+        `  This check compares the patch number to the pull request, so without one it\n` +
+        `  verifies nothing. Pass \`_PR_NUMBER\` to the step (cloudbuild.test.yaml).`,
+    );
+    process.exit(1);
+  }
+  console.log(`version ${version}; no pull request here to hold it to.`);
   process.exit(0);
 }
 
