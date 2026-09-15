@@ -28,24 +28,14 @@ export function registerBackup(program: Command): void {
       // prints its message and exits 0, which is a command reporting success
       // for work it declined to do. Found on this command's own first run.
       if (!target.endsWith(EXTENSION))
-        throw new Error(
-          `a backup is a gzip tarball of the data directory, not SQL — ` +
-            `name it something ending ${EXTENSION}`,
-        );
-      if (existsSync(target))
-        throw new Error(
-          `${target} already exists — a backup names the moment it was taken, so this ` +
-            `will not overwrite one. Choose another name.`,
-        );
+        throw new Error(`a backup is a gzip tarball. Name it something ending ${EXTENSION}.`);
+      if (existsSync(target)) throw new Error(`${target} already exists`);
       mkdirSync(dirname(target), { recursive: true });
 
       const connection = await connectDb(globals.db);
       try {
         if (!connection.pglite)
-          throw new Error(
-            `this record is on a real Postgres (LABKIT_DB_URL), which has no dumpDataDir — ` +
-              `use pg_dump against that server instead`,
-          );
+          throw new Error(`this record is on a real Postgres (LABKIT_DB_URL). Use pg_dump.`);
         const blob = await connection.pglite.dumpDataDir("gzip");
         await Bun.write(target, blob);
         // stderr, not stdout: a write command's stdout is what the next command
@@ -76,10 +66,7 @@ export function registerRestore(program: Command): void {
 
       const dataDir = dataDirFor(opts.into ?? globals.db);
       if (existsSync(dataDir) && readdirSync(dataDir).length > 0)
-        throw new Error(
-          `${dataDir} already holds a record — restore into an empty directory, ` +
-            `or move that one aside first`,
-        );
+        throw new Error(`${dataDir} already holds a record`);
       mkdirSync(dataDir, { recursive: true });
 
       const tar = Bun.spawnSync(["tar", "xzf", source, "-C", dataDir]);

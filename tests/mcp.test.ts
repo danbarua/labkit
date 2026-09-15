@@ -511,10 +511,10 @@ describe("an agent can track work through the tools alone", () => {
       const sentence = (again.content as Array<{ type: string; text?: string }>)
         .map((block) => block.text ?? "")
         .join("");
-      expect(sentence).toContain(`enquiry ${id(enquiry)} is already closed by decision`);
-      expect(sentence).toContain(
-        "closing it again would leave two decisions resolving one enquiry",
-      );
+      // The decision that closed it, named. The clause explaining that a second
+      // close would leave two decisions on one enquiry is gone: the caller is
+      // not choosing whether to have that rule.
+      expect(sentence).toContain(`${id(enquiry)} is already closed by DEC_`);
       await c.close();
     } finally {
       await scenario.end();

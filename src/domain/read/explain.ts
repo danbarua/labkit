@@ -2,7 +2,7 @@ import { optional, scalar, vertexProps } from "../../db/cypher";
 import type { EdgeLabel, Prose } from "../../db/domain";
 import { SEARCHABLE_TEXT, labelForNaturalId } from "../../db/domain";
 import { SessionCore } from "../core";
-import { kindOf, ref } from "../report";
+import { byHandle, kindOf, ref } from "../report";
 import type {
   AnalysisExplanation,
   AnalysisRef,
@@ -243,7 +243,7 @@ export class ExplainGroup extends SessionCore {
         });
     }
 
-    const byClaim = (a: { claim: string }, b: { claim: string }) => a.claim.localeCompare(b.claim);
+    const byClaim = (a: { claim: string }, b: { claim: string }) => byHandle(a.claim, b.claim);
     return {
       analysis,
       supersedes: ref("analysis", revises.old.natural_id),

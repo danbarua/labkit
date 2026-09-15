@@ -13,14 +13,14 @@ export function bullets(items: string[], empty: string): string {
  * Questions, each with its handle.
  */
 export function questionLines(questions: QuestionStanding[]): string[] {
-  return questions.map((q) => `${q.asks}  ${`(${q.question})`}`);
+  return questions.map((q) => `${`(${q.question})`}  ${q.asks}`);
 }
 
 export function partLine(a: IdentifiedArtefact, p: Palette): string {
   // `invalidated` is contested rather than quiet: the record has actively
   // withdrawn this part, which is a finding and not an absence.
   const flag = a.invalidated ? `  ${p.contested("invalidated")}` : "";
-  return `${a.name}  ${`(${a.part})`}${flag}`;
+  return `${`(${a.part})`}  ${a.name}${flag}`;
 }
 
 /** Terminal width to lay a report out in, clamped so it stays readable. */

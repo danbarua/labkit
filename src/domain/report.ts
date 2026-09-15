@@ -21,6 +21,15 @@ export {
   type AnyRef,
 } from "./ref";
 
+/**
+ * Handles in the order a person reads them: TASK_1, TASK_2, TASK_11.
+ *
+ * Plain `localeCompare` sorts the digits as text, which puts TASK_11 directly
+ * after TASK_1 and TASK_2 four rows below it.
+ */
+export const byHandle = (a: string, b: string): number =>
+  a.localeCompare(b, undefined, { numeric: true });
+
 export type ObservationsRef = Ref<"observations">;
 export type QuestionRef = Ref<"question">;
 export type CriterionRef = Ref<"criterion">;

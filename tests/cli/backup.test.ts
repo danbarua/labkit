@@ -68,7 +68,7 @@ test("a .sql path is refused, non-zero, rather than answered with something that
 
   expect(code).toBe(1);
   expect(existsSync(target)).toBe(false);
-  expect(stderr).toContain("not SQL");
+  expect(stderr).toContain("gzip tarball");
 });
 
 test("an existing file is refused, non-zero — a backup names the moment it was taken", () => {

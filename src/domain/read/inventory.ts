@@ -8,7 +8,7 @@
 
 import { optional, vertexProps } from "../../db/cypher";
 import { SessionCore } from "../core";
-import { ref } from "../report";
+import { byHandle, ref } from "../report";
 import type { ListedAnalysis, ListedClaim, ListedCriterion, ListedEnquiry } from "../report";
 
 export class InventoryGroup extends SessionCore {
@@ -55,7 +55,7 @@ export class InventoryGroup extends SessionCore {
         supports: supporting.size,
         challenges: against.size,
       }))
-      .sort((a, b) => a.claim.localeCompare(b.claim));
+      .sort((a, b) => byHandle(a.claim, b.claim));
   }
 
   /** Every line of enquiry, with the question it pursues. */
@@ -91,7 +91,7 @@ export class InventoryGroup extends SessionCore {
     }
     return [...found.values()]
       .map(({ units, ...enquiry }) => ({ ...enquiry, runs: units.size }))
-      .sort((a, b) => a.enquiry.localeCompare(b.enquiry));
+      .sort((a, b) => byHandle(a.enquiry, b.enquiry));
   }
 
   /** Every analysis, with what it was run for. */
@@ -123,7 +123,7 @@ export class InventoryGroup extends SessionCore {
     }
     return [...found.values()]
       .map(({ produced, ...analysis }) => ({ ...analysis, findings: produced.size }))
-      .sort((a, b) => a.analysis.localeCompare(b.analysis));
+      .sort((a, b) => byHandle(a.analysis, b.analysis));
   }
 
   /** Every condition, with what it governs. */
@@ -174,6 +174,6 @@ export class InventoryGroup extends SessionCore {
               ? ("failed" as const)
               : ("passed" as const),
       }))
-      .sort((a, b) => a.criterion.localeCompare(b.criterion));
+      .sort((a, b) => byHandle(a.criterion, b.criterion));
   }
 }

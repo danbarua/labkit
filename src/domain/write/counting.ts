@@ -176,16 +176,14 @@ export class Counting extends SessionCore {
       const everEvaluated = (await this.stateOfCriterion(input.criterion)) !== "never-run";
       if (input.citing === undefined && everEvaluated)
         throw new Error(
-          `condition ${input.criterion} has been evaluated; an amendment after a result names the finding that prompted it — pass --citing`,
+          `${input.criterion} has been evaluated. An amendment after a result needs --citing.`,
         );
 
       const diagnosis = input.citing === undefined ? [] : await this.evidenceFor(input.citing);
 
       const gates = await this.gatesGovernedBy(input.criterion);
       if (gates.length === 0) {
-        throw new Error(
-          `condition ${input.criterion} governs nothing; there is no locked design to amend`,
-        );
+        throw new Error(`${input.criterion} governs nothing. There is no design to amend.`);
       }
 
       // A condition that has already been amended is not the one in force, and
@@ -198,9 +196,7 @@ export class Counting extends SessionCore {
         { id: input.criterion },
       );
       if (alreadyAmended.length > 0) {
-        throw new Error(
-          `condition ${input.criterion} has already been amended; amend the one now in force`,
-        );
+        throw new Error(`${input.criterion} has already been amended. Amend the one now in force.`);
       }
 
       const prior = await this.amendmentThatIntroduced(input.criterion);
@@ -311,11 +307,7 @@ export class Counting extends SessionCore {
       { id: cited },
     );
     const found = rows[0];
-    if (!found)
-      throw new Error(
-        `no finding is recorded in ${cited}; a verdict rests on evidence, and observations ` +
-          `produce it when they are recorded — cite the observations a check actually read`,
-      );
+    if (!found) throw new Error(`no finding is recorded in ${cited}`);
     return [ref("evidence", found.e.natural_id)];
   }
 

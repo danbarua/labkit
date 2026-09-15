@@ -11,7 +11,7 @@ import type {
 import { SEARCHABLE_TEXT, labelForNaturalId } from "../../db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
-import { ref, isRefOfKind, verdictOf, kindOf } from "../report";
+import { byHandle, isRefOfKind, kindOf, ref, verdictOf } from "../report";
 import type {
   AffectedClaim,
   AffectedEnquiry,
@@ -274,10 +274,7 @@ export class StoryGroup extends SessionCore {
       { id: verification },
     );
     const found = link[0];
-    if (!found)
-      throw new Error(
-        `analysis ${verification} re-verifies nothing; a reproduction report is about a re-verification, so name one recorded by 'reverify'`,
-      );
+    if (!found) throw new Error(`${verification} re-verifies nothing`);
 
     const method = await this.graph.query(
       `MATCH (c:Computation {natural_id: $id}) RETURN c`,
@@ -555,7 +552,7 @@ export class StoryGroup extends SessionCore {
           states: r.e.statement,
         })),
         (f) => f.evidence,
-      ).sort((a, b) => a.evidence.localeCompare(b.evidence));
+      ).sort((a, b) => byHandle(a.evidence, b.evidence));
 
     const claim = conclusion;
 
@@ -1083,13 +1080,10 @@ export class StoryGroup extends SessionCore {
       { a: vertexProps<{ natural_id: string }>() },
       { name },
     );
-    if (rows.length === 0)
-      throw new Error(
-        `no artefact named "${name}"; observations are named when they are recorded, and the handle comes back from that act`,
-      );
+    if (rows.length === 0) throw new Error(`no artefact named "${name}"`);
     if (rows.length > 1) {
       throw new Error(
-        `${rows.length} artefacts are named "${name}"; name which, by the record that produced it`,
+        `${rows.length} artefacts are named "${name}". Name which, by the record that produced it.`,
       );
     }
     return ref("observations", rows[0]!.a.natural_id);

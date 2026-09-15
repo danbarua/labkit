@@ -21,7 +21,7 @@ import type {
   Undone,
   VerificationReport,
 } from "../report";
-import { kindOf, ref } from "../report";
+import { byHandle, kindOf, ref } from "../report";
 import type {
   ClaimIsConfirmedCommand,
   ClaimIsUndecidedCommand,
@@ -76,14 +76,13 @@ export class Revising extends Shared {
       const enquiry = input.enquiry ?? (await this.enquiryOf(input.historical));
       if (!enquiry)
         throw new Error(
-          `analysis ${input.historical} is under no line of enquiry, so there is none to ` +
-            `infer; name one with the enquiry this re-check belongs to`,
+          `${input.historical} is under no line of enquiry. Name one with --enquiry.`,
         );
 
       const original = await this.findingFor(input.historical, input.concludes.proposition);
       if (!original) {
         throw new Error(
-          `analysis ${input.historical} concluded nothing about "${input.concludes.proposition}"; there is nothing to re-verify`,
+          `${input.historical} concluded nothing about "${input.concludes.proposition}"`,
         );
       }
 
@@ -202,17 +201,12 @@ export class Revising extends Shared {
 
       const retracting = createdIn(found);
       if (retracting.length === 0)
-        throw new Error(
-          `event ${input.event} (${found.operation}) minted nothing to retract; there is no ` +
-            `node this verb can hide, and an edge alone has no natural id of its own to mark`,
-        );
+        throw new Error(`${input.event} (${found.operation}) minted nothing to retract`);
 
       const propsSet = found.changes.some((c) => c.change === "PropsChanged");
       if (propsSet)
         throw new Error(
-          `event ${input.event} (${found.operation}) set a property in place and has nothing ` +
-            `recorded to set it back to; this verb can retract what an act created, not undo ` +
-            `a value it overwrote`,
+          `${input.event} (${found.operation}) overwrote a value. undo retracts what an act created.`,
         );
 
       // What rests on any of this, from outside the act itself -- an edge between two things
@@ -259,8 +253,7 @@ export class Revising extends Shared {
           )
           .join(", ");
         throw new Error(
-          `event ${input.event} (${found.operation}) cannot be undone: ${named} rests on what ` +
-            `it created; retracting it would silently change what that depends on`,
+          `${input.event} (${found.operation}) cannot be undone: ${named} rests on what it created.`,
         );
       }
 
@@ -287,10 +280,7 @@ export class Revising extends Shared {
    */
   async keep(input: KeepCommand): Promise<ReplacementReport> {
     if (input.keeping.length === 0)
-      throw new Error(
-        `keep needs at least one conclusion to carry forward and was given none; ` +
-          `name the claims that survive, or use 'replace' to supersede an analysis whole`,
-      );
+      throw new Error(`keep needs at least one claim. \`replace\` supersedes an analysis whole.`);
     const spans = await this.analysesConcluding(input.keeping);
     if (spans.length !== 1)
       throw new Error(
@@ -361,11 +351,7 @@ export class Revising extends Shared {
         if (kept.has(c.claim)) continue;
         const gone = await this.supersessionOf(c.claim);
         if (gone !== undefined)
-          throw new Error(
-            `${c.claim} "${c.proposition}" has already been withdrawn by ${gone}, so this ` +
-              `revision cannot supersede it as well and a finding falls once; keep it, ` +
-              `since it no longer stands on its own account`,
-          );
+          throw new Error(`${c.claim} has already been withdrawn by ${gone}. Keep it instead.`);
       }
 
       // An edge to the review that found it wanting, not a flag on the
@@ -569,9 +555,7 @@ export class Revising extends Shared {
           // The act records what it produced: without this a caller has to go
           // back through `claimsAsserting` to name what this very call created.
           nowClaims: { claim: narrower, asserts: input.as },
-          evidenceStanding: [...carried.values()].sort((a, b) =>
-            a.evidence.localeCompare(b.evidence),
-          ),
+          evidenceStanding: [...carried.values()].sort((a, b) => byHandle(a.evidence, b.evidence)),
           restingOnTheOldReading,
           requiresRecomputation: false,
         },
@@ -592,9 +576,7 @@ export class Revising extends Shared {
       { review: review, analysis: analysis },
     );
     if (rows.length === 0) {
-      throw new Error(
-        `review ${review} does not review analysis ${analysis}; it cannot justify replacing it`,
-      );
+      throw new Error(`${review} does not review ${analysis}`);
     }
   }
 }

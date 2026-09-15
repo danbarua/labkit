@@ -15,11 +15,7 @@ export function resolveProjectRoot(
 ): string {
   if (named !== undefined) {
     if (!existsSync(named)) {
-      throw new Error(
-        `LABKIT_HOME names a directory that does not exist: ${named}\n` +
-          `  It must be the project root — the directory that holds .labkit/ — and it is ` +
-          `not created for you, because a typo would look exactly like a new project.`,
-      );
+      throw new Error(`LABKIT_HOME names a directory that does not exist: ${named}`);
     }
     return named;
   }

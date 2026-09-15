@@ -30,7 +30,7 @@ export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
       ? `
 The question's acceptance rests on
 ${bullets(
-  q.acceptedInLightOf.map((e) => `${e.states}  (${e.evidence})`),
+  q.acceptedInLightOf.map((e) => `(${e.evidence})  ${e.states}`),
   "",
 )}`
       : "",
@@ -38,7 +38,7 @@ ${bullets(
       ? `
 This enquiry's findings
 ${bullets(
-  status.contributed.map((e) => `${e.states}  (${e.evidence})`),
+  status.contributed.map((e) => `(${e.evidence})  ${e.states}`),
   "",
 )}`
       : "",
@@ -46,7 +46,7 @@ ${bullets(
       ? `
 This enquiry's closure rests on
 ${bullets(
-  status.evidence.map((e) => `${e.states}  (${e.evidence})`),
+  status.evidence.map((e) => `(${e.evidence})  ${e.states}`),
   "",
 )}`
       : "",
@@ -86,7 +86,7 @@ export function renderOrigin(
     "",
     p.heading("Known at that moment"),
     bullets(
-      origin.knownAtTheTime.map((f) => `${f.states}  ${`(${f.evidence})`}`),
+      origin.knownAtTheTime.map((f) => `${`(${f.evidence})`}  ${f.states}`),
       p.untested("nothing"),
     ),
     "",

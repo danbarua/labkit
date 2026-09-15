@@ -462,7 +462,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
       enquiry,
       answeredBy: claimOf(analysisClaims, "pruning moves convergence"),
     }),
-  ).rejects.toThrow(/already closed by decision DEC_\d+/);
+  ).rejects.toThrow(/already closed by DEC_\d+/);
 
   // And the record is unchanged rather than half-updated: one close, the one
   // that happened.
