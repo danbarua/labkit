@@ -15,7 +15,7 @@ export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
       : p.untested("open")
     : p.settled(`closed — ${status.closure}`);
   return [
-    `${p.heading(status.pursuing)}  ${p.handle(`(${status.enquiry})`)}`,
+    `${p.heading(status.pursuing)}  ${`(${status.enquiry})`}`,
     `  ${standing}`,
     status.contributed.length
       ? `  produced ${status.contributed.length} finding${status.contributed.length === 1 ? "" : "s"}`
@@ -23,9 +23,7 @@ export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
     status.answer ? `  answer: ${status.answer}` : "",
     status.restsOn ? `  resting on ${status.restsOn} work` : "",
     "",
-    q
-      ? `Pursuing "${q.asks}"  ${p.handle(`(${q.question})`)}`
-      : p.untested("Pursuing nothing on the record"),
+    q ? `Pursuing "${q.asks}"  ${`(${q.question})`}` : p.untested("Pursuing nothing on the record"),
     q?.acceptedBecause ? `  accepted because: ${q.acceptedBecause}` : "",
     q?.reopensIf ? `  reopens if: ${q.reopensIf}` : "",
     q?.acceptedInLightOf?.length
@@ -59,9 +57,9 @@ ${bullets(
 
 export function renderPursuits(enquiries: EnquiryRef[], question: QuestionRef, p: Palette): string {
   return [
-    p.heading(`Lines of enquiry pursuing ${p.handle(question)}`),
+    p.heading(`Lines of enquiry pursuing ${question}`),
     bullets(
-      enquiries.map((e) => p.handle(e)),
+      enquiries.map((e) => e),
       p.untested("none — the question is on the books and nothing has been started on it"),
     ),
     "",
@@ -79,26 +77,26 @@ export function renderOrigin(
 ): string {
   if (!origin)
     return [
-      `${p.handle(question)} was posed directly.`,
+      `${question} was posed directly.`,
       "",
       p.quiet("That is an answer, not a gap: a question has an origin here only when it"),
       p.quiet("was sharpened from an earlier one or posed out of a note."),
     ].join("\n");
   if (origin.kind === "noted")
     return [
-      `${p.handle(question)} came out of a note  ${p.handle(`(${origin.from})`)}`,
+      `${question} came out of a note  ${`(${origin.from})`}`,
       `  "${origin.said}"`,
       "",
       p.quiet("A note records no reason and cites nothing — it was written before there"),
       p.quiet("was anything to ask. What it carries is when, and who."),
     ].join("\n");
   return [
-    `${p.handle(question)} narrowed "${origin.said}"  ${p.handle(`(${origin.from})`)}`,
+    `${question} narrowed "${origin.said}"  ${`(${origin.from})`}`,
     `  because: ${origin.reason}`,
     "",
     p.heading("Known at that moment"),
     bullets(
-      origin.knownAtTheTime.map((f) => `${f.states}  ${p.handle(`(${f.evidence})`)}`),
+      origin.knownAtTheTime.map((f) => `${f.states}  ${`(${f.evidence})`}`),
       p.untested("nothing"),
     ),
     "",

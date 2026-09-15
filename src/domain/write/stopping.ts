@@ -48,14 +48,14 @@ export class Stopping extends SessionCore {
       if (!target)
         throw new DomainRefusal({
           kind: "not-found",
-          message: `no enquiry ${input.enquiry}; an enquiry exists once pursue records it, and its handle comes back from that act`,
+          message: `no enquiry ${input.enquiry}. \`pursue\` returns its handle.`,
           subject: input.enquiry,
         });
       const question = await this.questionBehind(input.enquiry);
       if (!question)
         throw new DomainRefusal({
           kind: "invariant",
-          message: `enquiry ${input.enquiry} has no motivating question; an enquiry is opened against a question, so pursue one before closing`,
+          message: `enquiry ${input.enquiry} has no question. \`pursue\` one before closing.`,
           subject: input.enquiry,
         });
       if (target.d)

@@ -4,6 +4,7 @@
  */
 
 import pkg from "../../package.json" with { type: "json" };
+import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "../request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -29,6 +30,20 @@ import { DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "./docs";
 export type WithSurfaces = <T>(
   work: (surfaces: { read: ReadSurface; write: WriteSurface }) => Promise<T>,
 ) => Promise<T>;
+
+/**
+ * A tool's `outputSchema`, only when the caller asked for it.
+ *
+ * The schemas are 87KB of the 133KB an agent receives from `tools/list`, and
+ * no caller reads them as documentation. Set `LABKIT_MCP_OUTPUT_SCHEMA=1` to
+ * declare them, which a client validating structured results wants.
+ */
+function declaredOutput(schema: z.ZodType | undefined): { outputSchema?: z.ZodType } {
+  const wanted = process.env.LABKIT_MCP_OUTPUT_SCHEMA;
+  if (schema === undefined) return {};
+  if (wanted === undefined || wanted === "" || wanted === "0" || wanted === "false") return {};
+  return { outputSchema: schema };
+}
 
 /**
  * Registers every tool against a **scope** that yields both surfaces. Transport-free, so a test
@@ -96,7 +111,7 @@ export function buildServer(
           title: definition.title,
           description: definition.description,
           inputSchema: definition.inputSchema,
-          outputSchema: definition.outputSchema,
+          ...declaredOutput(definition.outputSchema),
           // No `readOnlyHint`, matching the writes. It changes nothing in the
           // record and is not a read either; an absent hint is the honest thing
           // to say about a tool that is neither.
@@ -113,7 +128,7 @@ export function buildServer(
         title: definition.title,
         description: definition.description,
         inputSchema: definition.inputSchema,
-        outputSchema: definition.outputSchema,
+        ...declaredOutput(definition.outputSchema),
         // Only on the reads. An absent hint is not a claim either way, which is
         // the honest thing to say about a tool that changes the record.
         annotations: { readOnlyHint: true },
@@ -140,7 +155,7 @@ export function buildServer(
         title: definition.title,
         description: definition.description,
         inputSchema: definition.inputSchema,
-        outputSchema: definition.outputSchema,
+        ...declaredOutput(definition.outputSchema),
       },
       // A surface per call, so each write records the attribution and commit in force at the
       // moment it ran rather than at server start.
@@ -160,10 +175,7 @@ export function buildServer(
 function requireRegistered(session: SessionRegistry, tool: string): void {
   if (session.registered()) return;
   throw new Error(
-    `${tool} expected a registered session and this connection has none: ` +
-      "call register_session with the id your harness gives you, then retry. " +
-      "LabKit records what you tell it and checks nothing — the id is yours to " +
-      "state, and an unsigned entry is worse than none because it looks attributed.",
+    `${tool} needs a session: call register_session with your harness's id, then retry.`,
   );
 }
 

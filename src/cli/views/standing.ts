@@ -10,28 +10,25 @@ import { renderKnown } from "./knowledge";
 export function renderStanding(standing: Standing, p: Palette): string {
   const scope =
     standing.since !== undefined ? `Since seq ${standing.since} — what moved` : "Right now";
+  // Only what is there. Nine headings over "nothing" buried the one line that
+  // was not, and every section is reachable by its own command when empty.
+  const section = (title: string, body: string) => (body === "nothing" ? [] : [title, body, ""]);
+  const known = renderKnown(standing.known, p);
   return [
     p.heading(scope),
     "",
-    p.contested("Blocked gates"),
-    renderGateList(standing.blocked.gates, p),
-    "",
-    p.contested("Blocked work"),
-    renderWorkList(standing.blocked.work, p),
-    "",
-    p.untested("Incomplete gates"),
-    renderGateList(standing.unevaluated.gates, p),
-    "",
-    p.provisional("Waiting work — behind a gate nobody has finished checking"),
-    renderWorkList(standing.unevaluated.work, p),
-    "",
-    p.untested("Untouched work — ready to start"),
-    renderWorkList(standing.untouched, p),
-    "",
-    renderKnown(standing.known, p),
-    "",
-    // The whole record in both readings, so it is stated as such -- a `--since`
-    // report narrows every section above and this line does not follow.
+    ...section(p.contested("Blocked gates"), renderGateList(standing.blocked.gates, p)),
+    ...section(p.contested("Blocked work"), renderWorkList(standing.blocked.work, p)),
+    ...section(p.untested("Incomplete gates"), renderGateList(standing.unevaluated.gates, p)),
+    ...section(
+      p.provisional("Waiting work — behind a gate nobody has finished checking"),
+      renderWorkList(standing.unevaluated.work, p),
+    ),
+    ...section(
+      p.untested("Untouched work — ready to start"),
+      renderWorkList(standing.untouched, p),
+    ),
+    ...(known === "" ? [] : [known, ""]),
     ...(standing.transcribed.transcribed > 0
       ? [
           p.quiet(

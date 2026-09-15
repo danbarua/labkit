@@ -3,6 +3,7 @@
  */
 
 import type { Palette } from "./palette";
+import { forReading } from "./trim";
 
 /**
  * How one report reads. Pure — it returns text and prints nothing.
@@ -17,9 +18,14 @@ export interface Answer<T = unknown> {
   render(palette: Palette): string;
 }
 
-/** Pairs a report with its view. This is where the two are held to each other. */
+/**
+ * Pairs a report with its view. This is where the two are held to each other.
+ *
+ * The view sees prose trimmed to a summary; `value` keeps the whole of it, so
+ * `--json` is unaffected.
+ */
 export function answer<T>(value: T, view: View<T>): Answer<T> {
-  return { value, render: (palette) => view(value, palette) };
+  return { value, render: (palette) => view(forReading(value, palette), palette) };
 }
 
 /**

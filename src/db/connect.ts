@@ -1,6 +1,6 @@
 import { traced } from "./trace";
 import { dirname, join, sep } from "node:path";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { directPostgresBackend, pgliteBackend, type LabKitDBConnection } from "./backend";
 
@@ -104,13 +104,27 @@ export async function connectDb(projectRoot?: string): Promise<LabKitDBConnectio
     return withTrace(await directPostgresBackend({ connectionString: url }).connect(), "postgres");
   }
 
-  const labkitDir = join(projectRoot ?? resolveProjectRoot(), ".labkit");
-  announceNewRecord(labkitDir);
+  const dataDir = dataDirFor(projectRoot);
+  announceNewRecord(dataDir, projectRoot);
   const connection = await pgliteBackend({
-    dataDir: join(labkitDir, "pglite"),
-    lockPath: join(labkitDir, "pglite.lock"),
+    dataDir,
+    lockPath: `${dataDir}.lock`,
   }).connect();
   return withTrace(connection, "pglite");
+}
+
+/**
+ * The PGlite cluster to open, from whatever the caller pointed at: nothing, a
+ * project root holding `.labkit/`, a `.labkit/`, or a cluster directory —
+ * which is what unpacking a `backup` leaves, under whatever name.
+ */
+export function dataDirFor(pointedAt?: string): string {
+  if (pointedAt === undefined) return join(resolveProjectRoot(), ".labkit", "pglite");
+  // A cluster directory names itself: initdb writes PG_VERSION at its root.
+  if (existsSync(join(pointedAt, "PG_VERSION"))) return pointedAt;
+  if (existsSync(join(pointedAt, ".labkit", "pglite"))) return join(pointedAt, ".labkit", "pglite");
+  if (existsSync(join(pointedAt, "pglite"))) return join(pointedAt, "pglite");
+  return join(pointedAt, ".labkit", "pglite");
 }
 
 /**
@@ -136,7 +150,16 @@ function withTrace(connection: LabKitDBConnection, label: string): LabKitDBConne
 /**
  * Says so, once, when a command is about to bring a new record into existence.
  */
-function announceNewRecord(labkitDir: string): void {
-  if (existsSync(labkitDir)) return;
-  process.stderr.write(`labkit: creating a new record at ${labkitDir}\n`);
+function announceNewRecord(dataDir: string, pointedAt: string | undefined): void {
+  if (existsSync(dataDir)) return;
+  // A directory someone pointed `--db` at, holding files but no record, is a
+  // restore that landed in the wrong shape. Creating an empty record there
+  // reads like progress and answers every later command from nothing.
+  if (pointedAt !== undefined && existsSync(pointedAt) && readdirSync(pointedAt).length > 0)
+    throw new Error(
+      `${pointedAt} holds no record, and is not empty\n` +
+        `  --db takes a project directory, a .labkit/, or an unpacked pglite cluster.\n` +
+        `  \`labkit restore --path <backup>\` unpacks a backup into the right shape.`,
+    );
+  process.stderr.write(`labkit: creating a new record at ${dataDir}\n`);
 }

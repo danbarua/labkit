@@ -53,9 +53,11 @@ enquiry="$(lab open 'does the packaged binary work?')"
 known="$(lab known)"
 [[ "$known" == *"does the packaged binary work?"* ]] || fail "the question is not on the record" "$known"
 
-# The graph extension actually loaded: `unresolved` means a LineOfEnquiry node
-# was created and read back through AGE, not merely that Postgres started.
-[[ "$known" == *"Unresolved"* ]] || fail "the survey has no buckets" "$known"
+# The graph extension actually loaded: the question came back through AGE under
+# a bucket heading, not merely that Postgres started. Buckets holding nothing
+# do not print, so this names the one the question is actually in.
+[[ "$known" == *"Untested"* || "$known" == *"Unresolved"* ]] ||
+  fail "the survey has no buckets" "$known"
 
 # The durable event log, on the same connection as the graph.
 happened="$(lab happened)"

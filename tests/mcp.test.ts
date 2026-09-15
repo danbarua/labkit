@@ -532,22 +532,6 @@ describe("the tool documentation resource", () => {
    * The property worth testing is not that the markdown looks right -- it is that it is
    * *derived*.
    */
-  /** Every property name in a JSON Schema, at any depth. */
-  function leafNames(schema: unknown, depth = 0): string[] {
-    const s = schema as {
-      properties?: Record<string, unknown>;
-      items?: unknown;
-      anyOf?: unknown[];
-    };
-    if (!s || depth > 4) return [];
-    const here = Object.keys(s.properties ?? {});
-    const nested = [
-      ...Object.values(s.properties ?? {}),
-      ...(s.items ? [s.items] : []),
-      ...(s.anyOf ?? []),
-    ].flatMap((child) => leafNames(child, depth + 1));
-    return [...here, ...nested];
-  }
 
   /** The one content block, narrowed to the text variant a markdown resource returns. */
   const markdown = (contents: ReadonlyArray<{ mimeType?: string } & Record<string, unknown>>) => {
@@ -588,11 +572,12 @@ describe("the tool documentation resource", () => {
       // First, so a client scanning the list meets it before what it documents.
       expect(tools[0]?.name).toBe(DOCS_TOOL.name);
 
-      // And the handshake already said where to look, before any list was
-      // fetched: the one route that needs no choice by the agent.
+      // The handshake says what the record is and what to call first. It no
+      // longer sends the agent to read the page: a caller that wants the
+      // arguments already has them, and a person asks for the page.
       expect(client.getInstructions()).toBe(INSTRUCTIONS);
-      expect(INSTRUCTIONS).toContain(`\`${DOCS_TOOL.name}\``);
       expect(INSTRUCTIONS).toContain("register_session");
+      expect(INSTRUCTIONS).not.toContain(DOCS_URI);
 
       const result = await client.callTool({ name: DOCS_TOOL.name, arguments: {} });
       const { contents } = await client.readResource({ uri: DOCS_URI });
@@ -646,7 +631,7 @@ describe("the tool documentation resource", () => {
     expect(declared.properties.closure?.enum).toEqual([...GATE_CLOSURES]);
   });
 
-  test("every tool, and every field of every declared output, is documented", async () => {
+  test("every tool is documented, and no tool's arguments are restated", async () => {
     const client = await connected();
     try {
       const { contents } = await client.readResource({ uri: DOCS_URI });
@@ -655,17 +640,15 @@ describe("the tool documentation resource", () => {
       for (const tool of [...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS]) {
         expect(doc).toContain(`## ${tool.name}`);
         expect(doc).toContain(tool.description);
-        // Input field names, derived from the tool's own declaration.
-        for (const field of Object.keys(tool.inputSchema)) expect(doc).toContain(`\`${field}`);
-        // Output field names, derived from the schema rather than listed --
-        // and walked to the leaves, because the first version of this test read
-        // only the top level and passed while every nested name was missing.
-        if (tool.outputSchema) {
-          for (const field of leafNames(z.toJSONSchema(tool.outputSchema))) {
-            expect(doc).toContain(`\`${field}`);
-          }
-        }
       }
+
+      // Every caller already has the arguments and the result shape in the
+      // tool list the harness gave it. Repeating them here put the same
+      // `events` envelope in the page 27 times, for a fifth of its length.
+      expect(doc).not.toContain("**Takes**");
+      expect(doc).not.toContain("**Returns**");
+      expect(doc).not.toContain("attribution_label");
+
       await client.close();
     } finally {
       await scenario.end();
