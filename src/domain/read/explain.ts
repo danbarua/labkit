@@ -722,6 +722,19 @@ export interface Neighbour {
 }
 
 /**
+ * How an edge reads in a sentence. `via` is `type(r)` from the graph, so it can
+ * name an edge this build does not declare — one a backfill wrote, or one a
+ * newer build minted. Indexing `PHRASE` with it directly threw and took `why`
+ * down for the whole record; an undeclared label reads as itself instead.
+ */
+function phraseFor(via: string, direction: "out" | "in"): string {
+  const known = PHRASE[via as EdgeLabel];
+  if (known) return known[direction];
+  const worded = via.toLowerCase().replace(/_/g, " ");
+  return direction === "out" ? worded : `is ${worded} by`;
+}
+
+/**
  * What one record is connected to, in a researcher's words rather than the schema's.
  */
 const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
@@ -757,6 +770,7 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   IMPLEMENTS: { out: "carried out", in: "was carried out by" },
   RESTS_ON: { out: "is drawn from", in: "was drawn on by" },
   CONCERNS: { out: "concerns", in: "has a note on it" },
+  MENTIONS: { out: "mentions", in: "is mentioned by" },
 };
 
 /**
@@ -799,7 +813,7 @@ function walked(kind: WalkedKind): Explainer {
         // The other end's own words, or what it is when it has none. Falling
         // back to the handle printed it twice, the `Cause` carrying it
         // already: `was produced by EU_2 (EU_2)`.
-        wording: `${PHRASE[n.via][n.direction]} ${n.wording ?? describe(n.handle)}`,
+        wording: `${phraseFor(n.via, n.direction)} ${n.wording ?? describe(n.handle)}`,
       })),
     };
   };
