@@ -424,12 +424,22 @@ export class BlockedGroup extends SessionCore {
     }
 
     const listed = [...byGate.entries()]
-      .map(([id, { consequence, rows: forGate }]) => ({
-        gate: ref("gate", id),
-        consequence,
-        state:
-          closed.get(id) ?? gateStateFrom([...per(checkStatusForGate, forGate).values()].flat()),
-      }))
+      .map(([id, { consequence, rows: forGate }]) => {
+        const checks = [...per(checkStatusForGate, forGate).values()].flat();
+        // The most recent decision across every condition — a gate with no
+        // decided condition (never evaluated) has none to report.
+        const decidedAt = checks
+          .map((c) => c.decidedBy?.at)
+          .filter((at): at is string => at !== undefined)
+          .sort()
+          .at(-1);
+        return {
+          gate: ref("gate", id),
+          consequence,
+          state: closed.get(id) ?? gateStateFrom(checks),
+          ...(decidedAt ? { lastTouched: decidedAt } : {}),
+        };
+      })
       .sort((a, b) => a.gate.localeCompare(b.gate));
 
     // Filtering here rather than in Cypher, because the state is computed and

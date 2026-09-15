@@ -3,11 +3,12 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ResearchSession } from "../src/domain";
+import { ResearchSession, inMemoryEventLog } from "../src/domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimOf } from "./helpers/claims";
 import { recordAnalysis } from "./helpers/analysis";
 import { workStateFrom } from "../src/domain/read/blocked";
+import { windableClock, days } from "./helpers/clock";
 
 let scenario: Scenario;
 beforeAll(async () => {
@@ -267,6 +268,78 @@ describe("enumerating gates and work", () => {
       // recorded it was trying to unblock, not the only gate allowed to know.
       // A pass would not carry across; see S-17 for both directions.
       expect(states.get(gateB)).toBe("blocked");
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("a gate's lastTouched is the most recent condition decision, not the first", async () => {
+    const graph = await scenario.begin();
+    try {
+      const clock = windableClock("2026-01-01T09:00:00.000Z");
+      const s = new ResearchSession(graph, { clock, events: inMemoryEventLog() });
+
+      const { criterion: early } = await s.writes.stateCriterion("checked first");
+      const { criterion: late } = await s.writes.stateCriterion("checked later");
+      const { work } = await s.writes.planWork({ objective: "recency", acceptance: "done" });
+      const { gate } = await s.writes.declareGate({
+        governedBy: [early, late],
+        consequence: "needs both",
+        protecting: [work],
+      });
+      const { question } = await s.writes.pose({ question: "does recency hold?" });
+      const { enquiry } = await s.writes.pursue({ question, approach: "check both, apart" });
+      const { observations } = await s.writes.recordObservations({
+        enquiry,
+        name: "readings",
+        finding: "measured",
+      });
+      const { claims } = await recordAnalysis(s.writes, {
+        enquiry,
+        method: "comparison",
+        from: [observations],
+        concludes: [{ proposition: "recency holds", finding: "it holds" }],
+        heldTo: [early, late],
+      });
+      const cited = [claimOf(claims, "recency holds")];
+
+      await s.writes.evaluateCriterion({
+        criterion: early,
+        value: "no",
+        outcome: "fail",
+        gate,
+        citing: cited,
+      });
+      clock.wind(days(6));
+      await s.writes.evaluateCriterion({
+        criterion: late,
+        value: "no",
+        outcome: "fail",
+        gate,
+        citing: cited,
+      });
+
+      const listed = await s.reads.gateList({});
+      const row = listed.find((g) => g.gate === gate);
+      expect(row?.lastTouched).toBe("2026-01-07T09:00:00.000Z");
+    } finally {
+      await scenario.end();
+    }
+  });
+
+  test("a gate no evaluation has ever reached has no lastTouched", async () => {
+    const s = await session();
+    try {
+      const { criterion } = await s.writes.stateCriterion("nobody has looked at this yet");
+      const { work } = await s.writes.planWork({ objective: "untouched", acceptance: "done" });
+      const { gate } = await s.writes.declareGate({
+        governedBy: [criterion],
+        consequence: "waiting on a first check",
+        protecting: [work],
+      });
+
+      const listed = await s.reads.gateList({});
+      expect(listed.find((g) => g.gate === gate)?.lastTouched).toBeUndefined();
     } finally {
       await scenario.end();
     }

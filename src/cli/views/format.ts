@@ -30,6 +30,25 @@ export function width(): number {
   return Math.max(60, Math.min(columns, 120));
 }
 
+/**
+ * "3 hours ago", "6 days ago" — how long since an ISO instant, against wall-clock now.
+ *
+ * A blocked gate's own detail already prints the date next to each condition; this is what a
+ * summary list needed instead, so a reader can tell a gate nothing has touched in a week from
+ * one a check ran against yesterday, without doing the subtraction themselves.
+ */
+export function relativeAge(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso).getTime();
+  const ms = now.getTime() - then;
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
 /** Visible length, ignoring the colour a palette already applied. */
