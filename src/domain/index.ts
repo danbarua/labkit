@@ -36,6 +36,7 @@ export type {
   AttributionHow,
   CommandContext,
   DomainEvent,
+  RecordedEvent,
   EventSink,
   // Re-exported from `src/db/domain` through `./events`, so a consumer of the
   // domain barrel can name a change without importing the persistence layer.

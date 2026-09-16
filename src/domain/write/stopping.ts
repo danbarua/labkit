@@ -65,8 +65,10 @@ export class Stopping extends SessionCore {
           subject: input.enquiry,
         });
 
-      let answerBearing: EvidenceRef[] = [];
-      let answeredProposition: string | undefined;
+      // The two together or neither: whichever branch finds the answer sets both,
+      // and every branch that cannot throws. Held apart, the proposition needed a
+      // fallback at each use for a state no path reaches.
+      let answer: { bearing: EvidenceRef[]; asserts: string } | undefined;
       if (input.answeredBy) {
         // The claim identifies itself; what still has to be checked is that it belongs to THIS
         // enquiry. One hop from the claim rather than a search for a proposition. BOTH
@@ -108,8 +110,7 @@ export class Stopping extends SessionCore {
         }
         const found = await this.findingOn(input.answeredBy);
         if (found) {
-          answerBearing = [found.evidence];
-          answeredProposition = found.asserts;
+          answer = { bearing: [found.evidence], asserts: found.asserts };
         } else {
           // A synthesis rests on findings rather than producing one, so the closure rests on
           // the findings underneath it — all of them. Citing one would name an arbitrary part
@@ -134,28 +135,29 @@ export class Stopping extends SessionCore {
               message: noFindingBearsOn(input.answeredBy),
               subject: input.answeredBy,
             });
-          answerBearing = [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))];
-          answeredProposition = parts[0]!.c.name;
+          answer = {
+            bearing: [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))],
+            asserts: parts[0]!.c.name,
+          };
         }
       }
 
-      const closure =
-        input.answeredBy === undefined ? ("abandoned" as const) : ("answered" as const);
+      const closure = answer === undefined ? ("abandoned" as const) : ("answered" as const);
       const decided = ref(
         "decision",
         await unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason:
-            input.answeredBy === undefined
+            answer === undefined
               ? "closed without a cited result"
-              : `answered on "${answeredProposition ?? ""}"`,
+              : `answered on "${answer.asserts}"`,
           invalidation_check: "new evidence bearing on this enquiry's question",
           resolution_kind: closure,
         }),
       );
       unitOfWork.edge(decided, "RESOLVES", input.enquiry);
       if (input.answeredBy) unitOfWork.edge(decided, "ANSWERS", input.answeredBy);
-      for (const basis of answerBearing) unitOfWork.edge(decided, "BASED_ON", basis);
+      for (const basis of answer?.bearing ?? []) unitOfWork.edge(decided, "BASED_ON", basis);
 
       return {
         subject: input.enquiry,
@@ -164,9 +166,9 @@ export class Stopping extends SessionCore {
           enquiry: input.enquiry,
           question,
           closure,
-          ...(input.answeredBy === undefined
+          ...(answer === undefined
             ? {}
-            : { answered: { claim: input.answeredBy, asserts: answeredProposition ?? "" } }),
+            : { answered: { claim: input.answeredBy!, asserts: answer.asserts } }),
         },
       };
     });

@@ -1104,8 +1104,9 @@ export type ListedClaim = z.infer<typeof listedClaim>;
 export const listedEnquiry = z.strictObject({
   enquiry: ref("enquiry"),
   approach: prose(),
+  /** The question and its wording arrive together or not at all. */
   question: ref("question").optional(),
-  pursuing: prose(),
+  pursuing: prose().optional(),
   /** Evidence units addressing it — how much has actually been run. */
   runs: z.number(),
   closed: z.boolean(),

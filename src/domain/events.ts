@@ -108,11 +108,18 @@ export interface DomainEvent {
   reconstructedFrom: Prose | null;
 }
 
-/** Builds a `DomainEvent`, defaulting `changes` to empty. */
-export function domainEvent(
-  fields: Omit<DomainEvent, "changes" | "reconstructedFrom"> &
-    Partial<Pick<DomainEvent, "changes" | "reconstructedFrom">>,
-): DomainEvent {
+/** What `domainEvent` needs: an act, minus the two fields it defaults. */
+type EventFields = Omit<DomainEvent, "changes" | "reconstructedFrom"> &
+  Partial<Pick<DomainEvent, "changes" | "reconstructedFrom">>;
+
+/**
+ * Builds a `DomainEvent`, defaulting `changes` to empty. Given a `seq` it hands
+ * back a {@link RecordedEvent}, so a fixture built with one is the same type a
+ * sink returns.
+ */
+export function domainEvent(fields: EventFields & { seq: number }): RecordedEvent;
+export function domainEvent(fields: EventFields): DomainEvent;
+export function domainEvent(fields: EventFields): DomainEvent {
   return {
     ...fields,
     changes: fields.changes ?? [],
@@ -157,15 +164,25 @@ export const retractedIn = (event: DomainEvent): string[] =>
   );
 
 /**
+ * An event a sink has taken: the same act, and now with its position.
+ *
+ * `seq` is optional on the way in because the caller cannot know it, and
+ * present on the way out because assigning it is what a sink does. Readers
+ * that took `DomainEvent` were carrying a fallback for an act no sink can
+ * return.
+ */
+export type RecordedEvent = DomainEvent & { seq: number };
+
+/**
  * Where events go.
  */
 export interface EventSink {
   /** Returns the stored event, `seq` included -- the caller built one without it. */
-  record(event: DomainEvent): Promise<DomainEvent>;
+  record(event: DomainEvent): Promise<RecordedEvent>;
   /** Everything recorded so far, oldest first. */
-  all(): Promise<readonly DomainEvent[]>;
+  all(): Promise<readonly RecordedEvent[]>;
   /** The subset a caller asked for, oldest first. */
-  select(filter: EventFilter): Promise<readonly DomainEvent[]>;
+  select(filter: EventFilter): Promise<readonly RecordedEvent[]>;
 }
 
 /**
@@ -174,16 +191,14 @@ export interface EventSink {
  * answered from the graph.
  */
 export function inMemoryEventLog(): EventSink {
-  const events: DomainEvent[] = [];
+  const events: RecordedEvent[] = [];
   // **Numbered, because `matches` below reads `(e.seq ?? 0) > f.since`.** Leaving it undefined
   // scores every event 0, so `select({since})` returns nothing for every value of `since` while
   // `pgEventLog` answers the same filter correctly: two sinks behind one interface,
   // disagreeing.
   let n = 0;
-  const matches = (e: DomainEvent, f: EventFilter): boolean =>
-    // `?? 0` survives for a hand-built fixture that never went through
-    // `record` — every event this sink stores has a `seq`.
-    (f.since === undefined || (e.seq ?? 0) > f.since) &&
+  const matches = (e: RecordedEvent, f: EventFilter): boolean =>
+    (f.since === undefined || e.seq > f.since) &&
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
     (f.reconstructed === undefined || (e.reconstructedFrom !== null) === f.reconstructed) &&

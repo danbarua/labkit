@@ -555,12 +555,17 @@ export class StoryGroup extends SessionCore {
       ).sort((a, b) => byHandle(a.evidence, b.evidence));
 
     const claim = conclusion;
+    // `pursue` writes MOTIVATES from the question it was given, so there is
+    // always one. An empty handle stood here for the case that cannot arise.
+    const motivating = asked[0];
+    if (motivating === undefined)
+      throw new Error(`${enquiry} has no question; every line of enquiry is pursued from one`);
 
     return {
       claim,
-      question: ref("question", asked[0]?.q.natural_id ?? ""),
+      question: ref("question", motivating.q.natural_id),
       proposition: resolved.proposition,
-      asks: asked[0]?.q.name ?? "",
+      asks: motivating.q.name,
       supportedBy: await findings("SUPPORTS"),
       challengedBy: await findings("CHALLENGES"),
       enquiry,

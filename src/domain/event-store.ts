@@ -6,12 +6,18 @@ import { and, asc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { LabKitDB } from "../db/backend";
 import { ormOver, unwrapped } from "../db/orm";
 import { labkitEvents } from "../db/schema";
-import type { RecordedAttribution, DomainEvent, EventFilter, EventSink } from "./events";
+import type {
+  RecordedAttribution,
+  DomainEvent,
+  EventFilter,
+  EventSink,
+  RecordedEvent,
+} from "./events";
 
 /** The row shape, as drizzle hands it back — derived from the table, not restated. */
 type EventRow = typeof labkitEvents.$inferSelect;
 
-const toEvent = (r: EventRow): DomainEvent => {
+const toEvent = (r: EventRow): RecordedEvent => {
   const attribution: RecordedAttribution = {
     attribution_label: r.attribution_label,
     attribution_id: r.attribution_id,
@@ -43,7 +49,7 @@ const toEvent = (r: EventRow): DomainEvent => {
 export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
   const orm = ormOver(db);
 
-  const select = (filter: EventFilter): Promise<readonly DomainEvent[]> =>
+  const select = (filter: EventFilter): Promise<readonly RecordedEvent[]> =>
     unwrapped(async () => {
       const conditions = [eq(labkitEvents.tenant_id, tenantId)];
       if (filter.since !== undefined) conditions.push(gt(labkitEvents.seq, filter.since));

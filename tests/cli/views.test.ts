@@ -20,7 +20,7 @@ import { renderReproducibility, renderReproduction } from "../../src/cli/views/a
 import { renderHappened } from "../../src/cli/views/events";
 import type {
   ConflictVerdict,
-  DomainEvent,
+  RecordedEvent,
   Explanation,
   EnquiryStatus,
   GateStatus,
@@ -534,7 +534,7 @@ test("an empty event log does not read as an empty record", () => {
   expect(empty).toContain("Nothing recorded");
   expect(empty).toContain("every other command reads the graph");
 
-  const events: DomainEvent[] = [
+  const events: RecordedEvent[] = [
     domainEvent({
       seq: 7,
       at: "2026-03-01T00:00:00.000Z",
@@ -563,7 +563,7 @@ test("an empty event log does not read as an empty record", () => {
 });
 
 test("an uncaptured commit is not printed as a hash", () => {
-  const events: DomainEvent[] = [
+  const events: RecordedEvent[] = [
     domainEvent({
       seq: 8,
       at: "2026-03-01T00:00:00.000Z",
