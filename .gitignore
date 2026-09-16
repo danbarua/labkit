@@ -78,3 +78,6 @@ local:/
 # application_default_credentials.json -- a live refresh token. Never commit.
 .gcloud/
 .envrc
+
+# oh-my-pi project-scope config
+.omp/
