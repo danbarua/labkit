@@ -580,13 +580,53 @@ function causeForCheck(c: CheckStatus): Cause {
 }
 
 /**
+ * What an analysis addressed, read, produced and is held to.
+ *
+ * The same walk the generic `why` does, reused rather than re-queried: an
+ * analysis is a first run until something revises it, and reporting nothing
+ * for that case sent the reader to `happened` for edges the graph already has.
+ */
+async function liveEdgesOf(self: ReadSurface, subject: string): Promise<Cause[]> {
+  const analysis = ref("analysis", subject);
+  const direct = await self.neighboursOf({ subject: analysis });
+  // The enquiry, the work, the conditions and the conclusions hang off the
+  // inferential unit, not off the computation — so the analysis's own edges
+  // reach what it read and produced and nothing it was run for.
+  const units = direct.filter((n) => n.via === "USES").map((n) => n.handle);
+  const through = (
+    await Promise.all(units.map((unit) => self.neighboursOf({ subject: unit })))
+  ).flat();
+
+  const because: Cause[] = [];
+  const seen = new Set<string>([analysis, ...units]);
+  for (const n of [...direct, ...through]) {
+    if (seen.has(n.handle)) continue;
+    seen.add(n.handle);
+    because.push({
+      handle: n.handle,
+      wording: `${phraseFor(n.via, n.direction)} ${n.wording ?? describe(n.handle)}`,
+    });
+  }
+  return because;
+}
+
+/**
  * The `Computation` case: what this analysis revised, and which findings moved.
  */
 async function explainAnalysis(self: ReadSurface, subject: string): Promise<AnalysisExplanation> {
   const analysis = ref("analysis", subject);
   const report = await self.analysisRevision({ analysis });
   if (report.supersedes === undefined)
-    return { kind: "analysis", subject: analysis, is: "a first run", because: [], report };
+    return {
+      kind: "analysis",
+      subject: analysis,
+      is: "a first run",
+      // The live edges, not an empty list. Every analysis is a first run until
+      // something revises it, and the graph already holds what it addressed,
+      // read, produced and is held to.
+      because: await liveEdgesOf(self, subject),
+      report,
+    };
 
   const because: Cause[] = [];
   if (report.because)
