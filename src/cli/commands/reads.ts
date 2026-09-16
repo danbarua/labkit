@@ -55,6 +55,7 @@ import {
   renderCriterionList,
   renderEnquiryList,
 } from "../views/inventory";
+import { renderLearned } from "../views/learned";
 import {
   renderAffects,
   renderInterpretation,
@@ -101,6 +102,15 @@ export function registerReads(program: Command, run: Run): void {
       }
       return run(async ({ read }) => answer(await read.whatIsKnown(), renderKnown));
     });
+  program
+    .command("learned")
+    .helpGroup("What stands")
+    .summary("what the programme found out")
+    .description(
+      "Every conclusion, under the question it was reached against, with the finding beneath " +
+        "it. `claims` lists the same conclusions without saying what any of them was for.",
+    )
+    .action(async () => run(async ({ read }) => answer(await read.learned(), renderLearned)));
   program
     .command("why")
     .helpGroup("What stands")

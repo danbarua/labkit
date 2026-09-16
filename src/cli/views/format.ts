@@ -23,6 +23,27 @@ export function partLine(a: IdentifiedArtefact, p: Palette): string {
   return `${`(${a.part})`}  ${a.name}${flag}`;
 }
 
+/**
+ * A row of aligned columns, with the prose last.
+ *
+ * Every list view does the same thing: one or more short columns a reader
+ * scans down — a state, a handle — and then the sentence. Each was computing
+ * its own widths, so `work` aligned and `known` did not. The prose is not
+ * padded: it is last, and `wrap` hangs its continuation under it.
+ */
+export function rows(cells: string[][]): string[] {
+  if (cells.length === 0) return [];
+  const columns = Math.max(...cells.map((row) => row.length)) - 1;
+  const widths = Array.from({ length: columns }, (_, i) =>
+    Math.max(...cells.map((row) => (row[i] ?? "").length)),
+  );
+  return cells.map((row) =>
+    [...row.slice(0, columns).map((cell, i) => (cell ?? "").padEnd(widths[i] ?? 0)), row.at(-1)]
+      .join("  ")
+      .trimEnd(),
+  );
+}
+
 /** Terminal width to lay a report out in, clamped so it stays readable. */
 export function width(): number {
   const columns = process.stdout.columns ?? 0;
@@ -91,11 +112,17 @@ export function wrap(text: string, columns = width()): string {
       const indent = " ".repeat(hangAt(bare(line), lead));
       const out: string[] = [];
       let rest = line;
+      // `prefix` is what the current line already starts with: the line's own
+      // lead first, the hanging indent after. A break at or inside it would
+      // re-emit that prefix and leave `rest` the same length — which it did,
+      // forever, on a long unbroken token after a column.
+      let prefix = lead.length;
       while (bare(rest).length > columns) {
         const at = lastSpaceWithin(rest, columns);
-        if (at <= lead.length) break;
+        if (at <= prefix) break;
         out.push(rest.slice(0, at));
         rest = indent + rest.slice(at + 1).replace(/^ +/, "");
+        prefix = indent.length;
       }
       out.push(rest);
       return out;
@@ -111,8 +138,22 @@ export function wrap(text: string, columns = width()): string {
  * line's own first character.
  */
 function hangAt(line: string, lead: string): number {
-  const columns = line.match(/^\s*(?:- )?(?:\S+ {2,})+/)?.[0];
-  if (columns) return columns.length;
+  // Columns are separated by two or more spaces and are short; the prose is
+  // the first chunk that is not. Taking "everything but the last chunk"
+  // instead put the indent past a trailing `  (7 days ago)` and produced a
+  // 190-column hang.
+  const COLUMN = 24;
+  // The separators are kept, so the answer is where the prose actually starts
+  // rather than the sum of the chunk lengths — which loses the padding that
+  // made the columns line up in the first place.
+  const parts = line.split(/( {2,})/);
+  let at = 0;
+  for (let i = 0; i + 2 < parts.length; i += 2) {
+    const chunk = parts[i] ?? "";
+    if (chunk.length > COLUMN) break;
+    at += chunk.length + (parts[i + 1]?.length ?? 0);
+  }
+  if (at > 0) return at;
   // A short leading label only. Prose that happens to contain a colon is not
   // a label, and hanging the remainder under it reads as a column that is not
   // there.

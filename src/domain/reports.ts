@@ -1125,8 +1125,37 @@ export const enquiryList = z.strictObject({ enquiries: z.array(listedEnquiry) })
 export const analysisList = z.strictObject({ analyses: z.array(listedAnalysis) });
 export const criterionList = z.strictObject({ criteria: z.array(listedCriterion) });
 
+/** One conclusion, with the finding that reached it. */
+export const learnedFinding = z.strictObject({
+  claim: ref("claim"),
+  asserts: prose(),
+  bearing: z.enum(["supports", "challenges"]),
+  /** A decision promoted it: others may build on it. */
+  confirmed: z.boolean(),
+  finding: ref("evidence"),
+  states: prose(),
+});
+export type LearnedFinding = z.infer<typeof learnedFinding>;
+
+export const learnedUnderQuestion = z.strictObject({
+  question: ref("question"),
+  asks: prose(),
+  found: z.array(learnedFinding),
+});
+export type LearnedUnderQuestion = z.infer<typeof learnedUnderQuestion>;
+
+/** `learned` — what the programme found out, under the question it was asked for. */
+export const learned = z.strictObject({
+  questions: z.array(learnedUnderQuestion),
+  found: z.number(),
+});
+export type Learned = z.infer<typeof learned>;
+
 /** Every exported schema in this module, so PROSE_FIELDS can walk them all. */
 const SCHEMAS = {
+  learned,
+  learnedUnderQuestion,
+  learnedFinding,
   claimList,
   enquiryList,
   analysisList,

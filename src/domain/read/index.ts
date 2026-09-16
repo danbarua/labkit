@@ -6,6 +6,7 @@ import { vertexProps } from "../../db/cypher";
 import { createdIn, edgesIn } from "../events";
 import type {
   EnquiryRef,
+  Learned,
   ListedAnalysis,
   ListedClaim,
   ListedCriterion,
@@ -83,6 +84,7 @@ import { FindingGroup } from "./finding";
 import { StandingGroup } from "./standing";
 import { BlockedGroup } from "./blocked";
 import { InventoryGroup } from "./inventory";
+import { LearnedGroup } from "./learned";
 import { StoryGroup } from "./story";
 import { ExplainGroup, EXPLAINERS, enquiryInContext as enquiryInContextOf } from "./explain";
 
@@ -101,6 +103,7 @@ export class ReadSurface extends SessionCore {
   readonly #standing: StandingGroup;
   readonly #blocked: BlockedGroup;
   readonly #inventory: InventoryGroup;
+  readonly #learned: LearnedGroup;
   readonly #story: StoryGroup;
   readonly #explain: ExplainGroup;
 
@@ -118,6 +121,7 @@ export class ReadSurface extends SessionCore {
     this.#standing = new StandingGroup(...shared);
     this.#blocked = new BlockedGroup(...shared);
     this.#inventory = new InventoryGroup(...shared);
+    this.#learned = new LearnedGroup(...shared);
     this.#story = new StoryGroup(...shared);
     this.#explain = new ExplainGroup(...shared);
   }
@@ -209,6 +213,11 @@ export class ReadSurface extends SessionCore {
   async workList(query: WorkListQuery): Promise<ListedWork[]> {
     return this.#blocked.workList(query);
   }
+  /** What the programme found out, under the question it was asked for. */
+  async learned(): Promise<Learned> {
+    return this.#learned.learned();
+  }
+
   /** Every claim on the record, with what bears on it. */
   async claimList(): Promise<ListedClaim[]> {
     return this.#inventory.claimList();
