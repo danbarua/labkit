@@ -94,6 +94,17 @@ export type WalkedKind =
 export type EventPage = {
   acts: readonly DomainEvent[];
   more: boolean;
+  /** The cursor this page was read from, absent when the read started at the beginning. */
+  since?: number;
+  /**
+   * Whether anything but the cursor and the page size narrowed the read.
+   *
+   * An empty page means three different things — the record is empty, the
+   * cursor is past the end, or the filters matched nothing — and a reader who
+   * cannot tell them apart does not know whether to advance the cursor or drop
+   * a filter.
+   */
+  narrowed: boolean;
 };
 
 export type Conclusion = {

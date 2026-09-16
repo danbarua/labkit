@@ -98,7 +98,10 @@ describe("a reconstruction says what it was read off", () => {
         reconstructedFrom,
       });
 
-    const rendered = renderHappened({ acts: [act(1, PAPER), act(2, null)], more: false }, PLAIN);
+    const rendered = renderHappened(
+      { acts: [act(1, PAPER), act(2, null)], more: false, narrowed: false },
+      PLAIN,
+    );
     const lines = rendered.split("\n").filter((l) => l.includes("read off"));
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain(PAPER);
@@ -122,6 +125,7 @@ describe("a reconstruction says what it was read off", () => {
           }),
         ],
         more: false,
+        narrowed: false,
       },
       PLAIN,
     );
@@ -145,9 +149,26 @@ describe("a reconstruction says what it was read off", () => {
           },
         ],
         more: false,
+        narrowed: false,
       },
       PLAIN,
     );
     expect(deliberate).toContain("by unattributed");
   });
+});
+
+/**
+ * `""` passed the `reconstructed` filter, which tests for non-null, and failed the view,
+ * which tests for text: one act counted as sourced and rendered as unsourced.
+ */
+test("an empty source is nobody having said, not a source", () => {
+  const built = domainEvent({
+    at: "2026-09-16T09:00:00.000Z",
+    attribution: UNATTRIBUTED,
+    operation: "pose",
+    subject: "Q_1",
+    command: {} as never,
+    reconstructedFrom: "",
+  });
+  expect(built.reconstructedFrom).toBeNull();
 });

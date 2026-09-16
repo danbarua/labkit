@@ -128,11 +128,21 @@ export const whatHappened = z.strictObject({
   more: z.boolean(),
   events: z.array(
     z.strictObject({
-      seq: z.number(),
+      /** Absent until the store assigns one, rather than reported as zero. */
+      seq: z.number().optional(),
       at: timestamp(),
       operation: z.string(),
       subject: z.string(),
       created: z.array(z.string()),
+      /**
+       * The whole delta: every node minted, every edge wired, every property
+       * set in place. `created` is the node half and nothing else.
+       *
+       * Loose where `domainEvent.changes` is a union, because a union in an
+       * MCP `outputSchema` crashes an SDK client — the reason `command` is a
+       * record here and a `Command` there.
+       */
+      changes: z.array(z.record(z.string(), z.unknown())),
       attribution_label: z.string(),
       attribution_id: identity(),
       // A missing attribution grade is represented as null, not as an absent key.

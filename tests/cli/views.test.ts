@@ -530,8 +530,8 @@ test("`known` prints the buckets holding something and nothing else", () => {
 });
 
 test("an empty event log does not read as an empty record", () => {
-  const empty = renderHappened({ acts: [], more: false }, PLAIN);
-  expect(empty).toContain("Nothing matching");
+  const empty = renderHappened({ acts: [], more: false, narrowed: false }, PLAIN);
+  expect(empty).toContain("Nothing recorded");
   expect(empty).toContain("every other command reads the graph");
 
   const events: DomainEvent[] = [
@@ -553,7 +553,7 @@ test("an empty event log does not read as an empty record", () => {
       ],
     }),
   ];
-  const out = renderHappened({ acts: events, more: false }, PLAIN);
+  const out = renderHappened({ acts: events, more: false, narrowed: false }, PLAIN);
   expect(out).toContain("7");
   expect(out).toContain("recordAnalysis");
   // Who ran it and against what commit -- the two facts the graph cannot answer.
@@ -579,7 +579,7 @@ test("an uncaptured commit is not printed as a hash", () => {
       changes: [{ change: "NodeCreated", id: "NOTE_1", label: "Note", props: { text: "a note" } }],
     }),
   ];
-  const out = renderHappened({ acts: events, more: false }, PLAIN);
+  const out = renderHappened({ acts: events, more: false, narrowed: false }, PLAIN);
   expect(out).toContain("not captured");
   expect(out).not.toMatch(/@[0-9a-f]{8}/);
 });

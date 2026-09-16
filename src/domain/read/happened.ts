@@ -23,15 +23,27 @@ export class HappenedGroup extends SessionCore {
    * cannot tell it from an empty record.
    */
   async whatHappenedPage(filter: EventFilter): Promise<EventPage> {
+    const asked = {
+      ...(filter.since === undefined ? {} : { since: filter.since }),
+      narrowed:
+        filter.touching !== undefined ||
+        filter.by !== undefined ||
+        filter.operation !== undefined ||
+        filter.reconstructed !== undefined,
+    };
     if (filter.limit === undefined) {
       const acts = await this.events.select(filter);
-      return { acts, more: false };
+      return { acts, more: false, ...asked };
     }
     // One past the limit, then dropped: exact rather than inferred from
     // `length === limit`, which calls a page that happens to end on the
     // boundary truncated.
     const overshot = await this.events.select({ ...filter, limit: filter.limit + 1 });
-    return { acts: overshot.slice(0, filter.limit), more: overshot.length > filter.limit };
+    return {
+      acts: overshot.slice(0, filter.limit),
+      more: overshot.length > filter.limit,
+      ...asked,
+    };
   }
 
   /**

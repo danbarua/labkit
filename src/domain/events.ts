@@ -116,7 +116,11 @@ export function domainEvent(
   return {
     ...fields,
     changes: fields.changes ?? [],
-    reconstructedFrom: fields.reconstructedFrom ?? null,
+    // An empty source is not a source. Left as `""` it passes the
+    // `reconstructed` filter, which tests for non-null, and fails the view,
+    // which tests for text — one act counted as sourced and rendered as
+    // unsourced.
+    reconstructedFrom: fields.reconstructedFrom || null,
   };
 }
 
@@ -127,6 +131,22 @@ export const createdIn = (event: DomainEvent): string[] =>
 /** Every edge an act created. */
 export const edgesIn = (event: DomainEvent): EdgeCreated[] =>
   event.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : []));
+
+/**
+ * Every handle an act touched: what it minted, both ends of every edge it
+ * wired, and anything whose properties it changed.
+ *
+ * Wider than {@link createdIn} on purpose. `touching` is asked as "what
+ * happened to this record", and the acts that connected to a handle, or set a
+ * property on it, never name it as their subject and never mint it.
+ */
+export const touchedIn = (event: DomainEvent): string[] => [
+  ...new Set(
+    event.changes.flatMap((c) =>
+      c.change === "NodeCreated" ? [c.id] : c.change === "EdgeCreated" ? [c.from, c.to] : [c.id],
+    ),
+  ),
+];
 
 /** Every handle an act retracted. `undo` writes these and nothing else. */
 export const retractedIn = (event: DomainEvent): string[] =>
@@ -167,7 +187,7 @@ export function inMemoryEventLog(): EventSink {
     (f.by === undefined || e.attribution.attribution_id === f.by) &&
     (f.operation === undefined || e.operation === f.operation) &&
     (f.reconstructed === undefined || (e.reconstructedFrom !== null) === f.reconstructed) &&
-    (f.touching === undefined || e.subject === f.touching || createdIn(e).includes(f.touching));
+    (f.touching === undefined || e.subject === f.touching || touchedIn(e).includes(f.touching));
   return {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is

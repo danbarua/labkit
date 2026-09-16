@@ -62,10 +62,18 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
       // so the GIN index on `changes` is the one doing the work.
       if (filter.touching !== undefined) {
         const touching = filter.touching;
-        const created = JSON.stringify([{ change: "NodeCreated", id: touching }]);
+        // The same four positions `touchedIn` reads, so the two sinks answer
+        // one filter alike. Every clause is containment, so the GIN index on
+        // `changes` (jsonb_path_ops) serves all of them; `EdgeCreated.props`
+        // is optional and containment matches an edge that carries them.
+        const holds = (change: Record<string, string>) =>
+          sql`${labkitEvents.changes} @> ${JSON.stringify([change])}::jsonb`;
         const clause = or(
           eq(labkitEvents.subject, touching),
-          sql`${labkitEvents.changes} @> ${created}::jsonb`,
+          holds({ change: "NodeCreated", id: touching }),
+          holds({ change: "EdgeCreated", from: touching }),
+          holds({ change: "EdgeCreated", to: touching }),
+          holds({ change: "PropsChanged", id: touching }),
         );
         if (clause) conditions.push(clause);
       }
