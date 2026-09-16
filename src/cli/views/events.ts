@@ -2,7 +2,7 @@
  * The acts themselves — the one view over the event log rather than the graph.
  */
 
-import { createdIn, edgesIn } from "../../domain";
+import { createdIn, edgesIn, retractedIn } from "../../domain";
 import type { EventPage, ListedNote } from "../../domain";
 import type { Palette } from "../palette";
 
@@ -72,6 +72,12 @@ export function renderHappened({ acts: events, more }: EventPage, p: Palette): s
       const wired = edgesIn(e).map(
         (x) => `           ${x.from} ${p.quiet(`-[${x.label}]->`)} ${x.to}`,
       );
+      // What an `undo` took back. Without it the log said `undo LOE_3` and
+      // nothing about what stopped being readable.
+      const gone = retractedIn(e);
+      const retracted = gone.length
+        ? [`         ${p.quiet("retracting")}  ${gone.join(p.quiet(", "))}`]
+        : [];
       // Its own line, and only when there is one. An absence here means nobody
       // said what the act was read off, which is not a claim that it was watched.
       const source = e.reconstructedFrom
@@ -81,6 +87,7 @@ export function renderHappened({ acts: events, more }: EventPage, p: Palette): s
         `${p.quiet(String(e.seq ?? 0).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${e.subject}`,
         `         ${p.quiet(`by ${who}`)}${how}${p.quiet(commit)}${minted}`,
         ...source,
+        ...retracted,
         ...(wired.length ? [`         ${p.quiet("connecting")}`, ...wired] : []),
       ].join("\n");
     })

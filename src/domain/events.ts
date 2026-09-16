@@ -128,6 +128,14 @@ export const createdIn = (event: DomainEvent): string[] =>
 export const edgesIn = (event: DomainEvent): EdgeCreated[] =>
   event.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : []));
 
+/** Every handle an act retracted. `undo` writes these and nothing else. */
+export const retractedIn = (event: DomainEvent): string[] =>
+  event.changes.flatMap((c) =>
+    c.change === "PropsChanged" && (c.props as { retracted?: boolean }).retracted === true
+      ? [c.id]
+      : [],
+  );
+
 /**
  * Where events go.
  */

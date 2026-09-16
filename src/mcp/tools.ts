@@ -82,6 +82,7 @@ import {
   gateStatus,
   how,
   interpretationHistory,
+  learned,
   noted,
   notes,
   openedEnquiry,
@@ -349,6 +350,17 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     handler: async (read, { question }) => ({
       origin: await read.originOf(originOfQuery.parse({ question })),
     }),
+  }),
+  tool({
+    name: "learned",
+    title: "What the programme found out",
+    group: "What stands",
+    description:
+      "Every conclusion, under the question it was reached against, with the finding beneath " +
+      "it. `claim_list` lists the same conclusions without saying what any of them was for.",
+    inputSchema: {},
+    outputSchema: learned,
+    handler: async (read) => read.learned(),
   }),
   tool({
     name: "claim_list",
@@ -1192,11 +1204,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Take back a mistaken act",
     group: "Revising",
     description:
-      "Hides every handle that act minted from the ordinary read and write surface — what it " +
-      "connected goes with it, since an edge naming a hidden node cannot be traversed. Nothing " +
-      "is deleted: the record keeps the mistake and stops reaching it. Refuses rather than " +
-      "cascades: an act that set a property in place, or that something else already rests on, " +
-      "is refused with the reason.",
+      "**The act itself was wrong.** Hides every handle it minted, and what it connected. " +
+      "Nothing is deleted. Refused if something else already rests on it, or if the act set a " +
+      "property in place. `reinterpret` is for when the act was right and only the reading " +
+      "changed; `keep` and `replace` for when a whole analysis was wrong.",
     inputSchema: {
       event: z.number().describe("the act's seq, from `what_happened`"),
       because: z.string().describe("why this is being taken back"),
@@ -1210,13 +1221,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Revise an analysis, naming the conclusions that survive",
     group: "Revising",
     description:
-      "Records a successor to the analysis those claims came from, supersedes every other " +
-      "conclusion of it, and carries the named ones forward on their original evidence — " +
-      "`why` on a kept claim still rests on the run that produced the number. Record the " +
-      "successor's own findings with `conclude`: each is recorded as standing in place of the " +
-      "superseded finding it re-answers, and `replacing` says which when two answer the same " +
-      "proposition. The successor reads what its predecessor read; `from` adds to that. " +
-      "Answers with what was superseded, which is the complement of what you named.",
+      "**The analysis was wrong; some of its conclusions survive.** Names those; the rest " +
+      "fall. A kept claim still rests on the run that produced its number. `replace` when " +
+      "none survive; `undo` when the act itself was wrong. Record the successor's own " +
+      "findings with `conclude`; `replacing` says which fallen finding one stands in place " +
+      "of. It reads what its predecessor read; `from` adds to that. Answers with what was " +
+      "superseded, the complement of what you named.",
     inputSchema: {
       keeping: z
         .array(z.string())
@@ -1251,12 +1261,11 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Supersede a defective analysis",
     group: "Revising",
     description:
-      "Record a corrected analysis in place of a defective one, citing the review that " +
-      "justified the retraction, and the lineage between them. **Every conclusion of the " +
-      "superseded analysis falls here** — use `keep` instead to carry some of them forward. " +
-      "Record the successor's own findings with `conclude`: each is recorded as standing in " +
-      "place of the fallen finding it re-answers. Pass `replacing` when two fallen findings " +
-      "answer the same proposition. It reads what its predecessor read; `from` adds to that.",
+      "**The analysis was wrong and none of its conclusions survive.** All of them fall, " +
+      "citing the review that justified it. `keep` carries some forward; `undo` is for when " +
+      "the act itself was wrong. Record the successor's own findings with `conclude`; " +
+      "`replacing` says which fallen finding one stands in place of. It reads what its " +
+      "predecessor read; `from` adds to that.",
     inputSchema: {
       supersedes: z
         .string()
@@ -1287,11 +1296,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Re-run a historical analysis under current observations",
     group: "Revising",
     description:
-      "Record that an earlier analysis was checked again against observations available now. " +
-      "This is **not** reproduction: reproduction asks whether the same inputs give the same " +
-      "answer, and this asks whether the finding still holds under different ones. Use " +
-      "`reproduction_of` to ask the other question. `under` takes observation ids or the ids " +
-      "of earlier analyses whose output was read this time.",
+      "**Nothing was wrong.** Checks an earlier analysis again against observations available " +
+      "now — whether the finding still holds under different inputs. Not reproduction, which " +
+      "asks whether the same inputs give the same answer; `reproduction_of` asks that. " +
+      "`under` takes observation ids, or ids of earlier analyses whose output was read.",
     inputSchema: {
       historical: z
         .string()
@@ -1345,10 +1353,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Narrow what a claim is taken to mean",
     group: "Revising",
     description:
-      "Record that a claim's reading has been narrowed — the evidence is unchanged, what it " +
-      "is taken to show is not. The answer says whether anything resting on the old reading " +
-      "needs recomputing. Takes the claim's id, so there is nothing to disambiguate: two " +
-      "lines of enquiry asserting the same sentence are two claims and this names one.",
+      "**The reading was wrong; the evidence stands.** Narrows what a claim is taken to show. " +
+      "The answer says whether anything resting on the old reading needs recomputing. `undo` " +
+      "is for when the act itself was wrong and nothing needs reinterpreting. Takes the " +
+      "claim's id: two enquiries asserting one sentence are two claims, and this names one.",
     inputSchema: {
       claim: z.string().describe(`the claim's id, e.g. ${CLAIM_PREFIX}4 — from record_analysis`),
       as: z.string().describe("the narrower reading"),

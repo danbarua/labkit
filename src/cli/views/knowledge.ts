@@ -18,7 +18,7 @@ import type {
   Verdict,
 } from "../../domain";
 import type { Palette } from "../palette";
-import { bullets, gist, questionLines, relativeAge } from "./format";
+import { bullets, gist, questionLines, relativeAge, rows } from "./format";
 
 /**
  * `AcceptedQuestion`'s own line — `asks` and the handle, plus why it was
@@ -36,8 +36,16 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => {
     const parked = q.reopensIf ? p.quiet(`  (was parked until: ${q.reopensIf})`) : "";
+    // `supported`/`challenged`, never `yes`/`no`. The word is derived from the
+    // concluding claim's bearing, so beside a question it read as an answer to
+    // that question: Q_9 asks whether q narrows, the claim says it does not,
+    // the bearing supports it, and the line said "yes".
     const answers = q.answers
-      .map((answer) => `${answer.answer} via ${`(${answer.claim})`}  ${answer.enquiry}`)
+      .map(
+        (answer) =>
+          `${`(${answer.claim})`} ${answer.answer === "no" ? "challenged" : "supported"}` +
+          `  ${answer.enquiry}`,
+      )
       .join("; ");
     return `${`(${q.question})`}  ${q.asks}  — ${answers}${parked}`;
   });
@@ -65,9 +73,13 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
     ),
     ...section(
       p.heading("Closed pursuits"),
-      survey.closedPursuits.map(
-        (pursuit) =>
-          `${pursuit.closure}  ${pursuit.enquiry}  ${`(${pursuit.decision})`}  ${pursuit.pursuing}`,
+      rows(
+        survey.closedPursuits.map((pursuit) => [
+          pursuit.closure,
+          pursuit.enquiry,
+          `(${pursuit.decision})`,
+          pursuit.pursuing,
+        ]),
       ),
     ),
   ]

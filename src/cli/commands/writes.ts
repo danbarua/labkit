@@ -434,7 +434,9 @@ export function registerWrites(program: Command, run: Run): void {
     .command("is")
     .helpGroup("Revising")
     .description(
-      "Record what a claim now is. `undecided`: a finding that settles the proposition neither way. `confirmed`: a finding others may build on.",
+      "**The claim's standing changed; its wording did not.** `undecided` settles the " +
+        "proposition neither way. `confirmed` is one others may build on.\n\n" +
+        "`reinterpret` changes what a claim is read to mean.",
     );
   is.command("undecided")
     .helpGroup("Revising")
@@ -461,12 +463,10 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Revising")
     .summary("take back a mistaken act")
     .description(
-      "Hides every handle that act minted from the ordinary read and write surface -- what it " +
-        "connected goes with it, since an edge naming a hidden node cannot be traversed. Nothing " +
-        "is deleted: the record keeps the mistake and stops reaching it, which is what makes this " +
-        "a compensating act rather than an erasure, and why an operator can still recover it. " +
-        "Refuses rather than cascades: an act that set a property in place, or that something " +
-        "else already rests on, is refused with the reason.",
+      "**The act itself was wrong.** Hides every handle it minted, and what it connected. " +
+        "Nothing is deleted. Refused if something else already rests on it.\n\n" +
+        "`reinterpret` is for when the act was right and only the reading changed; `keep` and " +
+        "`replace` for when a whole analysis was wrong.",
     )
     .argument("<event>", "the act's seq, from 'labkit happened'", whole)
     .requiredOption("--because <text>", "why this is being taken back")
@@ -481,13 +481,12 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Revising")
     .summary("revise an analysis, naming the conclusions that survive")
     .description(
-      "Records a successor to the analysis those claims came from, supersedes every other " +
-        "conclusion of it, and carries the named ones forward on their original evidence — " +
-        "`labkit why` on a kept claim still rests on the run that produced the number. Add the " +
-        "successor's own findings with `labkit conclude`. The successor reads what its " +
-        "predecessor read; --from adds to that. A conclusion re-answering a superseded " +
-        "finding is recorded as standing in its place; `--replacing <claim-id>` says which " +
-        "when two of them answer the same proposition.",
+      "**The analysis was wrong; some of its conclusions survive.** Names those; the rest " +
+        "fall. A kept claim still rests on the run that produced its number.\n\n" +
+        "`replace` when none survive. `undo` when the act itself was wrong.\n\n" +
+        "Add the successor's own findings with `conclude`. It reads what its predecessor read; " +
+        "`--from` adds to that. `--replacing <claim-id>` says which fallen finding a new one " +
+        "stands in place of, when two answer the same proposition.",
     )
     .argument("<claim-id...>", "the conclusions that survive", (v, prev: string[] = []) => [
       ...prev,
@@ -521,11 +520,11 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Revising")
     .summary("supersede a defective analysis with a corrected one")
     .description(
-      "Every conclusion of the superseded analysis falls here — use `labkit keep` instead to " +
-        "carry some of them forward. Add the successor's own findings with `labkit conclude`: " +
-        "each one is recorded as standing in place of the fallen finding it re-answers. " +
-        "Use `--replacing <claim-id>` when two fallen findings answer the same proposition. " +
-        "It reads what its predecessor read; --from adds to that.",
+      "**The analysis was wrong and none of its conclusions survive.** All of them fall.\n\n" +
+        "`keep` carries some forward. `undo` when the act itself was wrong.\n\n" +
+        "Add the successor's own findings with `conclude`; each stands in place of the fallen " +
+        "finding it re-answers. It reads what its predecessor read; `--from` adds to that. " +
+        "`--replacing <claim-id>` when two fallen findings answer the same proposition.",
     )
     .argument("<analysis-id>", "the analysis being superseded")
     .requiredOption("--because <review-id>", "the review that found it defective")
@@ -548,8 +547,8 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Revising")
     .summary("re-check an earlier analysis under fresh inputs")
     .description(
-      "One conclusion, not a list: a re-check reaches one verdict about the thing it " +
-        "re-checked. It does not claim reproduction — see `labkit reproduction`.",
+      "**Nothing was wrong.** Re-checks the same analysis under fresh inputs, reaching one " +
+        "verdict — not a list. It does not claim reproduction; `reproduction` reports on that.",
     )
     .argument("<analysis-id>", "the analysis being re-checked")
     .option("--enquiry <id>", "the line of enquiry this belongs to (default: the analysis's own)")
@@ -585,9 +584,10 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Revising")
     .summary("narrow what a claim is read to mean")
     .description(
-      "Withdraws the old reading and records the new one. A single step can withdraw several " +
-        "claims — two analyses reaching one reading are withdrawn together — so the report names " +
-        "records rather than a sentence.",
+      "**The reading was wrong; the evidence stands.** Withdraws the old reading and records " +
+        "the new one. One step can withdraw several claims, so the report names records rather " +
+        "than a sentence.\n\n" +
+        "`undo` is for when the act itself was wrong and nothing needs reinterpreting.",
     )
     .argument("<claim-id>", "the claim being narrowed")
     .requiredOption("--as <text>", "the narrower reading")

@@ -27,6 +27,7 @@ export {
   domainEvent,
   createdIn,
   edgesIn,
+  retractedIn,
   UNATTRIBUTED,
 } from "./events";
 export type {
@@ -157,6 +158,9 @@ export type {
   SupportExplanation,
   Verdict,
   GateStatus,
+  Learned,
+  LearnedFinding,
+  LearnedUnderQuestion,
   ListedAnalysis,
   ListedClaim,
   ListedCriterion,

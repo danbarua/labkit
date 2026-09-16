@@ -227,6 +227,10 @@ describe("every tool answers when an agent actually calls it", () => {
       // shared helper exists to prevent.
       // The four inventories, exercised against a record that has one of each:
       // they are the only route to a handle for an agent that holds none.
+      // What the programme found out, under the question each was reached for.
+      const found = await call(c, "learned", {});
+      expect((found.questions as unknown[]).length).toBeGreaterThan(0);
+
       const claims = await call(c, "claim_list", {});
       expect((claims.claims as unknown[]).length).toBeGreaterThan(0);
       const enquiries = await call(c, "enquiry_list", {});

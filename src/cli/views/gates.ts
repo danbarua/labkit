@@ -15,52 +15,47 @@ import type {
   TaskContract,
 } from "../../domain";
 import type { Palette } from "../palette";
-import { bullets, relativeAge } from "./format";
+import { bullets, relativeAge, rows } from "./format";
 
 /**
  * A gate, itemised per condition.
  */
 export function renderGate(status: GateStatus, p: Palette): string {
-  // Coloured centrally by `colourVocabulary`, so this only chooses the word.
-  const state = (key: string, text: string = key) => text;
-  const check = (c: CheckStatus): string => {
-    // The verdict's own sentence is not here -- see `DecidingEvaluation`. The handle is, so a
-    // reader can reach it.
+  // The verdict's own sentence is not here -- see `DecidingEvaluation`. The
+  // handle is, so a reader can reach it.
+  const check = (c: CheckStatus): string[] => {
     const about = c.decidedBy?.about ? ` about ${c.decidedBy.about}` : "";
     const decided = c.decidedBy
-      ? `  decided ${state(c.decidedBy.outcome === "pass" ? "passed" : "failed")}${about} ${p.quiet(c.decidedBy.at)} ${`(${c.decidedBy.evaluation})`}`
+      ? `  decided ${c.decidedBy.outcome === "pass" ? "passed" : "failed"}${about} ${p.quiet(c.decidedBy.at)} ${`(${c.decidedBy.evaluation})`}`
       : "";
-    // Padded before colouring: an escape sequence has length and would throw
-    // the column off by exactly the bytes nobody can see.
-    return `${state(c.state, c.state.padEnd(19))} ${`(${c.criterion})`}  ${c.proposition}${decided}`;
+    return [c.state, `(${c.criterion})`, `${c.proposition}${decided}`];
   };
   return [
-    `${status.gate} — ${state(status.state)}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
+    `${status.gate} — ${status.state}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
     `  consequence: ${status.consequence}`,
     status.closure
       ? `  closed: ${status.closure.kind} by ${status.closure.decision}\n  because: ${status.closure.because}`
       : "",
     "",
     `${p.heading("Conditions by state")}\n${bullets(
-      (Object.entries(status.counts) as [CheckStatus["state"], number][])
-        .filter(([, n]) => n > 0)
-        .map(([s, n]) => `${state(s, s.padEnd(19))} ${n}`),
+      rows(
+        (Object.entries(status.counts) as [CheckStatus["state"], number][])
+          .filter(([, n]) => n > 0)
+          .map(([s, n]) => [s, String(n)]),
+      ),
       "none",
     )}`,
     "",
     p.heading("Conditions"),
-    bullets(status.checks.map(check), "none"),
+    bullets(rows(status.checks.map(check)), "none"),
     status.unmet.length
       ? `\nNot currently met\n${bullets(
-          status.unmet.map((u) => `(${u.criterion})  ${u.requires}`),
+          rows(status.unmet.map((u) => [`(${u.criterion})`, u.requires])),
           "",
         )}`
       : "",
     status.gating.length
-      ? `\nGating\n${bullets(
-          status.gating.map((w) => `(${w.work})  ${w.objective}`),
-          "",
-        )}`
+      ? `\nGating\n${bullets(rows(status.gating.map((w) => [`(${w.work})`, w.objective])), "")}`
       : "",
   ]
     .filter(Boolean)
@@ -146,22 +141,22 @@ export function renderContract(contract: TaskContract, p: Palette): string {
 export function renderGateList(gates: ListedGate[], p: Palette, heading = false): string {
   const title = heading ? p.heading(`Gates — ${gates.length}`) : "";
   if (gates.length === 0) return title ? `${title}\nnothing` : "nothing";
-  const width = Math.max(...gates.map((g) => g.state.length));
-  const handles = Math.max(...gates.map((g) => g.gate.length));
-  const rows = gates
-    .map((g) => {
-      // Coloured centrally by `colourVocabulary`; padding is the alignment.
-      const state = g.state.padEnd(width);
-      // Absent for a gate no evaluation has ever reached — nothing to date.
-      const age = g.lastTouched ? `  ${p.quiet(`(${relativeAge(g.lastTouched)})`)}` : "";
-      // The work underneath it, so the reader is not joining two lists by hand.
-      const holding = g.gating.map(
-        (w) => `\n${" ".repeat(width + 2)}  holding up  ${w.work}  ${w.objective}`,
-      );
-      return `${state}  ${g.gate.padEnd(handles)}  ${g.consequence}${age}${holding.join("")}`;
-    })
-    .join("\n");
-  return title ? `${title}\n${rows}` : rows;
+  // One pair of columns for every row, the nested work included: a gate and
+  // the work under it put their handles at the same indent, so a reader scans
+  // the handle column rather than hunting it inside each line.
+  // A gate and the work under it are rows of the same table, so their handles
+  // land in one column and a reader scans it rather than hunting each line.
+  const cells = gates.flatMap((g) => [
+    // Absent for a gate no evaluation has ever reached — nothing to date.
+    [
+      g.state,
+      g.gate,
+      `${g.consequence}${g.lastTouched ? `  ${p.quiet(`(${relativeAge(g.lastTouched)})`)}` : ""}`,
+    ],
+    ...g.gating.map((w) => [p.quiet("holding up"), w.work, w.objective]),
+  ]);
+  const body = rows(cells).join("\n");
+  return title ? `${title}\n${body}` : body;
 }
 
 /**
@@ -170,16 +165,7 @@ export function renderGateList(gates: ListedGate[], p: Palette, heading = false)
 export function renderWorkList(work: ListedWork[], p: Palette, heading = false): string {
   const title = heading ? p.heading(`Work — ${work.length}`) : "";
   if (work.length === 0) return title ? `${title}\nnothing` : "nothing";
-  const width = Math.max(...work.map((w) => w.state.length));
-  // The handle column too, so every objective starts at the same column
-  // whether its handle is TASK_1 or TASK_11.
-  const handles = Math.max(...work.map((w) => w.work.length));
-  const rows = work
-    .map((w) => {
-      // Coloured centrally by `colourVocabulary`; padding is the alignment.
-      const state = w.state.padEnd(width);
-      return `${state}  ${w.work.padEnd(handles)}  ${w.objective}`;
-    })
-    .join("\n");
-  return title ? `${title}\n${rows}` : rows;
+  // Coloured centrally by `colourVocabulary`; `rows` does the alignment.
+  const body = rows(work.map((w) => [w.state, w.work, w.objective])).join("\n");
+  return title ? `${title}\n${body}` : body;
 }
