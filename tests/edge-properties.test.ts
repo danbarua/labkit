@@ -12,7 +12,7 @@ import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
 import { optional, scalar } from "../src/db/cypher";
 import { applyDelta, UnitOfWork } from "../src/domain/projection";
-import { domainEvent, UNATTRIBUTED } from "../src/domain";
+import { domainEvent, UNATTRIBUTED, inMemoryEventLog, WriteSurface } from "../src/domain";
 
 let testDb: TestDb;
 let db: TestClient;
@@ -118,4 +118,34 @@ test("the change travels through an event's delta like every other change", asyn
 
   await applyDelta(graph, event);
   expect((await stateOf(graph, criterion, gate))?.state).toBe("satisfied");
+});
+
+/**
+ * `undo` retracts what an act created, and refuses an act that overwrote a value —
+ * there is no prior value on the log to put back. An edge property is such a value,
+ * and the guard tested only `PropsChanged`, so it refused for the wrong reason.
+ */
+test("undo refuses an act that set an edge property, and says why", async () => {
+  const ctx = await resolveTenantContext(db, db.tx, "edge-undo");
+  const graph = new TenantGraph(ctx, db, db.tx);
+  const events = inMemoryEventLog();
+  const write = new WriteSurface(graph, { events });
+
+  const { criterion, gate } = await governs(graph);
+  const unitOfWork = new UnitOfWork({ reserve: async () => "unused" });
+  unitOfWork.setEdge(criterion, "GOVERNS", gate, { state: "satisfied" });
+  const recorded = await events.record(
+    domainEvent({
+      at: "2026-09-16T13:00:00.000Z",
+      attribution: UNATTRIBUTED,
+      operation: "evaluateCriterion",
+      subject: criterion,
+      command: {} as never,
+      changes: unitOfWork.delta(),
+    }),
+  );
+
+  await expect(write.undo({ event: recorded.seq, because: "wrong scope" })).rejects.toThrow(
+    /overwrote a value/,
+  );
 });

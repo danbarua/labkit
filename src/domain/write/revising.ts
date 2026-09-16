@@ -199,15 +199,19 @@ export class Revising extends Shared {
       const [found] = await this.events.select({ since: input.event - 1, limit: 1 });
       if (found?.seq !== input.event) throw new Error(`${input.event} not found`);
 
-      const retracting = createdIn(found);
-      if (retracting.length === 0)
-        throw new Error(`${input.event} (${found.operation}) minted nothing to retract`);
-
-      const propsSet = found.changes.some((c) => c.change === "PropsChanged");
+      // Before the mint check, because an act that only set properties also minted
+      // nothing, and "minted nothing to retract" is true of it but not the reason.
+      const propsSet = found.changes.some(
+        (c) => c.change === "PropsChanged" || c.change === "EdgePropsChanged",
+      );
       if (propsSet)
         throw new Error(
           `${input.event} (${found.operation}) overwrote a value. undo retracts what an act created.`,
         );
+
+      const retracting = createdIn(found);
+      if (retracting.length === 0)
+        throw new Error(`${input.event} (${found.operation}) minted nothing to retract`);
 
       // What rests on any of this, from outside the act itself -- an edge between two things
       // this same event created is the act's own wiring, not a dependent. Unlabeled on both
