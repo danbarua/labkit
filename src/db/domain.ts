@@ -104,7 +104,7 @@ export type EdgeLabel = (typeof EDGE_LABELS)[number];
 /**
  * One change an act made to the graph.
  */
-export type GraphChange = NodeCreated | EdgeCreated | PropsChanged;
+export type GraphChange = NodeCreated | EdgeCreated | PropsChanged | EdgePropsChanged;
 
 /**
  * Distributed over the labels, so `label` picks the property shape exactly as
@@ -135,6 +135,21 @@ export interface PropsChanged {
   change: "PropsChanged";
   id: string;
   props: Record<string, unknown>;
+}
+
+/**
+ * Properties set in place on an edge that already exists.
+ *
+ * Keyed by the triple, because that is an edge's identity here — `createEdge`
+ * treats a repeat of it as a no-op, so re-creating an edge cannot carry new
+ * properties and this is the only way to change them.
+ */
+export interface EdgePropsChanged {
+  change: "EdgePropsChanged";
+  from: string;
+  label: EdgeLabel;
+  to: string;
+  props: EdgeProps;
 }
 
 export type EdgeProps = Record<string, string | number | boolean | number[]>;

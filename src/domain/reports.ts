@@ -184,10 +184,18 @@ const propsChanged = z.strictObject({
   id: z.string(),
   props: z.record(z.string(), z.unknown()),
 });
+const edgePropsChanged = z.strictObject({
+  change: z.literal("EdgePropsChanged"),
+  from: z.string(),
+  label: edgeLabel,
+  to: z.string(),
+  props: z.record(z.string(), z.unknown()),
+});
 const graphChange = z.union([
   nodeCreated,
   edgeCreated,
   propsChanged,
+  edgePropsChanged,
 ]) as unknown as z.ZodType<GraphChange>;
 
 const changesList = z.array(graphChange) as unknown as z.ZodType<readonly GraphChange[]>;

@@ -80,6 +80,8 @@ export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
           holds({ change: "EdgeCreated", from: touching }),
           holds({ change: "EdgeCreated", to: touching }),
           holds({ change: "PropsChanged", id: touching }),
+          holds({ change: "EdgePropsChanged", from: touching }),
+          holds({ change: "EdgePropsChanged", to: touching }),
         );
         if (clause) conditions.push(clause);
       }

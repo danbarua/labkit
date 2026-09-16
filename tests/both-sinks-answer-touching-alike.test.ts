@@ -60,6 +60,15 @@ const ACTS: DomainEvent[] = [
   ]),
   act("undo", "COMP_3", [{ change: "PropsChanged", id: "CLM_1", props: { retracted: true } }]),
   act("note", "NOTE_1", [{ change: "PropsChanged", id: "NOTE_1", props: { text: "x" } }]),
+  act("evaluateCriterion", "CEVAL_2", [
+    {
+      change: "EdgePropsChanged",
+      from: "CRIT_1",
+      label: "GOVERNS",
+      to: "GATE_1",
+      props: { state: "satisfied" },
+    } as GraphChange,
+  ]),
 ];
 
 const sequenceOf = async (sink: EventSink, touching: string): Promise<string[]> => {
@@ -77,7 +86,17 @@ test("both sinks return the same acts for every position touching reaches", asyn
     await inMemory.record(a);
   }
 
-  for (const handle of ["Q_1", "LOE_1", "CLM_1", "EV_1", "NOTE_1", "COMP_1", "CLM_99"]) {
+  for (const handle of [
+    "Q_1",
+    "LOE_1",
+    "CLM_1",
+    "EV_1",
+    "NOTE_1",
+    "COMP_1",
+    "CRIT_1",
+    "GATE_1",
+    "CLM_99",
+  ]) {
     expect(await sequenceOf(durable, handle)).toEqual(await sequenceOf(inMemory, handle));
   }
 });
@@ -98,4 +117,7 @@ test("touching reaches an edge endpoint and a property change, not only what was
   expect(await sequenceOf(durable, "EV_1")).toEqual(["conclude COMP_2"]);
   // Both a subject and an edge's `to`, counted once.
   expect(await sequenceOf(durable, "LOE_1")).toEqual(["analyse COMP_1", "pursue LOE_1"]);
+  // Reached only through a property set on an edge it is an endpoint of.
+  expect(await sequenceOf(durable, "CRIT_1")).toEqual(["evaluateCriterion CEVAL_2"]);
+  expect(await sequenceOf(durable, "GATE_1")).toEqual(["evaluateCriterion CEVAL_2"]);
 });
