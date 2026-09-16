@@ -384,7 +384,7 @@ function recordsOf(
     return {
       evaluation: ref("evaluation", v.evaluation),
       criterion: ref("criterion", criterion),
-      value: v.value ?? "",
+      value: v.value,
       outcome,
       at: v.at,
       basis: v.basis,

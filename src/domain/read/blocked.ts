@@ -54,8 +54,8 @@ export async function blockedBy(
        RETURN c, g, w, closing, stopping`,
     {
       c: vertexProps<Identified>(),
-      g: vertexProps<{ consequence?: string } & Identified>(),
-      w: optional(vertexProps<{ objective?: string } & Identified>()),
+      g: vertexProps<{ consequence: string } & Identified>(),
+      w: optional(vertexProps<{ objective: string } & Identified>()),
       closing: optional(vertexProps<Identified>()),
       stopping: optional(vertexProps<Identified>()),
     },
@@ -69,14 +69,12 @@ export async function blockedBy(
     const criterion = ref("criterion", row.c.natural_id);
     const list = out.get(criterion) ?? [];
     const existing = list.find((b) => b.gate === row.g.natural_id);
-    const work = row.w
-      ? [{ work: ref("work", row.w.natural_id), objective: row.w.objective ?? "" }]
-      : [];
+    const work = row.w ? [{ work: ref("work", row.w.natural_id), objective: row.w.objective }] : [];
     if (existing) existing.gating.push(...work);
     else
       list.push({
         gate: ref("gate", row.g.natural_id),
-        consequence: row.g.consequence ?? "",
+        consequence: row.g.consequence,
         gating: work,
       });
     out.set(criterion, list);
@@ -346,7 +344,7 @@ export class BlockedGroup extends SessionCore {
        OPTIONAL MATCH (stopping:Decision)-[:RESOLVES]->(w)
        RETURN w, stopping`,
       {
-        w: vertexProps<{ objective?: string; kind?: string } & Identified>(),
+        w: vertexProps<{ objective: string; kind?: string } & Identified>(),
         stopping: optional(vertexProps<Identified>()),
       },
       { id: gate },
@@ -372,7 +370,7 @@ export class BlockedGroup extends SessionCore {
         .filter((g) => !g.stopping)
         .map((g) => ({
           work: ref("work", g.w.natural_id),
-          objective: g.w.objective ?? "",
+          objective: g.w.objective,
         })),
       everFailed: criterionOutcomes.some((r) => r.ev.outcome === "fail"),
     };
@@ -412,7 +410,7 @@ export class BlockedGroup extends SessionCore {
        RETURN g, w, stopped`,
       {
         g: vertexProps<{ natural_id: string }>(),
-        w: vertexProps<{ natural_id: string; objective?: string }>(),
+        w: vertexProps<{ natural_id: string; objective: string }>(),
         stopped: optional(vertexProps<{ natural_id: string }>()),
       },
       {},
@@ -423,7 +421,7 @@ export class BlockedGroup extends SessionCore {
       if (row.stopped) continue;
       gating.set(row.g.natural_id, [
         ...(gating.get(row.g.natural_id) ?? []),
-        { work: ref("work", row.w.natural_id), objective: row.w.objective ?? "" },
+        { work: ref("work", row.w.natural_id), objective: row.w.objective },
       ]);
     }
 
@@ -526,7 +524,7 @@ export class BlockedGroup extends SessionCore {
     for (const row of rows) {
       const id = row.t.natural_id;
       const entry = tasks.get(id) ?? {
-        objective: row.t.objective ?? "",
+        objective: row.t.objective,
         gates: new Set<string>(),
         everGated: false,
         implemented: false,

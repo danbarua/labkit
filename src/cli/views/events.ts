@@ -126,7 +126,7 @@ export function renderHappened(
         ? [`         ${p.quiet(`read off ${e.reconstructedFrom}`)}`]
         : [];
       return [
-        `${p.quiet((e.seq === undefined ? "?" : String(e.seq)).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${e.subject}`,
+        `${p.quiet(String(e.seq).padStart(5))}  ${p.quiet(e.at)}  ${p.heading(e.operation)}  ${e.subject}`,
         `         ${p.quiet(`by ${who}`)}${how}${p.quiet(commit)}${minted}`,
         ...args,
         ...source,
@@ -139,17 +139,11 @@ export function renderHappened(
   // list — `.seq > 52` over a default page of 50 — gets an empty answer and
   // cannot otherwise tell it from an empty record.
   if (!more) return rendered;
-  // A cursor is only offered when the last act has one. `?? 0` printed
-  // `--since 0`, which reads the page again from the start.
-  const last = events.at(-1)?.seq;
+  const last = events.at(-1)!.seq;
   return [
     rendered,
     "",
-    ...(last === undefined
-      ? [p.quiet("More acts than this page holds. `--limit` takes a bigger one.")]
-      : [
-          p.quiet(`More acts than this page holds. \`happened --since ${last}\` reads the next,`),
-          p.quiet("or `--limit` takes a bigger one."),
-        ]),
+    p.quiet(`More acts than this page holds. \`happened --since ${last}\` reads the next,`),
+    p.quiet("or `--limit` takes a bigger one."),
   ].join("\n");
 }

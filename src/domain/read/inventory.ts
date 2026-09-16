@@ -79,11 +79,12 @@ export class InventoryGroup extends SessionCore {
       const entry = found.get(row.e.natural_id) ?? {
         enquiry: ref("enquiry", row.e.natural_id),
         approach: row.e.name,
-        pursuing: row.q?.name ?? "",
         runs: 0,
         closed: false,
         units: new Set<string>(),
-        ...(row.q ? { question: ref("question", row.q.natural_id) } : {}),
+        // The handle and the wording together or neither. Held apart, an
+        // enquiry whose question was retracted listed an empty proposition.
+        ...(row.q ? { question: ref("question", row.q.natural_id), pursuing: row.q.name } : {}),
       };
       if (row.u) entry.units.add(row.u.natural_id);
       if (row.closing) entry.closed = true;

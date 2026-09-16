@@ -231,7 +231,7 @@ export class Counting extends SessionCore {
           // `void replacement;` stood here: the amended criterion was created and
           // its handle thrown away, so the report named both conditions by wording
           // and a caller could reach neither.
-          replaced: { criterion: input.criterion, requires: replaced ?? "" },
+          replaced: { criterion: input.criterion, requires: replaced },
           nowRequires: { criterion: replacement, requires: input.nowRequires },
           rerun,
           confirmatoryAffected,

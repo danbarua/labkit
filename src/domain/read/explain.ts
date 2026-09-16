@@ -159,7 +159,7 @@ export class ExplainGroup extends SessionCore {
        RETURN g, w`,
       {
         g: vertexProps<{ natural_id: string; consequence: string }>(),
-        w: optional(vertexProps<{ objective?: string } & Identified>()),
+        w: optional(vertexProps<{ objective: string } & Identified>()),
       },
       { id: criterion },
     );
@@ -173,7 +173,7 @@ export class ExplainGroup extends SessionCore {
       if (r.w)
         existing.protecting.push({
           work: ref("work", r.w.natural_id),
-          objective: r.w.objective ?? "",
+          objective: r.w.objective,
         });
       byGate.set(r.g.natural_id, existing);
     }

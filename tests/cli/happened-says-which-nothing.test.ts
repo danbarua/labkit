@@ -6,12 +6,12 @@
 import { expect, test } from "bun:test";
 import { renderHappened } from "../../src/cli/views/events";
 import { domainEvent, UNATTRIBUTED } from "../../src/domain";
-import type { DomainEvent } from "../../src/domain/events";
+import type { RecordedEvent } from "../../src/domain/events";
 import { PLAIN } from "../../src/cli/palette";
 
-const act = (seq: number | undefined, command: Record<string, unknown>): DomainEvent =>
+const act = (seq: number, command: Record<string, unknown>): RecordedEvent =>
   domainEvent({
-    ...(seq === undefined ? {} : { seq }),
+    seq,
     at: "2026-09-16T09:00:00.000Z",
     attribution: UNATTRIBUTED,
     operation: "undo",
@@ -68,22 +68,4 @@ test("a long argument is cut to a gist, so the log does not become a wall", () =
   );
   for (const line of rendered.split("\n")) expect(line.length).toBeLessThan(140);
   expect(rendered).not.toContain("end");
-});
-
-test("an unsequenced act prints no sequence rather than sequence zero", () => {
-  const rendered = renderHappened(
-    { acts: [act(undefined, {})], more: false, narrowed: false },
-    PLAIN,
-  );
-  expect(rendered.split("\n")[0]).toContain("?");
-  expect(rendered.split("\n")[0]).not.toMatch(/^\s*0\s/);
-});
-
-test("a truncated page of unsequenced acts offers no cursor it cannot honour", () => {
-  const rendered = renderHappened(
-    { acts: [act(undefined, {})], more: true, narrowed: false },
-    PLAIN,
-  );
-  expect(rendered).not.toContain("--since");
-  expect(rendered).toContain("`--limit` takes a bigger one");
 });

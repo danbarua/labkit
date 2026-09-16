@@ -3,7 +3,7 @@
  * Runtime report codecs live in reports.ts; their types are inferred there.
  */
 
-import type { DomainEvent } from "./events";
+import type { RecordedEvent } from "./events";
 import type { ConcludedClaim, Explanation } from "./reports";
 import { GATE_STATES, WORK_STATES } from "./vocab";
 import type { AnyRef, Kind, Ref } from "./ref";
@@ -92,7 +92,7 @@ export type WalkedKind =
   | "observations"
   | "note";
 export type EventPage = {
-  acts: readonly DomainEvent[];
+  acts: readonly RecordedEvent[];
   more: boolean;
   /** The cursor this page was read from, absent when the read started at the beginning. */
   since?: number;
