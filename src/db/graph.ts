@@ -19,6 +19,7 @@ import {
   NODE_TYPES,
   labelForNaturalId,
   type EdgeLabel,
+  type EdgeProps,
   type NodeLabel,
   type NodePropsByLabel,
   type PublicNode,
@@ -131,6 +132,46 @@ export class TenantGraph {
       { id, value },
     );
     if (rows.length === 0) throw new Error(`no ${label} ${id} to set ${key} on`);
+  }
+
+  /**
+   * Sets properties on an existing edge, addressed by its `(from, label, to)` triple.
+   *
+   * `createEdge` treats a repeat of that triple as a no-op, so re-creating an
+   * edge cannot carry new properties. This is the only way to change them.
+   */
+  async setEdgeProperties(
+    fromId: string,
+    edge: EdgeLabel,
+    toId: string,
+    props: EdgeProps,
+  ): Promise<void> {
+    const entries = Object.entries(props);
+    if (entries.length === 0) return;
+    const fromLabel = labelForNaturalId(fromId);
+    const toLabel = labelForNaturalId(toId);
+    const allowed = EDGE_SCHEMA[edge].some(([f, t]) => f === fromLabel && t === toLabel);
+    if (!allowed)
+      throw new Error(`${fromLabel} -[:${edge}]-> ${toLabel} is not a shape this graph holds`);
+
+    const assignments: string[] = [];
+    const params: Record<string, unknown> = { from: fromId, to: toId };
+    for (const [key, value] of entries) {
+      validateIdentifier(key, "property name");
+      // Named after the key so the clause and its binding are written together;
+      // `validateIdentifier` above is what makes the name safe to interpolate.
+      params[`v_${key}`] = value;
+      assignments.push(`r.${key} = $v_${key}`);
+    }
+    const rows = await this.query(
+      `MATCH (a:${fromLabel} {natural_id: $from})-[r:${edge}]->(b:${toLabel} {natural_id: $to})
+       SET ${assignments.join(", ")}
+       RETURN r`,
+      { r: edgeColumn<Record<string, unknown>>() },
+      params,
+    );
+    if (rows.length === 0)
+      throw new Error(`no ${fromId} -[:${edge}]-> ${toId} to set properties on`);
   }
 
   /**

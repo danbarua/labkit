@@ -150,7 +150,11 @@ export const edgesIn = (event: DomainEvent): EdgeCreated[] =>
 export const touchedIn = (event: DomainEvent): string[] => [
   ...new Set(
     event.changes.flatMap((c) =>
-      c.change === "NodeCreated" ? [c.id] : c.change === "EdgeCreated" ? [c.from, c.to] : [c.id],
+      c.change === "NodeCreated"
+        ? [c.id]
+        : c.change === "EdgeCreated" || c.change === "EdgePropsChanged"
+          ? [c.from, c.to]
+          : [c.id],
     ),
   ),
 ];

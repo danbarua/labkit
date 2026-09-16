@@ -58,6 +58,11 @@ export class UnitOfWork {
     this.changes.push({ change: "PropsChanged", id, props });
   }
 
+  /** The same, for a relationship: an edge is addressed by its triple, not an id. */
+  setEdge(from: string, label: EdgeLabel, to: string, props: EdgeProps): void {
+    this.changes.push({ change: "EdgePropsChanged", from, label, to, props });
+  }
+
   delta(): GraphChange[] {
     return this.changes;
   }
@@ -88,6 +93,9 @@ export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promis
       case "PropsChanged":
         for (const [key, value] of Object.entries(change.props))
           await graph.setNodeProperty(change.id, key, value);
+        break;
+      case "EdgePropsChanged":
+        await graph.setEdgeProperties(change.from, change.label, change.to, change.props);
         break;
     }
   }
