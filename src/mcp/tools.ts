@@ -655,11 +655,12 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       return {
         more: page.more,
         events: page.acts.map((e) => ({
-          seq: e.seq ?? 0,
+          ...(e.seq === undefined ? {} : { seq: e.seq }),
           at: e.at,
           operation: e.operation,
           subject: e.subject,
           created: createdIn(e),
+          changes: e.changes as unknown as Record<string, unknown>[],
           attribution_label: e.attribution.attribution_label,
           attribution_id: e.attribution.attribution_id,
           attribution_how: e.attribution.attribution_how,
