@@ -2,13 +2,13 @@
  * The temporal seam.
  */
 
-import type { EdgeCreated, GraphChange, NodeCreated, Prose, PropsChanged } from "../db/domain";
+import type { EdgeCreated, GraphChange, NodeCreated, Prose, NodePropsChanged } from "../db/domain";
 import type { Command } from "./commands";
 import type { EventFilter } from "./queries";
 
 export type { EventFilter };
 
-export type { EdgeCreated, GraphChange, NodeCreated, PropsChanged };
+export type { EdgeCreated, GraphChange, NodeCreated, NodePropsChanged };
 
 /** Injected so scenario tests can assert on exact timestamps instead of racing the wall clock. */
 export interface Clock {
@@ -162,7 +162,7 @@ export const touchedIn = (event: DomainEvent): string[] => [
 /** Every handle an act retracted. `undo` writes these and nothing else. */
 export const retractedIn = (event: DomainEvent): string[] =>
   event.changes.flatMap((c) =>
-    c.change === "PropsChanged" && (c.props as { retracted?: boolean }).retracted === true
+    c.change === "NodePropsChanged" && (c.after as { retracted?: boolean }).retracted === true
       ? [c.id]
       : [],
   );

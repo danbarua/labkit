@@ -180,16 +180,19 @@ const edgeCreated = z.strictObject({
   props: z.record(z.string(), z.unknown()).optional(),
 });
 const propsChanged = z.strictObject({
-  change: z.literal("PropsChanged"),
+  change: z.literal("NodePropsChanged"),
   id: z.string(),
-  props: z.record(z.string(), z.unknown()),
+  /** What the graph held for each of `after`'s keys, so the change can be taken back. */
+  before: z.record(z.string(), z.unknown()),
+  after: z.record(z.string(), z.unknown()),
 });
 const edgePropsChanged = z.strictObject({
   change: z.literal("EdgePropsChanged"),
   from: z.string(),
   label: edgeLabel,
   to: z.string(),
-  props: z.record(z.string(), z.unknown()),
+  before: z.record(z.string(), z.unknown()),
+  after: z.record(z.string(), z.unknown()),
 });
 const graphChange = z.union([
   nodeCreated,

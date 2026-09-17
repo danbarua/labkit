@@ -58,15 +58,20 @@ const ACTS: DomainEvent[] = [
       props: { weight: 1 },
     } as GraphChange,
   ]),
-  act("undo", "COMP_3", [{ change: "PropsChanged", id: "CLM_1", props: { retracted: true } }]),
-  act("note", "NOTE_1", [{ change: "PropsChanged", id: "NOTE_1", props: { text: "x" } }]),
+  act("undo", "COMP_3", [
+    { change: "NodePropsChanged", id: "CLM_1", before: {}, after: { retracted: true } },
+  ]),
+  act("note", "NOTE_1", [
+    { change: "NodePropsChanged", id: "NOTE_1", before: {}, after: { text: "x" } },
+  ]),
   act("evaluateCriterion", "CEVAL_2", [
     {
       change: "EdgePropsChanged",
       from: "CRIT_1",
       label: "GOVERNS",
       to: "GATE_1",
-      props: { state: "satisfied" },
+      before: {},
+      after: { state: "satisfied" },
     } as GraphChange,
   ]),
 ];

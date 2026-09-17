@@ -290,9 +290,10 @@ describe("an event records the edges the act created", () => {
     expect(promoted!.command).toMatchObject({ because: "the prespecified check passed" });
     expect(promoted!.command).not.toHaveProperty("state");
     expect(promoted!.changes).toContainEqual({
-      change: "PropsChanged",
+      change: "NodePropsChanged",
       id: exploratory.claims[0]!.claim,
-      props: { kind: "confirmatory" },
+      before: { kind: "exploratory" },
+      after: { kind: "confirmatory" },
     });
   });
 

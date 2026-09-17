@@ -104,7 +104,7 @@ export type EdgeLabel = (typeof EDGE_LABELS)[number];
 /**
  * One change an act made to the graph.
  */
-export type GraphChange = NodeCreated | EdgeCreated | PropsChanged | EdgePropsChanged;
+export type GraphChange = NodeCreated | EdgeCreated | NodePropsChanged | EdgePropsChanged;
 
 /**
  * Distributed over the labels, so `label` picks the property shape exactly as
@@ -129,12 +129,17 @@ export interface EdgeCreated {
 }
 
 /**
- * Properties set in place on something that already exists.
+ * Properties set in place on a node that already exists.
+ *
+ * `before` is what each of `after`'s keys held when the act ran, so the change
+ * can be taken back. It is captured once, at the seam in `handling()`, where
+ * the graph still holds the old values because no projector has run yet.
  */
-export interface PropsChanged {
-  change: "PropsChanged";
+export interface NodePropsChanged {
+  change: "NodePropsChanged";
   id: string;
-  props: Record<string, unknown>;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
 }
 
 /**
@@ -149,7 +154,8 @@ export interface EdgePropsChanged {
   from: string;
   label: EdgeLabel;
   to: string;
-  props: EdgeProps;
+  before: Record<string, unknown>;
+  after: EdgeProps;
 }
 
 export type EdgeProps = Record<string, string | number | boolean | number[]>;

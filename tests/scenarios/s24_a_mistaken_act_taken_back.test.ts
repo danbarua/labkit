@@ -39,7 +39,7 @@ describe("S-24 — a mistaken act taken back", () => {
     expect(undone.retracted).toContain(question);
   });
 
-  test("refuses to undo an act that set a property in place", async () => {
+  test("puts back the value an act set in place", async () => {
     const { enquiry } = await session.writes.openEnquiry("does depth move convergence?");
     const { observations } = await session.writes.recordObservations({
       enquiry,
@@ -53,13 +53,19 @@ describe("S-24 — a mistaken act taken back", () => {
       concludes: [{ proposition: "depth 8 converges faster", finding: "moves by ~3 steps" }],
     });
     const claim = claims[0]!.claim;
-    const finding = claims[0]!.finding!;
-    const { events } = await session.writes.isUndecided({ claim, because: finding });
-    const seq = events[0]!.seq!;
+    const before = (await session.reads.whySupported({ claim })).standing;
+    expect(before).toBe("exploratory");
 
-    await expect(
-      session.writes.undo({ event: seq, because: "changed my mind about undoing this" }),
-    ).rejects.toThrow(/overwrote a value/);
+    const { events } = await session.writes.isConfirmed({
+      claim,
+      because: "the prespecified check passed",
+    });
+    expect((await session.reads.whySupported({ claim })).standing).toBe("confirmatory");
+
+    // The act mints nothing — it sets a property. Undoing it writes back what
+    // the graph held, which the event carries because nothing had projected yet.
+    await session.writes.undo({ event: events[0]!.seq!, because: "promoted the wrong claim" });
+    expect((await session.reads.whySupported({ claim })).standing).toBe(before);
   });
 
   test("refuses to undo an act something else already rests on", async () => {

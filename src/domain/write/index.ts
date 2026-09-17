@@ -60,7 +60,7 @@ import type {
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
 import type { DomainEvent } from "../events";
-import { naturalIds, UnitOfWork } from "../projection";
+import { snapshotPriorValues, naturalIds, UnitOfWork } from "../projection";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
@@ -238,13 +238,17 @@ export class WriteSurface extends SessionCore {
     return this.graph.inTransaction(async () => {
       const unitOfWork = new UnitOfWork(naturalIds(this.graph));
       const act = await work(unitOfWork);
+      // **Here and nowhere else.** The graph still holds the old values at this
+      // instant -- the act only staged, and the projectors below have not run --
+      // so this is the one point where a change can record what it replaced.
+      const changes = await snapshotPriorValues(this.graph, unitOfWork.delta());
       const recorded = await this.events.record({
         at: this.clock.now(),
         attribution: this.attribution,
         operation,
         subject: act.subject,
         command,
-        changes: unitOfWork.delta(),
+        changes,
         reconstructedFrom: this.reconstructedFrom,
       });
       // The graph is one of these, not the step this used to be. Ordered:
