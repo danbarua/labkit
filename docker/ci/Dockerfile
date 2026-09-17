@@ -19,7 +19,7 @@
 #
 # The bun tag is pinned, as `docker/postgres` pins its base. Bump it in step
 # with `package.json`'s engines and the version CLAUDE.md names.
-FROM oven/bun:1.3.14
+FROM oven/bun:1.4.2
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
