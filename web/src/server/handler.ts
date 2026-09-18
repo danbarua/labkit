@@ -1,6 +1,7 @@
 import { HAL_JSON, LABEL_BY_COLLECTION, type CollectionSlug } from "../hypermedia";
 import { loadCollection, loadResource, loadRoot } from "./resources";
 import type { Runtime } from "./runtime";
+import { graphHandler } from "./graph-handler";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -44,6 +45,7 @@ function isCollectionSlug(value: string): value is CollectionSlug {
 export function isLabkitApiPath(pathname: string, accept: string): boolean {
   if (pathname === "/healthz") return true;
   if (pathname === "/api" || pathname.startsWith("/api/")) return true;
+  if (pathname === "/graph" || pathname.startsWith("/graph/")) return true;
   if (pathname === "/") {
     return acceptsDocument(accept);
   }
@@ -58,12 +60,17 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
 
   const original = new URL(req.url).pathname;
   let path = original;
-  if (path === "/api" || path === "/api/") path = "/";
-  else if (path.startsWith("/api/")) path = path.slice("/api".length) || "/";
 
   if (path === "/healthz") {
     return json({ ok: true, worktree: runtime.worktree, tenant: runtime.tenant });
   }
+
+  // new API
+  if (path.startsWith("/graph")) return (await graphHandler(req, runtime));
+
+  // old API
+  if (path === "/api" || path === "/api/") path = "/";
+  else if (path.startsWith("/api/")) path = path.slice("/api".length) || "/";
 
   if (path === "/") {
     // `/api` is the HAL root for any Accept. `/` with HTML is the SPA and
@@ -79,6 +86,7 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
     if (!isCollectionSlug(slug)) return notFound(`${original} is not a collection`);
     return hal(await loadCollection(runtime.graph, slug));
   }
+  
   if (parts.length === 2) {
     const slug = parts[0]!;
     const n = parts[1]!;

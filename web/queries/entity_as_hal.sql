@@ -203,7 +203,7 @@ BEGIN
         ARRAY[relation_key],
         link_items || jsonb_build_array(
           jsonb_build_object(
-            'href', '/api/' || walk_row.node_id,
+            'href', '/graph/' || walk_row.node_id,
             'dir', walk_row.dir,
             'type', walk_row.node_type
           )
@@ -218,62 +218,62 @@ BEGIN
       );
     ELSE
       path_key := array_to_string(walk_row.path, E'\x1f');
-    embedded := COALESCE(embedded_by_path -> path_key, '{}'::jsonb);
-    links := jsonb_build_object(
-      'self', jsonb_build_object(
-        'href', '/api/' || walk_row.node_id,
-        'type', walk_row.node_type
-      )
-    );
-    IF walk_row.depth = p_depth THEN
-      links := links || COALESCE(boundary_links_by_path -> path_key, '{}'::jsonb);
-    END IF;
-
-    item := COALESCE(walk_row.node_properties, '{}'::jsonb)
-      || jsonb_build_object(
-        'id', walk_row.node_id,
-        'type', walk_row.node_type,
-        'dir', walk_row.dir,
-        'depth', walk_row.depth,
-        '_links', links
+      embedded := COALESCE(embedded_by_path -> path_key, '{}'::jsonb);
+      links := jsonb_build_object(
+        'self', jsonb_build_object(
+          'href', '/graph/' || walk_row.node_id,
+          'type', walk_row.node_type
+        )
       );
-    IF walk_row.depth < p_depth AND embedded <> '{}'::jsonb THEN
-      item := item || jsonb_build_object('_embedded', embedded);
-    END IF;
+      IF walk_row.depth = p_depth THEN
+        links := links || COALESCE(boundary_links_by_path -> path_key, '{}'::jsonb);
+      END IF;
 
-    IF walk_row.parent_id IS NULL THEN
-      result := COALESCE(walk_row.node_properties, '{}'::jsonb)
+      item := COALESCE(walk_row.node_properties, '{}'::jsonb)
         || jsonb_build_object(
           'id', walk_row.node_id,
           'type', walk_row.node_type,
-          '_links', links || jsonb_build_object(
-            'start', jsonb_build_object(
-              'href', '/api/' || walk_row.node_id,
-              'type', walk_row.node_type
-            )
-          )
+          'dir', walk_row.dir,
+          'depth', walk_row.depth,
+          '_links', links
         );
-      IF p_depth > 0 AND embedded <> '{}'::jsonb THEN
-        result := result || jsonb_build_object('_embedded', embedded);
+      IF walk_row.depth < p_depth AND embedded <> '{}'::jsonb THEN
+        item := item || jsonb_build_object('_embedded', embedded);
       END IF;
-    ELSE
-      relation_key := lower('lk:' || walk_row.relation);
-      parent_key := array_to_string(walk_row.path[1:array_length(walk_row.path, 1) - 1], E'\x1f');
-      parent_embedded := COALESCE(embedded_by_path -> parent_key, '{}'::jsonb);
-      relation_items := COALESCE(parent_embedded -> relation_key, '[]'::jsonb);
-      parent_embedded := jsonb_set(
-        parent_embedded,
-        ARRAY[relation_key],
-        relation_items || jsonb_build_array(item),
-        true
-      );
-      embedded_by_path := jsonb_set(
-        embedded_by_path,
-        ARRAY[parent_key],
-        parent_embedded,
-        true
-      );
-    END IF;
+
+      IF walk_row.parent_id IS NULL THEN
+        result := COALESCE(walk_row.node_properties, '{}'::jsonb)
+          || jsonb_build_object(
+            'id', walk_row.node_id,
+            'type', walk_row.node_type,
+            '_links', links || jsonb_build_object(
+              'start', jsonb_build_object(
+                'href', '/graph/' || walk_row.node_id,
+                'type', walk_row.node_type
+              )
+            )
+          );
+        IF p_depth > 0 AND embedded <> '{}'::jsonb THEN
+          result := result || jsonb_build_object('_embedded', embedded);
+        END IF;
+      ELSE
+        relation_key := lower('lk:' || walk_row.relation);
+        parent_key := array_to_string(walk_row.path[1:array_length(walk_row.path, 1) - 1], E'\x1f');
+        parent_embedded := COALESCE(embedded_by_path -> parent_key, '{}'::jsonb);
+        relation_items := COALESCE(parent_embedded -> relation_key, '[]'::jsonb);
+        parent_embedded := jsonb_set(
+          parent_embedded,
+          ARRAY[relation_key],
+          relation_items || jsonb_build_array(item),
+          true
+        );
+        embedded_by_path := jsonb_set(
+          embedded_by_path,
+          ARRAY[parent_key],
+          parent_embedded,
+          true
+        );
+      END IF;
     END IF;
   END LOOP;
 
