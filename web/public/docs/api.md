@@ -6,17 +6,18 @@ Machine-readable description: [/docs/openapi.json](/docs/openapi.json). Discover
 
 ## Workspaces
 
-Everything below is scoped to a workspace, one research project's graph. Bare `/graph` and `/collections` are the default workspace. To read another, put `/workspace/{slug}` in front:
+Everything below is scoped to a workspace, one research project's graph. Bare `/graph` and `/collections` are the default workspace. To read another, address it as `/workspace/{slug}`:
 
 ```
-GET /graph/{id}                          the default workspace
-GET /workspace/{slug}/graph/{id}         another one
-GET /workspace/{slug}/collections/{type}
+GET /workspace/{slug}                a workspace's collections, one per node type
+GET /workspace/{slug}/{type}         one collection
+GET /workspace/{slug}/graph/{id}     one entity
 ```
 
-- `/collections/workspace` lists the workspaces, each with links to its `graph` and `collections`. It is offered from the default workspace only, since workspaces are not nested.
+- A workspace is a collection. `/collections/workspace` lists them, and each item's address is the workspace itself, with a link to its `graph`. That collection is offered from the default workspace only, since workspaces are not nested.
 - A slug that does not exist is a 404. A workspace never falls back to another one's data.
 - Links in a response keep you in the workspace you arrived by. `/workspace/{slug}/graph/{id}` links to `/workspace/{slug}/graph/…`, and the bare form links to the bare form.
+- `graph` is not a collection name, so it cannot clash with a node type.
 - `/sitemap.xml` and `/.well-known/api-catalog` describe the default workspace only.
 
 ## Entities: `/graph/{id}`

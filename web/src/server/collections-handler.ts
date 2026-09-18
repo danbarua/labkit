@@ -19,6 +19,9 @@ const LABEL_BY_SLUG = new Map<string, NodeLabel>(NODE_LABELS.map((label) => [slu
 // Not a node type: workspaces are the tenants, and only the default workspace can see them all.
 const WORKSPACE_SLUG = "workspace";
 
+// Inside a workspace a collection sits at the same path level as `graph`.
+if (LABEL_BY_SLUG.has("graph")) throw new Error("a node type cannot have the slug `graph`");
+
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
@@ -34,16 +37,16 @@ function collectionJson(collection: Record<string, unknown>): Response {
   });
 }
 
-// `/collections` lists one collection per node type, and the workspaces from the default one.
-function index(base: string, scope: TenantScope): Response {
+// The index lists one collection per node type, and the workspaces from the default workspace.
+function index(root: string, withWorkspaces: boolean): Response {
   const entries = [
     ...NODE_LABELS.map((label) => ({ slug: slugFor(label), type: label as string })),
-    ...(scope.isDefault ? [{ slug: WORKSPACE_SLUG, type: "Workspace" }] : []),
+    ...(withWorkspaces ? [{ slug: WORKSPACE_SLUG, type: "Workspace" }] : []),
   ];
   return collectionJson({
-    href: `${base}/collections`,
+    href: root,
     items: entries.map((entry) => ({
-      href: `${base}/collections/${entry.slug}`,
+      href: `${root}/${entry.slug}`,
       data: [
         { name: "slug", value: entry.slug },
         { name: "type", value: entry.type },
@@ -53,14 +56,14 @@ function index(base: string, scope: TenantScope): Response {
 }
 
 function pagingLinks(
-  base: string,
+  root: string,
   self: string,
   limit: number,
   offset: number,
   hasMore: boolean,
 ): { rel: string; href: string }[] {
   const pageHref = (o: number) => `${self}?limit=${limit}&offset=${o}`;
-  const links = [{ rel: "index", href: `${base}/collections` }];
+  const links = [{ rel: "index", href: root }];
   if (offset > 0) links.push({ rel: "prev", href: pageHref(Math.max(offset - limit, 0)) });
   if (hasMore) links.push({ rel: "next", href: pageHref(offset + limit) });
   return links;
@@ -101,12 +104,18 @@ async function outboundLinks(
   return links;
 }
 
-// `/collections/:slug` lists the live nodes of one type: id, type, what each links to, and, where
+// A collection lists the live nodes of one type: id, type, what each links to, and, where
 // the type has one, its main text as `name`. A type with no text of its own is described by its
 // other properties instead.
-async function listing(req: Request, scope: TenantScope, label: NodeLabel): Promise<Response> {
+async function listing(
+  req: Request,
+  scope: TenantScope,
+  root: string,
+  label: NodeLabel,
+): Promise<Response> {
   const url = new URL(req.url);
-  const base = publicOrigin(req).origin + scope.prefix;
+  const origin = publicOrigin(req).origin;
+  const base = origin + scope.prefix;
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
   const nameProp = SEARCHABLE_TEXT[label]?.[0];
@@ -130,11 +139,11 @@ async function listing(req: Request, scope: TenantScope, label: NodeLabel): Prom
   const page = rows.slice(0, limit);
   const links = await outboundLinks(scope, label, page.map((row) => row.id), base);
 
-  const self = `${base}/collections/${slugFor(label)}`;
+  const self = `${root}/${slugFor(label)}`;
 
   return collectionJson({
     href: `${self}?limit=${limit}&offset=${offset}`,
-    links: pagingLinks(base, self, limit, offset, rows.length > limit),
+    links: pagingLinks(root, self, limit, offset, rows.length > limit),
     items: page.map((row) => {
       const data: Data[] = [
         { name: "id", value: row.id },
@@ -155,46 +164,70 @@ async function listing(req: Request, scope: TenantScope, label: NodeLabel): Prom
   });
 }
 
-// `/collections/workspace`: each workspace, and where its graph and collections live.
-async function workspaceListing(req: Request, scope: TenantScope): Promise<Response> {
+// `/collections/workspace`: each workspace. A workspace is a collection, and its address is its
+// index.
+async function workspaceListing(
+  req: Request,
+  scope: TenantScope,
+  root: string,
+): Promise<Response> {
   const url = new URL(req.url);
   const origin = publicOrigin(req).origin;
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
   const rows = (await scope.workspaces()).slice(offset, offset + limit + 1);
 
-  const self = `${origin}/collections/${WORKSPACE_SLUG}`;
+  const self = `${root}/${WORKSPACE_SLUG}`;
   return collectionJson({
     href: `${self}?limit=${limit}&offset=${offset}`,
-    links: pagingLinks(origin, self, limit, offset, rows.length > limit),
+    links: pagingLinks(root, self, limit, offset, rows.length > limit),
     items: rows.slice(0, limit).map((workspace) => {
-      const root = `${origin}/workspace/${encodeURIComponent(workspace.slug)}`;
+      const address = `${origin}/workspace/${encodeURIComponent(workspace.slug)}`;
       return {
-        href: `${root}/collections`,
+        href: address,
         data: [
           { name: "slug", value: workspace.slug },
           { name: "name", value: workspace.displayName },
         ],
-        links: [
-          { rel: "graph", href: `${root}/graph` },
-          { rel: "collections", href: `${root}/collections` },
-        ],
+        links: [{ rel: "graph", href: `${address}/graph` }],
       };
     }),
   });
 }
 
-// `path` is the request path with any workspace prefix already taken off.
-export async function collectionsHandler(
+// The collection called `name`, or the index when it is empty. `root` is where this workspace's
+// collections are addressed from; only the root handler offers the workspaces.
+function serve(
+  req: Request,
+  scope: TenantScope,
+  root: string,
+  name: string,
+  withWorkspaces: boolean,
+): Promise<Response> | Response {
+  if (name === "") return index(root, withWorkspaces);
+  if (name === WORKSPACE_SLUG && withWorkspaces) return workspaceListing(req, scope, root);
+
+  const label = LABEL_BY_SLUG.get(name);
+  if (label === undefined) return problem(404, "Not Found", `${name} is not a collection`);
+  return listing(req, scope, root, label);
+}
+
+// `/collections` and `/collections/{type}`: the default workspace, and the list of workspaces.
+export async function rootCollectionsHandler(
   req: Request,
   scope: TenantScope,
   path: string,
 ): Promise<Response> {
-  const slug = path.replace(/^\/collections\/?/, "").replace(/\/$/, "");
-  if (slug === "") return index(publicOrigin(req).origin + scope.prefix, scope);
-  if (slug === WORKSPACE_SLUG && scope.isDefault) return workspaceListing(req, scope);
+  const name = path.replace(/^\/collections\/?/, "").replace(/\/$/, "");
+  return serve(req, scope, `${publicOrigin(req).origin}/collections`, name, true);
+}
 
-  const label = LABEL_BY_SLUG.get(slug);
-  if (label === undefined) return problem(404, "Not Found", `${slug} is not a collection`);
-  return listing(req, scope, label);
+// `/workspace/{slug}` and `/workspace/{slug}/{type}`. `rest` is what follows the slug.
+export async function workspaceCollectionsHandler(
+  req: Request,
+  scope: TenantScope,
+  rest: string,
+): Promise<Response> {
+  const name = rest.replace(/^\//, "").replace(/\/$/, "");
+  return serve(req, scope, `${publicOrigin(req).origin}${scope.prefix}`, name, false);
 }

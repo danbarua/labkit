@@ -1,5 +1,5 @@
 import { withTenant, type Runtime, type TenantScope } from "./runtime";
-import { collectionsHandler } from "./collections-handler";
+import { rootCollectionsHandler, workspaceCollectionsHandler } from "./collections-handler";
 import { docsHandler } from "./docs-handler";
 import { apiCatalogHandler, graphHandler, sitemapHandler } from "./graph-handler";
 
@@ -85,9 +85,10 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
   return withCors(req, await route(req, runtime));
 }
 
-// `/workspace/{slug}` in front of `/graph…` or `/collections…` selects a workspace. The same paths
-// without it are the default workspace.
-const WORKSPACE_PATH = /^\/workspace\/([^/]+)(\/(?:graph|collections)(?:\/.*)?)$/;
+// `/workspace/{slug}` is a workspace's collections, `/workspace/{slug}/graph…` its graph, and
+// `/workspace/{slug}/{type}` one collection. The bare `/graph` and `/collections…` are the default
+// workspace.
+const WORKSPACE_PATH = /^\/workspace\/([^/]+)(\/.*)?$/;
 
 async function inWorkspace(
   runtime: Runtime,
@@ -103,9 +104,18 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
   }
 
   const original = new URL(req.url).pathname;
+  let path = original;
+
   const workspace = WORKSPACE_PATH.exec(original);
-  const slug = workspace ? decodeURIComponent(workspace[1]!) : undefined;
-  let path = workspace ? workspace[2]! : original;
+  if (workspace) {
+    const slug = decodeURIComponent(workspace[1]!);
+    const rest = workspace[2] ?? "";
+    console.debug("request: workspace", slug, rest);
+    if (rest === "/graph" || rest.startsWith("/graph/")) {
+      return inWorkspace(runtime, slug, (scope) => graphHandler(req, scope, rest));
+    }
+    return inWorkspace(runtime, slug, (scope) => workspaceCollectionsHandler(req, scope, rest));
+  }
 
   if (path === "/healthz") {
     console.debug("request: health check", path);
@@ -119,7 +129,7 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
 
   if (path === "/collections" || path.startsWith("/collections/")) {
     console.debug("request: collections", path);
-    return inWorkspace(runtime, slug, (scope) => collectionsHandler(req, scope, path));
+    return inWorkspace(runtime, undefined, (scope) => rootCollectionsHandler(req, scope, path));
   }
 
   if (path === "/.well-known/api-catalog") {
@@ -135,7 +145,7 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
   // new API
   if (path.startsWith("/graph")) {
     console.debug("request: graph", path);
-    return inWorkspace(runtime, slug, (scope) => graphHandler(req, scope, path));
+    return inWorkspace(runtime, undefined, (scope) => graphHandler(req, scope, path));
   }
 
   if (path === "/") {

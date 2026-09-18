@@ -32,8 +32,6 @@ export interface Workspace {
 export interface TenantScope {
   slug: string;
   graphName: string;
-  /** True for the workspace that bare paths resolve to. */
-  isDefault: boolean;
   /** Prepended to every path this scope links to: empty for the default workspace. */
   prefix: string;
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
@@ -92,7 +90,6 @@ export async function withTenant<T>(
       const result = await work({
         slug: row.slug,
         graphName: row.graph_name,
-        isDefault: slug === undefined,
         prefix: slug === undefined ? "" : `/workspace/${encodeURIComponent(row.slug)}`,
         query: async <R = Record<string, unknown>>(sql: string, params?: unknown[]) => {
           const r = await client.query(sql, params);

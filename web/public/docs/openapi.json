@@ -218,9 +218,9 @@
         }
       }
     },
-    "/workspace/{slug}/collections": {
+    "/workspace/{slug}": {
       "get": {
-        "summary": "One collection per node type (in a workspace)",
+        "summary": "A workspace's collections: one per node type",
         "responses": {
           "200": {
             "description": "A Collection+JSON document.",
@@ -246,9 +246,9 @@
         ]
       }
     },
-    "/workspace/{slug}/collections/{type}": {
+    "/workspace/{slug}/{type}": {
       "get": {
-        "summary": "The live nodes of one type: id, type and name (in a workspace)",
+        "summary": "The live nodes of one type, in a workspace",
         "parameters": [
           {
             "name": "slug",
@@ -263,7 +263,7 @@
             "name": "type",
             "in": "path",
             "required": true,
-            "description": "A slug from /collections, e.g. question, claim, evidence-unit.",
+            "description": "A slug from the workspace index, e.g. question, claim, evidence-unit.",
             "schema": {
               "type": "string"
             }

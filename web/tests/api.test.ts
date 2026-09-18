@@ -224,7 +224,7 @@ describe.skipIf(!serverUrl)("workspaces", () => {
 
   test("a handle that only exists in another workspace is a 404, not a fallback", async () => {
     expect((await get("/workspace/beta/graph/LOE_1")).status).toBe(404);
-    expect((await get("/workspace/beta/collections/enquiry")).body.collection.items).toEqual([]);
+    expect((await get("/workspace/beta/enquiry")).body.collection.items).toEqual([]);
   });
 
   test("an unknown workspace is a 404", async () => {
@@ -251,10 +251,17 @@ describe.skipIf(!serverUrl)("workspaces", () => {
     expect(r.res.headers.get("location")).toBe(`${PUBLIC}/workspace/beta/graph/Q_1`);
   });
 
-  test("only /graph and /collections are workspace routes", async () => {
+  test("inside a workspace, only graph and the collections are routes", async () => {
     expect((await get("/workspace/alpha/sitemap.xml")).status).toBe(404);
-    expect((await get("/workspace/alpha")).status).toBe(404);
     expect((await get("/workspace/alpha/docs/")).status).toBe(404);
+    expect((await get("/workspace/alpha/collections")).status).toBe(404);
+    expect((await get("/workspace/alpha/question/extra")).status).toBe(404);
+  });
+
+  test("no node type is called graph, which would clash with the graph path", async () => {
+    const index = await get("/collections");
+    const slugs = index.body.collection.items.map((i: any) => dataOf(i).slug);
+    expect(slugs).not.toContain("graph");
   });
 
   test("interleaved requests to different workspaces never cross", async () => {
@@ -301,12 +308,22 @@ describe.skipIf(!serverUrl)("collections", () => {
     expect(r.body.collection.items[0].href).toBe(`${PUBLIC}/collections/question`);
   });
 
-  test("another workspace's index does not list workspaces", async () => {
-    const r = await get("/workspace/beta/collections");
+  test("a workspace's own address is its collections index, and does not list workspaces", async () => {
+    const r = await get("/workspace/beta");
+    expect(r.status).toBe(200);
+    expect(r.type).toBe("application/vnd.collection+json");
+    expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/beta`);
     const slugs = r.body.collection.items.map((i: any) => dataOf(i).slug);
     expect(slugs).toContain("question");
     expect(slugs).not.toContain("workspace");
-    expect((await get("/workspace/beta/collections/workspace")).status).toBe(404);
+    expect(r.body.collection.items[0].href).toBe(`${PUBLIC}/workspace/beta/question`);
+    expect((await get("/workspace/beta/workspace")).status).toBe(404);
+  });
+
+  test("a trailing slash on a workspace address is the same index", async () => {
+    const r = await get("/workspace/beta/");
+    expect(r.status).toBe(200);
+    expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/beta`);
   });
 
   test("an item has id, type and the type's main text as name", async () => {
@@ -362,19 +379,19 @@ describe.skipIf(!serverUrl)("collections", () => {
     expect(r.type).toBe("application/problem+json");
   });
 
-  test("workspace lists every workspace with links to its graph and collections", async () => {
+  test("workspace lists every workspace, each addressed by its own index, with a link to its graph", async () => {
     const r = await get("/collections/workspace");
     const items = r.body.collection.items;
     expect(items.map((i: any) => dataOf(i).slug)).toEqual(["alpha", "beta"]);
-    expect(items[1].links).toEqual([
-      { rel: "graph", href: `${PUBLIC}/workspace/beta/graph` },
-      { rel: "collections", href: `${PUBLIC}/workspace/beta/collections` },
-    ]);
+    expect(items[1].href).toBe(`${PUBLIC}/workspace/beta`);
+    expect(items[1].links).toEqual([{ rel: "graph", href: `${PUBLIC}/workspace/beta/graph` }]);
   });
 
   test("collection links stay in the workspace", async () => {
-    const r = await get("/workspace/beta/collections/question");
-    for (const href of hrefs(r.body)) expect(href.startsWith(`${PUBLIC}/workspace/beta/`)).toBe(true);
+    const r = await get("/workspace/beta/question");
+    for (const href of hrefs(r.body)) expect(href.startsWith(`${PUBLIC}/workspace/beta`)).toBe(true);
+    expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/beta/question?limit=50&offset=0`);
+    expect(r.body.collection.links[0]).toEqual({ rel: "index", href: `${PUBLIC}/workspace/beta` });
     expect(dataOf(r.body.collection.items[0]).name).toBe("beta question");
   });
 });
