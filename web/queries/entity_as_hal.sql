@@ -42,8 +42,9 @@ $function$;
 
 
 CREATE OR REPLACE FUNCTION public.entity_as_hal(
+  p_graph_name text,
   p_natural_id text,
-  p_depth integer DEFAULT 1
+  p_depth integer
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -86,7 +87,7 @@ BEGIN
         trim(both '"' FROM natural_id::text) AS id,
         properties_text::text AS properties_text
       FROM ag_catalog.cypher(
-        'labkit_t1'::name,
+        %L::name,
         $$MATCH (n:%s)
           WHERE n.natural_id = %L
             AND n.retracted IS NULL
@@ -107,7 +108,7 @@ BEGIN
         regexp_replace(target_type::text, '^\["([^"]+)"\]$', '\1') AS target_type,
         target_properties::text AS target_properties
       FROM ag_catalog.cypher(
-        'labkit_t1'::name,
+        %L::name,
         $$
           MATCH (a)-[r]->(b)
           WHERE a.retracted IS NULL
@@ -191,7 +192,7 @@ BEGIN
     SELECT node_id, parent_id, relation, dir, depth, path, node_type, node_properties
     FROM walk
     ORDER BY depth DESC, path
-  $sql$, root_label, p_natural_id, root_label, p_depth + 1)
+  $sql$, p_graph_name, root_label, p_natural_id, p_graph_name, root_label, p_depth + 1)
   LOOP
     IF walk_row.depth = p_depth + 1 THEN
       relation_key := lower(
@@ -295,6 +296,6 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.entity_as_hal(text, integer)
+ALTER FUNCTION public.entity_as_hal(text, text, integer)
 SET search_path = ag_catalog;
 

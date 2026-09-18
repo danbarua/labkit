@@ -1,4 +1,4 @@
-import type { Runtime } from "./runtime";
+import { withTenant, type Runtime, type TenantScope } from "./runtime";
 import { collectionsHandler } from "./collections-handler";
 import { docsHandler } from "./docs-handler";
 import { apiCatalogHandler, graphHandler, sitemapHandler } from "./graph-handler";
@@ -48,6 +48,7 @@ export function isLabkitApiPath(pathname: string, accept: string): boolean {
   if (pathname === "/api" || pathname.startsWith("/api/")) return true;
   if (pathname === "/docs" || pathname.startsWith("/docs/")) return true;
   if (pathname === "/collections" || pathname.startsWith("/collections/")) return true;
+  if (pathname.startsWith("/workspace/")) return true;
   if (pathname === "/graph" || pathname.startsWith("/graph/")) return true;
   if (pathname === "/") {
     return acceptsDocument(accept);
@@ -84,17 +85,31 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
   return withCors(req, await route(req, runtime));
 }
 
+// `/workspace/{slug}` in front of `/graph…` or `/collections…` selects a workspace. The same paths
+// without it are the default workspace.
+const WORKSPACE_PATH = /^\/workspace\/([^/]+)(\/(?:graph|collections)(?:\/.*)?)$/;
+
+async function inWorkspace(
+  runtime: Runtime,
+  slug: string | undefined,
+  work: (scope: TenantScope) => Promise<Response>,
+): Promise<Response> {
+  return (await withTenant(runtime, slug, work)) ?? notFound(`workspace ${slug} does not exist`);
+}
+
 async function route(req: Request, runtime: Runtime): Promise<Response> {
   if (req.method !== "GET") {
     return problem(405, "Method Not Allowed", `${req.method} is not GET`);
   }
 
   const original = new URL(req.url).pathname;
-  let path = original;
+  const workspace = WORKSPACE_PATH.exec(original);
+  const slug = workspace ? decodeURIComponent(workspace[1]!) : undefined;
+  let path = workspace ? workspace[2]! : original;
 
   if (path === "/healthz") {
     console.debug("request: health check", path);
-    return json({ ok: true, worktree: runtime.worktree, tenant: runtime.tenant });
+    return json({ ok: true, worktree: runtime.worktree });
   }
 
   if (path === "/docs" || path.startsWith("/docs/")) {
@@ -104,7 +119,7 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
 
   if (path === "/collections" || path.startsWith("/collections/")) {
     console.debug("request: collections", path);
-    return collectionsHandler(req, runtime);
+    return inWorkspace(runtime, slug, (scope) => collectionsHandler(req, scope, path));
   }
 
   if (path === "/.well-known/api-catalog") {
@@ -114,13 +129,13 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
 
   if (path === "/sitemap.xml") {
     console.debug("request: sitemap", path);
-    return sitemapHandler(req, runtime);
+    return inWorkspace(runtime, undefined, (scope) => sitemapHandler(req, scope));
   }
 
   // new API
   if (path.startsWith("/graph")) {
     console.debug("request: graph", path);
-    return await graphHandler(req, runtime);
+    return inWorkspace(runtime, slug, (scope) => graphHandler(req, scope, path));
   }
 
   if (path === "/") {

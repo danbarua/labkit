@@ -4,6 +4,21 @@ A read-only view of the LabKit research graph. Every response is JSON. Errors ar
 
 Machine-readable description: [/docs/openapi.json](/docs/openapi.json). Discovery: [/.well-known/api-catalog](/.well-known/api-catalog), [/sitemap.xml](/sitemap.xml).
 
+## Workspaces
+
+Everything below is scoped to a workspace, one research project's graph. Bare `/graph` and `/collections` are the default workspace. To read another, put `/workspace/{slug}` in front:
+
+```
+GET /graph/{id}                          the default workspace
+GET /workspace/{slug}/graph/{id}         another one
+GET /workspace/{slug}/collections/{type}
+```
+
+- `/collections/workspace` lists the workspaces, each with links to its `graph` and `collections`. It is offered from the default workspace only, since workspaces are not nested.
+- A slug that does not exist is a 404. A workspace never falls back to another one's data.
+- Links in a response keep you in the workspace you arrived by. `/workspace/{slug}/graph/{id}` links to `/workspace/{slug}/graph/…`, and the bare form links to the bare form.
+- `/sitemap.xml` and `/.well-known/api-catalog` describe the default workspace only.
+
 ## Entities: `/graph/{id}`
 
 An entity is addressed by its handle, a type prefix and a number (`Q_1`, `CLM_3`). `application/hal+json`.
@@ -43,7 +58,7 @@ Every item has `data` entries `id` and `type`. Beyond that, nothing about the do
 
 | An item shows | Taken from |
 |---|---|
-| The collections, and their `{type}` slugs | The domain's list of node types. The slug is the type name in kebab case (`evidence-unit`). A few are shortened by hand (`enquiry`, `evaluation`). |
+| The collections, and their `{type}` slugs | The domain's list of node types, plus `workspace`. The slug is the type name in kebab case (`evidence-unit`). A few are shortened by hand (`enquiry`, `evaluation`). |
 | `name` | The first of the type's searchable text properties in the domain. It is whatever that type considers its main text: a title, a statement, a reason. |
 | The node's other scalar properties, when the type has no `name` | The node itself. A type with no text of its own is described by what it carries (`role`) and by what it links to. |
 | `links` | The node's outbound relations. Each is `{rel, href, name}`, with `rel` the lower-cased edge label and `name` the target's handle. |

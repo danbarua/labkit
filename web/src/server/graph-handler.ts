@@ -1,4 +1,4 @@
-import type { Runtime } from "./runtime";
+import type { TenantScope } from "./runtime";
 import { DatabaseError } from "pg";
 // Bare links return one hop of neighbours. MAX_DEPTH mirrors the limit in entity_as_hal.
 const DEFAULT_DEPTH = 1;
@@ -19,16 +19,21 @@ export function problem(status: number, title: string, detail?: string): Respons
   );
 }
 
-export async function graphHandler(req: Request, runtime: Runtime): Promise<Response> {
+// `path` is the request path with any workspace prefix already taken off.
+export async function graphHandler(
+  req: Request,
+  scope: TenantScope,
+  path: string,
+): Promise<Response> {
   if (!URL.canParse(req.url)) {
     throw Error("Invalid URL");
   }
 
-  const m = MATCHER.exec(req.url);
+  const m = MATCHER.exec({ pathname: path });
   const id = m?.pathname.groups.id;
   if (!id) {
     console.log("request: /graph without id, redirecting to /graph/Q_1", req.url);
-    return Response.redirect(new URL("/graph/Q_1", req.url), 302);
+    return Response.redirect(new URL(`${scope.prefix}/graph/Q_1`, publicOrigin(req)), 302);
   }
 
   const url = new URL(req.url);
@@ -39,7 +44,8 @@ export async function graphHandler(req: Request, runtime: Runtime): Promise<Resp
   }
 
   try {
-    const queryResult = await runtime.connection.db.query("SELECT entity_as_hal($1, $2)", [
+    const queryResult = await scope.query("SELECT entity_as_hal($1, $2, $3)", [
+      scope.graphName,
       id,
       depth,
     ]);
@@ -52,9 +58,13 @@ export async function graphHandler(req: Request, runtime: Runtime): Promise<Resp
     // Links carry the depth that was applied, so following one repeats this view.
     const search = new URLSearchParams(url.search);
     search.set("depth", String(depth));
-    const converted = populateLinks(resource, req, `?${search}`);
+    const converted = populateLinks(resource, {
+      origin: publicOrigin(req).origin,
+      search: `?${search}`,
+      prefix: scope.prefix,
+    });
     (converted._links as Record<string, unknown>).expand = {
-      href: `${publicOrigin(req).origin}/graph/${id}{?depth}`,
+      href: `${publicOrigin(req).origin}${scope.prefix}/graph/${id}{?depth}`,
       templated: true,
       title: `depth: hops of neighbours to embed, 0 to ${MAX_DEPTH}`,
     };
@@ -90,11 +100,11 @@ export function publicOrigin(req: Request): URL {
 }
 
 // Every live Question is an entry point into /graph; the rest of the graph is reached by following links.
-export async function sitemapHandler(req: Request, runtime: Runtime): Promise<Response> {
-  const result = await runtime.connection.db.query(`
+export async function sitemapHandler(req: Request, scope: TenantScope): Promise<Response> {
+  const result = await scope.query<{ id: string }>(`
         SELECT trim(both '"' FROM natural_id::text) AS id
         FROM ag_catalog.cypher(
-            'labkit_t1'::name,
+            '${scope.graphName}'::name,
             $$MATCH (n:Question)
               WHERE n.retracted IS NULL
               RETURN n.natural_id
@@ -106,7 +116,7 @@ export async function sitemapHandler(req: Request, runtime: Runtime): Promise<Re
     "/docs/",
     "/docs/api.md",
     "/collections",
-    ...result.rows.map((row) => `/graph/${(row as { id: string }).id}`),
+    ...result.rows.map((row) => `${scope.prefix}/graph/${row.id}`),
   ];
   const urls = paths.map((p) => `  <url><loc>${xmlEscape(origin + p)}</loc></url>`).join("\n");
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
@@ -135,9 +145,14 @@ export function apiCatalogHandler(req: Request): Response {
   });
 }
 
+interface LinkContext {
+  origin: string;
+  search: string;
+  prefix: string;
+}
+
 // walk through the resource and convert _links to absolute URLs
-function populateLinks(obj: any, req: Request, queryString: string): Record<string, unknown> {
-  const baseUrl = publicOrigin(req);
+function populateLinks(obj: any, ctx: LinkContext): Record<string, unknown> {
   if (obj && typeof obj === "object") {
     for (const key of Object.keys(obj)) {
       if (key === "_links" && typeof obj[key] === "object") {
@@ -148,7 +163,7 @@ function populateLinks(obj: any, req: Request, queryString: string): Record<stri
             : absolute(linkValue);
         }
       } else {
-        populateLinks(obj[key], req, queryString);
+        populateLinks(obj[key], ctx);
       }
     }
 
@@ -159,8 +174,8 @@ function populateLinks(obj: any, req: Request, queryString: string): Record<stri
 
   function absolute(link: any) {
     if (!link || typeof link !== "object" || !link.href) return link;
-    const absoluteUrl = new URL(link.href, baseUrl.origin);
-    absoluteUrl.search = queryString;
+    const absoluteUrl = new URL(ctx.prefix + link.href, ctx.origin);
+    absoluteUrl.search = ctx.search;
     return { ...link, href: absoluteUrl.toString() };
   }
 }
