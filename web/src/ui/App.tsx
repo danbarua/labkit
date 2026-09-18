@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay, type ViewMode } from "./GraphView";
+import {
+  GraphView,
+  type GraphEdgeSeed,
+  type GraphNodeSeed,
+  type Overlay,
+  type ViewMode,
+} from "./GraphView";
 import { fetchResource, START_HREF, type Resource } from "./graph-api";
 import { ResourcePanel } from "./ResourcePanel";
 import "./graph.css";

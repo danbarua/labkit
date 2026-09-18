@@ -160,4 +160,3 @@ function labelFromId(naturalId: string): NodeLabel {
   if (!entry) throw new Error(`unrecognized natural id prefix in "${naturalId}"`);
   return entry[0];
 }
-
