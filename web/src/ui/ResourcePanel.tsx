@@ -1,14 +1,9 @@
 import { Fragment, type MouseEvent } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import {
-  asResourceArray,
-  isEdgeLabel,
-  type HalResource,
-  type ResourceDocument,
-} from "../hypermedia";
+import type { Neighbor, Resource } from "./graph-api";
 
 export interface ResourcePanelProps {
-  resource: ResourceDocument | null;
+  resource: Resource | null;
   error: string | null;
   loading: boolean;
   onNavigate: (href: string) => void;
@@ -44,7 +39,7 @@ function LinkRel({
   onNavigate,
 }: {
   label: string;
-  neighbors: HalResource[];
+  neighbors: Neighbor[];
   currentId: string | undefined;
   onNavigate: (href: string) => void;
 }) {
@@ -53,9 +48,9 @@ function LinkRel({
       <h4>{label}</h4>
       <ul>
         {neighbors.map((neighbor) => {
-          const href = neighbor._links.self.href;
+          const href = neighbor.href;
           return (
-            <li key={`${label}:${neighbor.dir ?? ""}:${neighbor.id}:${href}`}>
+            <li key={`${label}:${neighbor.dir}:${neighbor.id}`}>
               <a
                 href={href}
                 data-id={neighbor.id}
@@ -77,15 +72,14 @@ function EmbeddedRels({
   resource,
   onNavigate,
 }: {
-  resource: ResourceDocument;
+  resource: Resource;
   onNavigate: (href: string) => void;
 }) {
-  const entries: [string, HalResource[]][] = [];
-  for (const [rel, value] of Object.entries(resource._embedded ?? {})) {
-    if (!isEdgeLabel(rel)) continue;
-    const neighbors = asResourceArray(value);
-    if (neighbors.length > 0) entries.push([rel, neighbors]);
+  const byRel = new Map<string, Neighbor[]>();
+  for (const neighbor of resource.neighbors) {
+    byRel.set(neighbor.rel, [...(byRel.get(neighbor.rel) ?? []), neighbor]);
   }
+  const entries = [...byRel.entries()];
   return (
     <section>
       <h3>links</h3>
@@ -127,7 +121,7 @@ export function ResourcePanel({ resource, error, loading, onNavigate }: Resource
     );
   }
 
-  const properties = resource.properties ?? {};
+  const properties = resource.properties;
   const propKeys = Object.keys(properties);
 
   return (
@@ -137,7 +131,7 @@ export function ResourcePanel({ resource, error, loading, onNavigate }: Resource
           <h2>Resource</h2>
           <div className="kind">{resource.type}</div>
           <div className="handle">{resource.id}</div>
-          <div className="href">{resource._links.self.href}</div>
+          <div className="href">{resource.href}</div>
           {loading ? <div className="empty">loading…</div> : null}
 
           <h3>properties</h3>

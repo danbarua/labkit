@@ -194,7 +194,12 @@ BEGIN
   $sql$, root_label, p_natural_id, root_label, p_depth + 1)
   LOOP
     IF walk_row.depth = p_depth + 1 THEN
-      relation_key := lower('lk:' || walk_row.relation);
+      relation_key := lower(
+        CASE walk_row.dir
+          WHEN 'out' THEN walk_row.relation || ':' || walk_row.node_type
+          ELSE walk_row.node_type || ':' || walk_row.relation
+        END
+      );
       parent_key := array_to_string(walk_row.path[1:array_length(walk_row.path, 1) - 1], E'\x1f');
       parent_embedded := COALESCE(boundary_links_by_path -> parent_key, '{}'::jsonb);
       link_items := COALESCE(parent_embedded -> relation_key, '[]'::jsonb);
@@ -257,7 +262,12 @@ BEGIN
           result := result || jsonb_build_object('_embedded', embedded);
         END IF;
       ELSE
-        relation_key := lower('lk:' || walk_row.relation);
+        relation_key := lower(
+          CASE walk_row.dir
+            WHEN 'out' THEN walk_row.relation || ':' || walk_row.node_type
+            ELSE walk_row.node_type || ':' || walk_row.relation
+          END
+        );
         parent_key := array_to_string(walk_row.path[1:array_length(walk_row.path, 1) - 1], E'\x1f');
         parent_embedded := COALESCE(embedded_by_path -> parent_key, '{}'::jsonb);
         relation_items := COALESCE(parent_embedded -> relation_key, '[]'::jsonb);

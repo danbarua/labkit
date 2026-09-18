@@ -1,0 +1,6 @@
+User-agent: Claude-User
+User-agent: ClaudeBot
+Allow: /graph
+Allow: /docs
+
+Sitemap: https://labkit-central.framesift.ai/sitemap.xml

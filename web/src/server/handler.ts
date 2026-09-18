@@ -1,7 +1,8 @@
 import { HAL_JSON, LABEL_BY_COLLECTION, type CollectionSlug } from "../hypermedia";
 import { loadCollection, loadResource, loadRoot } from "./resources";
 import type { Runtime } from "./runtime";
-import { graphHandler } from "./graph-handler";
+import { docsHandler } from "./docs-handler";
+import { graphHandler, sitemapHandler } from "./graph-handler";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -43,8 +44,9 @@ function isCollectionSlug(value: string): value is CollectionSlug {
 }
 
 export function isLabkitApiPath(pathname: string, accept: string): boolean {
-  if (pathname === "/healthz") return true;
+  if (pathname === "/healthz" || pathname === "/sitemap.xml") return true;
   if (pathname === "/api" || pathname.startsWith("/api/")) return true;
+  if (pathname === "/docs" || pathname.startsWith("/docs/")) return true;
   if (pathname === "/graph" || pathname.startsWith("/graph/")) return true;
   if (pathname === "/") {
     return acceptsDocument(accept);
@@ -65,6 +67,10 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
     return json({ ok: true, worktree: runtime.worktree, tenant: runtime.tenant });
   }
 
+  if (path === "/docs" || path.startsWith("/docs/")) return docsHandler(req);
+
+  if (path === "/sitemap.xml") return sitemapHandler(req, runtime);
+
   // new API
   if (path.startsWith("/graph")) return (await graphHandler(req, runtime));
 
@@ -75,9 +81,11 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
   if (path === "/") {
     // `/api` is the HAL root for any Accept. `/` with HTML is the SPA and
     // never reaches handle; if it does, still return the root document.
-    const root = await loadRoot(runtime.graph);
-    if (root == null) return notFound("no pose question in this graph");
-    return hal(root);
+    // const root = await loadRoot(runtime.graph);
+    // if (root == null) return notFound("no pose question in this graph");
+    // return hal(root);
+
+    return Response.redirect("/graph/Q_1", 302);
   }
 
   const parts = path.split("/").filter((part) => part.length > 0);
