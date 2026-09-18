@@ -23,21 +23,20 @@ export type NodeLabel = (typeof NODE_LABELS)[number];
 /**
  * Which node properties get a Postgres index, per label.
  */
-export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } =
-  {
-    Question: ["posed_at"],
-    LineOfEnquiry: ["started_at"],
-    Claim: ["name"],
-    Decision: ["decided_at"],
-    CriterionEvaluation: ["evaluated_at"],
-    Artefact: ["logical_name"],
-    // Written by nothing today, and indexed anyway — `check:prop-classes` found
-    // them missing on its first run, which is the rule working. An index over a
-    // property that is always absent costs almost nothing in Postgres, and it is
-    // already there for the integration that fills them. Exceptions to
-    // "every Timestamp is indexed" would need a reason; these have none.
-    Computation: ["started_at", "finished_at"],
-  };
+export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = {
+  Question: ["posed_at"],
+  LineOfEnquiry: ["started_at"],
+  Claim: ["name"],
+  Decision: ["decided_at"],
+  CriterionEvaluation: ["evaluated_at"],
+  Artefact: ["logical_name"],
+  // Written by nothing today, and indexed anyway — `check:prop-classes` found
+  // them missing on its first run, which is the rule working. An index over a
+  // property that is always absent costs almost nothing in Postgres, and it is
+  // already there for the integration that fills them. Exceptions to
+  // "every Timestamp is indexed" would need a reason; these have none.
+  Computation: ["started_at", "finished_at"],
+};
 
 /**
  * Which scalar node properties `search()` scans, per label.
@@ -170,10 +169,7 @@ export type EdgeProps = Record<string, string | number | boolean | number[]>;
  * resolved `(fromLabel, toLabel)` pair against this table and throws before issuing any Cypher
  * if the pair is not listed.
  */
-export const EDGE_SCHEMA: Record<
-  EdgeLabel,
-  ReadonlyArray<readonly [NodeLabel, NodeLabel]>
-> = {
+export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, NodeLabel]>> = {
   /**
    * "Gave rise to." A question gives rise to a line of enquiry; a decision gives rise to a
    * question; a note gives rise to the question somebody eventually sharpened out of it.
@@ -395,12 +391,7 @@ export interface ClaimProps {
   kind?: "exploratory" | "confirmatory" | "undecided";
 }
 
-export type ResolutionKind =
-  | "answered"
-  | "abandoned"
-  | "stopped"
-  | "sidestepped"
-  | "retired";
+export type ResolutionKind = "answered" | "abandoned" | "stopped" | "sidestepped" | "retired";
 
 /** No evidence string shadow, and no mutable open or closed property. */
 export interface DecisionProps {
@@ -555,8 +546,7 @@ export function labelForNaturalId(naturalId: string): NodeLabel {
   const sep = naturalId.indexOf("_");
   const prefix = sep === -1 ? naturalId : naturalId.slice(0, sep);
   const label = LABEL_BY_PREFIX[prefix];
-  if (!label)
-    throw new Error(`unrecognized natural id prefix in "${naturalId}"`);
+  if (!label) throw new Error(`unrecognized natural id prefix in "${naturalId}"`);
   return label;
 }
 
