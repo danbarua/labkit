@@ -13,11 +13,18 @@ Bun.serve({
     try {
       return await handle(req, runtime);
     } catch (err) {
+      console.error(err);
       const message = err instanceof Error ? err.message : String(err);
-      return new Response(JSON.stringify({ error: message }), {
-        status: 500,
-        headers: { "content-type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          title: "Application Error",
+          detail: message,
+        }),
+        {
+          status: 500,
+          headers: { "content-type": "application/problem+json" },
+        },
+      );
     }
   },
 });
