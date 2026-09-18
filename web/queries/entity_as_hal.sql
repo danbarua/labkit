@@ -43,7 +43,7 @@ $function$;
 
 CREATE OR REPLACE FUNCTION public.entity_as_hal(
   p_natural_id text,
-  p_depth smallint DEFAULT 1
+  p_depth integer DEFAULT 1
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -161,7 +161,7 @@ BEGIN
         %L::text,
         CASE
           WHEN properties_text IS NULL OR properties_text = 'None' THEN '{}'::jsonb
-          ELSE properties_text::jsonb
+          ELSE properties_text::jsonb - 'natural_id'
         END
       FROM root
 
@@ -177,7 +177,7 @@ BEGIN
         e.node_type,
         CASE
           WHEN e.node_properties IS NULL OR e.node_properties = 'None' THEN '{}'::jsonb
-          ELSE e.node_properties::jsonb
+          ELSE e.node_properties::jsonb - 'natural_id'
         END
       FROM walk w
       JOIN edges e ON e.source_id = w.node_id
@@ -281,6 +281,6 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.entity_as_hal(text, smallint)
+ALTER FUNCTION public.entity_as_hal(text, integer)
 SET search_path = ag_catalog;
 
