@@ -55,7 +55,34 @@ export function isLabkitApiPath(pathname: string, accept: string): boolean {
   return false;
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+// Only a request that arrived by a public name is readable from other origins. The Host header
+// is set by the browser, so a page cannot claim to be on the tunnel while hitting the local server.
+function withCors(req: Request, response: Response): Response {
+  if (LOOPBACK_HOSTS.has(new URL(req.url).hostname)) return response;
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", "*");
+  return new Response(response.body, { status: response.status, headers });
+}
+
+function preflight(req: Request): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-methods": "GET, HEAD, OPTIONS",
+      "access-control-allow-headers": req.headers.get("access-control-request-headers") ?? "",
+      "access-control-max-age": "86400",
+    },
+  });
+}
+
 export async function handle(req: Request, runtime: Runtime): Promise<Response> {
+  if (req.method === "OPTIONS") return withCors(req, preflight(req));
+  return withCors(req, await route(req, runtime));
+}
+
+async function route(req: Request, runtime: Runtime): Promise<Response> {
   if (req.method !== "GET") {
     return problem(405, "Method Not Allowed", `${req.method} is not GET`);
   }

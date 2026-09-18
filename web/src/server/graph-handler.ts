@@ -42,7 +42,7 @@ export async function graphHandler(req: Request, runtime: Runtime): Promise<Resp
     }
 
     const resource = queryResult!.rows.at(0)!.entity_as_hal as Record<string, unknown>;
-    const converted = convertLinksToAbsolute(resource, publicOrigin(req));
+    const converted = populateLinks(resource, req);
 
     return new Response(JSON.stringify(converted), {
       status: 200,
@@ -120,27 +120,20 @@ export function apiCatalogHandler(req: Request): Response {
 }
 
 // walk through the resource and convert _links to absolute URLs
-function convertLinksToAbsolute(obj: any, baseUrl: URL): Record<string, unknown> {
+function populateLinks(obj: any, req: Request): Record<string, unknown> {
+  const baseUrl = publicOrigin(req);
+  const queryString = new URL(req.url).search;
   if (obj && typeof obj === "object") {
     for (const key of Object.keys(obj)) {
       if (key === "_links" && typeof obj[key] === "object") {
         for (const linkKey of Object.keys(obj[key])) {
           const linkValue = obj[key][linkKey];
-          if (Array.isArray(linkValue)) {
-            obj[key][linkKey] = linkValue.map((link: any) => {
-              if (link && typeof link === "object" && link.href) {
-                const absoluteUrl = new URL(link.href, baseUrl.origin).toString();
-                return { ...link, href: absoluteUrl };
-              }
-              return link;
-            });
-          } else if (linkValue && typeof linkValue === "object" && linkValue.href) {
-            const absoluteUrl = new URL(linkValue.href, baseUrl.origin).toString();
-            obj[key][linkKey] = { ...linkValue, href: absoluteUrl };
-          }
+          obj[key][linkKey] = Array.isArray(linkValue)
+            ? linkValue.map(absolute)
+            : absolute(linkValue);
         }
       } else {
-        convertLinksToAbsolute(obj[key], baseUrl);
+        populateLinks(obj[key], req);
       }
     }
 
@@ -148,4 +141,11 @@ function convertLinksToAbsolute(obj: any, baseUrl: URL): Record<string, unknown>
   }
 
   return obj;
+
+  function absolute(link: any) {
+    if (!link || typeof link !== "object" || !link.href) return link;
+    const absoluteUrl = new URL(link.href, baseUrl.origin);
+    absoluteUrl.search = queryString; // preserve query string
+    return { ...link, href: absoluteUrl.toString() };
+  }
 }

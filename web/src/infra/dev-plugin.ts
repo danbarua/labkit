@@ -86,8 +86,9 @@ function serveSpaOrNotFound(server: ViteDevServer): void {
 export function labkitDev(): Plugin {
   return {
     name: "labkit-dev",
-    // "custom" turns off Vite's fallback to index.html for unknown paths.
-    config: () => ({ appType: "custom" }),
+    // "custom" turns off Vite's fallback to index.html for unknown paths. Vite's own CORS layer
+    // answers preflights before our handlers run, so it is off and handler.ts owns CORS.
+    config: () => ({ appType: "custom", server: { cors: false } }),
     configureServer(server) {
       attachLabkit(server);
       return () => serveSpaOrNotFound(server);
