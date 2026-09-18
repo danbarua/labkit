@@ -2,7 +2,11 @@
   // **This file is `.jsonc`, not `.json`, and that is load-bearing.** Biome's
   // JSON config rejects comments, and `biome format --write` then falls back to
   // its defaults **silently** -- no parse error, just "Formatted N files".
-  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "root": false,
+  // **This file is `.jsonc`, not `.json`, and that is load-bearing.** Biome's
+  // JSON config rejects comments, and `biome format --write` then falls back to
+  // its defaults **silently** -- no parse error, just "Formatted N files".
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
 
   "linter": {
     "enabled": true,
