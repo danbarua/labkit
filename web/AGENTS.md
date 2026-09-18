@@ -28,7 +28,7 @@ The SPA is served at `/` only. Every other path that no handler claims is a 404,
 
 ## Tests
 
-`tests/walk*` are stale and tied to specific data. They are reference for writing tests, not a suite to keep green.
+`LABKIT_DB_URL=… bun test` from `web/`. Each run creates its own database on that server, seeds two workspaces, and drops it afterwards. Without the variable the suite skips, and reports it as skipped.
 
 ## Do not
 
