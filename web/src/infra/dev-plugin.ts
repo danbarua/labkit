@@ -66,13 +66,11 @@ export function labkitDev(): Plugin {
       server.printUrls = () => {
         printUrls();
         announceServices(server);
-        runTypecheck(server);
       };
     },
     handleHotUpdate({ file, server }) {
       if (!file.endsWith(".ts") && !file.endsWith(".tsx")) return;
       if (file.includes("node_modules")) return;
-      runTypecheck(server);
     },
   };
 }
@@ -115,36 +113,4 @@ function announceServices(server: ViteDevServer): void {
   log(line("front-end", `http://localhost:${port}/`, httpPid));
   log(line("back-end", `http://localhost:${port}/api`, httpPid));
   log(line("labkit-db", `postgres://localhost:${pg}/`, pgPid));
-}
-
-let typecheckRunning = false;
-let typecheckAgain = false;
-
-function runTypecheck(server: ViteDevServer): void {
-  if (typecheckRunning) {
-    typecheckAgain = true;
-    return;
-  }
-  typecheckRunning = true;
-  const child = spawn("bun", ["run", "check:types"], {
-    cwd: server.config.root,
-    env: process.env,
-  });
-  const chunks: Buffer[] = [];
-  child.stdout?.on("data", (chunk: Buffer) => {
-    chunks.push(chunk);
-  });
-  child.stderr?.on("data", (chunk: Buffer) => {
-    chunks.push(chunk);
-  });
-  child.on("close", (status) => {
-    typecheckRunning = false;
-    const out = Buffer.concat(chunks).toString("utf8").trim();
-    if (status === 0) server.config.logger.info("tsc ok");
-    else server.config.logger.error(out.length > 0 ? `tsc failed\n${out}` : "tsc failed");
-    if (typecheckAgain) {
-      typecheckAgain = false;
-      runTypecheck(server);
-    }
-  });
 }
