@@ -80,7 +80,9 @@ export async function withTenant<T>(
     const row = found.rows[0] as { id: number; slug: string; graph_name: string } | undefined;
     if (row === undefined) return undefined;
     if (!GRAPH_NAME.test(row.graph_name)) {
-      throw new Error(`tenant ${row.id} has a graph name that is not safe to query: ${row.graph_name}`);
+      throw new Error(
+        `tenant ${row.id} has a graph name that is not safe to query: ${row.graph_name}`,
+      );
     }
 
     await client.query("BEGIN READ ONLY");
@@ -96,9 +98,7 @@ export async function withTenant<T>(
           return { rows: r.rows as R[] };
         },
         workspaces: async () => {
-          const r = await client.query(
-            `SELECT slug, display_name FROM public.tenants ORDER BY id`,
-          );
+          const r = await client.query(`SELECT slug, display_name FROM public.tenants ORDER BY id`);
           return r.rows.map((w: { slug: string; display_name: string }) => ({
             slug: w.slug,
             displayName: w.display_name,

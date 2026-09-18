@@ -167,9 +167,11 @@ describe.skipIf(!serverUrl)("entities", () => {
     expect(hrefs(deep.body).filter((h) => !h.includes("{"))).toEqual(
       expect.arrayContaining([expect.stringContaining("depth=2")]),
     );
-    expect(hrefs(deep.body).filter((h) => !h.includes("{")).every((h) => h.endsWith("depth=2"))).toBe(
-      true,
-    );
+    expect(
+      hrefs(deep.body)
+        .filter((h) => !h.includes("{"))
+        .every((h) => h.endsWith("depth=2")),
+    ).toBe(true);
   });
 
   test("links at the boundary are absolute too, not just the embedded ones", async () => {
@@ -237,7 +239,8 @@ describe.skipIf(!serverUrl)("workspaces", () => {
     const r = await get("/workspace/alpha/graph/LOE_1?depth=2");
     const links = hrefs(r.body);
     expect(links.length).toBeGreaterThan(0);
-    for (const href of links) expect(href.startsWith(`${PUBLIC}/workspace/alpha/graph/`)).toBe(true);
+    for (const href of links)
+      expect(href.startsWith(`${PUBLIC}/workspace/alpha/graph/`)).toBe(true);
     expect(r.body._links.expand.href).toBe(`${PUBLIC}/workspace/alpha/graph/LOE_1{?depth}`);
   });
 
@@ -270,11 +273,17 @@ describe.skipIf(!serverUrl)("workspaces", () => {
         get(`/workspace/${i % 2 === 0 ? "alpha" : "beta"}/graph/Q_1`),
       ),
     );
-    results.forEach((r, i) => expect(r.body.name).toBe(i % 2 === 0 ? "alpha question" : "beta question"));
+    results.forEach((r, i) =>
+      expect(r.body.name).toBe(i % 2 === 0 ? "alpha question" : "beta question"),
+    );
   });
 
   test("more concurrent requests than pool connections all complete", async () => {
-    const paths = ["/collections/workspace", "/workspace/alpha/graph/LOE_1?depth=2", "/collections/question"];
+    const paths = [
+      "/collections/workspace",
+      "/workspace/alpha/graph/LOE_1?depth=2",
+      "/collections/question",
+    ];
     const results = await Promise.all(
       Array.from({ length: 100 }, (_, i) => get(paths[i % paths.length] as string)),
     );
@@ -370,7 +379,9 @@ describe.skipIf(!serverUrl)("collections", () => {
 
   test("limit and offset are clamped rather than rejected", async () => {
     expect((await get("/collections/question?limit=0")).body.collection.items).toHaveLength(1);
-    expect((await get("/collections/question?limit=x&offset=-5")).body.collection.items).toHaveLength(2);
+    expect(
+      (await get("/collections/question?limit=x&offset=-5")).body.collection.items,
+    ).toHaveLength(2);
   });
 
   test("an unknown collection is a 404", async () => {
@@ -389,7 +400,8 @@ describe.skipIf(!serverUrl)("collections", () => {
 
   test("collection links stay in the workspace", async () => {
     const r = await get("/workspace/beta/question");
-    for (const href of hrefs(r.body)) expect(href.startsWith(`${PUBLIC}/workspace/beta`)).toBe(true);
+    for (const href of hrefs(r.body))
+      expect(href.startsWith(`${PUBLIC}/workspace/beta`)).toBe(true);
     expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/beta/question?limit=50&offset=0`);
     expect(r.body.collection.links[0]).toEqual({ rel: "index", href: `${PUBLIC}/workspace/beta` });
     expect(dataOf(r.body.collection.items[0]).name).toBe("beta question");

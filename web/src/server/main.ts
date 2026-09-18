@@ -27,6 +27,4 @@ Bun.serve({
   },
 });
 
-console.log(
-  `labkit-web api http://127.0.0.1:${port} worktree=${runtime.worktree}`,
-);
+console.log(`labkit-web api http://127.0.0.1:${port} worktree=${runtime.worktree}`);

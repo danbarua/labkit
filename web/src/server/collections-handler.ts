@@ -14,7 +14,9 @@ function slugFor(label: NodeLabel): string {
   return SLUG_OVERRIDES[label] ?? label.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 }
 
-const LABEL_BY_SLUG = new Map<string, NodeLabel>(NODE_LABELS.map((label) => [slugFor(label), label]));
+const LABEL_BY_SLUG = new Map<string, NodeLabel>(
+  NODE_LABELS.map((label) => [slugFor(label), label]),
+);
 
 // Not a node type: workspaces are the tenants, and only the default workspace can see them all.
 const WORKSPACE_SLUG = "workspace";
@@ -137,7 +139,12 @@ async function listing(
   );
   const rows = result.rows;
   const page = rows.slice(0, limit);
-  const links = await outboundLinks(scope, label, page.map((row) => row.id), base);
+  const links = await outboundLinks(
+    scope,
+    label,
+    page.map((row) => row.id),
+    base,
+  );
 
   const self = `${root}/${slugFor(label)}`;
 
@@ -166,11 +173,7 @@ async function listing(
 
 // `/collections/workspace`: each workspace. A workspace is a collection, and its address is its
 // index.
-async function workspaceListing(
-  req: Request,
-  scope: TenantScope,
-  root: string,
-): Promise<Response> {
+async function workspaceListing(req: Request, scope: TenantScope, root: string): Promise<Response> {
   const url = new URL(req.url);
   const origin = publicOrigin(req).origin;
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
