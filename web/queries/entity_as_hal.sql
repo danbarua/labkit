@@ -69,6 +69,10 @@ BEGIN
     RAISE EXCEPTION 'depth must be non-negative';
   END IF;
 
+  IF p_depth > 6 THEN
+    RAISE EXCEPTION 'maximum traversal depth is 6';
+  END IF;
+
   IF p_natural_id !~ '^[A-Za-z0-9]+_[A-Za-z0-9]+$' THEN
     RAISE EXCEPTION 'Invalid natural_id: %', p_natural_id;
   END IF;
