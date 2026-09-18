@@ -3,7 +3,7 @@ import { DatabaseError } from "pg";
 // matches /graph/Q_1
 const MATCHER = new URLPattern({ pathname: "/graph/:id" });
 
-function problem(status: number, title: string, detail?: string): Response {
+export function problem(status: number, title: string, detail?: string): Response {
   return new Response(
     JSON.stringify({
       type: "about:blank",
@@ -67,7 +67,7 @@ function xmlEscape(value: string): string {
 }
 
 // Behind the tunnel the request URL says http; the forwarded header says what the crawler used.
-function publicOrigin(req: Request): URL {
+export function publicOrigin(req: Request): URL {
   const url = new URL(req.url);
   const proto =
     req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? url.protocol.slice(0, -1);
@@ -90,6 +90,7 @@ export async function sitemapHandler(req: Request, runtime: Runtime): Promise<Re
   const paths = [
     "/docs/",
     "/docs/api.md",
+    "/collections",
     ...result.rows.map((row) => `/graph/${(row as { id: string }).id}`),
   ];
   const urls = paths.map((p) => `  <url><loc>${xmlEscape(origin + p)}</loc></url>`).join("\n");
@@ -105,12 +106,12 @@ export function apiCatalogHandler(req: Request): Response {
   const origin = publicOrigin(req).origin;
   const catalog = {
     linkset: [
-      {
-        anchor: `${origin}/graph`,
+      ...["/graph", "/collections"].map((anchor) => ({
+        anchor: `${origin}${anchor}`,
         "service-desc": [{ href: `${origin}/docs/openapi.json`, type: "application/openapi+json" }],
         "service-doc": [{ href: `${origin}/docs/`, type: "text/markdown" }],
         status: [{ href: `${origin}/healthz`, type: "application/json" }],
-      },
+      })),
     ],
   };
   return new Response(JSON.stringify(catalog), {

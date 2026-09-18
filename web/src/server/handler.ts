@@ -1,4 +1,5 @@
 import type { Runtime } from "./runtime";
+import { collectionsHandler } from "./collections-handler";
 import { docsHandler } from "./docs-handler";
 import { apiCatalogHandler, graphHandler, sitemapHandler } from "./graph-handler";
 
@@ -46,6 +47,7 @@ export function isLabkitApiPath(pathname: string, accept: string): boolean {
   if (pathname === "/.well-known/api-catalog") return true;
   if (pathname === "/api" || pathname.startsWith("/api/")) return true;
   if (pathname === "/docs" || pathname.startsWith("/docs/")) return true;
+  if (pathname === "/collections" || pathname.startsWith("/collections/")) return true;
   if (pathname === "/graph" || pathname.startsWith("/graph/")) return true;
   if (pathname === "/") {
     return acceptsDocument(accept);
@@ -98,6 +100,11 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
   if (path === "/docs" || path.startsWith("/docs/")) {
     console.debug("request: docs", path);
     return docsHandler(req);
+  }
+
+  if (path === "/collections" || path.startsWith("/collections/")) {
+    console.debug("request: collections", path);
+    return collectionsHandler(req, runtime);
   }
 
   if (path === "/.well-known/api-catalog") {
