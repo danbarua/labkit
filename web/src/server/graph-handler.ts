@@ -1,5 +1,5 @@
 import type { Runtime } from "./runtime";
-
+import { DatabaseError } from "pg";
 // matches /graph/Q_1
 const MATCHER = new URLPattern({ pathname: "/graph/:id" });
 
@@ -23,6 +23,7 @@ export async function graphHandler(req: Request, runtime: Runtime): Promise<Resp
   const m = MATCHER.exec(req.url);
   const id = m?.pathname.groups.id;
   if (!id) {
+    console.log("request: /graph without id, redirecting to /graph/Q_1", req.url);
     return Response.redirect(new URL("/graph/Q_1", req.url), 302);
   }
 
@@ -48,9 +49,8 @@ export async function graphHandler(req: Request, runtime: Runtime): Promise<Resp
       headers: { "content-type": "application/hal+json" },
     });
   } catch (err) {
-    console.error("Error querying entity_as_hal:", err);
-    if (err instanceof Error && err.message.includes("Entity not found")) {
-      return problem(404, "Not Found", `Resource with id ${id} not found`);
+    if (err instanceof DatabaseError && err.code === "P0001") {
+      return problem(404, "Not Found", `Resource with id ${id} not found. ${err.message}`);
     } else {
       throw err;
     }
@@ -102,21 +102,21 @@ export async function sitemapHandler(req: Request, runtime: Runtime): Promise<Re
 
 // RFC 9727: one linkset entry per API.
 export function apiCatalogHandler(req: Request): Response {
-    const origin = publicOrigin(req).origin;
-    const catalog = {
-        linkset: [
-            {
-                anchor: `${origin}/graph`,
-                "service-desc": [{ href: `${origin}/docs/openapi.json`, type: "application/openapi+json" }],
-                "service-doc": [{ href: `${origin}/docs/`, type: "text/markdown" }],
-                status: [{ href: `${origin}/healthz`, type: "application/json" }],
-            },
-        ],
-    };
-    return new Response(JSON.stringify(catalog), {
-        status: 200,
-        headers: { "content-type": "application/linkset+json" },
-    });
+  const origin = publicOrigin(req).origin;
+  const catalog = {
+    linkset: [
+      {
+        anchor: `${origin}/graph`,
+        "service-desc": [{ href: `${origin}/docs/openapi.json`, type: "application/openapi+json" }],
+        "service-doc": [{ href: `${origin}/docs/`, type: "text/markdown" }],
+        status: [{ href: `${origin}/healthz`, type: "application/json" }],
+      },
+    ],
+  };
+  return new Response(JSON.stringify(catalog), {
+    status: 200,
+    headers: { "content-type": "application/linkset+json" },
+  });
 }
 
 // walk through the resource and convert _links to absolute URLs

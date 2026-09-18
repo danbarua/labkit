@@ -16,6 +16,6 @@ export default defineConfig({
     host: "127.0.0.1",
     port: explorerPort,
     strictPort: true,
-    allowedHosts: ["labkit-central.framesift.ai"]
+    allowedHosts: ["labkit-central.framesift.ai"],
   },
 });

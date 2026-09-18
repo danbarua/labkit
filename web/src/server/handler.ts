@@ -1,5 +1,3 @@
-import { HAL_JSON, LABEL_BY_COLLECTION, type CollectionSlug } from "../hypermedia";
-import { loadCollection, loadResource, loadRoot } from "./resources";
 import type { Runtime } from "./runtime";
 import { docsHandler } from "./docs-handler";
 import { apiCatalogHandler, graphHandler, sitemapHandler } from "./graph-handler";
@@ -14,7 +12,7 @@ function json(data: unknown, status = 200): Response {
 function hal(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": HAL_JSON },
+    headers: { "content-type": "application/hal+json" },
   });
 }
 
@@ -39,9 +37,9 @@ function notFound(detail?: string): Response {
   return problem(404, "Not Found", detail);
 }
 
-function isCollectionSlug(value: string): value is CollectionSlug {
-  return Object.hasOwn(LABEL_BY_COLLECTION, value);
-}
+// function isCollectionSlug(value: string): value is CollectionSlug {
+//   return Object.hasOwn(LABEL_BY_COLLECTION, value);
+// }
 
 export function isLabkitApiPath(pathname: string, accept: string): boolean {
   if (pathname === "/healthz" || pathname === "/sitemap.xml") return true;
@@ -52,8 +50,9 @@ export function isLabkitApiPath(pathname: string, accept: string): boolean {
   if (pathname === "/") {
     return acceptsDocument(accept);
   }
-  const slug = pathname.split("/").filter((part) => part.length > 0)[0];
-  return slug !== undefined && isCollectionSlug(slug);
+  // const slug = pathname.split("/").filter((part) => part.length > 0)[0];
+  // return slug !== undefined && isCollectionSlug(slug);
+  return false;
 }
 
 export async function handle(req: Request, runtime: Runtime): Promise<Response> {
@@ -65,21 +64,30 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
   let path = original;
 
   if (path === "/healthz") {
+    console.debug("request: health check", path);
     return json({ ok: true, worktree: runtime.worktree, tenant: runtime.tenant });
   }
 
-  if (path === "/docs" || path.startsWith("/docs/")) return docsHandler(req);
+  if (path === "/docs" || path.startsWith("/docs/")) {
+    console.debug("request: docs", path);
+    return docsHandler(req);
+  }
 
-  if (path === "/.well-known/api-catalog") return apiCatalogHandler(req);
+  if (path === "/.well-known/api-catalog") {
+    console.debug("request: api-catalog", path);
+    return apiCatalogHandler(req);
+  }
 
-  if (path === "/sitemap.xml") return sitemapHandler(req, runtime);
+  if (path === "/sitemap.xml") {
+    console.debug("request: sitemap", path);
+    return sitemapHandler(req, runtime);
+  }
 
   // new API
-  if (path.startsWith("/graph")) return await graphHandler(req, runtime);
-
-  // old API
-  if (path === "/api" || path === "/api/") path = "/";
-  else if (path.startsWith("/api/")) path = path.slice("/api".length) || "/";
+  if (path.startsWith("/graph")) {
+    console.debug("request: graph", path);
+    return await graphHandler(req, runtime);
+  }
 
   if (path === "/") {
     // `/api` is the HAL root for any Accept. `/` with HTML is the SPA and
@@ -87,25 +95,25 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
     // const root = await loadRoot(runtime.graph);
     // if (root == null) return notFound("no pose question in this graph");
     // return hal(root);
-
+    console.debug("request: root", path);
     return Response.redirect("/graph/Q_1", 302);
   }
 
-  const parts = path.split("/").filter((part) => part.length > 0);
-  if (parts.length === 1) {
-    const slug = parts[0]!;
-    if (!isCollectionSlug(slug)) return notFound(`${original} is not a collection`);
-    return hal(await loadCollection(runtime.graph, slug));
-  }
+  // const parts = path.split("/").filter((part) => part.length > 0);
+  // if (parts.length === 1) {
+  //   const slug = parts[0]!;
+  //   if (!isCollectionSlug(slug)) return notFound(`${original} is not a collection`);
+  //   return hal(await loadCollection(runtime.graph, slug));
+  // }
 
-  if (parts.length === 2) {
-    const slug = parts[0]!;
-    const n = parts[1]!;
-    if (!isCollectionSlug(slug)) return notFound(`${original} is not a resource`);
-    const resource = await loadResource(runtime.graph, slug, n);
-    if (resource == null) return notFound(`${original} is not in the graph`);
-    return hal(resource);
-  }
+  // if (parts.length === 2) {
+  //   const slug = parts[0]!;
+  //   const n = parts[1]!;
+  //   if (!isCollectionSlug(slug)) return notFound(`${original} is not a resource`);
+  //   const resource = await loadResource(runtime.graph, slug, n);
+  //   if (resource == null) return notFound(`${original} is not in the graph`);
+  //   return hal(resource);
+  // }
 
   return notFound(`${original} is not a labkit resource`);
 }

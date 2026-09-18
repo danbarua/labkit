@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import type { Plugin, ViteDevServer } from "vite";
-import { ensureOverlapBench } from "./seed";
 import { ensureLabkitPostgres, LABKIT_PG_URL } from "./postgres";
 import { handle, isLabkitApiPath } from "../server/handler";
 import { openRuntime, type Runtime } from "../server/runtime";
@@ -30,7 +29,6 @@ async function writeResponse(res: ServerResponse, response: Response): Promise<v
 export function attachLabkit(server: ViteDevServer): void {
   const boot: Promise<Runtime> = (async () => {
     await ensureLabkitPostgres();
-    await ensureOverlapBench();
     return openRuntime();
   })();
   server.middlewares.use(async (req, res, next) => {
@@ -42,9 +40,11 @@ export function attachLabkit(server: ViteDevServer): void {
         next();
         return;
       }
+      const requestStart = Date.now();
       const response = await handle(toRequest(req), runtime);
+      const requestEnd = Date.now();
       const ctype = response.headers.get("content-type") ?? "";
-      const line = `${req.method ?? "GET"} ${pathname} ${response.status} ${ctype}`;
+      const line = `${req.method ?? "GET"} ${pathname} ${response.status} ${ctype} ${requestEnd - requestStart}ms`;
       if (response.status >= 400) {
         server.config.logger.warn(`${line} accept=${accept}`);
       } else {
@@ -69,8 +69,8 @@ export function labkitDev(): Plugin {
       };
     },
     handleHotUpdate({ file, server }) {
-      if (!file.endsWith(".ts") && !file.endsWith(".tsx")) return;
-      if (file.includes("node_modules")) return;
+      if (!file.endsWith(".ts") && !file.endsWith(".tsx")) return [];
+      if (file.includes("node_modules")) return [];
     },
   };
 }
@@ -111,6 +111,6 @@ function announceServices(server: ViteDevServer): void {
   const pgPid = listeningPid(pg);
   const log = server.config.logger.info.bind(server.config.logger);
   log(line("front-end", `http://localhost:${port}/`, httpPid));
-  log(line("back-end", `http://localhost:${port}/api`, httpPid));
+  log(line("back-end", `http://localhost:${port}/graph`, httpPid));
   log(line("labkit-db", `postgres://localhost:${pg}/`, pgPid));
 }

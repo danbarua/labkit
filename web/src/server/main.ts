@@ -1,8 +1,6 @@
-import { ensureOverlapBench } from "../infra/seed";
 import { handle } from "./handler";
 import { openRuntime } from "./runtime";
 
-await ensureOverlapBench();
 const runtime = await openRuntime();
 const port = Number(process.env.LABKIT_PORT_WEB ?? 8899);
 
