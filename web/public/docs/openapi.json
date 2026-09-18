@@ -24,12 +24,12 @@
             "name": "depth",
             "in": "query",
             "required": false,
-            "description": "How many hops of neighbours to embed. 0 returns the entity alone.",
+            "description": "How many hops of neighbours to embed. 0 returns the entity alone. Links in the response repeat the depth that was applied.",
             "schema": {
               "type": "integer",
               "minimum": 0,
               "maximum": 6,
-              "default": 0
+              "default": 1
             }
           }
         ],

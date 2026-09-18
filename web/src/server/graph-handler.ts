@@ -1,5 +1,9 @@
 import type { Runtime } from "./runtime";
 import { DatabaseError } from "pg";
+// Bare links return one hop of neighbours. MAX_DEPTH mirrors the limit in entity_as_hal.
+const DEFAULT_DEPTH = 1;
+const MAX_DEPTH = 6;
+
 // matches /graph/Q_1
 const MATCHER = new URLPattern({ pathname: "/graph/:id" });
 
@@ -29,7 +33,10 @@ export async function graphHandler(req: Request, runtime: Runtime): Promise<Resp
 
   const url = new URL(req.url);
   const depthParam = url.searchParams.get("depth");
-  const depth = Number.parseInt(depthParam || "0");
+  const depth = depthParam === null ? DEFAULT_DEPTH : Number(depthParam);
+  if (!Number.isInteger(depth) || depth < 0 || depth > MAX_DEPTH) {
+    return problem(400, "Bad Request", `depth must be an integer from 0 to ${MAX_DEPTH}`);
+  }
 
   try {
     const queryResult = await runtime.connection.db.query("SELECT entity_as_hal($1, $2)", [
@@ -42,7 +49,15 @@ export async function graphHandler(req: Request, runtime: Runtime): Promise<Resp
     }
 
     const resource = queryResult!.rows.at(0)!.entity_as_hal as Record<string, unknown>;
-    const converted = populateLinks(resource, req);
+    // Links carry the depth that was applied, so following one repeats this view.
+    const search = new URLSearchParams(url.search);
+    search.set("depth", String(depth));
+    const converted = populateLinks(resource, req, `?${search}`);
+    (converted._links as Record<string, unknown>).expand = {
+      href: `${publicOrigin(req).origin}/graph/${id}{?depth}`,
+      templated: true,
+      title: `depth: hops of neighbours to embed, 0 to ${MAX_DEPTH}`,
+    };
 
     return new Response(JSON.stringify(converted), {
       status: 200,
@@ -121,9 +136,8 @@ export function apiCatalogHandler(req: Request): Response {
 }
 
 // walk through the resource and convert _links to absolute URLs
-function populateLinks(obj: any, req: Request): Record<string, unknown> {
+function populateLinks(obj: any, req: Request, queryString: string): Record<string, unknown> {
   const baseUrl = publicOrigin(req);
-  const queryString = new URL(req.url).search;
   if (obj && typeof obj === "object") {
     for (const key of Object.keys(obj)) {
       if (key === "_links" && typeof obj[key] === "object") {
@@ -134,7 +148,7 @@ function populateLinks(obj: any, req: Request): Record<string, unknown> {
             : absolute(linkValue);
         }
       } else {
-        populateLinks(obj[key], req);
+        populateLinks(obj[key], req, queryString);
       }
     }
 
@@ -146,7 +160,7 @@ function populateLinks(obj: any, req: Request): Record<string, unknown> {
   function absolute(link: any) {
     if (!link || typeof link !== "object" || !link.href) return link;
     const absoluteUrl = new URL(link.href, baseUrl.origin);
-    absoluteUrl.search = queryString; // preserve query string
+    absoluteUrl.search = queryString;
     return { ...link, href: absoluteUrl.toString() };
   }
 }
