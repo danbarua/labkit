@@ -15,10 +15,7 @@ function problem(status: number, title: string, detail?: string): Response {
   );
 }
 
-export async function graphHandler(
-  req: Request,
-  runtime: Runtime,
-): Promise<Response> {
+export async function graphHandler(req: Request, runtime: Runtime): Promise<Response> {
   if (!URL.canParse(req.url)) {
     throw Error("Invalid URL");
   }
@@ -34,32 +31,30 @@ export async function graphHandler(
   const depth = Number.parseInt(depthParam || "0");
 
   try {
-    const queryResult = await runtime.connection.db.query(
-      "SELECT entity_as_hal($1, $2)",
-      [id, depth],
-    );
+    const queryResult = await runtime.connection.db.query("SELECT entity_as_hal($1, $2)", [
+      id,
+      depth,
+    ]);
+
     if (!queryResult || !queryResult.rows.length) {
       return problem(404, "Not Found");
     }
+
+    const resource = queryResult!.rows.at(0)!.entity_as_hal as Record<string, unknown>;
+    const converted = convertLinksToAbsolute(resource, publicOrigin(req));
+
+    return new Response(JSON.stringify(converted), {
+      status: 200,
+      headers: { "content-type": "application/hal+json" },
+    });
   } catch (err) {
-    console.error('Error querying entity_as_hal:', err);
+    console.error("Error querying entity_as_hal:", err);
     if (err instanceof Error && err.message.includes("Entity not found")) {
       return problem(404, "Not Found", `Resource with id ${id} not found`);
     } else {
       throw err;
     }
   }
-
-  const resource = queryResult!.rows.at(0)!.entity_as_hal as Record<
-    string,
-    unknown
-  >;
-  const converted = convertLinksToAbsolute(resource, publicOrigin(req));
-
-  return new Response(JSON.stringify(converted), {
-    status: 200,
-    headers: { "content-type": "application/hal+json" },
-  });
 }
 
 function xmlEscape(value: string): string {
@@ -75,16 +70,12 @@ function xmlEscape(value: string): string {
 function publicOrigin(req: Request): URL {
   const url = new URL(req.url);
   const proto =
-    req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
-    url.protocol.slice(0, -1);
+    req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ?? url.protocol.slice(0, -1);
   return new URL(`${proto}://${url.host}`);
 }
 
 // Every live Question is an entry point into /graph; the rest of the graph is reached by following links.
-export async function sitemapHandler(
-  req: Request,
-  runtime: Runtime,
-): Promise<Response> {
+export async function sitemapHandler(req: Request, runtime: Runtime): Promise<Response> {
   const result = await runtime.connection.db.query(`
         SELECT trim(both '"' FROM natural_id::text) AS id
         FROM ag_catalog.cypher(
@@ -101,9 +92,7 @@ export async function sitemapHandler(
     "/docs/api.md",
     ...result.rows.map((row) => `/graph/${(row as { id: string }).id}`),
   ];
-  const urls = paths
-    .map((p) => `  <url><loc>${xmlEscape(origin + p)}</loc></url>`)
-    .join("\n");
+  const urls = paths.map((p) => `  <url><loc>${xmlEscape(origin + p)}</loc></url>`).join("\n");
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
   return new Response(body, {
     status: 200,
@@ -112,10 +101,7 @@ export async function sitemapHandler(
 }
 
 // walk through the resource and convert _links to absolute URLs
-function convertLinksToAbsolute(
-  obj: any,
-  baseUrl: URL,
-): Record<string, unknown> {
+function convertLinksToAbsolute(obj: any, baseUrl: URL): Record<string, unknown> {
   if (obj && typeof obj === "object") {
     for (const key of Object.keys(obj)) {
       if (key === "_links" && typeof obj[key] === "object") {
@@ -124,23 +110,13 @@ function convertLinksToAbsolute(
           if (Array.isArray(linkValue)) {
             obj[key][linkKey] = linkValue.map((link: any) => {
               if (link && typeof link === "object" && link.href) {
-                const absoluteUrl = new URL(
-                  link.href,
-                  baseUrl.origin,
-                ).toString();
+                const absoluteUrl = new URL(link.href, baseUrl.origin).toString();
                 return { ...link, href: absoluteUrl };
               }
               return link;
             });
-          } else if (
-            linkValue &&
-            typeof linkValue === "object" &&
-            linkValue.href
-          ) {
-            const absoluteUrl = new URL(
-              linkValue.href,
-              baseUrl.origin,
-            ).toString();
+          } else if (linkValue && typeof linkValue === "object" && linkValue.href) {
+            const absoluteUrl = new URL(linkValue.href, baseUrl.origin).toString();
             obj[key][linkKey] = { ...linkValue, href: absoluteUrl };
           }
         }
