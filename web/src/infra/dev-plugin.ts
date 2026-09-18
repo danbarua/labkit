@@ -1,8 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import type { Plugin, ViteDevServer } from "vite";
 import { ensureLabkitPostgres, LABKIT_PG_URL } from "./postgres";
-import { handle, isLabkitApiPath } from "../server/handler";
+import { handle, isLabkitApiPath, notFound } from "../server/handler";
 import { openRuntime, type Runtime } from "../server/runtime";
 
 function toRequest(req: IncomingMessage): Request {
@@ -57,11 +59,38 @@ export function attachLabkit(server: ViteDevServer): void {
   });
 }
 
+// Runs after Vite's own middlewares, so anything that reaches it is neither a module, an asset
+// nor an API path. The SPA lives at `/` only; every other path is a 404 rather than index.html.
+function serveSpaOrNotFound(server: ViteDevServer): void {
+  server.middlewares.use(async (req, res, next) => {
+    try {
+      const pathname = (req.url ?? "/").split("?")[0] ?? "/";
+      const isRead = req.method === "GET" || req.method === "HEAD";
+      if (isRead && (pathname === "/" || pathname === "/index.html")) {
+        const raw = await readFile(path.join(server.config.root, "index.html"), "utf8");
+        const html = await server.transformIndexHtml(req.url ?? "/", raw, req.originalUrl);
+        res.statusCode = 200;
+        res.setHeader("content-type", "text/html");
+        res.end(html);
+        return;
+      }
+      const response = notFound(`${req.method ?? "GET"} ${pathname} is not handled`);
+      server.config.logger.warn(`${req.method ?? "GET"} ${pathname} 404`);
+      await writeResponse(res, response);
+    } catch (err) {
+      next(err);
+    }
+  });
+}
+
 export function labkitDev(): Plugin {
   return {
     name: "labkit-dev",
+    // "custom" turns off Vite's fallback to index.html for unknown paths.
+    config: () => ({ appType: "custom" }),
     configureServer(server) {
       attachLabkit(server);
+      return () => serveSpaOrNotFound(server);
       const printUrls = server.printUrls.bind(server);
       server.printUrls = () => {
         printUrls();

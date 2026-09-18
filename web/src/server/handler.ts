@@ -33,7 +33,7 @@ function acceptsDocument(accept: string | null): boolean {
   return /\bapplication\/(hal\+)?json\b/.test(accept);
 }
 
-function notFound(detail?: string): Response {
+export function notFound(detail?: string): Response {
   return problem(404, "Not Found", detail);
 }
 
