@@ -135,6 +135,45 @@ export class TenantGraph {
   }
 
   /**
+   * What a node currently holds for each named property, absent keys omitted.
+   *
+   * Read before a change is applied so the change can be taken back. A key the
+   * node does not hold is left out rather than recorded as null: "there was no
+   * value" and "the value was null" undo differently.
+   */
+  async nodePropertiesOf(id: string, keys: string[]): Promise<Record<string, unknown>> {
+    if (keys.length === 0) return {};
+    const label = labelForNaturalId(id);
+    const rows = await this.query(
+      `MATCH (n:${label} {natural_id: $id}) RETURN n`,
+      { n: vertexColumn<Record<string, unknown>>() },
+      { id },
+    );
+    const held = rows[0]?.n.properties ?? {};
+    return Object.fromEntries(keys.filter((k) => k in held).map((k) => [k, held[k]]));
+  }
+
+  /** The same for an edge, addressed by its triple. */
+  async edgePropertiesOf(
+    fromId: string,
+    edge: EdgeLabel,
+    toId: string,
+    keys: string[],
+  ): Promise<Record<string, unknown>> {
+    if (keys.length === 0) return {};
+    const fromLabel = labelForNaturalId(fromId);
+    const toLabel = labelForNaturalId(toId);
+    const rows = await this.query(
+      `MATCH (a:${fromLabel} {natural_id: $from})-[r:${edge}]->(b:${toLabel} {natural_id: $to})
+       RETURN r`,
+      { r: edgeColumn<Record<string, unknown>>() },
+      { from: fromId, to: toId },
+    );
+    const held = rows[0]?.r.properties ?? {};
+    return Object.fromEntries(keys.filter((k) => k in held).map((k) => [k, held[k]]));
+  }
+
+  /**
    * Sets properties on an existing edge, addressed by its `(from, label, to)` triple.
    *
    * `createEdge` treats a repeat of that triple as a no-op, so re-creating an

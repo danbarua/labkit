@@ -43,7 +43,7 @@ export type {
   GraphChange,
   NodeCreated,
   EdgeCreated,
-  PropsChanged,
+  NodePropsChanged,
 } from "./events";
 export {
   eventFilter,

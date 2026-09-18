@@ -108,7 +108,11 @@ describe("S-23: prespecified is not promoted", () => {
 
     const [promotion] = await events.select({ operation: "isConfirmed" });
     expect(promotion!.changes).toContainEqual(
-      expect.objectContaining({ change: "PropsChanged", props: { kind: "confirmatory" } }),
+      expect.objectContaining({
+        change: "NodePropsChanged",
+        before: { kind: "exploratory" },
+        after: { kind: "confirmatory" },
+      }),
     );
   });
 });

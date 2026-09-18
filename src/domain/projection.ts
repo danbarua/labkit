@@ -54,13 +54,16 @@ export class UnitOfWork {
     this.changes.push({ change: "EdgeCreated", from, label, to, ...(props ? { props } : {}) });
   }
 
+  // `before` is left empty here and filled by `snapshotPriorValues` at the seam.
+  // A unit of work stages what an act decided and never reads the graph; the
+  // prior values are read once, in one place, just before the delta is recorded.
   set(id: string, props: Record<string, unknown>): void {
-    this.changes.push({ change: "PropsChanged", id, props });
+    this.changes.push({ change: "NodePropsChanged", id, before: {}, after: props });
   }
 
   /** The same, for a relationship: an edge is addressed by its triple, not an id. */
   setEdge(from: string, label: EdgeLabel, to: string, props: EdgeProps): void {
-    this.changes.push({ change: "EdgePropsChanged", from, label, to, props });
+    this.changes.push({ change: "EdgePropsChanged", from, label, to, before: {}, after: props });
   }
 
   delta(): GraphChange[] {
@@ -80,6 +83,36 @@ export const graphProjector = (graph: TenantGraph): Projector => ({
   apply: (event) => applyDelta(graph, event),
 });
 
+/**
+ * Fills each property change's `before` from the graph.
+ *
+ * Called once, between the act staging its delta and the event being recorded,
+ * which is the only instant at which the graph still holds the old values: no
+ * projector has run. Every verb that sets a property gets this without knowing
+ * it exists.
+ */
+export async function snapshotPriorValues(
+  graph: TenantGraph,
+  changes: readonly GraphChange[],
+): Promise<GraphChange[]> {
+  const out: GraphChange[] = [];
+  for (const change of changes) {
+    if (change.change === "NodePropsChanged") {
+      const held = await graph.nodePropertiesOf(change.id, Object.keys(change.after));
+      out.push({ ...change, before: held });
+    } else if (change.change === "EdgePropsChanged") {
+      const held = await graph.edgePropertiesOf(
+        change.from,
+        change.label,
+        change.to,
+        Object.keys(change.after),
+      );
+      out.push({ ...change, before: held });
+    } else out.push(change);
+  }
+  return out;
+}
+
 /** Writes an event's changes into the graph, in the order the act made them. */
 export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {
   for (const change of event.changes) {
@@ -90,12 +123,12 @@ export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promis
       case "EdgeCreated":
         await graph.createEdge(change.from, change.label, change.to, change.props);
         break;
-      case "PropsChanged":
-        for (const [key, value] of Object.entries(change.props))
+      case "NodePropsChanged":
+        for (const [key, value] of Object.entries(change.after))
           await graph.setNodeProperty(change.id, key, value);
         break;
       case "EdgePropsChanged":
-        await graph.setEdgeProperties(change.from, change.label, change.to, change.props);
+        await graph.setEdgeProperties(change.from, change.label, change.to, change.after);
         break;
     }
   }

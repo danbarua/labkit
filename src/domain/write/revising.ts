@@ -1,7 +1,7 @@
 /** Same thing, understood differently now. */
 
 import { scalar, vertexProps } from "../../db/cypher";
-import type { ClaimProps, Prose } from "../../db/domain";
+import type { ClaimProps, EdgeProps, Prose } from "../../db/domain";
 import type { TenantGraph } from "../../db/graph";
 import { createdIn, edgesIn } from "../events";
 import type {
@@ -52,6 +52,19 @@ const INVALIDATION_CHECK = {
   undecided: "a further finding that settles the proposition either way",
   confirmed: "evidence that the promoted result does not replicate",
 } as const;
+
+/**
+ * What to write to take a property change back.
+ *
+ * A key the graph did not hold before is removed by writing `null` — there is
+ * no delete-property verb, and `null` is what every read already treats as
+ * absent.
+ */
+const restored = (
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): Record<string, unknown> =>
+  Object.fromEntries(Object.keys(after).map((k) => [k, k in before ? before[k] : null]));
 
 export class Revising extends Shared {
   constructor(
@@ -199,50 +212,66 @@ export class Revising extends Shared {
       const [found] = await this.events.select({ since: input.event - 1, limit: 1 });
       if (found?.seq !== input.event) throw new Error(`${input.event} not found`);
 
-      // Before the mint check, because an act that only set properties also minted
-      // nothing, and "minted nothing to retract" is true of it but not the reason.
-      const propsSet = found.changes.some(
-        (c) => c.change === "PropsChanged" || c.change === "EdgePropsChanged",
+      // Put back what the act replaced. Every property change carries what the
+      // graph held when it ran, so taking one back is writing that value again
+      // -- and restoring a key the node did not hold is removing it.
+      const restoring = found.changes.filter(
+        (c) => c.change === "NodePropsChanged" || c.change === "EdgePropsChanged",
       );
-      if (propsSet)
-        throw new Error(
-          `${input.event} (${found.operation}) overwrote a value. undo retracts what an act created.`,
-        );
+      for (const change of restoring) {
+        if (change.change === "NodePropsChanged")
+          unitOfWork.set(change.id, restored(change.before, change.after));
+        else
+          unitOfWork.setEdge(
+            change.from,
+            change.label,
+            change.to,
+            restored(change.before, change.after) as EdgeProps,
+          );
+      }
 
       const retracting = createdIn(found);
-      if (retracting.length === 0)
-        throw new Error(`${input.event} (${found.operation}) minted nothing to retract`);
+      if (retracting.length === 0 && restoring.length === 0)
+        throw new Error(`${input.event} (${found.operation}) changed nothing to take back`);
 
       // What rests on any of this, from outside the act itself -- an edge between two things
       // this same event created is the act's own wiring, not a dependent. Unlabeled on both
       // sides deliberately: a dependent can be any kind of node, and naming one label would
       // silently miss every other.
-      const into = await this.graph.query(
-        `MATCH (external)-[r]->(target)
+      // Only what the act minted can be rested on. An act that changed a property
+      // created nothing, so there is nothing for anything else to depend on.
+      const into =
+        retracting.length === 0
+          ? []
+          : await this.graph.query(
+              `MATCH (external)-[r]->(target)
          WHERE target.natural_id IN $ids
            AND NOT external.natural_id IN $ids
            AND external.retracted IS NULL
          RETURN external AS origin, type(r) AS via, target AS reaches`,
-        {
-          origin: vertexProps<{ natural_id: string }>(),
-          via: scalar<string>(),
-          reaches: vertexProps<{ natural_id: string }>(),
-        },
-        { ids: retracting },
-      );
-      const outOf = await this.graph.query(
-        `MATCH (source)-[r]->(external)
+              {
+                origin: vertexProps<{ natural_id: string }>(),
+                via: scalar<string>(),
+                reaches: vertexProps<{ natural_id: string }>(),
+              },
+              { ids: retracting },
+            );
+      const outOf =
+        retracting.length === 0
+          ? []
+          : await this.graph.query(
+              `MATCH (source)-[r]->(external)
          WHERE source.natural_id IN $ids
            AND NOT external.natural_id IN $ids
            AND external.retracted IS NULL
          RETURN source AS origin, type(r) AS via, external AS reaches`,
-        {
-          origin: vertexProps<{ natural_id: string }>(),
-          via: scalar<string>(),
-          reaches: vertexProps<{ natural_id: string }>(),
-        },
-        { ids: retracting },
-      );
+              {
+                origin: vertexProps<{ natural_id: string }>(),
+                via: scalar<string>(),
+                reaches: vertexProps<{ natural_id: string }>(),
+              },
+              { ids: retracting },
+            );
       // An edge THIS event wrote is the act's own wiring even when one of its two endpoints
       // already existed -- `conclude` staging `unit PRODUCES evidence` reaches a pre-existing
       // unit, and that unit is not a dependent of the evidence it produced.

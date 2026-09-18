@@ -11,8 +11,8 @@ import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "../src/db/tenant";
 import { TenantGraph } from "../src/db/graph";
 import { optional, scalar } from "../src/db/cypher";
-import { applyDelta, UnitOfWork } from "../src/domain/projection";
-import { domainEvent, UNATTRIBUTED, inMemoryEventLog, WriteSurface } from "../src/domain";
+import { applyDelta, snapshotPriorValues, UnitOfWork } from "../src/domain/projection";
+import { domainEvent, UNATTRIBUTED } from "../src/domain";
 
 let testDb: TestDb;
 let db: TestClient;
@@ -43,6 +43,16 @@ const governs = async (graph: TenantGraph) => {
   await graph.createEdge(criterion.natural_id, "GOVERNS", gate.natural_id);
   return { criterion: criterion.natural_id, gate: gate.natural_id };
 };
+
+const event = (changes: ReturnType<UnitOfWork["delta"]>) =>
+  domainEvent({
+    at: "2026-09-17T09:00:00.000Z",
+    attribution: UNATTRIBUTED,
+    operation: "evaluateCriterion",
+    subject: "CRIT_1",
+    command: {} as never,
+    changes,
+  });
 
 const stateOf = async (graph: TenantGraph, from: string, to: string) => {
   const rows = await graph.query(
@@ -121,31 +131,39 @@ test("the change travels through an event's delta like every other change", asyn
 });
 
 /**
- * `undo` retracts what an act created, and refuses an act that overwrote a value —
- * there is no prior value on the log to put back. An edge property is such a value,
- * and the guard tested only `PropsChanged`, so it refused for the wrong reason.
+ * `undo` puts back what an act replaced. The change carries what the graph held when it
+ * ran, so taking it back is writing that value again — and a key the edge did not hold
+ * before is removed.
  */
-test("undo refuses an act that set an edge property, and says why", async () => {
+test("undo restores an edge property to what it held", async () => {
   const ctx = await resolveTenantContext(db, db.tx, "edge-undo");
   const graph = new TenantGraph(ctx, db, db.tx);
-  const events = inMemoryEventLog();
-  const write = new WriteSurface(graph, { events });
-
   const { criterion, gate } = await governs(graph);
+  await graph.setEdgeProperties(criterion, "GOVERNS", gate, { state: "failed" });
+
   const unitOfWork = new UnitOfWork({ reserve: async () => "unused" });
   unitOfWork.setEdge(criterion, "GOVERNS", gate, { state: "satisfied" });
-  const recorded = await events.record(
-    domainEvent({
-      at: "2026-09-16T13:00:00.000Z",
-      attribution: UNATTRIBUTED,
-      operation: "evaluateCriterion",
-      subject: criterion,
-      command: {} as never,
-      changes: unitOfWork.delta(),
-    }),
-  );
+  const changes = await snapshotPriorValues(graph, unitOfWork.delta());
+  expect(changes[0]).toMatchObject({ before: { state: "failed" }, after: { state: "satisfied" } });
 
-  await expect(write.undo({ event: recorded.seq, because: "wrong scope" })).rejects.toThrow(
-    /overwrote a value/,
-  );
+  await applyDelta(graph, event(changes));
+  expect((await stateOf(graph, criterion, gate))?.state).toBe("satisfied");
+
+  // What `undo` stages, applied: the prior value, written again.
+  const takingBack = new UnitOfWork({ reserve: async () => "unused" });
+  takingBack.setEdge(criterion, "GOVERNS", gate, { state: "failed" });
+  await applyDelta(graph, event(takingBack.delta()));
+  expect((await stateOf(graph, criterion, gate))?.state).toBe("failed");
+});
+
+test("a property the edge never held is removed, not restored to nothing", async () => {
+  const ctx = await resolveTenantContext(db, db.tx, "edge-undo-absent");
+  const graph = new TenantGraph(ctx, db, db.tx);
+  const { criterion, gate } = await governs(graph);
+
+  const unitOfWork = new UnitOfWork({ reserve: async () => "unused" });
+  unitOfWork.setEdge(criterion, "GOVERNS", gate, { state: "satisfied" });
+  const changes = await snapshotPriorValues(graph, unitOfWork.delta());
+  // Absent, not null: "there was no value" and "the value was null" undo differently.
+  expect(changes[0]).toMatchObject({ before: {} });
 });
