@@ -86,7 +86,7 @@ export async function sitemapHandler(req: Request, runtime: Runtime): Promise<Re
               ORDER BY n.natural_id$$
         ) AS node(natural_id ag_catalog.agtype)
     `);
-  const origin = publicOrigin(req);
+  const origin = publicOrigin(req).origin;
   const paths = [
     "/docs/",
     "/docs/api.md",
@@ -98,6 +98,25 @@ export async function sitemapHandler(req: Request, runtime: Runtime): Promise<Re
     status: 200,
     headers: { "content-type": "application/xml" },
   });
+}
+
+// RFC 9727: one linkset entry per API.
+export function apiCatalogHandler(req: Request): Response {
+    const origin = publicOrigin(req).origin;
+    const catalog = {
+        linkset: [
+            {
+                anchor: `${origin}/graph`,
+                "service-desc": [{ href: `${origin}/docs/openapi.json`, type: "application/openapi+json" }],
+                "service-doc": [{ href: `${origin}/docs/`, type: "text/markdown" }],
+                status: [{ href: `${origin}/healthz`, type: "application/json" }],
+            },
+        ],
+    };
+    return new Response(JSON.stringify(catalog), {
+        status: 200,
+        headers: { "content-type": "application/linkset+json" },
+    });
 }
 
 // walk through the resource and convert _links to absolute URLs

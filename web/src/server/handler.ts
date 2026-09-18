@@ -2,7 +2,7 @@ import { HAL_JSON, LABEL_BY_COLLECTION, type CollectionSlug } from "../hypermedi
 import { loadCollection, loadResource, loadRoot } from "./resources";
 import type { Runtime } from "./runtime";
 import { docsHandler } from "./docs-handler";
-import { graphHandler, sitemapHandler } from "./graph-handler";
+import { apiCatalogHandler, graphHandler, sitemapHandler } from "./graph-handler";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -45,6 +45,7 @@ function isCollectionSlug(value: string): value is CollectionSlug {
 
 export function isLabkitApiPath(pathname: string, accept: string): boolean {
   if (pathname === "/healthz" || pathname === "/sitemap.xml") return true;
+  if (pathname === "/.well-known/api-catalog") return true;
   if (pathname === "/api" || pathname.startsWith("/api/")) return true;
   if (pathname === "/docs" || pathname.startsWith("/docs/")) return true;
   if (pathname === "/graph" || pathname.startsWith("/graph/")) return true;
@@ -69,10 +70,12 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
 
   if (path === "/docs" || path.startsWith("/docs/")) return docsHandler(req);
 
+  if (path === "/.well-known/api-catalog") return apiCatalogHandler(req);
+
   if (path === "/sitemap.xml") return sitemapHandler(req, runtime);
 
   // new API
-  if (path.startsWith("/graph")) return (await graphHandler(req, runtime));
+  if (path.startsWith("/graph")) return await graphHandler(req, runtime);
 
   // old API
   if (path === "/api" || path === "/api/") path = "/";
@@ -94,7 +97,7 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
     if (!isCollectionSlug(slug)) return notFound(`${original} is not a collection`);
     return hal(await loadCollection(runtime.graph, slug));
   }
-  
+
   if (parts.length === 2) {
     const slug = parts[0]!;
     const n = parts[1]!;

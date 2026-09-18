@@ -1,0 +1,63 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LabKit graph API",
+    "version": "1.0.0",
+    "description": "Read-only HAL+JSON view of the LabKit research graph. Each resource embeds its neighbours under `_embedded`, keyed `relation:type` for outbound links and `type:relation` for inbound ones."
+  },
+  "paths": {
+    "/graph/{id}": {
+      "get": {
+        "summary": "One graph entity and its neighbours",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Entity handle, e.g. Q_1, LOE_1, CLM_27.",
+            "schema": { "type": "string", "pattern": "^[A-Za-z0-9]+_[A-Za-z0-9]+$" }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "description": "How many hops of neighbours to embed. 0 returns the entity alone.",
+            "schema": { "type": "integer", "minimum": 0, "maximum": 6, "default": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entity, with its properties beside id and type.",
+            "content": { "application/hal+json": { "schema": { "type": "object" } } }
+          },
+          "default": {
+            "description": "The handle is malformed or not in the graph, or depth is out of range.",
+            "content": { "application/problem+json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "The server is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "worktree": { "type": "string" },
+                    "tenant": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
