@@ -57,6 +57,10 @@ DECLARE
   embedded jsonb;
   parent_embedded jsonb;
   relation_items jsonb;
+  boundary_links_by_path jsonb := '{}'::jsonb;
+  links jsonb;
+  link_items jsonb;
+  relation_key text;
   path_key text;
   parent_key text;
 BEGIN
@@ -94,12 +98,13 @@ BEGIN
           MATCH (a)-[r]->(b)
           WHERE a.retracted IS NULL
             AND b.retracted IS NULL
-          RETURN a.natural_id, type(r), b.natural_id
+          RETURN a.natural_id, type(r), b.natural_id, type(b)
         $$
       ) AS edge(
         source_id ag_catalog.agtype,
         relation  ag_catalog.agtype,
-        target_id ag_catalog.agtype
+        target_id ag_catalog.agtype,
+        target_type ag_catalog.agtype
       )
     ),
 
@@ -134,43 +139,72 @@ BEGIN
     SELECT node_id, parent_id, relation, dir, depth, path
     FROM walk
     ORDER BY depth DESC, path
-  $sql$, root_label, p_natural_id, p_depth)
+  $sql$, root_label, p_natural_id, p_depth + 1)
   LOOP
-    path_key := array_to_string(walk_row.path, E'\x1f');
+    IF walk_row.depth = p_depth + 1 THEN
+      relation_key := lower('lk:' || walk_row.relation);
+      parent_key := array_to_string(walk_row.path[1:array_length(walk_row.path, 1) - 1], E'\x1f');
+      parent_embedded := COALESCE(boundary_links_by_path -> parent_key, '{}'::jsonb);
+      link_items := COALESCE(parent_embedded -> relation_key, '[]'::jsonb);
+      parent_embedded := jsonb_set(
+        parent_embedded,
+        ARRAY[relation_key],
+        link_items || jsonb_build_array(
+          jsonb_build_object(
+            'href', '/api/' || walk_row.node_id,
+            'dir', walk_row.dir
+          )
+        ),
+        true
+      );
+      boundary_links_by_path := jsonb_set(
+        boundary_links_by_path,
+        ARRAY[parent_key],
+        parent_embedded,
+        true
+      );
+    ELSE
+      path_key := array_to_string(walk_row.path, E'\x1f');
     embedded := COALESCE(embedded_by_path -> path_key, '{}'::jsonb);
+    links := jsonb_build_object(
+      'self', jsonb_build_object(
+        'href', '/api/' || walk_row.node_id
+      )
+    );
+    IF walk_row.depth = p_depth THEN
+      links := links || COALESCE(boundary_links_by_path -> path_key, '{}'::jsonb);
+    END IF;
 
     item := jsonb_build_object(
       'id', walk_row.node_id,
       'dir', walk_row.dir,
       'depth', walk_row.depth,
-      '_links', jsonb_build_object(
-        'self', jsonb_build_object(
-          'href', '/api/' || walk_row.node_id
-        )
-      ),
-      '_embedded', embedded
+      '_links', links
     );
+    IF walk_row.depth < p_depth AND embedded <> '{}'::jsonb THEN
+      item := item || jsonb_build_object('_embedded', embedded);
+    END IF;
 
     IF walk_row.parent_id IS NULL THEN
       result := jsonb_build_object(
         'id', walk_row.node_id,
-        '_links', jsonb_build_object(
-          'self', jsonb_build_object(
-            'href', '/api/' || walk_row.node_id
-          ),
+        '_links', links || jsonb_build_object(
           'start', jsonb_build_object(
             'href', '/api/' || walk_row.node_id
           )
-        ),
-        '_embedded', embedded
+        )
       );
+      IF p_depth > 0 AND embedded <> '{}'::jsonb THEN
+        result := result || jsonb_build_object('_embedded', embedded);
+      END IF;
     ELSE
+      relation_key := lower('lk:' || walk_row.relation);
       parent_key := array_to_string(walk_row.path[1:array_length(walk_row.path, 1) - 1], E'\x1f');
       parent_embedded := COALESCE(embedded_by_path -> parent_key, '{}'::jsonb);
-      relation_items := COALESCE(parent_embedded -> walk_row.relation, '[]'::jsonb);
+      relation_items := COALESCE(parent_embedded -> relation_key, '[]'::jsonb);
       parent_embedded := jsonb_set(
         parent_embedded,
-        ARRAY[walk_row.relation],
+        ARRAY[relation_key],
         relation_items || jsonb_build_array(item),
         true
       );
@@ -180,6 +214,7 @@ BEGIN
         parent_embedded,
         true
       );
+    END IF;
     END IF;
   END LOOP;
 
@@ -191,14 +226,6 @@ BEGIN
 END;
 $function$;
 
+ALTER FUNCTION public.entity_as_hal(text, smallint)
+SET search_path = ag_catalog;
 
--- test queries
-SELECT public.entity_as_hal('Q_1'::TEXT, 6::SMALLINT)
-UNION ALL
-SELECT public.entity_as_hal('Q_5'::TEXT, 2::SMALLINT)
-UNION ALL
-SELECT public.entity_as_hal('Q_5'::TEXT, 3::SMALLINT)
-UNION ALL
-SELECT public.entity_as_hal('DEC_12'::TEXT, 4::SMALLINT);
-
-SELECT public.entity_as_hal('EU_21'::TEXT, 4::SMALLINT);
