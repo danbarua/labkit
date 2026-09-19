@@ -13,7 +13,7 @@ import { NODE_LABELS, type NodeLabel } from "@labkit/core-db/domain";
 import { TenantGraph } from "@labkit/core-db/graph";
 import { runMigrationsOnPostgres } from "@labkit/core-db/migrate";
 import { LABKIT_SCHEMA } from "@labkit/core-db/schema";
-import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { resolveTenantContext, type TenantContext } from "@labkit/core-db/tenant";
 import { validateIdentifier } from "@labkit/core-db/agtype";
 
 const SOURCE_LABKIT = resolve(
@@ -59,11 +59,17 @@ function numericSuffix(naturalId: string): number | undefined {
   return Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
-async function maxEventSeq(db: {
-  query<T extends Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
-}): Promise<number> {
+async function maxEventSeq(
+  db: {
+    query<T extends Record<string, unknown>>(
+      sql: string,
+      params?: unknown[],
+    ): Promise<{ rows: T[] }>;
+  },
+  workspace: string,
+): Promise<number> {
   const rows = await db.query<{ seq: string | number }>(
-    `SELECT COALESCE(max(seq), 0) AS seq FROM ${LABKIT_SCHEMA}.labkit_event`,
+    `SELECT COALESCE(max(seq), 0) AS seq FROM "${workspace}".labkit_event`,
   );
   return Number(rows.rows[0]?.seq ?? 0);
 }
@@ -163,10 +169,14 @@ async function withSource<T>(fn: (conn: LabKitDBConnection) => Promise<T>): Prom
   }
 }
 
-async function dumpGraph(src: LabKitDBConnection): Promise<{
-  nodes: DumpedNode[];
-  edges: DumpedEdge[];
-}> {
+/**
+ * The source tenant holding the bench: the first whose graph has `WALK_START`, else the first
+ * tenant there is. Resolved once, because the workspace it names is where both the graph and
+ * the events are read from.
+ */
+async function sourceTenant(
+  src: LabKitDBConnection,
+): Promise<{ ctx: TenantContext; graph: TenantGraph }> {
   const tenants = await src.db.query<{ slug: string }>(
     `SELECT slug FROM ${LABKIT_SCHEMA}.tenants ORDER BY id`,
   );
@@ -174,8 +184,6 @@ async function dumpGraph(src: LabKitDBConnection): Promise<{
     throw new Error(`source ${SOURCE_LABKIT} has no tenants`);
   }
 
-  let slug = tenants.rows[0]!.slug;
-  let graph: TenantGraph | undefined;
   for (const row of tenants.rows) {
     const ctx = await resolveTenantContext(src.db, src.tx, row.slug);
     const candidate = new TenantGraph(ctx, src.db, src.tx);
@@ -184,17 +192,16 @@ async function dumpGraph(src: LabKitDBConnection): Promise<{
       { n: vertexColumn<VertexProps>() },
       { id: WALK_START },
     );
-    if (found.length > 0) {
-      slug = row.slug;
-      graph = candidate;
-      break;
-    }
+    if (found.length > 0) return { ctx, graph: candidate };
   }
-  if (!graph) {
-    const ctx = await resolveTenantContext(src.db, src.tx, slug);
-    graph = new TenantGraph(ctx, src.db, src.tx);
-  }
+  const ctx = await resolveTenantContext(src.db, src.tx, tenants.rows[0]!.slug);
+  return { ctx, graph: new TenantGraph(ctx, src.db, src.tx) };
+}
 
+async function dumpGraph(graph: TenantGraph): Promise<{
+  nodes: DumpedNode[];
+  edges: DumpedEdge[];
+}> {
   const nodeRows = await graph.query(`MATCH (n) RETURN n`, {
     n: vertexColumn<VertexProps>(),
   });
@@ -293,23 +300,41 @@ type DumpedEvent = {
   command: unknown;
 };
 
-async function dumpEvents(src: LabKitDBConnection): Promise<DumpedEvent[]> {
+async function dumpEvents(src: LabKitDBConnection, workspace: string): Promise<DumpedEvent[]> {
   const rows = await src.db.query<DumpedEvent>(
     `SELECT seq, tenant_id, at, operation, subject, changes,
             attribution_label, attribution_id, attribution_how,
             git_hash, reconstructed_from, command
-     FROM ${LABKIT_SCHEMA}.labkit_event
+     FROM "${workspace}".labkit_event
      ORDER BY seq`,
   );
   return rows.rows;
 }
 
-async function destEventMax(url: string): Promise<number> {
+/** The dest workspace for `TENANT`, or nothing if the tenant has never been resolved there. */
+async function destWorkspace(url: string): Promise<string | undefined> {
+  const client = new Client({ connectionString: url });
+  await client.connect();
+  try {
+    const rows = await client.query<{ graph_name: string }>(
+      `SELECT graph_name FROM ${LABKIT_SCHEMA}.tenants WHERE slug = $1`,
+      [TENANT],
+    );
+    const name = rows.rows[0]?.graph_name;
+    if (name !== undefined) validateIdentifier(name, "graph name");
+    return name;
+  } finally {
+    await client.end();
+  }
+}
+
+async function destEventMax(url: string, workspace: string | undefined): Promise<number> {
+  if (workspace === undefined) return 0;
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
     const rows = await client.query<{ seq: string | number }>(
-      `SELECT COALESCE(max(seq), 0) AS seq FROM ${LABKIT_SCHEMA}.labkit_event`,
+      `SELECT COALESCE(max(seq), 0) AS seq FROM "${workspace}".labkit_event`,
     );
     return Number(rows.rows[0]?.seq ?? 0);
   } finally {
@@ -317,14 +342,16 @@ async function destEventMax(url: string): Promise<number> {
   }
 }
 
-async function copyEvents(url: string, tenantId: number, events: DumpedEvent[]): Promise<void> {
+async function copyEvents(url: string, ctx: TenantContext, events: DumpedEvent[]): Promise<void> {
+  const tenantId = ctx.tenantId;
+  const g = `"${ctx.graphName}"`;
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query(`TRUNCATE ${LABKIT_SCHEMA}.labkit_event RESTART IDENTITY`);
+    await client.query(`TRUNCATE ${g}.labkit_event RESTART IDENTITY`);
     for (const e of events) {
       await client.query(
-        `INSERT INTO ${LABKIT_SCHEMA}.labkit_event (
+        `INSERT INTO ${g}.labkit_event (
            seq, tenant_id, at, operation, subject, changes,
            attribution_label, attribution_id, attribution_how,
            git_hash, reconstructed_from, command
@@ -348,10 +375,10 @@ async function copyEvents(url: string, tenantId: number, events: DumpedEvent[]):
     }
     if (events.length > 0) {
       const max = events[events.length - 1]!.seq;
-      await client.query(
-        `SELECT setval(pg_get_serial_sequence('public.labkit_event', 'seq'), $1, true)`,
-        [max],
-      );
+      await client.query(`SELECT setval(pg_get_serial_sequence($1, 'seq'), $2, true)`, [
+        `${ctx.graphName}.labkit_event`,
+        max,
+      ]);
     }
   } finally {
     await client.end();
@@ -366,8 +393,9 @@ export async function ensureOverlapBench(): Promise<void> {
   await migrateDest(destUrl);
 
   await withSource(async (src) => {
-    const sourceSeq = await maxEventSeq(src.db);
-    const destMax = await destEventMax(destUrl);
+    const source = await sourceTenant(src);
+    const sourceSeq = await maxEventSeq(src.db, source.ctx.graphName);
+    const destMax = await destEventMax(destUrl, await destWorkspace(destUrl));
     if (destMax === sourceSeq && destMax > 0) {
       await writeStamp(destUrl, sourceSeq);
       console.log(`labkit-web seed: ${destMax} events already imported`);
@@ -381,7 +409,7 @@ export async function ensureOverlapBench(): Promise<void> {
       const graph = new TenantGraph(ctx, dest.db, dest.tx);
 
       if (!(await nodeExists(graph, WALK_START))) {
-        const { nodes, edges } = await dumpGraph(src);
+        const { nodes, edges } = await dumpGraph(source.graph);
         await graph.inTransaction(async () => {
           for (const node of nodes) {
             await graph.createNode(node.label, node.props as never, node.natural_id);
@@ -400,8 +428,8 @@ export async function ensureOverlapBench(): Promise<void> {
         console.log(`labkit-web seed: copied ${nodes.length} nodes ${edges.length} edges`);
       }
 
-      const events = await dumpEvents(src);
-      await copyEvents(destUrl, ctx.tenantId, events);
+      const events = await dumpEvents(src, source.ctx.graphName);
+      await copyEvents(destUrl, ctx, events);
       await writeStamp(destUrl, sourceSeq);
       console.log(`labkit-web seed: copied ${events.length} events seq ${sourceSeq}`);
     } finally {

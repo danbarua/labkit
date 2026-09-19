@@ -28,7 +28,7 @@ beforeAll(async () => {
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
     const write = new WriteSurface(graph, {
       clock: systemClock,
-      events: pgEventLog(connection.db, ctx.tenantId),
+      events: pgEventLog(connection.db, ctx),
     });
     for (let i = 0; i < NOTES; i++) {
       await write.note({

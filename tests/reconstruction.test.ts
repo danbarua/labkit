@@ -67,14 +67,14 @@ describe("a reconstruction says what it was read off", () => {
     const context = commandContext(mockGitContext, mockSessionContext, clock);
     await new WriteSurface(graph, {
       ...context,
-      events: pgEventLog(db, ctx.tenantId),
+      events: pgEventLog(db, ctx),
       reconstructedFrom: PAPER,
     }).pose({ question: "does the coating slow corrosion?" });
 
     const other = await testDb.openClient();
     try {
       const there = await resolveTenantContext(other, other.tx, "labkit");
-      const seen = await pgEventLog(other, there.tenantId).all();
+      const seen = await pgEventLog(other, there).all();
       expect(seen.map((e) => e.reconstructedFrom)).toEqual([PAPER]);
     } finally {
       await other.close();

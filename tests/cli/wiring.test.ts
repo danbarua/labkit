@@ -27,7 +27,7 @@ test("opening a record hands the event log in rather than letting it default", (
   // `SessionCore` defaults `events` to `inMemoryEventLog()`. In a process that exits after one
   // command that is an array nothing ever wrote to. Asserted on `openRecord` now that every
   // adapter opens through it, which is what makes this true of all three rather than the CLI.
-  expect(open).toContain("const events = pgEventLog(connection.db, ctx.tenantId)");
+  expect(open).toContain("const events = pgEventLog(connection.db, ctx)");
   expect(open).toMatch(/new ReadSurface\(graph, \{ events \}\)/);
   expect(open).toMatch(/new WriteSurface\(graph, \{[\s\S]*?events[,\s}]/);
   expect(open).not.toContain("inMemoryEventLog");

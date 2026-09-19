@@ -42,7 +42,7 @@ const surfaceFor = async (slug: string) => {
     ctx,
     write: new WriteSurface(graph, {
       clock,
-      events: pgEventLog(db, ctx.tenantId),
+      events: pgEventLog(db, ctx),
     }),
   };
 };
@@ -60,7 +60,7 @@ describe("the event log outlives the process that wrote it", () => {
     const other = await testDb.openClient();
     try {
       const ctx = await resolveTenantContext(other, other.tx, "labkit");
-      const seen = await pgEventLog(other, ctx.tenantId).all();
+      const seen = await pgEventLog(other, ctx).all();
       expect(seen.map((e) => e.operation)).toEqual(["pose"]);
       expect(seen[0]!.subject).toBe(question);
       expect(seen[0]!.attribution).toEqual(UNATTRIBUTED);
@@ -78,8 +78,8 @@ describe("the event log outlives the process that wrote it", () => {
     await a.write.pose({ question: "is A's question recorded?" });
     await b.write.pose({ question: "is B's question recorded?" });
 
-    const seenByA = await pgEventLog(db, a.ctx.tenantId).all();
-    const seenByB = await pgEventLog(db, b.ctx.tenantId).all();
+    const seenByA = await pgEventLog(db, a.ctx).all();
+    const seenByB = await pgEventLog(db, b.ctx).all();
     expect(seenByA).toHaveLength(1);
     expect(seenByB).toHaveLength(1);
     expect((seenByA[0]!.command as PoseCommand).question).toBe("is A's question recorded?");
@@ -95,7 +95,7 @@ describe("an event commits with the writes it describes, or not at all", () => {
    */
   test("a verb that throws leaves no event", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
 
     const realCreateEdge = graph.createEdge.bind(graph);
     graph.createEdge = (async (from: string, edge: string, to: string) => {
@@ -114,7 +114,7 @@ describe("an event commits with the writes it describes, or not at all", () => {
    */
   test("after a failure, the next event claims only its own records", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
 
     const realCreateEdge = graph.createEdge.bind(graph);
     graph.createEdge = (async (from: string, edge: string, to: string) => {
@@ -134,7 +134,7 @@ describe("an event commits with the writes it describes, or not at all", () => {
    */
   test("after a failure, the next event claims only its own edges", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
     const { enquiry } = await write.openEnquiry("the one that fails");
     const { observations: raw } = await write.recordObservations({
       enquiry,
@@ -204,7 +204,7 @@ describe("an event records the edges the act created", () => {
    */
   test("a verb emits its own name", async () => {
     const { ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
     const { enquiry } = await write.openEnquiry("does the coating hold?");
     const { observations } = await write.recordObservations({
       enquiry,
@@ -243,7 +243,7 @@ describe("an event records the edges the act created", () => {
    */
   test("standing is on the conclusion, and a promotion says what it moved", async () => {
     const { ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
     const { enquiry } = await write.openEnquiry("does the coating hold?");
     const { observations } = await write.recordObservations({
       enquiry,
@@ -299,7 +299,7 @@ describe("an event records the edges the act created", () => {
 
   test("recordAnalysis reports every edge, not only its nodes", async () => {
     const { ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
     const { enquiry } = await write.openEnquiry("does the coating hold?");
     const { observations: raw } = await write.recordObservations({
       enquiry,
@@ -344,7 +344,7 @@ describe("an event records the edges the act created", () => {
    */
   test("an act that connects nothing records an empty list, not an absent one", async () => {
     const { ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
     await write.pose({ question: "does the coating hold?" });
 
     const [event] = await log.all();
@@ -359,7 +359,7 @@ describe("the log answers what the graph cannot", () => {
    */
   test("an act is found by what it created, not only by what it was about", async () => {
     const { graph, ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
     const { enquiry } = await write.openEnquiry("does the coating hold?");
     await write.closeEnquiry({ enquiry });
 
@@ -384,7 +384,7 @@ describe("the log answers what the graph cannot", () => {
    */
   test("seq orders two events a frozen clock stamps identically", async () => {
     const { ctx, write } = await surfaceFor("labkit");
-    const log = pgEventLog(db, ctx.tenantId);
+    const log = pgEventLog(db, ctx);
     await write.pose({ question: "first" });
     await write.pose({ question: "second" });
 

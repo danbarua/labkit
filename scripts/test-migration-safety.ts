@@ -125,7 +125,7 @@ try {
     const ctx = await resolveTenantContext(rawDb, rawTx, tenant);
     await scopeToTenant(rawDb, ctx);
     const graph = new TenantGraph(ctx, rawDb, rawTx);
-    const events = await pgEventLog(rawDb, ctx.tenantId).all();
+    const events = await pgEventLog(rawDb, ctx).all();
     const { nodes, edges } = await countGraph(graph);
     return { events: events.length, nodes, edges };
   })();
@@ -137,7 +137,7 @@ try {
     const ctx = await resolveTenantContext(connection.db, connection.tx, tenant);
     await scopeToTenant(connection.db, ctx);
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
-    const events = await pgEventLog(connection.db, ctx.tenantId).all();
+    const events = await pgEventLog(connection.db, ctx).all();
     const { nodes, edges } = await countGraph(graph);
     return { events: events.length, nodes, edges };
   })();

@@ -84,7 +84,7 @@ const sequenceOf = async (sink: EventSink, touching: string): Promise<string[]> 
 test("both sinks return the same acts for every position touching reaches", async () => {
   const ctx = await resolveTenantContext(db, db.tx, "touching");
   new TenantGraph(ctx, db, db.tx);
-  const durable = pgEventLog(db, ctx.tenantId);
+  const durable = pgEventLog(db, ctx);
   const inMemory = inMemoryEventLog();
   for (const a of ACTS) {
     await durable.record(a);
@@ -109,7 +109,7 @@ test("both sinks return the same acts for every position touching reaches", asyn
 test("touching reaches an edge endpoint and a property change, not only what was minted", async () => {
   const ctx = await resolveTenantContext(db, db.tx, "touching-positions");
   new TenantGraph(ctx, db, db.tx);
-  const durable = pgEventLog(db, ctx.tenantId);
+  const durable = pgEventLog(db, ctx);
   for (const a of ACTS) await durable.record(a);
 
   // Minted by one act, pointed at by an edge in another, retracted by a third.

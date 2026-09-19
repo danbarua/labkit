@@ -51,7 +51,7 @@ export async function openRecord(options: OpenOptions): Promise<OpenRecord> {
     // One event log on the same connection as the graph: `emit` runs inside
     // each verb's transaction, so an event and the writes it describes commit
     // together. A second connection would end that silently.
-    const events = pgEventLog(connection.db, ctx.tenantId);
+    const events = pgEventLog(connection.db, ctx);
     // One graph for both surfaces, so `inTransaction`'s re-entrancy is shared.
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
     return {
