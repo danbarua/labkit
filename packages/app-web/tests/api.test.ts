@@ -10,29 +10,25 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { handle } from "../src/server/handler";
-import { openRuntime, type Runtime } from "../src/server/runtime";
-import { createScratchDb, type ScratchDb } from "./support/scratch-db";
-
-const serverUrl = process.env.LABKIT_DB_URL;
+import { createRuntime, type Runtime } from "../src/server/runtime";
+import { createFixture, defaultBackend, type Fixture } from "./support/fixture";
 
 const PUBLIC = "https://labkit.test";
 const TUNNEL = { "x-forwarded-proto": "https" };
 
+// Some behaviour only shows on a real pool of connections, and PGlite has one.
+const testOnPostgres = test.skipIf(defaultBackend() !== "postgres");
+
 let runtime: Runtime;
-let scratch: ScratchDb;
+let fixture: Fixture;
 
 beforeAll(async () => {
-  if (!serverUrl) return;
-  scratch = await createScratchDb(serverUrl);
-  process.env.LABKIT_DB_URL = scratch.url;
-  runtime = await openRuntime();
+  fixture = await createFixture();
+  runtime = createRuntime(fixture.connections);
 }, 60_000);
 
 afterAll(async () => {
-  if (!serverUrl) return;
-  process.env.LABKIT_DB_URL = serverUrl;
-  await runtime?.pool.end();
-  await scratch?.drop();
+  await fixture?.close();
 });
 
 async function get(path: string, headers: Record<string, string> = TUNNEL) {
@@ -60,7 +56,7 @@ function hrefs(value: unknown, out: string[] = []): string[] {
 const dataOf = (item: any): Record<string, unknown> =>
   Object.fromEntries(item.data.map((d: any) => [d.name, d.value]));
 
-describe.skipIf(!serverUrl)("entities", () => {
+describe("entities", () => {
   test("a bare handle returns one hop of neighbours", async () => {
     const r = await get("/graph/LOE_1");
     expect(r.status).toBe(200);
@@ -132,7 +128,7 @@ describe.skipIf(!serverUrl)("entities", () => {
   });
 });
 
-describe.skipIf(!serverUrl)("workspaces", () => {
+describe("workspaces", () => {
   test("the same handle is a different entity in each workspace", async () => {
     const alpha = await get("/workspace/alpha/graph/Q_1");
     const beta = await get("/workspace/beta/graph/Q_1");
@@ -187,7 +183,7 @@ describe.skipIf(!serverUrl)("workspaces", () => {
     expect(slugs).not.toContain("graph");
   });
 
-  test("interleaved requests to different workspaces never cross", async () => {
+  testOnPostgres("interleaved requests to different workspaces never cross", async () => {
     const results = await Promise.all(
       Array.from({ length: 60 }, (_, i) =>
         get(`/workspace/${i % 2 === 0 ? "alpha" : "beta"}/graph/Q_1`),
@@ -198,7 +194,7 @@ describe.skipIf(!serverUrl)("workspaces", () => {
     }
   });
 
-  test("more concurrent requests than pool connections all complete", async () => {
+  testOnPostgres("more concurrent requests than pool connections all complete", async () => {
     const paths = [
       "/collections/workspace",
       "/workspace/alpha/graph/LOE_1?depth=2",
@@ -212,21 +208,20 @@ describe.skipIf(!serverUrl)("workspaces", () => {
 
   test("no request leaves tenant state on the connection it used", async () => {
     await get("/workspace/beta/graph/Q_1");
-    const client = await runtime.pool.connect();
+    const session = await runtime.connections.connect();
     try {
-      await runtime.ready.get(client);
-      const { rows } = await client.query(
+      const { rows } = await session.query<{ role: string; tenant: string | null }>(
         `SELECT current_user AS role, current_setting('labkit.tenant_id', true) AS tenant`,
       );
-      expect(rows[0].role).not.toBe("labkit_app");
-      expect(rows[0].tenant ?? "").toBe("");
+      expect(rows[0]?.role).not.toBe("labkit_app");
+      expect(rows[0]?.tenant ?? "").toBe("");
     } finally {
-      client.release();
+      session.release();
     }
   });
 });
 
-describe.skipIf(!serverUrl)("collections", () => {
+describe("collections", () => {
   test("the index has a collection per node type, and workspaces in the default workspace", async () => {
     const r = await get("/collections");
     expect(r.type).toBe("application/vnd.collection+json");
@@ -328,7 +323,7 @@ describe.skipIf(!serverUrl)("collections", () => {
   });
 });
 
-describe.skipIf(!serverUrl)("discovery", () => {
+describe("discovery", () => {
   test("the sitemap lists the default workspace only", async () => {
     const r = await get("/sitemap.xml");
     expect(r.type).toBe("application/xml");
@@ -371,7 +366,7 @@ describe.skipIf(!serverUrl)("discovery", () => {
   });
 });
 
-describe.skipIf(!serverUrl)("cross-origin access", () => {
+describe("cross-origin access", () => {
   test("a request that came by a public name may be read from any origin", async () => {
     const r = await get("/graph/Q_1");
     expect(r.res.headers.get("access-control-allow-origin")).toBe("*");

@@ -241,7 +241,7 @@ module.exports = {
         pathNot: [
           '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$',
           // The web app's build tooling runs at dev and build time and never ships.
-          '^packages/app-web/(vite[.]config[.]ts|playwright[.]config[.]ts|e2e/|src/vite-env[.]d[.]ts|src/infra/)'
+          '^packages/app-web/(vite[.]config[.]ts|playwright[.]config[.]ts|e2e/|tests/support/|src/vite-env[.]d[.]ts|src/infra/)'
         ]
       },
       to: {

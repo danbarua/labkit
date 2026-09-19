@@ -1,8 +1,8 @@
 import { basename } from "node:path";
-import { Pool, type PoolClient } from "pg";
 import { APP_ROLE } from "@labkit/core-db/schema";
 import { TENANT_SETTING } from "@labkit/core-db/scoped";
 import { worktreeName } from "@labkit/app-cli/worktree";
+import { type Connections, pgConnections } from "./connections";
 
 /** The workspace a bare `/graph` or `/collections` resolves to. */
 const DEFAULT_TENANT_ID = 1;
@@ -11,13 +11,11 @@ const DEFAULT_TENANT_ID = 1;
 const GRAPH_NAME = /^[a-z0-9_]+$/;
 
 /**
- * Process-lifetime store: a pool of Postgres connections. A request borrows one for the length of
- * its transaction and never keeps tenant state on it afterwards.
+ * Process-lifetime store: where connections come from. A request borrows one for the length of its
+ * transaction and never keeps tenant state on it afterwards.
  */
 export interface Runtime {
-  pool: Pool;
-  /** Per connection: resolves once its session setup has run. */
-  ready: WeakMap<PoolClient, Promise<unknown>>;
+  connections: Connections;
   worktree: string;
 }
 
@@ -39,16 +37,14 @@ export interface TenantScope {
   workspaces(): Promise<Workspace[]>;
 }
 
-export async function openRuntime(): Promise<Runtime> {
+export function createRuntime(connections: Connections): Runtime {
+  return { connections, worktree: worktreeName() ?? basename(process.cwd()) };
+}
+
+/** A runtime on the Postgres server `LABKIT_DB_URL` names. */
+export function openRuntime(): Runtime {
   process.env.LABKIT_DB_URL ??= "postgresql://postgres:agens@127.0.0.1:5433/labkit";
-  const pool = new Pool({ connectionString: process.env.LABKIT_DB_URL });
-  // An idle client that loses its server must not take the process down.
-  pool.on("error", (err) => console.error("postgres pool:", err.message));
-  const ready: Runtime["ready"] = new WeakMap();
-  pool.on("connect", (client) => {
-    ready.set(client, client.query(`LOAD 'age'; SET search_path = ag_catalog, "$user", public;`));
-  });
-  return { pool, ready, worktree: worktreeName() ?? basename(process.cwd()) };
+  return createRuntime(pgConnections(process.env.LABKIT_DB_URL));
 }
 
 /**
@@ -64,20 +60,21 @@ export async function withTenant<T>(
   slug: string | undefined,
   work: (scope: TenantScope) => Promise<T>,
 ): Promise<T | undefined> {
-  const client = await runtime.pool.connect();
+  const client = await runtime.connections.connect();
   let failure: unknown;
   try {
-    // A connection is only used once its session setup has finished.
-    await runtime.ready.get(client);
+    type TenantRow = { id: number; slug: string; graph_name: string };
     const found =
       slug === undefined
-        ? await client.query(`SELECT id, slug, graph_name FROM public.tenants WHERE id = $1`, [
-            DEFAULT_TENANT_ID,
-          ])
-        : await client.query(`SELECT id, slug, graph_name FROM public.tenants WHERE slug = $1`, [
-            slug,
-          ]);
-    const row = found.rows[0] as { id: number; slug: string; graph_name: string } | undefined;
+        ? await client.query<TenantRow>(
+            `SELECT id, slug, graph_name FROM public.tenants WHERE id = $1`,
+            [DEFAULT_TENANT_ID],
+          )
+        : await client.query<TenantRow>(
+            `SELECT id, slug, graph_name FROM public.tenants WHERE slug = $1`,
+            [slug],
+          );
+    const row = found.rows[0];
     if (row === undefined) return undefined;
     if (!GRAPH_NAME.test(row.graph_name)) {
       throw new Error(
@@ -94,12 +91,13 @@ export async function withTenant<T>(
         graphName: row.graph_name,
         prefix: slug === undefined ? "" : `/workspace/${encodeURIComponent(row.slug)}`,
         query: async <R = Record<string, unknown>>(sql: string, params?: unknown[]) => {
-          const r = await client.query(sql, params);
-          return { rows: r.rows as R[] };
+          return client.query<R>(sql, params);
         },
         workspaces: async () => {
-          const r = await client.query(`SELECT slug, display_name FROM public.tenants ORDER BY id`);
-          return r.rows.map((w: { slug: string; display_name: string }) => ({
+          const r = await client.query<{ slug: string; display_name: string }>(
+            `SELECT slug, display_name FROM public.tenants ORDER BY id`,
+          );
+          return r.rows.map((w) => ({
             slug: w.slug,
             displayName: w.display_name,
           }));
@@ -115,7 +113,7 @@ export async function withTenant<T>(
     failure = err;
     throw err;
   } finally {
-    // A connection that failed mid-transaction is not handed back to the pool.
-    client.release(failure === undefined ? undefined : true);
+    // A connection that failed mid-transaction is not handed to another request.
+    client.release(failure !== undefined);
   }
 }

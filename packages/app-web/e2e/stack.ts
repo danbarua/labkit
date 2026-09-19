@@ -1,25 +1,19 @@
 #!/usr/bin/env bun
 /**
- * The stack the browser tests run against, on a database of its own.
+ * The stack the browser tests run against.
  *
- * A scratch database with two workspaces, the API on it, the Vite dev server, and `vite preview`
- * of a fresh production build. Preview starts last, so its being reachable means everything is,
- * and that is the URL Playwright waits on. `LABKIT_DB_URL` names the Postgres server the
- * database is created on.
+ * The API in this process on an in-memory PGlite database with two workspaces, the Vite dev
+ * server, and `vite preview` of a fresh production build. Preview starts last, so its being
+ * reachable means everything is, and that is the URL Playwright waits on. Nothing outside this
+ * machine is needed.
  */
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createScratchDb } from "../tests/support/scratch-db";
-
-const serverUrl = process.env.LABKIT_DB_URL;
-if (!serverUrl) {
-  console.error(
-    "e2e needs LABKIT_DB_URL: a Postgres server it may create a throwaway database on.",
-  );
-  process.exit(1);
-}
+import { createRuntime } from "../src/server/runtime";
+import { serve } from "../src/server/serve";
+import { createFixture } from "../tests/support/fixture";
 
 const port = (name: string, fallback: number) => String(Number(process.env[name] ?? fallback));
 const ports = {
@@ -28,10 +22,11 @@ const ports = {
   built: port("E2E_PORT_BUILT", 8951),
 };
 
-const scratch = await createScratchDb(serverUrl);
+const fixture = await createFixture("pglite");
+const api = serve(createRuntime(fixture.connections), Number(ports.api));
 // The bundle goes in a directory of its own, so a test run leaves nothing in the package.
 const built = await mkdtemp(path.join(tmpdir(), "labkit-e2e-"));
-const env = { ...process.env, LABKIT_DB_URL: scratch.url, LABKIT_PORT_WEB: ports.api };
+const env = { ...process.env, LABKIT_PORT_WEB: ports.api };
 const vite = "node_modules/vite/bin/vite.js";
 const inherit = { env, stdout: "inherit", stderr: "inherit" } as const;
 
@@ -43,7 +38,8 @@ async function stop(code: number): Promise<never> {
     stopping = true;
     for (const child of children) child.kill();
     await Promise.all(children.map((child) => child.exited));
-    await scratch.drop();
+    await api.stop(true);
+    await fixture.close();
     await rm(built, { recursive: true, force: true });
   }
   process.exit(code);
@@ -67,7 +63,6 @@ async function reachable(url: string, seconds: number): Promise<boolean> {
 
 try {
   children.push(
-    Bun.spawn(["bun", "src/server/main.ts"], inherit),
     Bun.spawn(["bun", vite, "--host", "127.0.0.1", "--port", ports.dev, "--strictPort"], {
       ...inherit,
       env: { ...env, LABKIT_PORT_EXPLORER: ports.dev },

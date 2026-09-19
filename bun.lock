@@ -66,6 +66,8 @@
       },
       "devDependencies": {
         "@biomejs/biome": "2.5.13",
+        "@electric-sql/pglite": "^0.5.7",
+        "@electric-sql/pglite-age": "^0.0.8",
         "@playwright/test": "^1.55.0",
         "@tanstack/router-plugin": "^1.168.40",
         "@types/react": "^19.1.12",

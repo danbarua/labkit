@@ -1,5 +1,4 @@
 import type { TenantScope } from "./runtime";
-import { DatabaseError } from "pg";
 // Bare links return one hop of neighbours. MAX_DEPTH mirrors the limit in entity_as_hal.
 const DEFAULT_DEPTH = 1;
 const MAX_DEPTH = 6;
@@ -20,6 +19,12 @@ export function problem(status: number, title: string, detail?: string): Respons
 }
 
 // `path` is the request path with any workspace prefix already taken off.
+// `RAISE EXCEPTION` in the database. Both drivers put the SQLSTATE in `code`, and only that is read,
+// because they do not share an error class.
+function isRaisedException(err: unknown): err is Error {
+  return err instanceof Error && (err as { code?: unknown }).code === "P0001";
+}
+
 export async function graphHandler(
   req: Request,
   scope: TenantScope,
@@ -74,7 +79,7 @@ export async function graphHandler(
       headers: { "content-type": "application/hal+json" },
     });
   } catch (err) {
-    if (err instanceof DatabaseError && err.code === "P0001") {
+    if (isRaisedException(err)) {
       return problem(404, "Not Found", `Resource with id ${id} not found. ${err.message}`);
     } else {
       throw err;

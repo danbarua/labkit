@@ -28,9 +28,9 @@ Neighbor queries filter `n.retracted IS NULL AND m.retracted IS NULL`. Unlabelle
 
 ## Tests
 
-`LABKIT_DB_URL=… bun run test` from here. Each run creates its own database on that server, seeds two workspaces, and drops it afterwards. Without the variable the suite skips, and reports it as skipped.
+`bun run test` from here runs the API tests on in-memory PGlite, with nothing to install. Set `LABKIT_DB_URL` to a Postgres server and the same suite runs on Postgres instead, in a throwaway database it creates and drops. Two tests only mean something on a real pool of connections, so they run on Postgres and skip on PGlite. A bare `bun test` at the repo root finds this suite too.
 
-`LABKIT_DB_URL=… bun run e2e` drives the browser app in Chrome. `e2e/stack.ts` builds the same kind of database, starts the API and Vite, builds the app and previews it, and the tests run against both the dev server and the built bundle. A run killed hard can leave a `labkit_web_test_*` database behind. The specs are named `*.e2e.ts` so `bun test` does not pick them up.
+`bun run e2e` drives the browser app in Chrome, on PGlite. `e2e/stack.ts` starts the API in its own process space, the Vite dev server, and a preview of a fresh build, and the tests run against both the dev server and the built bundle. The specs are named `*.e2e.ts` so `bun test` does not pick them up.
 
 ## Do not
 

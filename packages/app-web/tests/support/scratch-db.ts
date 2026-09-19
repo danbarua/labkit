@@ -1,8 +1,7 @@
-import { readFileSync } from "node:fs";
 import { Client } from "pg";
 import { directPostgresBackend } from "@labkit/core-db/backend";
 import { runMigrationsOnPostgres } from "@labkit/core-db/migrate";
-import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { seed } from "./seed";
 
 export interface ScratchDb {
   /** A connection string for the new database. */
@@ -19,56 +18,21 @@ function urlFor(serverUrl: string, database: string): string {
   return url.toString();
 }
 
-async function seed(url: string): Promise<void> {
+async function seedOn(url: string): Promise<void> {
   const { db, tx, close } = await directPostgresBackend({ connectionString: url }).connect();
-  try {
-    const alpha = await resolveTenantContext(db, tx, "alpha");
-    const beta = await resolveTenantContext(db, tx, "beta");
-    // The default workspace is tenant 1, so the first one created has to be it.
-    if (alpha.tenantId !== 1) throw new Error(`alpha is tenant ${alpha.tenantId}, not 1`);
-
-    const cypher = (graph: string, body: string) =>
-      db.query(
-        `SELECT * FROM ag_catalog.cypher('${graph}'::name, $$${body}$$) AS (r ag_catalog.agtype)`,
-      );
-
-    await cypher(
-      alpha.graphName,
-      `CREATE (:Question {natural_id: 'Q_1', name: 'alpha question'}),
-              (:Question {natural_id: 'Q_2', name: 'second alpha question'}),
-              (:Question {natural_id: 'Q_3', name: 'retracted question', retracted: 'x'}),
-              (:LineOfEnquiry {natural_id: 'LOE_1', name: 'alpha enquiry'}),
-              (:EvidenceUnit {natural_id: 'EU_1', role: 'observation'}),
-              (:Evidence {natural_id: 'EV_1', statement: 'alpha evidence'})`,
-    );
-    for (const edge of [
-      "(a:Question {natural_id: 'Q_1'}), (b:LineOfEnquiry {natural_id: 'LOE_1'}) CREATE (a)-[:MOTIVATES]->(b)",
-      "(a:EvidenceUnit {natural_id: 'EU_1'}), (b:LineOfEnquiry {natural_id: 'LOE_1'}) CREATE (a)-[:ADDRESSES]->(b)",
-      "(a:EvidenceUnit {natural_id: 'EU_1'}), (b:Evidence {natural_id: 'EV_1'}) CREATE (a)-[:PRODUCES]->(b)",
-    ]) {
-      await cypher(alpha.graphName, `MATCH ${edge}`);
-    }
-
-    // The same handle as alpha's, with different content: the sharpest test of isolation.
-    await cypher(beta.graphName, `CREATE (:Question {natural_id: 'Q_1', name: 'beta question'})`);
-  } finally {
-    await close();
-  }
-
-  const sql = readFileSync(new URL("../../queries/entity_as_hal.sql", import.meta.url), "utf8");
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query(sql);
+    await seed(db, tx, (sql) => client.query(sql));
   } finally {
     await client.end();
+    await close();
   }
 }
 
 /**
- * A throwaway database on the server `serverUrl` names, holding two workspaces with different
- * data: `alpha` (the default, tenant 1) and `beta`. Nothing else in it, so nothing a developer
- * has loaded can change a result.
+ * A throwaway Postgres database on the server `serverUrl` names, seeded by `seed`. Nothing else
+ * is in it, so nothing a developer has loaded can change a result.
  */
 export async function createScratchDb(serverUrl: string): Promise<ScratchDb> {
   const name = `${PREFIX}${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
@@ -92,7 +56,7 @@ export async function createScratchDb(serverUrl: string): Promise<ScratchDb> {
   } finally {
     await migrator.end();
   }
-  await seed(url);
+  await seedOn(url);
 
   return {
     url,
