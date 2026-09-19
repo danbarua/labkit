@@ -20,7 +20,7 @@ export async function provisionTenantGraph(
 ): Promise<void> {
   await tx.inTransaction(async () => {
     await db.query("SELECT pg_advisory_xact_lock($1)", [tenantId]);
-    await new TenantGraphProvisioner(db, tenantId, graphName).reconcile();
+    await new TenantGraphProvisioner(db, graphName).reconcile();
   });
 }
 
@@ -38,7 +38,6 @@ export async function dropTenantGraph(db: LabKitDB, graphName: string): Promise<
 class TenantGraphProvisioner {
   constructor(
     private readonly db: LabKitDB,
-    private readonly tenantId: number,
     private readonly graphName: string,
   ) {}
 
@@ -63,9 +62,9 @@ class TenantGraphProvisioner {
     for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label, indexes);
     for (const label of NODE_LABELS) await this.ensurePropertyIndexes(label, indexes);
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
-    await this.ensureNaturalIdSequence();
+    // The event table first: the sequence is seeded from what it holds.
     await this.ensureEventTable();
-    await this.ensureSuppliedEventSeq();
+    await this.ensureNaturalIdSequence();
     const policies = await this.existingPolicies();
     for (const label of NODE_LABELS) await this.ensureRetractionPolicy(label, policies);
     await this.ensureGrants();
@@ -103,8 +102,13 @@ class TenantGraphProvisioner {
        ) ids
        WHERE id ~ '_\\d+"?$'`,
     );
-    const high = used.rows[0]?.high;
-    if (high) {
+    // The events too: their `seq` comes from this counter, and a record moved off the old
+    // event table has rows here before the sequence exists.
+    const events = await this.db.query<{ high: number | null }>(
+      `SELECT max(seq) AS high FROM "${this.graphName}".domain_event`,
+    );
+    const high = Math.max(used.rows[0]?.high ?? 0, events.rows[0]?.high ?? 0);
+    if (high > 0) {
       await this.db.query(`SELECT setval($1, $2)`, [
         `"${this.graphName}".labkit_natural_id_seq`,
         high,
@@ -115,89 +119,51 @@ class TenantGraphProvisioner {
   /**
    * This workspace's event log, in its own schema.
    *
-   * Copied from `public.labkit_event` with `LIKE`, which is where the column list is still
-   * written down. `LIKE` runs once: a column added there later never reaches a workspace
-   * that already has the table.
+   * The columns come from `workspaceEvents`, which is the only place they are written down.
    */
   private async ensureEventTable(): Promise<void> {
     const { rows } = await this.db.query<{ exists: boolean }>(
       `SELECT EXISTS (
          SELECT 1 FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace
-         WHERE c.relkind = 'r' AND c.relname = 'labkit_event' AND n.nspname = $1
+         WHERE c.relkind = 'r' AND c.relname = 'domain_event' AND n.nspname = $1
        ) AS exists`,
       [this.graphName],
     );
     if (rows[0]?.exists) return;
 
     const g = `"${this.graphName}"`;
-    // `INCLUDING INDEXES` brings the primary key and the three tenant indexes. It does not
-    // bring the foreign key, row-level security or the policy — those are stated below.
+    await this.db.query(`CREATE TABLE ${g}.domain_event (
+      seq bigint PRIMARY KEY,
+      tenant_id integer NOT NULL REFERENCES public.tenants(id),
+      at text NOT NULL,
+      operation text NOT NULL,
+      subject text NOT NULL,
+      changes jsonb NOT NULL DEFAULT '[]'::jsonb,
+      attribution_label text NOT NULL,
+      attribution_id text NOT NULL,
+      attribution_how text,
+      git_hash text,
+      reconstructed_from text,
+      command jsonb NOT NULL
+    )`);
     await this.db.query(
-      `CREATE TABLE ${g}.labkit_event (LIKE public.labkit_event INCLUDING DEFAULTS INCLUDING INDEXES)`,
+      `CREATE INDEX domain_event_tenant_seq_idx ON ${g}.domain_event (tenant_id, seq)`,
     );
-
     await this.db.query(
-      `ALTER TABLE ${g}.labkit_event ADD CONSTRAINT labkit_event_tenant_id_tenants_id_fk
-         FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)`,
+      `CREATE INDEX domain_event_tenant_subject_idx ON ${g}.domain_event (tenant_id, subject)`,
     );
-    await this.db.query(`ALTER TABLE ${g}.labkit_event ENABLE ROW LEVEL SECURITY`);
     await this.db.query(
-      `CREATE POLICY labkit_event_tenant_isolation ON ${g}.labkit_event FOR ALL TO ${APP_ROLE}
+      `CREATE INDEX domain_event_tenant_agent_idx ON ${g}.domain_event (tenant_id, attribution_id, seq)`,
+    );
+    await this.db.query(
+      `CREATE INDEX domain_event_changes_idx ON ${g}.domain_event USING gin (changes jsonb_path_ops)`,
+    );
+    await this.db.query(`ALTER TABLE ${g}.domain_event ENABLE ROW LEVEL SECURITY`);
+    await this.db.query(
+      `CREATE POLICY domain_event_tenant_isolation ON ${g}.domain_event FOR ALL TO ${APP_ROLE}
          USING (tenant_id = current_setting('labkit.tenant_id')::int)
          WITH CHECK (tenant_id = current_setting('labkit.tenant_id')::int)`,
-    );
-
-    // Rows written before the log moved. Filtered by `tenant_id` rather than left to the
-    // policy: provisioning runs before `scopeToTenant`, as the owning role and with
-    // `labkit.tenant_id` unset, so the policy is not in force here. `SELECT *` is safe only
-    // because `LIKE` guarantees the column order matches.
-    await this.db.query(
-      `INSERT INTO ${g}.labkit_event SELECT * FROM public.labkit_event WHERE tenant_id = $1`,
-      [this.tenantId],
-    );
-    // The one counter has to clear the copied events too: an act takes its number from
-    // `labkit_natural_id_seq`, and that number is now a `seq` as well as an id. The `WHERE`
-    // is what makes this do nothing on an empty workspace — an unconditional `setval` would
-    // burn number 1 and the first act of a new record would be event 2.
-    await this.db.query(
-      `SELECT setval($1, m.high, true)
-         FROM (SELECT max(seq) AS high FROM ${g}.labkit_event) m
-        WHERE m.high IS NOT NULL
-          AND m.high >= (SELECT last_value FROM ${g}.labkit_natural_id_seq)`,
-      [`${this.graphName}.labkit_natural_id_seq`],
-    );
-  }
-
-  /**
-   * Removes the `seq` default a workspace made by 0.7.459 still carries, and lifts the id
-   * counter above the event numbers already written.
-   *
-   * Those workspaces draw event numbers from `labkit_event_seq_seq` and ids from
-   * `labkit_natural_id_seq`. One counter does both jobs now, so the second one goes — and
-   * the first has to clear what it handed out, or the next act writes a `seq` a row holds.
-   */
-  private async ensureSuppliedEventSeq(): Promise<void> {
-    const { rows } = await this.db.query<{ has_default: boolean }>(
-      `SELECT a.atthasdef AS has_default
-         FROM pg_attribute a
-         JOIN pg_class c ON c.oid = a.attrelid
-         JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = $1 AND c.relname = 'labkit_event' AND a.attname = 'seq'`,
-      [this.graphName],
-    );
-    if (rows[0]?.has_default !== true) return;
-    await this.db.query(
-      `ALTER TABLE "${this.graphName}".labkit_event ALTER COLUMN seq DROP DEFAULT`,
-    );
-    // Past the numbers the old counter handed out, or the next act collides with an event
-    // that already holds its number.
-    await this.db.query(
-      `SELECT setval($1, m.high, true)
-         FROM (SELECT max(seq) AS high FROM "${this.graphName}".labkit_event) m
-        WHERE m.high IS NOT NULL
-          AND m.high >= (SELECT last_value FROM "${this.graphName}".labkit_natural_id_seq)`,
-      [`${this.graphName}.labkit_natural_id_seq`],
     );
   }
 
@@ -303,6 +269,10 @@ class TenantGraphProvisioner {
   /**
    * Hides a retracted node from `labkit_app` — the compensating act `undo` writes stands in the
    * record, and this is what stops it being traversed.
+   *
+   * `retracted` is a key inside the agtype `properties` column, not a column. AGE creates
+   * these tables as the provisioning role, so `postgres` owns them and bypasses this.
+   * `_ag_label_vertex` has no policy and shows retracted rows to any reader.
    */
   private async ensureRetractionPolicy(label: NodeLabel, existing: Set<string>): Promise<void> {
     const policyName = `${label.toLowerCase()}_hide_retracted`;

@@ -1,7 +1,7 @@
 /**
  * Optional query tracing, off unless asked for.
  */
-import type { LabKitDB } from "./backend";
+import type { LabKitDB, QueryOptions } from "./backend";
 
 interface TraceOptions {
   /** Log completed queries at or above this duration. Default 1000ms. */
@@ -110,13 +110,21 @@ export function traced(db: LabKitDB, label = "db"): LabKitDB {
   ensureWatchdog(opts.stuckMs);
 
   return {
-    async query<T = Record<string, unknown>>(sql: string, params?: unknown[]) {
+    async query<T = Record<string, unknown>>(
+      sql: string,
+      params?: unknown[],
+      queryOpts?: QueryOptions,
+    ) {
       const id = nextQueryId++;
       const short = shorten(sql);
       const startedAt = performance.now();
       inFlight.set(id, { connection: label, sql: short, startedAt });
       try {
-        const result = await db.query<T>(sql, params);
+        // **`opts` forwarded, and that is the whole of the bug this once had.** It carries
+        // `rowMode: "array"`, which is how drizzle's pg-proxy asks for rows it can decode
+        // positionally. Dropped, every drizzle query came back as objects it read as arrays:
+        // `graph_name` arrived NULL and `create_graph` refused it — only ever with tracing on.
+        const result = await db.query<T>(sql, params, queryOpts);
         const ms = performance.now() - startedAt;
         const c = counts.get(label) ?? { queries: 0, totalMs: 0 };
         counts.set(label, { queries: c.queries + 1, totalMs: c.totalMs + ms });

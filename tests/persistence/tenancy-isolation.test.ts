@@ -92,10 +92,10 @@ describe("a scoped session is confined to its tenant", () => {
     // this session and B's rows. Without RLS it returns Q_B.
     const rows = await asTenant("rls-a", async (c) => {
       const own = await c.db.query<{ subject: string }>(
-        `select subject from "${a.graphName}".labkit_event order by subject`,
+        `select subject from "${a.graphName}".domain_event order by subject`,
       );
       const theirs = await c.db.query<{ subject: string }>(
-        `select subject from "${b.graphName}".labkit_event order by subject`,
+        `select subject from "${b.graphName}".domain_event order by subject`,
       );
       return { own: own.rows.map((x) => x.subject), theirs: theirs.rows.map((x) => x.subject) };
     });

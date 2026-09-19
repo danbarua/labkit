@@ -84,5 +84,5 @@ GRANT EXECUTE ON FUNCTION public.labkit_record_event(text, integer, jsonb) TO la
 -- argument types at the call site.
 ALTER FUNCTION public.labkit_next_workspace_id(text, text)
 SET search_path = ag_catalog, public;--> statement-breakpoint
-ALTER FUNCTION public.labkit_prop(agtype, text)
+ALTER FUNCTION public.labkit_prop(ag_catalog.agtype, text)
 SET search_path = ag_catalog, public;

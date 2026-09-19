@@ -99,6 +99,13 @@
       "when": 1789826363308,
       "tag": "0013_event_number_from_the_database",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789826364308,
+      "tag": "0014_events_leave_public",
+      "breakpoints": true
     }
   ]
 }

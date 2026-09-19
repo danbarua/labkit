@@ -69,7 +69,7 @@ async function maxEventSeq(
   workspace: string,
 ): Promise<number> {
   const rows = await db.query<{ seq: string | number }>(
-    `SELECT COALESCE(max(seq), 0) AS seq FROM "${workspace}".labkit_event`,
+    `SELECT COALESCE(max(seq), 0) AS seq FROM "${workspace}".domain_event`,
   );
   return Number(rows.rows[0]?.seq ?? 0);
 }
@@ -305,7 +305,7 @@ async function dumpEvents(src: LabKitDBConnection, workspace: string): Promise<D
     `SELECT seq, tenant_id, at, operation, subject, changes,
             attribution_label, attribution_id, attribution_how,
             git_hash, reconstructed_from, command
-     FROM "${workspace}".labkit_event
+     FROM "${workspace}".domain_event
      ORDER BY seq`,
   );
   return rows.rows;
@@ -334,7 +334,7 @@ async function destEventMax(url: string, workspace: string | undefined): Promise
   await client.connect();
   try {
     const rows = await client.query<{ seq: string | number }>(
-      `SELECT COALESCE(max(seq), 0) AS seq FROM "${workspace}".labkit_event`,
+      `SELECT COALESCE(max(seq), 0) AS seq FROM "${workspace}".domain_event`,
     );
     return Number(rows.rows[0]?.seq ?? 0);
   } finally {
@@ -348,10 +348,10 @@ async function copyEvents(url: string, ctx: TenantContext, events: DumpedEvent[]
   const client = new Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query(`TRUNCATE ${g}.labkit_event RESTART IDENTITY`);
+    await client.query(`TRUNCATE ${g}.domain_event RESTART IDENTITY`);
     for (const e of events) {
       await client.query(
-        `INSERT INTO ${g}.labkit_event (
+        `INSERT INTO ${g}.domain_event (
            seq, tenant_id, at, operation, subject, changes,
            attribution_label, attribution_id, attribution_how,
            git_hash, reconstructed_from, command
@@ -376,7 +376,7 @@ async function copyEvents(url: string, ctx: TenantContext, events: DumpedEvent[]
     if (events.length > 0) {
       const max = events[events.length - 1]!.seq;
       await client.query(`SELECT setval(pg_get_serial_sequence($1, 'seq'), $2, true)`, [
-        `${ctx.graphName}.labkit_event`,
+        `${ctx.graphName}.domain_event`,
         max,
       ]);
     }
