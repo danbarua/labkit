@@ -8,6 +8,9 @@ import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
 import { runner, type Globals } from "@labkit/app-cli/session";
 import { answer } from "@labkit/app-cli/output";
+import { ignoreLabkitDbUrl } from "../helpers/scratch-record";
+
+ignoreLabkitDbUrl();
 
 let dir: string;
 
