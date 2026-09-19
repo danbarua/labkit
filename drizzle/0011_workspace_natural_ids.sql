@@ -7,18 +7,17 @@
 -- streamed into a second database from a checkpoint without colliding.
 --
 -- The sequences themselves are created by `provisionTenantGraph`, which owns
--- everything else in a workspace schema. This migration replaces the function
--- that reads them. The old per-label sequences in `public` are left in place:
--- an existing record's ids were minted from them and must not be re-minted,
--- and dropping a sequence nothing reads costs nothing to defer.
--- The old function has the same signature — (text, text) — and Postgres
--- refuses to rename an input parameter in CREATE OR REPLACE, so it is dropped
--- first rather than replaced. Nothing reads it between these two statements:
--- a migration runs in one transaction.
-DROP FUNCTION IF EXISTS public.labkit_next_natural_id(text, text);
---> statement-breakpoint
-
-CREATE FUNCTION public.labkit_next_natural_id(workspace text, prefix text)
+-- everything else in a workspace schema. This migration adds the function that
+-- reads them.
+--
+-- A new name rather than a replacement, and nothing is dropped. The old
+-- function has the same signature and a different meaning — its first argument
+-- is a label, this one's is a workspace — so replacing it would make a code
+-- rollback call the new body with a label and look for a schema named
+-- `question`. Both exist; the name says which is which; the old one and the
+-- per-label sequences it reads go in a later migration once nothing calls
+-- them.
+CREATE FUNCTION public.labkit_next_workspace_id(workspace text, prefix text)
 RETURNS text
 LANGUAGE plpgsql
 AS $$
@@ -35,4 +34,4 @@ END;
 $$;
 --> statement-breakpoint
 
-GRANT EXECUTE ON FUNCTION public.labkit_next_natural_id(text, text) TO labkit_app;
+GRANT EXECUTE ON FUNCTION public.labkit_next_workspace_id(text, text) TO labkit_app;
