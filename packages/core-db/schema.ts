@@ -106,6 +106,10 @@ const eventExtras = (t: Record<keyof ReturnType<typeof eventColumns>, p.PgColumn
   p.index("domain_event_tenant_agent_idx").on(t.tenant_id, t.attribution_id, t.seq),
   /**
    * Rows belong to the tenant the session is scoped to, and to no other.
+   *
+   * Needed even inside a per-tenant schema: `labkit_app` has USAGE on every workspace, so
+   * it can reach another tenant's `domain_event`, and this is what stops it reading there.
+   * The owner bypasses the policy, which is how the test harness truncates.
    */
   p.pgPolicy("domain_event_tenant_isolation", {
     as: "permissive",
