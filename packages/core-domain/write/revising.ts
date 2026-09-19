@@ -204,17 +204,15 @@ export class Revising extends Shared {
    */
   async undo(input: UndoCommand): Promise<Undone> {
     return this.handle("undo", input, async (unitOfWork) => {
-      // `since: event - 1, limit: 1` rather than an exact-seq filter: `seq` is per-tenant but
-      // the underlying sequence is shared across tenants (see `DomainEvent.seq`'s own doc
-      // comment), so a gap at this tenant's next number is a real, ordinary case and not a bug
-      // — checked explicitly rather than trusted, because a `since` filter finds the *next*
-      // event whether or not this one exists.
+      // No exact-seq filter exists, and `since` finds the next event, which is a different
+      // one when a rolled-back write left a gap. Hence the equality check.
       const [found] = await this.events.select({ since: input.event - 1, limit: 1 });
       if (found?.seq !== input.event) throw new Error(`${input.event} not found`);
 
-      // Put back what the act replaced. Every property change carries what the
-      // graph held when it ran, so taking one back is writing that value again
-      // -- and restoring a key the node did not hold is removing it.
+      // The event log captures the command that caused the events to be raised.
+      // When properties are changed, the events log the deltas.
+      // Undoing a command that mutated props means re-setting props values to their prior
+      // state, or deleting any keys that were added.
       const restoring = found.changes.filter(
         (c) => c.change === "NodePropsChanged" || c.change === "EdgePropsChanged",
       );
@@ -234,12 +232,10 @@ export class Revising extends Shared {
       if (retracting.length === 0 && restoring.length === 0)
         throw new Error(`${input.event} (${found.operation}) changed nothing to take back`);
 
-      // What rests on any of this, from outside the act itself -- an edge between two things
-      // this same event created is the act's own wiring, not a dependent. Unlabeled on both
-      // sides deliberately: a dependent can be any kind of node, and naming one label would
-      // silently miss every other.
-      // Only what the act minted can be rested on. An act that changed a property
-      // created nothing, so there is nothing for anything else to depend on.
+      // Two unlabelled Cypher MATCHes, one per direction: everything outside this act that
+      // points at, or is pointed at by, a node the act created. Those nodes are about to be
+      // marked `retracted`, so anything still reaching them is a reason to refuse.
+      // Unlabelled because a dependent can be any kind of node.
       const into =
         retracting.length === 0
           ? []
@@ -272,9 +268,8 @@ export class Revising extends Shared {
               },
               { ids: retracting },
             );
-      // An edge THIS event wrote is the act's own wiring even when one of its two endpoints
-      // already existed -- `conclude` staging `unit PRODUCES evidence` reaches a pre-existing
-      // unit, and that unit is not a dependent of the evidence it produced.
+      // Minus the edges this act wrote itself. `conclude` wiring `unit PRODUCES evidence`
+      // reaches a pre-existing unit; that is the act's own wiring, not a dependent.
       const ownEdges = new Set(edgesIn(found).map((e) => `${e.from}|${e.label}|${e.to}`));
       const dependents = [...into, ...outOf].filter(
         (d) => !ownEdges.has(`${d.origin.natural_id}|${d.via}|${d.reaches.natural_id}`),
