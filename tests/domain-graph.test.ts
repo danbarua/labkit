@@ -476,7 +476,11 @@ describe("tenant isolation", () => {
 
     const claimA = await graphA.createNode("Claim", { name: "x" });
     const claimB = await graphB.createNode("Claim", { name: "x" });
-    expect(claimA.natural_id).not.toBe(claimB.natural_id); // natural ids are global, but the nodes are still in disjoint graphs
+    // Each workspace counts its own, so the first claim in either is CLM_1.
+    // That is what lets one workspace's events be streamed into another
+    // database from a checkpoint; the graphs are disjoint, so the shared
+    // number is not a collision.
+    expect(claimA.natural_id).toBe(claimB.natural_id);
 
     const rowsA = await graphA.query(`MATCH (c:Claim) RETURN c`, {
       c: vertexProps<ClaimProps>(),
