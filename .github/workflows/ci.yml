@@ -1,22 +1,13 @@
-# Two jobs, named for what they do: `run-ci-build` runs the gate on every pull
-# request, and `bump-package-version` writes the version number on main after
-# a merge.
+# On a pull request: the suite in five shards, the other checks beside them,
+# and `run-ci-build` over the top as the one name branch protection knows.
+# On a merge to main: the version number is set to the pull request that
+# shipped it, so `labkit --version` says 0.7.426 for #426.
 #
-# `labkit --version` names its own change: 0.7.426 came from #426. The number
-# is written **on main, after the merge**, and never on a branch.
-#
-# **Why not on the branch, which is where this started.** A stamp that edits
-# `package.json` on every pull request makes every other open pull request
-# conflict on that one line the moment one of them merges — measured on #463,
-# which was re-conflicted twice in ten minutes by #462, #465 and #466 landing.
-# It also pushed a bot commit to the branch, which raised a second run of this
-# workflow that GitHub either blocks as `action_required` or fails at startup
-# with no jobs. One cause, three symptoms, all of them gone when branches stop
-# touching the line.
-#
-# `scripts/check-version.ts` is deleted with this change, and its own
-# `retire-when:` is why: "the version is written by the merge rather than by
-# hand". It is.
+# **The version is written on main, never on a branch.** A stamp that edits
+# `package.json` on a pull request makes every other open one conflict on that
+# line the moment any of them merges: #463 was re-conflicted twice in ten
+# minutes. The same bot push also raised a second run of this workflow that
+# GitHub blocks or fails at startup. One cause, three symptoms.
 
 name: Run CI build on pull requests, bump package version on merge
 
@@ -74,29 +65,48 @@ jobs:
           git push origin HEAD:main
           echo "version $current -> $wanted"
 
-  # `bun run check` on GitHub's runners, beside the Cloud Build gate rather
-  # than instead of it. Measured on #465, same pull request, content identical
-  # but for one line:
-  #
-  #   total        Cloud Build 9m40s   runner 6m19s
-  #   test step    Cloud Build  604s   runner  320s
-  #   check:cli    Cloud Build   75s   runner   26s
-  #
-  # No image step: `docker/ci/Dockerfile` exists to add git to `oven/bun`, and
-  # a runner has git. Bun is pinned to the version that Dockerfile pins.
-  #
-  # **Not a gate.** Cloud Build remains the required check while this runs.
-  #
-  # retire-when: the numbers are in and one of the two CI paths is chosen.
-  run-ci-build:
+  # The suite, split five ways. Round-robin over the sorted file list, so a new
+  # test file joins a shard without anyone updating one. Measured 34.6s-42.7s
+  # a shard, against 192s in one run.
+  test-shard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - name: test
+        run: |
+          bun run test -- $(bun scripts/shard.ts --of 5 --index ${{ matrix.shard }}) \
+            --reporter=junit --reporter-outfile=junit-${{ matrix.shard }}.xml
+
+      - name: junit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.shard }}
+          path: junit-${{ matrix.shard }}.xml
+          if-no-files-found: warn
+
+  # Everything the suite is not: typecheck, depcruise, every `check:*`, the
+  # compiled binary and the CLI. `check:quick` is the first three.
+  other-checks:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      # `check:changed` narrows the suite by diffing against main, and
-      # `check:no-tracked-symlinks` runs `git ls-files`, so this needs real
-      # history rather than the single commit a default checkout gives.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 50
@@ -107,23 +117,37 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # The same narrowing Cloud Build does, for the same reason: a pull
-      # request tests what it can reach. Every failure of it runs everything.
-      - name: check
-        run: |
-          set -e
-          if git fetch --no-tags --depth=50 origin main; then
-            bun run check:changed origin/main
-          else
-            bun run check
-          fi
+      - run: bun run check:quick
+      - run: bun run check:cli
+      - run: bun run check:binary
 
-      # **The thing Cloud Build cannot do**, without granting its identity a
-      # bucket it deliberately does not have. Uploaded on failure too.
-      - name: junit
-        if: always()
-        uses: actions/upload-artifact@v4
+  # **The required check, and the only name branch protection knows.** Whatever
+  # runs underneath can be renamed, split or replaced without the protection
+  # rule going stale and blocking every pull request on a status nothing
+  # reports -- which is what happened on #463.
+  run-ci-build:
+    if: always() && github.event_name == 'pull_request'
+    needs: [test-shard, other-checks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
         with:
-          name: junit
-          path: junit.xml
-          if-no-files-found: warn
+          bun-version: 1.4.2
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: junit
+          pattern: junit-*
+          merge-multiple: true
+
+      - name: summarise the tests
+        if: always()
+        run: bun scripts/junit-summary.ts junit >> "$GITHUB_STEP_SUMMARY"
+
+      - name: fail if anything under this did
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
