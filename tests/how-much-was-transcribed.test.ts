@@ -4,7 +4,7 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
-import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { resolveTenantContext, type TenantContext } from "@labkit/core-db/tenant";
 import { TenantGraph } from "@labkit/core-db/graph";
 import {
   ReadSurface,
@@ -57,12 +57,12 @@ describe("which acts were read off something", () => {
    * repo has already had, and a filter tested through one of them is tested through neither.
    */
   for (const [name, build] of [
-    ["in-memory", (_: number) => inMemoryEventLog()],
-    ["durable", (tenant: number) => pgEventLog(db, tenant)],
+    ["in-memory", (_: TenantContext) => inMemoryEventLog()],
+    ["durable", (ctx: TenantContext) => pgEventLog(db, ctx)],
   ] as const) {
     test(`${name}: the filter selects the transcribed acts, and its negation the rest`, async () => {
       const { ctx, graph } = await graphFor();
-      const events = build(ctx.tenantId);
+      const events = build(ctx);
       await threeActs(events, graph);
       const read = new ReadSurface(graph, { events });
 
@@ -78,7 +78,7 @@ describe("which acts were read off something", () => {
 
   test("the count says how much of the whole record was read off something", async () => {
     const { ctx, graph } = await graphFor();
-    const events = pgEventLog(db, ctx.tenantId);
+    const events = pgEventLog(db, ctx);
     await threeActs(events, graph);
 
     const read = new ReadSurface(graph, { events });
@@ -91,7 +91,7 @@ describe("which acts were read off something", () => {
    */
   test("the count on `now` is the whole record, not the cursor's window", async () => {
     const { ctx, graph } = await graphFor();
-    const events = pgEventLog(db, ctx.tenantId);
+    const events = pgEventLog(db, ctx);
     await threeActs(events, graph);
     const read = new ReadSurface(graph, { events });
 

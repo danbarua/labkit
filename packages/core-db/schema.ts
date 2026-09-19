@@ -4,6 +4,9 @@ import { sql } from "drizzle-orm";
 /**
  * The schema LabKit's own SQL objects live in: the `tenants` table and the natural-id sequences.
  * Named once so every raw-SQL call site qualifies explicitly rather than trusting `search_path`.
+ *
+ * Per-tenant data is not here. A workspace's graph and its event log both live in the tenant's
+ * own schema, named by `TenantContext.graphName` — see `workspaceEvents` below.
  */
 export const LABKIT_SCHEMA = "public";
 
@@ -38,73 +41,106 @@ export const labkitApp = p.pgRole(APP_ROLE).existing();
 /**
  * The durable event log — **the second LabKit-owned relational table**, and the first that is
  * per-tenant data rather than the tenancy boundary itself.
+ *
+ * A fresh object each call, not a shared literal: drizzle binds a column builder to the table
+ * that consumes it, so handing the same builders to two tables rebinds the first one's columns.
  */
-export const labkitEvents = p
-  .pgTable(
-    "labkit_event",
-    {
-      /**
-       * The stream's order, and the reason it is a sequence rather than `at`.
-       */
-      seq: p.bigserial({ mode: "number" }).primaryKey(),
-      tenant_id: p
-        .integer()
-        .notNull()
-        .references(() => tenants.id),
-      /**
-       * Verbatim what the `Clock` said — text, not `timestamptz`.
-       */
-      at: p.text().notNull(),
-      operation: p.text().notNull(),
-      /**
-       * The natural id of what the operation was primarily about.
-       */
-      subject: p.text().notNull(),
-      /**
-       * Every change this act made to the graph, in the order it made them — `NodeCreated`,
-       * `EdgeCreated` and `PropsChanged` records.
-       */
-      changes: p.jsonb().notNull().default([]),
-      attribution_label: p.text().notNull(),
-      attribution_id: p.text().notNull(),
-      /**
-       * How LabKit came by the name beside it — `observed`, `claimed` or `unattributed`. See
-       * `AttributionHow` in `packages/core-domain/events.ts` for what each means and why there are three.
-       */
-      attribution_how: p.text(),
-      /**
-       * The commit this act ran against. Null means it was not captured — never a hex stand-in.
-       */
-      git_hash: p.text(),
-      /**
-       * What the act was read off, when it was not performed. Nullable, and the absence means
-       * nobody said — see `CommandContext` in `packages/core-domain/events.ts`.
-       */
-      reconstructed_from: p.text(),
-      /**
-       * The command the caller issued, verbatim.
-       */
-      command: p.jsonb().notNull(),
-    },
-    (t) => [
-      // The stream, per tenant. Every read is tenant-scoped, so every index is.
-      p.index("labkit_event_tenant_seq_idx").on(t.tenant_id, t.seq),
-      // "What happened to this record" -- the only lookup keyed by a handle.
-      p.index("labkit_event_tenant_subject_idx").on(t.tenant_id, t.subject),
-      // "What has this agent been doing", in order.
-      p.index("labkit_event_tenant_agent_idx").on(t.tenant_id, t.attribution_id, t.seq),
-      /**
-       * Rows belong to the tenant the session is scoped to, and to no other.
-       */
-      p.pgPolicy("labkit_event_tenant_isolation", {
-        as: "permissive",
-        for: "all",
-        to: labkitApp,
-        using: sql`tenant_id = current_setting('labkit.tenant_id')::int`,
-        withCheck: sql`tenant_id = current_setting('labkit.tenant_id')::int`,
-      }),
-    ],
-  )
-  .enableRLS();
+const eventColumns = () =>
+  ({
+    /**
+     * The stream's order, and the reason it is a sequence rather than `at`.
+     */
+    seq: p.bigserial({ mode: "number" }).primaryKey(),
+    tenant_id: p
+      .integer()
+      .notNull()
+      .references(() => tenants.id),
+    /**
+     * Verbatim what the `Clock` said — text, not `timestamptz`.
+     */
+    at: p.text().notNull(),
+    operation: p.text().notNull(),
+    /**
+     * The natural id of what the operation was primarily about.
+     */
+    subject: p.text().notNull(),
+    /**
+     * Every change this act made to the graph, in the order it made them — `NodeCreated`,
+     * `EdgeCreated` and `PropsChanged` records.
+     */
+    changes: p.jsonb().notNull().default([]),
+    attribution_label: p.text().notNull(),
+    attribution_id: p.text().notNull(),
+    /**
+     * How LabKit came by the name beside it — `observed`, `claimed` or `unattributed`. See
+     * `AttributionHow` in `packages/core-domain/events.ts` for what each means and why there are three.
+     */
+    attribution_how: p.text(),
+    /**
+     * The commit this act ran against. Null means it was not captured — never a hex stand-in.
+     */
+    git_hash: p.text(),
+    /**
+     * What the act was read off, when it was not performed. Nullable, and the absence means
+     * nobody said — see `CommandContext` in `packages/core-domain/events.ts`.
+     */
+    reconstructed_from: p.text(),
+    /**
+     * The command the caller issued, verbatim.
+     */
+    command: p.jsonb().notNull(),
+  }) as const;
+
+/**
+ * The indexes and the policy, over whichever table consumed the columns above.
+ */
+const eventExtras = (t: Record<keyof ReturnType<typeof eventColumns>, p.PgColumn>) => [
+  // The stream, per tenant. Every read is tenant-scoped, so every index is.
+  p.index("labkit_event_tenant_seq_idx").on(t.tenant_id, t.seq),
+  // "What happened to this record" -- the only lookup keyed by a handle.
+  p.index("labkit_event_tenant_subject_idx").on(t.tenant_id, t.subject),
+  // "What has this agent been doing", in order.
+  p.index("labkit_event_tenant_agent_idx").on(t.tenant_id, t.attribution_id, t.seq),
+  /**
+   * Rows belong to the tenant the session is scoped to, and to no other.
+   */
+  p.pgPolicy("labkit_event_tenant_isolation", {
+    as: "permissive",
+    for: "all",
+    to: labkitApp,
+    using: sql`tenant_id = current_setting('labkit.tenant_id')::int`,
+    withCheck: sql`tenant_id = current_setting('labkit.tenant_id')::int`,
+  }),
+];
+
+/**
+ * The shape's owner, in `public`, and what `drizzle-kit` reads.
+ *
+ * Events are stored per workspace — `workspaceEvents` below is what the application queries.
+ * This table is the template every workspace copy is made from, and the home of any rows
+ * written before that was true. Nothing writes to it.
+ */
+export const labkitEvents = p.pgTable("labkit_event", eventColumns(), eventExtras).enableRLS();
 
 export type LabkitEvent = typeof labkitEvents.$inferSelect;
+
+/** One table object per workspace schema; the same object on every later call. */
+const perWorkspace = new Map<string, ReturnType<typeof buildWorkspaceEvents>>();
+
+const buildWorkspaceEvents = (schema: string) =>
+  p.pgSchema(schema).table("labkit_event", eventColumns(), eventExtras);
+
+/**
+ * `<workspace>.labkit_event` — the table a tenant's events actually live in.
+ *
+ * The **one** exception to the rule at the top of this file: the schema here is the tenant's,
+ * not `LABKIT_SCHEMA`, and it is bound per call rather than statically. `search_path` is still
+ * not trusted — drizzle qualifies every reference with the name passed in.
+ */
+export function workspaceEvents(schema: string) {
+  const existing = perWorkspace.get(schema);
+  if (existing) return existing;
+  const table = buildWorkspaceEvents(schema);
+  perWorkspace.set(schema, table);
+  return table;
+}

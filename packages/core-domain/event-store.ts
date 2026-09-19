@@ -5,7 +5,8 @@
 import { and, asc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { LabKitDB } from "@labkit/core-db/backend";
 import { ormOver, unwrapped } from "@labkit/core-db/orm";
-import { labkitEvents } from "@labkit/core-db/schema";
+import { workspaceEvents } from "@labkit/core-db/schema";
+import type { TenantContext } from "@labkit/core-db/tenant";
 import type {
   RecordedAttribution,
   DomainEvent,
@@ -15,7 +16,7 @@ import type {
 } from "./events";
 
 /** The row shape, as drizzle hands it back — derived from the table, not restated. */
-type EventRow = typeof labkitEvents.$inferSelect;
+type EventRow = ReturnType<typeof workspaceEvents>["$inferSelect"];
 
 const toEvent = (r: EventRow): RecordedEvent => {
   const attribution: RecordedAttribution = {
@@ -44,10 +45,15 @@ const toEvent = (r: EventRow): RecordedEvent => {
 };
 
 /**
- * An `EventSink` backed by `public.labkit_event`, scoped to one tenant.
+ * An `EventSink` backed by the tenant's own `labkit_event`, in its workspace schema.
+ *
+ * `tenant_id` is still on every row and every query: the column is what the policy reads, and
+ * the schema boundary and the policy are two answers to the same question rather than one.
  */
-export function pgEventLog(db: LabKitDB, tenantId: number): EventSink {
+export function pgEventLog(db: LabKitDB, ctx: TenantContext): EventSink {
   const orm = ormOver(db);
+  const tenantId = ctx.tenantId;
+  const labkitEvents = workspaceEvents(ctx.graphName);
 
   const select = (filter: EventFilter): Promise<readonly RecordedEvent[]> =>
     unwrapped(async () => {

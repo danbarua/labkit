@@ -66,19 +66,19 @@ describe("a scoped session is confined to its tenant", () => {
 
   test("two tenants each record an event", async () => {
     a = await asTenant("rls-a", async (c, ctx) => {
-      await pgEventLog(c.db, ctx.tenantId).record(anEvent("Q_A"));
+      await pgEventLog(c.db, ctx).record(anEvent("Q_A"));
       return ctx;
     });
     b = await asTenant("rls-b", async (c, ctx) => {
-      await pgEventLog(c.db, ctx.tenantId).record(anEvent("Q_B"));
+      await pgEventLog(c.db, ctx).record(anEvent("Q_B"));
       return ctx;
     });
     expect(a.tenantId).not.toBe(b.tenantId);
   }, 60_000);
 
   test("each sees only its own, through the ordinary read path", async () => {
-    const seenByA = await asTenant("rls-a", (c, ctx) => pgEventLog(c.db, ctx.tenantId).all());
-    const seenByB = await asTenant("rls-b", (c, ctx) => pgEventLog(c.db, ctx.tenantId).all());
+    const seenByA = await asTenant("rls-a", (c, ctx) => pgEventLog(c.db, ctx).all());
+    const seenByB = await asTenant("rls-b", (c, ctx) => pgEventLog(c.db, ctx).all());
     expect(seenByA.map((e) => e.subject)).toEqual(["Q_A"]);
     expect(seenByB.map((e) => e.subject)).toEqual(["Q_B"]);
   }, 60_000);
@@ -86,20 +86,25 @@ describe("a scoped session is confined to its tenant", () => {
   test("the tenant filter is the policy's, not the query's", async () => {
     // The event store always filters by tenant, so its answer above cannot
     // distinguish "the policy works" from "the WHERE clause works". This is
-    // the query the policy has to catch: no filter at all, one tenant scoped.
-    // Without RLS it returns both rows.
+    // the query the policy has to catch: no filter at all, one tenant scoped,
+    // reading the OTHER tenant's table directly. `labkit_app` is granted
+    // SELECT on every workspace schema, so nothing but the policy is between
+    // this session and B's rows. Without RLS it returns Q_B.
     const rows = await asTenant("rls-a", async (c) => {
-      const r = await c.db.query<{ subject: string }>(
-        `select subject from public.labkit_event order by subject`,
+      const own = await c.db.query<{ subject: string }>(
+        `select subject from "${a.graphName}".labkit_event order by subject`,
       );
-      return r.rows.map((x) => x.subject);
+      const theirs = await c.db.query<{ subject: string }>(
+        `select subject from "${b.graphName}".labkit_event order by subject`,
+      );
+      return { own: own.rows.map((x) => x.subject), theirs: theirs.rows.map((x) => x.subject) };
     });
-    expect(rows).toEqual(["Q_A"]);
+    expect(rows).toEqual({ own: ["Q_A"], theirs: [] });
   }, 60_000);
 
   test("writing another tenant's row is refused", async () => {
     const refusal = await asTenant("rls-a", (c) =>
-      pgEventLog(c.db, b.tenantId)
+      pgEventLog(c.db, b)
         .record(anEvent("Q_SMUGGLED"))
         .then(
           () => "it was allowed",
@@ -109,7 +114,7 @@ describe("a scoped session is confined to its tenant", () => {
     expect(refusal).toMatch(/row-level security policy/);
 
     // And nothing landed: the refusal is not a partial write.
-    const stillOnlyB = await asTenant("rls-b", (c, ctx) => pgEventLog(c.db, ctx.tenantId).all());
+    const stillOnlyB = await asTenant("rls-b", (c, ctx) => pgEventLog(c.db, ctx).all());
     expect(stillOnlyB.map((e) => e.subject)).toEqual(["Q_B"]);
   }, 60_000);
 
@@ -125,5 +130,28 @@ describe("a scoped session is confined to its tenant", () => {
     });
     expect(who.current_user).toBe("labkit_app");
     expect(who.rolsuper).toBe(false);
+  }, 60_000);
+
+  /**
+   * The point of the move: a workspace's stream is numbered in the workspace.
+   *
+   * Asserted as a gap, not a value — three events into A must not move B's numbering. A
+   * shared counter, which a `LIKE`-copied `bigserial` default leaves behind, makes B's step
+   * 4. Absolute numbers would depend on what the tests above wrote, including the insert RLS
+   * refused after the sequence had handed out its number.
+   */
+  test("each workspace numbers its own stream", async () => {
+    const write = (slug: string, subject: string) =>
+      asTenant(slug, (c, ctx) =>
+        pgEventLog(c.db, ctx)
+          .record(anEvent(subject))
+          .then((e) => e.seq),
+      );
+
+    const first = await write("rls-b", "Q_B_FIRST");
+    for (const n of [1, 2, 3]) await write("rls-a", `Q_A_${n}`);
+    const second = await write("rls-b", "Q_B_SECOND");
+
+    expect(second - first).toBe(1);
   }, 60_000);
 });

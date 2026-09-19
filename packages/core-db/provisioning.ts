@@ -20,7 +20,7 @@ export async function provisionTenantGraph(
 ): Promise<void> {
   await tx.inTransaction(async () => {
     await db.query("SELECT pg_advisory_xact_lock($1)", [tenantId]);
-    await new TenantGraphProvisioner(db, graphName).reconcile();
+    await new TenantGraphProvisioner(db, tenantId, graphName).reconcile();
   });
 }
 
@@ -38,6 +38,7 @@ export async function dropTenantGraph(db: LabKitDB, graphName: string): Promise<
 class TenantGraphProvisioner {
   constructor(
     private readonly db: LabKitDB,
+    private readonly tenantId: number,
     private readonly graphName: string,
   ) {}
 
@@ -63,6 +64,7 @@ class TenantGraphProvisioner {
     for (const label of NODE_LABELS) await this.ensurePropertyIndexes(label, indexes);
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
     await this.ensureNaturalIdSequence();
+    await this.ensureEventTable();
     const policies = await this.existingPolicies();
     for (const label of NODE_LABELS) await this.ensureRetractionPolicy(label, policies);
     await this.ensureGrants();
@@ -107,6 +109,68 @@ class TenantGraphProvisioner {
         high,
       ]);
     }
+  }
+
+  /**
+   * This workspace's event log, in its own schema.
+   *
+   * Made from `public.labkit_event` with `LIKE`, so the columns cannot drift from the drizzle
+   * declaration that owns the shape. `LIKE` is creation-time only: a column added to the
+   * template later does not reach a workspace that already has the table.
+   */
+  private async ensureEventTable(): Promise<void> {
+    const { rows } = await this.db.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE c.relkind = 'r' AND c.relname = 'labkit_event' AND n.nspname = $1
+       ) AS exists`,
+      [this.graphName],
+    );
+    if (rows[0]?.exists) return;
+
+    const g = `"${this.graphName}"`;
+    // `INCLUDING INDEXES` brings the primary key and the three tenant indexes. It does not
+    // bring the foreign key, row-level security or the policy — those are stated below.
+    await this.db.query(
+      `CREATE TABLE ${g}.labkit_event (LIKE public.labkit_event INCLUDING DEFAULTS INCLUDING INDEXES)`,
+    );
+
+    // **`LIKE` copies the default verbatim, and `bigserial` is not an identity column**, so
+    // without this the workspace draws `seq` from `public.labkit_event_seq_seq` and every
+    // tenant shares one counter — the exact thing a per-workspace event log is for. `OWNED BY`
+    // is what `pg_get_serial_sequence` and `TRUNCATE ... RESTART IDENTITY` resolve through.
+    await this.db.query(`CREATE SEQUENCE ${g}.labkit_event_seq_seq`);
+    await this.db.query(
+      `ALTER TABLE ${g}.labkit_event ALTER COLUMN seq SET DEFAULT nextval('${this.graphName}.labkit_event_seq_seq')`,
+    );
+    await this.db.query(`ALTER SEQUENCE ${g}.labkit_event_seq_seq OWNED BY ${g}.labkit_event.seq`);
+    await this.db.query(
+      `ALTER TABLE ${g}.labkit_event ADD CONSTRAINT labkit_event_tenant_id_tenants_id_fk
+         FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)`,
+    );
+    await this.db.query(`ALTER TABLE ${g}.labkit_event ENABLE ROW LEVEL SECURITY`);
+    await this.db.query(
+      `CREATE POLICY labkit_event_tenant_isolation ON ${g}.labkit_event FOR ALL TO ${APP_ROLE}
+         USING (tenant_id = current_setting('labkit.tenant_id')::int)
+         WITH CHECK (tenant_id = current_setting('labkit.tenant_id')::int)`,
+    );
+
+    // Rows written before the log moved. Filtered by `tenant_id` rather than left to the
+    // policy: provisioning runs before `scopeToTenant`, as the owning role and with
+    // `labkit.tenant_id` unset, so the policy is not in force here. `SELECT *` is safe only
+    // because `LIKE` guarantees the column order matches.
+    await this.db.query(
+      `INSERT INTO ${g}.labkit_event SELECT * FROM public.labkit_event WHERE tenant_id = $1`,
+      [this.tenantId],
+    );
+    // Past what was copied, keeping the numbers the events already have: renumbering would
+    // break a stored `--since`.
+    await this.db.query(
+      `SELECT setval($1, greatest((SELECT coalesce(max(seq), 0) FROM ${g}.labkit_event), 1),
+                     (SELECT count(*) > 0 FROM ${g}.labkit_event))`,
+      [`${this.graphName}.labkit_event_seq_seq`],
+    );
   }
 
   /**
