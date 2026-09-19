@@ -1,13 +1,13 @@
-# On a pull request: the suite in five shards, the other checks beside them,
-# and `run-ci-build` over the top as the one name branch protection knows.
-# On a merge to main: the suite again against real Postgres, and the version
-# number set to the pull request that shipped it.
+# On a pull request: the suite in five shards, the other checks beside them, and
+# `run-ci-build` over the top as the one name branch protection knows.
+# On a merge to main: the suite again against real Postgres, and a `v0.7.<pull request>`
+# tag, which is where the version number lives.
 #
-# **The version is written on main, never on a branch.** A stamp that edits
-# `package.json` on a pull request makes every other open one conflict on that
-# line the moment any of them merges: #463 was re-conflicted twice in ten
-# minutes. The same bot push also raised a second run of this workflow that
-# GitHub blocks or fails at startup. One cause, three symptoms.
+# **The version is a tag, not a tracked file.** Writing it into `package.json` made every
+# open pull request conflict on that one line the moment any of them merged, and a bot
+# cannot push the correction to a protected main. A tag can be pushed, and it answers the
+# question a version is asked: `0.7.470` is that release, `0.7.470+3.g7c7cd1e (branch)` is
+# somebody's build.
 
 name: CI Build
 
@@ -18,9 +18,18 @@ on:
     branches: [main]
 
 jobs:
-  # Reads the pull request number out of the squash commit's subject, which is
-  # where GitHub puts it: "Some title (#463)".
-  bump-package-version:
+  # Tags the merge `v0.7.<pull request>`, which is where the version number lives.
+  #
+  # A tag rather than a commit: `package.json` used to carry the number, and writing it
+  # there made every open pull request conflict on that line the moment one of them merged
+  # — and a bot cannot push the correction to a protected main anyway, which is how this
+  # job failed on #470: "Protected branch update failed … Required status check
+  # run-ci-build is expected". Tags are not branch-protected.
+  #
+  # A binary built from this commit then says `0.7.470` and nothing else. One built from
+  # anywhere else says `0.7.470+3.g7c7cd1e (some-branch)`, which is the question a version
+  # is being asked: released, or scratch?
+  tag-the-merge:
     if: github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'version-bump:')
     runs-on: ubuntu-latest
     permissions:
@@ -28,42 +37,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          fetch-depth: 0
           persist-credentials: true
 
-      - name: Set the patch number to the pull request that shipped
+      - name: tag this merge with the pull request that shipped it
         env:
           SUBJECT: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
-          # A merge that names no pull request -- a direct push -- leaves the
-          # version alone rather than guessing a number for it.
+          # A direct push names no pull request, and gets no tag rather than a guessed one.
           pr=$(printf '%s' "$SUBJECT" | head -1 | sed -n 's/.*(#\([0-9]\{1,\}\)).*/\1/p')
           if [ -z "$pr" ]; then
             echo "no pull request number in: $(printf '%s' "$SUBJECT" | head -1)"
             exit 0
           fi
-          current=$(node -p "require('./package.json').version")
-          wanted="$(echo "$current" | cut -d. -f1-2).$pr"
-          if [ "$current" = "$wanted" ]; then
-            echo "version is already $current"
+          series=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          tag="v${series}.${pr}"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag is already here"
             exit 0
           fi
-          node -e '
-            const fs = require("node:fs");
-            const file = "package.json";
-            const text = fs.readFileSync(file, "utf8");
-            const next = process.argv[1];
-            // Rewritten by hand rather than through JSON.stringify, which would
-            // reformat every other line and bury the one that changed.
-            fs.writeFileSync(file, text.replace(/("version":\s*")[^"]+(")/, `$1${next}$2`));
-          ' "$wanted"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json
-          git commit -m "version-bump: v$wanted"
-          git push origin HEAD:main
-          echo "version $current -> $wanted"
+          git tag "$tag"
+          git push origin "$tag"
+          echo "tagged $tag"
 
   # The suite, split five ways. Round-robin over the sorted file list, so a new
   # test file joins a shard without anyone updating one. Measured 34.6s-42.7s
