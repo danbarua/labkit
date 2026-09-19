@@ -6,6 +6,8 @@
  * server to create it on; without it the suite is skipped.
  */
 
+// biome-ignore-all lint/suspicious/noExplicitAny: response bodies are read loosely; each test asserts only the part of the shape it is about
+
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";

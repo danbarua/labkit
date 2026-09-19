@@ -50,7 +50,7 @@ export async function graphHandler(
       depth,
     ]);
 
-    if (!queryResult || !queryResult.rows.length) {
+    if (!queryResult?.rows.length) {
       return problem(404, "Not Found");
     }
 
@@ -58,18 +58,18 @@ export async function graphHandler(
     // Links carry the depth that was applied, so following one repeats this view.
     const search = new URLSearchParams(url.search);
     search.set("depth", String(depth));
-    const converted = populateLinks(resource, {
+    populateLinks(resource, {
       origin: publicOrigin(req).origin,
       search: `?${search}`,
       prefix: scope.prefix,
     });
-    (converted._links as Record<string, unknown>).expand = {
+    (resource._links as Record<string, unknown>).expand = {
       href: `${publicOrigin(req).origin}${scope.prefix}/graph/${id}{?depth}`,
       templated: true,
       title: `depth: hops of neighbours to embed, 0 to ${MAX_DEPTH}`,
     };
 
-    return new Response(JSON.stringify(converted), {
+    return new Response(JSON.stringify(resource), {
       status: 200,
       headers: { "content-type": "application/hal+json" },
     });
@@ -151,31 +151,28 @@ interface LinkContext {
   prefix: string;
 }
 
-// walk through the resource and convert _links to absolute URLs
-function populateLinks(obj: any, ctx: LinkContext): Record<string, unknown> {
-  if (obj && typeof obj === "object") {
-    for (const key of Object.keys(obj)) {
-      if (key === "_links" && typeof obj[key] === "object") {
-        for (const linkKey of Object.keys(obj[key])) {
-          const linkValue = obj[key][linkKey];
-          obj[key][linkKey] = Array.isArray(linkValue)
-            ? linkValue.map(absolute)
-            : absolute(linkValue);
-        }
-      } else {
-        populateLinks(obj[key], ctx);
+// Walks the resource and makes every `_links` href absolute, in place.
+function populateLinks(obj: unknown, ctx: LinkContext): void {
+  if (obj === null || typeof obj !== "object") return;
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === "_links" && value !== null && typeof value === "object") {
+      const links = value as Record<string, unknown>;
+      for (const [rel, link] of Object.entries(links)) {
+        links[rel] = Array.isArray(link)
+          ? link.map((one) => absolute(one, ctx))
+          : absolute(link, ctx);
       }
+    } else {
+      populateLinks(value, ctx);
     }
-
-    return obj;
   }
+}
 
-  return obj;
-
-  function absolute(link: any) {
-    if (!link || typeof link !== "object" || !link.href) return link;
-    const absoluteUrl = new URL(ctx.prefix + link.href, ctx.origin);
-    absoluteUrl.search = ctx.search;
-    return { ...link, href: absoluteUrl.toString() };
-  }
+function absolute(link: unknown, ctx: LinkContext): unknown {
+  if (link === null || typeof link !== "object") return link;
+  const { href } = link as { href?: unknown };
+  if (typeof href !== "string" || href === "") return link;
+  const absoluteUrl = new URL(ctx.prefix + href, ctx.origin);
+  absoluteUrl.search = ctx.search;
+  return { ...link, href: absoluteUrl.toString() };
 }

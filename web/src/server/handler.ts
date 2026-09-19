@@ -10,13 +10,6 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-function hal(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "content-type": "application/hal+json" },
-  });
-}
-
 function problem(status: number, title: string, detail?: string): Response {
   return new Response(
     JSON.stringify({

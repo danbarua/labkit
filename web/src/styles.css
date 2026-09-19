@@ -64,6 +64,7 @@ body,
   font-size: 12px;
   color: var(--text-dim);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: source order is the cascade the explorer was designed against */
 .field span {
   text-transform: uppercase;
   letter-spacing: 0.05em;

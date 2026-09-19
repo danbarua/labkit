@@ -98,7 +98,7 @@ export function labkitDev(): Plugin {
       };
       return () => serveSpaOrNotFound(server);
     },
-    handleHotUpdate({ file, server }) {
+    handleHotUpdate({ file }) {
       if (!file.endsWith(".ts") && !file.endsWith(".tsx")) return [];
       if (file.includes("node_modules")) return [];
     },
