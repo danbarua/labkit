@@ -273,9 +273,9 @@ describe.skipIf(!serverUrl)("workspaces", () => {
         get(`/workspace/${i % 2 === 0 ? "alpha" : "beta"}/graph/Q_1`),
       ),
     );
-    results.forEach((r, i) =>
-      expect(r.body.name).toBe(i % 2 === 0 ? "alpha question" : "beta question"),
-    );
+    for (const [i, r] of results.entries()) {
+      expect(r.body.name).toBe(i % 2 === 0 ? "alpha question" : "beta question");
+    }
   });
 
   test("more concurrent requests than pool connections all complete", async () => {

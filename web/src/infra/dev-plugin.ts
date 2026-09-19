@@ -91,12 +91,12 @@ export function labkitDev(): Plugin {
     config: () => ({ appType: "custom", server: { cors: false } }),
     configureServer(server) {
       attachLabkit(server);
-      return () => serveSpaOrNotFound(server);
       const printUrls = server.printUrls.bind(server);
       server.printUrls = () => {
         printUrls();
         announceServices(server);
       };
+      return () => serveSpaOrNotFound(server);
     },
     handleHotUpdate({ file, server }) {
       if (!file.endsWith(".ts") && !file.endsWith(".tsx")) return [];

@@ -104,7 +104,7 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
   }
 
   const original = new URL(req.url).pathname;
-  let path = original;
+  const path = original;
 
   const workspace = WORKSPACE_PATH.exec(original);
   if (workspace) {
