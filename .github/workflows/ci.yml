@@ -1,7 +1,7 @@
 # On a pull request: the suite in five shards, the other checks beside them,
 # and `run-ci-build` over the top as the one name branch protection knows.
-# On a merge to main: the version number is set to the pull request that
-# shipped it, so `labkit --version` says 0.7.426 for #426.
+# On a merge to main: the suite again against real Postgres, and the version
+# number set to the pull request that shipped it.
 #
 # **The version is written on main, never on a branch.** A stamp that edits
 # `package.json` on a pull request makes every other open one conflict on that
@@ -9,7 +9,7 @@
 # minutes. The same bot push also raised a second run of this workflow that
 # GitHub blocks or fails at startup. One cause, three symptoms.
 
-name: Run CI build on pull requests, bump package version on merge
+name: CI Build
 
 on:
   pull_request:
@@ -69,6 +69,7 @@ jobs:
   # test file joins a shard without anyone updating one. Measured 34.6s-42.7s
   # a shard, against 192s in one run.
   test-shard:
+    name: PR tests [${{ matrix.shard }} of 5]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -112,6 +113,7 @@ jobs:
   # The image is the one `docker/postgres` publishes, so a developer running
   # `test:pg` and this job are on the same Postgres.
   test-postgres:
+    name: Postgres tests [${{ matrix.shard }} of 4]
     if: github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'version-bump:')
     runs-on: ubuntu-latest
     permissions:
@@ -203,7 +205,9 @@ jobs:
       - run: bun run check:cli
       - run: bun run check:binary
 
-  # **The required check, and the only name branch protection knows.** Whatever
+  # **The required check, and the only name branch protection knows.** It has
+  # no `name:` on purpose: setting one renames the check, and a protection rule
+  # naming a status nothing reports blocks every pull request forever. Whatever
   # runs underneath can be renamed, split or replaced without the protection
   # rule going stale and blocking every pull request on a status nothing
   # reports -- which is what happened on #463.
