@@ -10,6 +10,8 @@ export {
   type RetiredOperation,
 } from "./write";
 export { SessionCore } from "./core";
+export { openRecord } from "./open";
+export type { OpenOptions, OpenRecord } from "./open";
 export { DomainRefusal } from "./refusal";
 export {
   READ_GROUPS,

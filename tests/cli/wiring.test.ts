@@ -13,21 +13,24 @@ const code = (path: string): string =>
     .replace(/^\s*\/\/.*$/gm, "");
 
 const session = code("src/cli/session.ts");
+const open = code("src/domain/open.ts");
 
 test("the wiring under test was found at all", () => {
   // Guards the derivation. A moved or renamed file would otherwise make every
   // assertion below pass by having nothing to read.
-  expect(session).toContain("resolveTenantContext");
-  expect(session).toContain("new TenantGraph");
+  expect(session).toContain("openRecord");
+  expect(open).toContain("resolveTenantContext");
+  expect(open).toContain("new TenantGraph");
 });
 
-test("the CLI hands the event log in rather than letting it default", () => {
+test("opening a record hands the event log in rather than letting it default", () => {
   // `SessionCore` defaults `events` to `inMemoryEventLog()`. In a process that exits after one
-  // command that is an array nothing ever wrote to.
-  expect(session).toContain("const events = pgEventLog(connection.db, ctx.tenantId)");
-  expect(session).toMatch(/new ReadSurface\(graph, \{ events \}\)/);
-  expect(session).toMatch(/new WriteSurface\(graph, \{[\s\S]*?events,/);
-  expect(session).not.toContain("inMemoryEventLog");
+  // command that is an array nothing ever wrote to. Asserted on `openRecord` now that every
+  // adapter opens through it, which is what makes this true of all three rather than the CLI.
+  expect(open).toContain("const events = pgEventLog(connection.db, ctx.tenantId)");
+  expect(open).toMatch(/new ReadSurface\(graph, \{ events \}\)/);
+  expect(open).toMatch(/new WriteSurface\(graph, \{[\s\S]*?events[,\s}]/);
+  expect(open).not.toContain("inMemoryEventLog");
 });
 
 test("the CLI attributes writes to a real person and a real commit", () => {
