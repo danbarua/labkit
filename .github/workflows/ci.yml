@@ -1,5 +1,6 @@
-# Two jobs: `check` runs the gate on every pull request, and `stamp` writes
-# the version number on main after a merge.
+# Two jobs, named for what they do: `run-ci-build` runs the gate on every pull
+# request, and `bump-package-version` writes the version number on main after
+# a merge.
 #
 # `labkit --version` names its own change: 0.7.426 came from #426. The number
 # is written **on main, after the merge**, and never on a branch.
@@ -17,7 +18,7 @@
 # `retire-when:` is why: "the version is written by the merge rather than by
 # hand". It is.
 
-name: CI
+name: Run CI build on pull requests, bump package version on merge
 
 on:
   pull_request:
@@ -28,7 +29,7 @@ on:
 jobs:
   # Reads the pull request number out of the squash commit's subject, which is
   # where GitHub puts it: "Some title (#463)".
-  stamp:
+  bump-package-version:
     if: github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'version-bump:')
     runs-on: ubuntu-latest
     permissions:
@@ -87,7 +88,7 @@ jobs:
   # **Not a gate.** Cloud Build remains the required check while this runs.
   #
   # retire-when: the numbers are in and one of the two CI paths is chosen.
-  check:
+  run-ci-build:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
