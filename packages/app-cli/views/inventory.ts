@@ -7,7 +7,7 @@ import type {
   ListedClaim,
   ListedCriterion,
   ListedEnquiry,
-} from "../../core-domain";
+} from "@labkit/core-domain";
 import type { Palette } from "../palette";
 import { rows } from "./format";
 

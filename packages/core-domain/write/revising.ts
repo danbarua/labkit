@@ -1,8 +1,8 @@
 /** Same thing, understood differently now. */
 
-import { scalar, vertexProps } from "../../core-db/cypher";
-import type { ClaimProps, EdgeProps, Prose } from "../../core-db/domain";
-import type { TenantGraph } from "../../core-db/graph";
+import { scalar, vertexProps } from "@labkit/core-db/cypher";
+import type { ClaimProps, EdgeProps, Prose } from "@labkit/core-db/domain";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import { createdIn, edgesIn } from "../events";
 import type {
   AnalysisRef,

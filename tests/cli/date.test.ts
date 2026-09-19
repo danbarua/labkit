@@ -8,8 +8,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { runner, type Globals } from "../../packages/app-cli/session";
-import { answer } from "../../packages/app-cli/output";
+import { runner, type Globals } from "@labkit/app-cli/session";
+import { answer } from "@labkit/app-cli/output";
 
 let dir: string;
 

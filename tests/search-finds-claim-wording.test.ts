@@ -3,10 +3,10 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
-import { ResearchSession } from "../packages/core-domain";
+import { ResearchSession } from "@labkit/core-domain";
 import { recordAnalysis } from "./helpers/analysis";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import type { TenantGraph } from "../packages/core-db/graph";
+import type { TenantGraph } from "@labkit/core-db/graph";
 
 let scenario: Scenario;
 let session: ResearchSession;

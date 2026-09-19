@@ -1,6 +1,6 @@
-import { optional, scalar, vertexProps } from "../../core-db/cypher";
-import type { EdgeLabel, Prose } from "../../core-db/domain";
-import { SEARCHABLE_TEXT, labelForNaturalId } from "../../core-db/domain";
+import { optional, scalar, vertexProps } from "@labkit/core-db/cypher";
+import type { EdgeLabel, Prose } from "@labkit/core-db/domain";
+import { SEARCHABLE_TEXT, labelForNaturalId } from "@labkit/core-db/domain";
 import { SessionCore } from "../core";
 import { byHandle, kindOf, ref } from "../report";
 import type {

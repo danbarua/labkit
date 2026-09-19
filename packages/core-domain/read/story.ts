@@ -1,4 +1,4 @@
-import { edgeProps, optional, scalar, vertexProps } from "../../core-db/cypher";
+import { edgeProps, optional, scalar, vertexProps } from "@labkit/core-db/cypher";
 import type {
   ArtefactProps,
   ClaimProps,
@@ -7,8 +7,8 @@ import type {
   IdentityString,
   IndexedString,
   Prose,
-} from "../../core-db/domain";
-import { SEARCHABLE_TEXT, labelForNaturalId } from "../../core-db/domain";
+} from "@labkit/core-db/domain";
+import { SEARCHABLE_TEXT, labelForNaturalId } from "@labkit/core-db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import { byHandle, isRefOfKind, kindOf, ref, verdictOf } from "../report";

@@ -4,10 +4,10 @@
  */
 
 import { expect, test } from "bun:test";
-import { renderHappened } from "../../packages/app-cli/views/events";
-import { domainEvent, UNATTRIBUTED } from "../../packages/core-domain";
-import type { RecordedEvent } from "../../packages/core-domain/events";
-import { PLAIN } from "../../packages/app-cli/palette";
+import { renderHappened } from "@labkit/app-cli/views/events";
+import { domainEvent, UNATTRIBUTED } from "@labkit/core-domain";
+import type { RecordedEvent } from "@labkit/core-domain/events";
+import { PLAIN } from "@labkit/app-cli/palette";
 
 const act = (seq: number, command: Record<string, unknown>): RecordedEvent =>
   domainEvent({

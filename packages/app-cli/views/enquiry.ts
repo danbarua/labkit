@@ -2,7 +2,7 @@
  * Questions and the lines of enquiry under them.
  */
 
-import type { EnquiryRef, EnquiryStatus, QuestionOrigin, QuestionRef } from "../../core-domain";
+import type { EnquiryRef, EnquiryStatus, QuestionOrigin, QuestionRef } from "@labkit/core-domain";
 import type { Palette } from "../palette";
 import { bullets } from "./format";
 

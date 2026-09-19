@@ -3,7 +3,7 @@
  * events, commands, or reports, so those layers can brand a handle without a cycle.
  */
 
-import { labelForNaturalId, type NodeLabel } from "../core-db/domain";
+import { labelForNaturalId, type NodeLabel } from "@labkit/core-db/domain";
 
 declare const KIND: unique symbol;
 

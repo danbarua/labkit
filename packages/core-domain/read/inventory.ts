@@ -6,7 +6,7 @@
  * only way to a handle was to already know it or to search for wording.
  */
 
-import { optional, vertexProps } from "../../core-db/cypher";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
 import { SessionCore } from "../core";
 import { byHandle, ref } from "../report";
 import type { ListedAnalysis, ListedClaim, ListedCriterion, ListedEnquiry } from "../report";

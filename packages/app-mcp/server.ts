@@ -6,17 +6,17 @@
 import pkg from "../../package.json" with { type: "json" };
 import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { logFailedRequest, type Adapter } from "../core-domain/request-log";
+import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ReadSurface, WriteSurface, openRecord } from "../core-domain";
-import { pgEventLog } from "../core-domain/event-store";
+import { ReadSurface, WriteSurface, openRecord } from "@labkit/core-domain";
+import { pgEventLog } from "@labkit/core-domain/event-store";
 import {
   commandContext,
   mockGitContext,
   registeredSession,
   sessionRegistry,
   type SessionRegistry,
-} from "../core-domain/context";
+} from "@labkit/core-domain/context";
 import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "./tools";
 import { DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "./docs";
 

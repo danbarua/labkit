@@ -3,9 +3,9 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
-import { ResearchSession } from "../packages/core-domain";
+import { ResearchSession } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import type { TenantGraph } from "../packages/core-db/graph";
+import type { TenantGraph } from "@labkit/core-db/graph";
 
 let scenario: Scenario;
 let graph: TenantGraph;
@@ -108,7 +108,7 @@ test("note --supersedes refuses self", async () => {
   // to a known value present in the supersedes input. This exercises the exact
   // post-mint `if (old === noted)` self guard in Asking.note.
   const g = graph as unknown as {
-    reserveId: (label: import("../packages/core-db/domain").NodeLabel) => Promise<string>;
+    reserveId: (label: import("@labkit/core-db/domain").NodeLabel) => Promise<string>;
   };
   const original = g.reserveId;
   g.reserveId = async (label) => {

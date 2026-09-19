@@ -2,7 +2,7 @@
  * Derived facts, as named nodes over Cypher clauses.
  */
 
-import type { ColumnDecoder } from "../core-db/cypher";
+import type { ColumnDecoder } from "@labkit/core-db/cypher";
 
 /**
  * What a fact is computed **per** — its subject.

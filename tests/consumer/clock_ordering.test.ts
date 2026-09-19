@@ -8,8 +8,8 @@ import {
   inMemoryEventLog,
   type AnalysisRef,
   type EnquiryRef,
-} from "../../packages/core-domain";
-import type { ClaimRef } from "../../packages/core-domain";
+} from "@labkit/core-domain";
+import type { ClaimRef } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, minutes, days } from "../helpers/clock";
 import { claimNamed, claimOf } from "../helpers/claims";

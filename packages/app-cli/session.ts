@@ -2,10 +2,10 @@
  * What a command is handed, and what happens around it.
  */
 
-import { openRecord } from "../core-domain";
-import type { ReadSurface, WriteSurface } from "../core-domain";
-import { commandContext, gitContext, personContext } from "../core-domain/context";
-import type { Clock } from "../core-domain";
+import { openRecord } from "@labkit/core-domain";
+import type { ReadSurface, WriteSurface } from "@labkit/core-domain";
+import { commandContext, gitContext, personContext } from "@labkit/core-domain/context";
+import type { Clock } from "@labkit/core-domain";
 import { asJson, type Answer } from "./output";
 import { isColorSupported } from "picocolors";
 import { type Palette, palette } from "./palette";

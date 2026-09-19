@@ -1,7 +1,7 @@
 /** Measuring, analysing, concluding, reviewing. */
 
-import { vertexProps } from "../../core-db/cypher";
-import type { TenantGraph } from "../../core-db/graph";
+import { vertexProps } from "@labkit/core-db/cypher";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   RecordedAnalysis,
   RecordedObservations,

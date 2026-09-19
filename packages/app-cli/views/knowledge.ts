@@ -16,7 +16,7 @@ import type {
   SearchGroup,
   SupportExplanation,
   Verdict,
-} from "../../core-domain";
+} from "@labkit/core-domain";
 import type { Palette } from "../palette";
 import { bullets, gist, questionLines, relativeAge, rows } from "./format";
 

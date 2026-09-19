@@ -11,12 +11,12 @@ import {
   WriteSurface,
   inMemoryEventLog,
   type Clock,
-} from "../packages/core-domain";
-import { buildServer } from "../packages/app-mcp/server";
-import { sessionRegistry } from "../packages/core-domain/context";
+} from "@labkit/core-domain";
+import { buildServer } from "@labkit/app-mcp/server";
+import { sessionRegistry } from "@labkit/core-domain/context";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
-import { ref } from "../packages/core-domain/report";
+import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "./helpers/analysis";
 
 /**

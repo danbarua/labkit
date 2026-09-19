@@ -1,10 +1,10 @@
 import { PGlite } from "@electric-sql/pglite";
 import { age } from "@electric-sql/pglite-age";
 import { Client } from "pg";
-import { runMigrations, runMigrationsOnPostgres } from "../../packages/core-db/migrate";
-import { bootstrapSession, type LabKitDB, type QueryOptions } from "../../packages/core-db/backend";
-import { traced } from "../../packages/core-db/trace";
-import { type Transactor, transactor } from "../../packages/core-db/transactor";
+import { runMigrations, runMigrationsOnPostgres } from "@labkit/core-db/migrate";
+import { bootstrapSession, type LabKitDB, type QueryOptions } from "@labkit/core-db/backend";
+import { traced } from "@labkit/core-db/trace";
+import { type Transactor, transactor } from "@labkit/core-db/transactor";
 
 /**
  * The database the suite runs against, and there are two of them.

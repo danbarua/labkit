@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { EdgeLabel } from "../../../packages/core-db/domain";
+import type { EdgeLabel } from "@labkit/core-db/domain";
 
 export type ViewMode = "2d" | "3d";
 export type Overlay = "structural" | "standing" | "temporal";

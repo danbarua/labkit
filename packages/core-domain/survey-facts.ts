@@ -2,8 +2,8 @@
  * The facts a knowledge survey is made of.
  */
 
-import { optional, vertexProps } from "../core-db/cypher";
-import type { ColumnDecoder } from "../core-db/cypher";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
+import type { ColumnDecoder } from "@labkit/core-db/cypher";
 import { ref } from "./report";
 import type { CheckStatus, ClaimRef, EvaluationRecord, EvidenceRef } from "./report";
 import type { Derived, Leaf, Row } from "./facts";

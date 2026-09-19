@@ -1,5 +1,5 @@
-import { optional, vertexProps } from "../../core-db/cypher";
-import type { ClaimProps } from "../../core-db/domain";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
+import type { ClaimProps } from "@labkit/core-db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";

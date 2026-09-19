@@ -2,7 +2,7 @@
 	"name": "labkit",
 	"description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
 	"license": "MIT",
-	"version": "0.7.452",
+	"version": "0.7.453",
 	"main": "packages/core-domain/entry.ts",
 	"type": "module",
 	"bin": {
@@ -54,6 +54,10 @@
 	"private": true,
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.10",
+		"@labkit/app-cli": "workspace:*",
+		"@labkit/app-mcp": "workspace:*",
+		"@labkit/core-db": "workspace:*",
+		"@labkit/core-domain": "workspace:*",
 		"@types/bun": "latest",
 		"@types/pg": "^8.21.0",
 		"dependency-cruiser": "^18.2.0",

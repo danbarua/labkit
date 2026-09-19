@@ -5,7 +5,7 @@
  * `session.writes.pose` and `session.reads.whySupported`.
  */
 
-import type { TenantGraph } from "../core-db/graph";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import type { EventSink } from "./events";
 import { ReadSurface } from "./read";
 import { WriteSurface } from "./write";

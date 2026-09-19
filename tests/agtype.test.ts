@@ -5,10 +5,10 @@ import {
   validateIdentifier,
   type AgtypeNumeric,
   type AgtypeUnknown,
-} from "../packages/core-db/agtype";
-import { TenantGraph } from "../packages/core-db/graph";
-import { agtypeValue } from "../packages/core-db/cypher";
-import { resolveTenantContext } from "../packages/core-db/tenant";
+} from "@labkit/core-db/agtype";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { agtypeValue } from "@labkit/core-db/cypher";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 
 /**

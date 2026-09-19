@@ -6,12 +6,12 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { connectScratch } from "../../packages/core-db/connect";
-import { resolveTenantContext } from "../../packages/core-db/tenant";
-import { scopeToTenant } from "../../packages/core-db/scoped";
-import { TenantGraph } from "../../packages/core-db/graph";
-import { pgEventLog } from "../../packages/core-domain/event-store";
-import { WriteSurface, systemClock } from "../../packages/core-domain";
+import { connectScratch } from "@labkit/core-db/connect";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { scopeToTenant } from "@labkit/core-db/scoped";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { pgEventLog } from "@labkit/core-domain/event-store";
+import { WriteSurface, systemClock } from "@labkit/core-domain";
 
 const CLI = join(import.meta.dir, "..", "..", "packages", "app-cli", "cli.ts");
 /** Comfortably past one 64 KiB pipe buffer once rendered. */

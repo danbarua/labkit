@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ReadSurface, WriteSurface } from "../../packages/core-domain";
+import { ReadSurface, WriteSurface } from "@labkit/core-domain";
 import {
   publicVerbsOf,
   verbsCalledOn,

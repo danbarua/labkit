@@ -4,8 +4,8 @@
  */
 
 import { buildProgram } from "./program";
-import { logFailedRequest, type Adapter } from "../core-domain/request-log";
-import { DomainRefusal } from "../core-domain";
+import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
+import { DomainRefusal } from "@labkit/core-domain";
 import { writeSync } from "node:fs";
 import { runner } from "./session";
 

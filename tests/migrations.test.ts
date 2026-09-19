@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
-import { embeddedMigrations } from "../packages/core-db/migrations";
+import { embeddedMigrations } from "@labkit/core-db/migrations";
 
 test("the embedded migrations are byte-identical to what drizzle reads off disk", () => {
   // `readMigrationFiles` is drizzle's own public API and reads the real folder.

@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Command } from "commander";
-import { connectDb, dataDirFor } from "../../core-db/connect";
+import { connectDb, dataDirFor } from "@labkit/core-db/connect";
 import type { Globals } from "../session";
 
 /** What a dump of a PGlite data directory is, so a name cannot claim otherwise. */

@@ -16,6 +16,10 @@
       },
       "devDependencies": {
         "@biomejs/biome": "^2.5.10",
+        "@labkit/app-cli": "workspace:*",
+        "@labkit/app-mcp": "workspace:*",
+        "@labkit/core-db": "workspace:*",
+        "@labkit/core-domain": "workspace:*",
         "@types/bun": "latest",
         "@types/pg": "^8.21.0",
         "dependency-cruiser": "^18.2.0",
@@ -68,6 +72,8 @@
     "web": {
       "name": "labkit-web",
       "dependencies": {
+        "@labkit/core-db": "workspace:*",
+        "@labkit/core-domain": "workspace:*",
         "react": "^19.1.1",
         "react-dom": "^19.1.1",
       },

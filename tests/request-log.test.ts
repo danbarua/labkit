@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { logFailedRequest, truncated } from "../packages/core-domain/request-log";
+import { logFailedRequest, truncated } from "@labkit/core-domain/request-log";
 
 describe("truncated", () => {
   test("a short string is untouched — handles and instants must stay whole", () => {

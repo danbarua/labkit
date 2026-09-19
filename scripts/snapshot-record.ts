@@ -41,7 +41,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
-import { connectDb } from "../packages/core-db/connect";
+import { connectDb } from "@labkit/core-db/connect";
 
 const args = process.argv.slice(2);
 const value = (name: string, fallback?: string): string | undefined => {

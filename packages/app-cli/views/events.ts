@@ -2,9 +2,9 @@
  * The acts themselves — the one view over the event log rather than the graph.
  */
 
-import { createdIn, edgesIn, retractedIn } from "../../core-domain";
+import { createdIn, edgesIn, retractedIn } from "@labkit/core-domain";
 import { gist } from "./format";
-import type { EventPage, ListedNote } from "../../core-domain";
+import type { EventPage, ListedNote } from "@labkit/core-domain";
 import type { Palette } from "../palette";
 
 /**

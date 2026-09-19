@@ -3,7 +3,7 @@
  */
 
 import type { Command } from "commander";
-import { main as serveMcp } from "../../app-mcp/server";
+import { main as serveMcp } from "@labkit/app-mcp/server";
 import type { Globals } from "../session";
 
 /**

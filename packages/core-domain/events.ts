@@ -8,7 +8,7 @@ import type {
   NodeCreated,
   Prose,
   NodePropsChanged,
-} from "../core-db/domain";
+} from "@labkit/core-db/domain";
 import type { Command } from "./commands";
 import type { EventFilter } from "./queries";
 

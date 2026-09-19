@@ -2,9 +2,9 @@
  * What every research verb needs, and the few helpers both halves share.
  */
 
-import type { TenantGraph } from "../core-db/graph";
-import type { IndexedString, Prose } from "../core-db/domain";
-import { optional, vertexProps } from "../core-db/cypher";
+import type { TenantGraph } from "@labkit/core-db/graph";
+import type { IndexedString, Prose } from "@labkit/core-db/domain";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
 import { compose, per, type Row } from "./facts";
 import { checkState } from "./survey-facts";
 import {

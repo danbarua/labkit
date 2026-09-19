@@ -2,7 +2,7 @@
  * The shared shapes every view is built out of.
  */
 
-import type { IdentifiedArtefact, QuestionStanding } from "../../core-domain";
+import type { IdentifiedArtefact, QuestionStanding } from "@labkit/core-domain";
 import type { Palette } from "../palette";
 
 export function bullets(items: string[], empty: string): string {

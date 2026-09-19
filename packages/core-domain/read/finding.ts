@@ -1,5 +1,5 @@
-import { vertexProps } from "../../core-db/cypher";
-import { NODE_LABELS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } from "../../core-db/domain";
+import { vertexProps } from "@labkit/core-db/cypher";
+import { NODE_LABELS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } from "@labkit/core-db/domain";
 import type { ClaimsAssertingQuery, OriginOfQuery, PursuitsOfQuery, SearchQuery } from "../queries";
 import { SessionCore } from "../core";
 import { KIND_BY_LABEL, byHandle, ref } from "../report";

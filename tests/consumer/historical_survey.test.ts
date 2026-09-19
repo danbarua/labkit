@@ -3,7 +3,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog } from "../../packages/core-domain";
+import { ResearchSession, inMemoryEventLog } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { windableClock, days } from "../helpers/clock";
 import { claimOf } from "../helpers/claims";
