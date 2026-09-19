@@ -2,9 +2,9 @@
  * What more than one write group needs to reach the same record the same way.
  */
 
-import { optional, vertexProps } from "../../core-db/cypher";
-import type { IndexedString, ArtefactProps, ClaimProps, GraphChange } from "../../core-db/domain";
-import { labelForNaturalId } from "../../core-db/domain";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
+import type { IndexedString, ArtefactProps, ClaimProps, GraphChange } from "@labkit/core-db/domain";
+import { labelForNaturalId } from "@labkit/core-db/domain";
 import type {
   AnalysisRef,
   ClaimRef,

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { verdictOf, type Verdict } from "../packages/core-domain/report";
+import { verdictOf, type Verdict } from "@labkit/core-domain/report";
 
 /** Nothing examined, nothing withdrawn, nothing owed: the empty claim. */
 const nothing = {

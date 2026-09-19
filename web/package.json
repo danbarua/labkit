@@ -18,6 +18,8 @@
     "typecheck": "bunx --bun tsc --noEmit"
   },
   "dependencies": {
+    "@labkit/core-db": "workspace:*",
+    "@labkit/core-domain": "workspace:*",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

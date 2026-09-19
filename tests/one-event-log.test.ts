@@ -3,7 +3,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
-import { ResearchSession, ReadSurface, WriteSurface } from "../packages/core-domain";
+import { ResearchSession, ReadSurface, WriteSurface } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
 let scenario: Scenario;

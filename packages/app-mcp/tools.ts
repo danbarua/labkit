@@ -3,10 +3,10 @@
  * in `SESSION_TOOLS`.
  */
 
-import { createdIn } from "../core-domain";
+import { createdIn } from "@labkit/core-domain";
 import { z } from "zod";
-import type { ReadGroup, ReadSurface, WriteGroup, WriteSurface } from "../core-domain";
-import type { SessionRegistry } from "../core-domain/context";
+import type { ReadGroup, ReadSurface, WriteGroup, WriteSurface } from "@labkit/core-domain";
+import type { SessionRegistry } from "@labkit/core-domain/context";
 import {
   claimsAssertingQuery,
   contractForQuery,
@@ -31,7 +31,7 @@ import {
   howQuery,
   whySupportedQuery,
   workListQuery,
-} from "../core-domain/queries";
+} from "@labkit/core-domain/queries";
 import {
   acceptAsUnresolvedCommand,
   amendDesignCommand,
@@ -59,7 +59,7 @@ import {
   stopWorkCommand,
   synthesiseCommand,
   undoCommand,
-} from "../core-domain/commands";
+} from "@labkit/core-domain/commands";
 
 import {
   acceptedAsUnresolved,
@@ -112,7 +112,7 @@ import {
   verificationReport,
   whatHappened,
   workList,
-} from "../core-domain/reports";
+} from "@labkit/core-domain/reports";
 
 /**
  * One tool. `Shape` is a Zod **raw shape** — `{ at: z.string().optional() }`,

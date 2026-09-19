@@ -2,8 +2,8 @@
  * Harness for the acceptance scenarios.
  */
 
-import { resolveTenantContext, type TenantContext } from "../../packages/core-db/tenant";
-import { TenantGraph } from "../../packages/core-db/graph";
+import { resolveTenantContext, type TenantContext } from "@labkit/core-db/tenant";
+import { TenantGraph } from "@labkit/core-db/graph";
 import { setupTestDb, type TestClient, type TestDb } from "./db";
 
 export interface Scenario {

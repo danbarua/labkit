@@ -29,8 +29,8 @@ import {
   whyQuery,
   howQuery,
   workListQuery,
-} from "../../core-domain/queries";
-import { GATE_STATES, WORK_STATES } from "../../core-domain/vocab";
+} from "@labkit/core-domain/queries";
+import { GATE_STATES, WORK_STATES } from "@labkit/core-domain/vocab";
 import {
   renderHistorical,
   renderKnown,

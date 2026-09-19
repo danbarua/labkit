@@ -1,8 +1,8 @@
 /** The conditions a result will be held to, agreed before it exists. */
 
-import { scalar, vertexProps } from "../../core-db/cypher";
-import { labelForNaturalId, type Prose } from "../../core-db/domain";
-import type { TenantGraph } from "../../core-db/graph";
+import { scalar, vertexProps } from "@labkit/core-db/cypher";
+import { labelForNaturalId, type Prose } from "@labkit/core-db/domain";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   AmendmentReport,
   ClaimRef,

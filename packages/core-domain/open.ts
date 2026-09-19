@@ -5,10 +5,10 @@
  * build one themselves. This is how an adapter gets a graph at all.
  */
 
-import { connectDb } from "../core-db/connect";
-import { resolveTenantContext } from "../core-db/tenant";
-import { scopeToTenant } from "../core-db/scoped";
-import { TenantGraph } from "../core-db/graph";
+import { connectDb } from "@labkit/core-db/connect";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { scopeToTenant } from "@labkit/core-db/scoped";
+import { TenantGraph } from "@labkit/core-db/graph";
 import type { CommandContext } from "./events";
 import { pgEventLog } from "./event-store";
 import { ReadSurface } from "./read";

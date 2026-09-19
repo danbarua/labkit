@@ -7,7 +7,7 @@
  * without one.
  */
 
-import { VOCABULARY } from "../core-domain/reports";
+import { VOCABULARY } from "@labkit/core-domain/reports";
 import type { Palette } from "./palette";
 
 /** Which of the palette's four readings a word takes. */

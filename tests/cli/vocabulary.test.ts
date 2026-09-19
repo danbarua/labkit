@@ -5,8 +5,8 @@
  */
 
 import { expect, test } from "bun:test";
-import { VOCABULARY } from "../../packages/core-domain/reports";
-import { READING } from "../../packages/app-cli/vocabulary";
+import { VOCABULARY } from "@labkit/core-domain/reports";
+import { READING } from "@labkit/app-cli/vocabulary";
 
 test("every word the schemas can say has a reading", () => {
   const missing = [...VOCABULARY].filter((word) => !(word in READING)).sort();

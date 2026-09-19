@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { TenantGraph } from "../packages/core-db/graph";
-import { agtypeValue, edgeProps, optional, scalar, vertexProps } from "../packages/core-db/cypher";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { agtypeValue, edgeProps, optional, scalar, vertexProps } from "@labkit/core-db/cypher";
 import {
   NODE_LABELS,
   NODE_TYPES,
@@ -11,11 +11,11 @@ import {
   type DecisionProps,
   type EvidenceProps,
   type LineOfEnquiryProps,
-} from "../packages/core-db/domain";
-import type { LabKitDB } from "../packages/core-db/backend";
-import { resolveTenantContext, type TenantContext } from "../packages/core-db/tenant";
+} from "@labkit/core-db/domain";
+import type { LabKitDB } from "@labkit/core-db/backend";
+import { resolveTenantContext, type TenantContext } from "@labkit/core-db/tenant";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
-import { transactor } from "../packages/core-db/transactor";
+import { transactor } from "@labkit/core-db/transactor";
 
 /**
  * Exercises the LabKit domain model revised by and ) against Apache AGE, migrated and

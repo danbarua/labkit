@@ -3,9 +3,9 @@
  */
 
 import { and, asc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
-import type { LabKitDB } from "../core-db/backend";
-import { ormOver, unwrapped } from "../core-db/orm";
-import { labkitEvents } from "../core-db/schema";
+import type { LabKitDB } from "@labkit/core-db/backend";
+import { ormOver, unwrapped } from "@labkit/core-db/orm";
+import { labkitEvents } from "@labkit/core-db/schema";
 import type {
   RecordedAttribution,
   DomainEvent,

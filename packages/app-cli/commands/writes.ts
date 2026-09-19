@@ -2,8 +2,8 @@
  * The write commands — one per public verb on `WriteSurface`.
  */
 
-import { createdIn } from "../../core-domain";
-import type { DomainEvent, WriteSurface } from "../../core-domain";
+import { createdIn } from "@labkit/core-domain";
+import type { DomainEvent, WriteSurface } from "@labkit/core-domain";
 import type { Command } from "commander";
 import type { z } from "zod";
 import { collect, parseCommand, whole } from "../args";
@@ -37,7 +37,7 @@ import {
   stopWorkCommand,
   synthesiseCommand,
   undoCommand,
-} from "../../core-domain/commands";
+} from "@labkit/core-domain/commands";
 
 /**
  * Every handle an act minted, across however many events it recorded — in practice one per act.

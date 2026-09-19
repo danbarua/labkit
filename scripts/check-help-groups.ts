@@ -20,7 +20,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { READ_GROUPS, WRITE_GROUPS, OPERATING_GROUPS } from "../packages/core-domain/groups";
+import { READ_GROUPS, WRITE_GROUPS, OPERATING_GROUPS } from "@labkit/core-domain/groups";
 
 /**
  * Every command module, and which groups each may use.

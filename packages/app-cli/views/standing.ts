@@ -2,7 +2,7 @@
  * "What am I blocked on right now, what are my priorities?"
  */
 
-import type { Standing } from "../../core-domain";
+import type { Standing } from "@labkit/core-domain";
 import type { Palette } from "../palette";
 import { renderGateList, renderWorkList } from "./gates";
 import { renderKnown } from "./knowledge";

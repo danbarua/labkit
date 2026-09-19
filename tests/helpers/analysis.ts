@@ -14,8 +14,8 @@ import type {
   WorkRef,
   ReviewRef,
   ReplacementReport,
-} from "../../packages/core-domain/report";
-import type { ResearchWrites, ReplacementConclusion } from "../../packages/core-domain";
+} from "@labkit/core-domain/report";
+import type { ResearchWrites, ReplacementConclusion } from "@labkit/core-domain";
 
 /** Every fragment writes through the public surface and nothing else. */
 type W = ResearchWrites;

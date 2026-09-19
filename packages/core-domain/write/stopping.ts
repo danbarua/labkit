@@ -1,7 +1,7 @@
 /** Closing a pursuit or planned work, or deliberately leaving a question open. */
 
-import { optional, scalar, vertexProps } from "../../core-db/cypher";
-import type { TenantGraph } from "../../core-db/graph";
+import { optional, scalar, vertexProps } from "@labkit/core-db/cypher";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   AcceptedAsUnresolved,
   ClosedEnquiry,

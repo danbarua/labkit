@@ -2,7 +2,7 @@
  * What the programme found out, under the question it was asked for.
  */
 
-import type { Learned } from "../../core-domain";
+import type { Learned } from "@labkit/core-domain";
 import type { Palette } from "../palette";
 import { rows } from "./format";
 

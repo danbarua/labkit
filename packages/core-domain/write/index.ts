@@ -2,8 +2,8 @@
  * The verbs that change the record.
  */
 
-import type { TenantGraph } from "../../core-db/graph";
-import type { Prose } from "../../core-db/domain";
+import type { TenantGraph } from "@labkit/core-db/graph";
+import type { Prose } from "@labkit/core-db/domain";
 import type {
   AcceptedAsUnresolved,
   AmendmentReport,

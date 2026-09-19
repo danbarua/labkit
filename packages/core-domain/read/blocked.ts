@@ -1,5 +1,5 @@
-import { optional, vertexProps } from "../../core-db/cypher";
-import type { TenantGraph } from "../../core-db/graph";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import { byHandle, ref } from "../report";

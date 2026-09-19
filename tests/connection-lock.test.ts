@@ -6,9 +6,9 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pgliteBackend } from "../packages/core-db/backend";
+import { pgliteBackend } from "@labkit/core-db/backend";
 import { usingPostgres } from "./helpers/db";
-import { resolveTenantContext } from "../packages/core-db/tenant";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
 
 let root: string;
 

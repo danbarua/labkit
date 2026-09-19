@@ -38,16 +38,16 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import { age, pgliteAssets } from "../packages/core-db/extensions";
-import { transactor } from "../packages/core-db/transactor";
-import { resolveTenantContext } from "../packages/core-db/tenant";
-import { scopeToTenant } from "../packages/core-db/scoped";
-import { TenantGraph } from "../packages/core-db/graph";
-import { connectDb } from "../packages/core-db/connect";
-import { pgEventLog } from "../packages/core-domain/event-store";
-import { NODE_LABELS, EDGE_LABELS } from "../packages/core-db/domain";
-import { scalar } from "../packages/core-db/cypher";
-import { bootstrapSession, type LabKitDB } from "../packages/core-db/backend";
+import { age, pgliteAssets } from "@labkit/core-db/extensions";
+import { transactor } from "@labkit/core-db/transactor";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { scopeToTenant } from "@labkit/core-db/scoped";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { connectDb } from "@labkit/core-db/connect";
+import { pgEventLog } from "@labkit/core-domain/event-store";
+import { NODE_LABELS, EDGE_LABELS } from "@labkit/core-db/domain";
+import { scalar } from "@labkit/core-db/cypher";
+import { bootstrapSession, type LabKitDB } from "@labkit/core-db/backend";
 
 const args = process.argv.slice(2);
 const value = (name: string, fallback?: string): string | undefined => {

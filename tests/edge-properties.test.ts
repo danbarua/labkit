@@ -8,11 +8,11 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
-import { resolveTenantContext } from "../packages/core-db/tenant";
-import { TenantGraph } from "../packages/core-db/graph";
-import { optional, scalar } from "../packages/core-db/cypher";
-import { applyDelta, snapshotPriorValues, UnitOfWork } from "../packages/core-domain/projection";
-import { domainEvent, UNATTRIBUTED } from "../packages/core-domain";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { optional, scalar } from "@labkit/core-db/cypher";
+import { applyDelta, snapshotPriorValues, UnitOfWork } from "@labkit/core-domain/projection";
+import { domainEvent, UNATTRIBUTED } from "@labkit/core-domain";
 
 let testDb: TestDb;
 let db: TestClient;

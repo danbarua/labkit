@@ -64,4 +64,4 @@ export {
   workList as workListSchema,
   transcription as transcriptionSchema,
   standing as standingSchema,
-} from "../core-domain/reports";
+} from "@labkit/core-domain/reports";

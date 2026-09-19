@@ -107,7 +107,7 @@ source.forEachChild((node) => {
 });
 
 const { INDEXED_PROPS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } = await import(
-  "../packages/core-db/domain"
+  "@labkit/core-db/domain"
 );
 
 const problems: string[] = [];

@@ -1,4 +1,4 @@
-import { optional, vertexProps } from "../../core-db/cypher";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
 import { SessionCore } from "../core";
 import { ref } from "../report";
 import type { DomainEvent, EventFilter } from "../events";

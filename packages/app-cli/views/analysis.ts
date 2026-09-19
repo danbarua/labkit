@@ -8,7 +8,7 @@ import type {
   ReproducibilityReport,
   ReproductionReport,
   Revision,
-} from "../../core-domain";
+} from "@labkit/core-domain";
 import type { Palette } from "../palette";
 import { bullets, partLine } from "./format";
 

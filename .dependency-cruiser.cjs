@@ -65,7 +65,7 @@ module.exports = {
         "in the CLI, the MCP server and twice in the web seeder, and each copy had to " +
         "reach into packages/core-db to do it. packages/core-db/connect stays reachable — `backup` and " +
         "`restore` act on a data directory rather than a session.",
-      from: { path: '^src/(cli|mcp)' },
+      from: { path: '^packages/app-(cli|mcp)' },
       to: { path: '^packages/core-db/(tenant|scoped|graph)' }
     },
     {
@@ -237,7 +237,7 @@ module.exports = {
         'section of your package.json. If this module is development only - add it to the ' +
         'from.pathNot re of the not-to-dev-dep rule in the dependency-cruiser configuration',
       from: {
-        path: '^(src)',
+        path: '^(packages)',
         pathNot: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$'
       },
       to: {

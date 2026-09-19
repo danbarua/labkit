@@ -6,13 +6,13 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { connectDb, type LabKitDBConnection } from "../packages/core-db/connect";
-import { resolveTenantContext } from "../packages/core-db/tenant";
-import { scopeToTenant } from "../packages/core-db/scoped";
-import { NODE_LABELS } from "../packages/core-db/domain";
-import { TenantGraph } from "../packages/core-db/graph";
-import { ResearchSession, inMemoryEventLog } from "../packages/core-domain";
-import { kindOf, ref } from "../packages/core-domain/report";
+import { connectDb, type LabKitDBConnection } from "@labkit/core-db/connect";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { scopeToTenant } from "@labkit/core-db/scoped";
+import { NODE_LABELS } from "@labkit/core-db/domain";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { ResearchSession, inMemoryEventLog } from "@labkit/core-domain";
+import { kindOf, ref } from "@labkit/core-domain/report";
 
 let home: string;
 beforeAll(() => {

@@ -4,9 +4,9 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "../../packages/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { ref } from "../../packages/core-domain/report";
+import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;

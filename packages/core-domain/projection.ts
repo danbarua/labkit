@@ -10,8 +10,8 @@ import type {
   NodeCreated,
   NodeLabel,
   NodePropsByLabel,
-} from "../core-db/domain";
-import type { TenantGraph } from "../core-db/graph";
+} from "@labkit/core-db/domain";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import type { DomainEvent } from "./events";
 
 /**

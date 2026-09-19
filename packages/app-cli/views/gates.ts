@@ -13,7 +13,7 @@ import type {
   ListedGate,
   ListedWork,
   TaskContract,
-} from "../../core-domain";
+} from "@labkit/core-domain";
 import type { Palette } from "../palette";
 import { bullets, relativeAge, rows } from "./format";
 

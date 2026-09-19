@@ -3,15 +3,10 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import {
-  ResearchSession,
-  inMemoryEventLog,
-  type Clock,
-  type EventSink,
-} from "../../packages/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { ref } from "../../packages/core-domain/report";
+import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
 

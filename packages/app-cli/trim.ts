@@ -7,7 +7,7 @@
  * that reads the whole of it.
  */
 
-import { IDENTITY_FIELDS, PROSE_FIELDS } from "../core-domain/reports";
+import { IDENTITY_FIELDS, PROSE_FIELDS } from "@labkit/core-domain/reports";
 import type { Palette } from "./palette";
 
 /** How much prose a summary keeps before it starts costing the reader. */

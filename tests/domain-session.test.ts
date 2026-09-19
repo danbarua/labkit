@@ -4,10 +4,10 @@
  */
 
 import { afterAll, beforeAll, beforeEach, afterEach, expect, test } from "bun:test";
-import { ResearchSession } from "../packages/core-domain";
+import { ResearchSession } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { vertexProps } from "../packages/core-db/cypher";
-import type { TenantGraph } from "../packages/core-db/graph";
+import { vertexProps } from "@labkit/core-db/cypher";
+import type { TenantGraph } from "@labkit/core-db/graph";
 import { claimNamed, claimOf } from "./helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "./helpers/analysis";
 import { evaluationsOf } from "./helpers/criteria";

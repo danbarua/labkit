@@ -3,8 +3,8 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "../../packages/core-domain";
-import { LABEL_BY_KIND, kindOf, type AnyRef, type Kind } from "../../packages/core-domain/report";
+import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { LABEL_BY_KIND, kindOf, type AnyRef, type Kind } from "@labkit/core-domain/report";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
 

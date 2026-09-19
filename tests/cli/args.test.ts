@@ -7,9 +7,9 @@ import { mkdtemp } from "node:fs/promises";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { main } from "../../packages/app-cli/cli";
-import { buildProgram } from "../../packages/app-cli/program";
-import type { Run } from "../../packages/app-cli/session";
+import { main } from "@labkit/app-cli/cli";
+import { buildProgram } from "@labkit/app-cli/program";
+import type { Run } from "@labkit/app-cli/session";
 
 /**
  * Parses one argv and reports whether the command's action was reached.

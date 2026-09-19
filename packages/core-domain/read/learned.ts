@@ -6,7 +6,7 @@
  * underneath — which is the answer to "what was all this compute for?".
  */
 
-import { optional, vertexProps } from "../../core-db/cypher";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
 import { SessionCore } from "../core";
 import { byHandle, ref } from "../report";
 import type { Learned, LearnedUnderQuestion } from "../report";

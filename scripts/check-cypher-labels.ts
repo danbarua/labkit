@@ -31,7 +31,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { EDGE_LABELS, NODE_LABELS } from "../packages/core-db/domain";
+import { EDGE_LABELS, NODE_LABELS } from "@labkit/core-db/domain";
 
 const ROOT = "packages";
 

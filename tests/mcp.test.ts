@@ -16,34 +16,34 @@ import {
   WriteSurface,
   inMemoryEventLog,
   type Clock,
-} from "../packages/core-domain";
-import type { TenantGraph } from "../packages/core-db/graph";
-import { buildServer } from "../packages/app-mcp/server";
+} from "@labkit/core-domain";
+import type { TenantGraph } from "@labkit/core-db/graph";
+import { buildServer } from "@labkit/app-mcp/server";
 import {
   commandContext,
   mockGitContext,
   registeredSession,
   sessionRegistry,
   type SessionRegistry,
-} from "../packages/core-domain/context";
-import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../packages/app-mcp/tools";
-import { GATE_STATES } from "../packages/core-domain/vocab";
-import { GATE_CLOSURES } from "../packages/core-domain/commands";
+} from "@labkit/core-domain/context";
+import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
+import { GATE_STATES } from "@labkit/core-domain/vocab";
+import { GATE_CLOSURES } from "@labkit/core-domain/commands";
 import {
   explanationSchema,
   historicalSurveySchema,
   knowledgeSurveySchema,
-} from "../packages/app-mcp/schemas";
+} from "@labkit/app-mcp/schemas";
 import {
   DOCS_TOOL,
   DOCS_URI,
   INSTRUCTIONS,
   META_TOOLS,
   renderToolDocs,
-} from "../packages/app-mcp/docs";
+} from "@labkit/app-mcp/docs";
 import { z } from "zod";
 import { Command } from "commander";
-import { globalOptions } from "../packages/app-cli/program";
+import { globalOptions } from "@labkit/app-cli/program";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import {
   NOT_EXPOSED,

@@ -1,4 +1,4 @@
-import { EDGE_LABELS, type EdgeLabel, type NodeLabel } from "../../../packages/core-db/domain";
+import { EDGE_LABELS, type EdgeLabel, type NodeLabel } from "@labkit/core-db/domain";
 
 export const START_HREF = "/graph/Q_1";
 

@@ -6,12 +6,12 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
-import { resolveTenantContext } from "../packages/core-db/tenant";
-import { TenantGraph } from "../packages/core-db/graph";
-import { inMemoryEventLog, domainEvent, UNATTRIBUTED } from "../packages/core-domain";
-import type { DomainEvent, EventSink, GraphChange } from "../packages/core-domain/events";
-import { eventFilter } from "../packages/core-domain/queries";
-import { pgEventLog } from "../packages/core-domain/event-store";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { inMemoryEventLog, domainEvent, UNATTRIBUTED } from "@labkit/core-domain";
+import type { DomainEvent, EventSink, GraphChange } from "@labkit/core-domain/events";
+import { eventFilter } from "@labkit/core-domain/queries";
+import { pgEventLog } from "@labkit/core-domain/event-store";
 
 let testDb: TestDb;
 let db: TestClient;

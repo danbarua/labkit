@@ -2,7 +2,7 @@
  * The verbs that answer questions about the record, and change nothing.
  */
 
-import { vertexProps } from "../../core-db/cypher";
+import { vertexProps } from "@labkit/core-db/cypher";
 import { createdIn, edgesIn } from "../events";
 import type {
   EnquiryRef,

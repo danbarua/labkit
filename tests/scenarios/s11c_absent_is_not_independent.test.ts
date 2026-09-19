@@ -9,7 +9,7 @@ import {
   inMemoryEventLog,
   type Clock,
   type DependencyReport,
-} from "../../packages/core-domain";
+} from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
 

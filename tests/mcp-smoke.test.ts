@@ -5,22 +5,17 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import {
-  ReadSurface,
-  WriteSurface,
-  inMemoryEventLog,
-  type EventSink,
-} from "../packages/core-domain";
+import { ReadSurface, WriteSurface, inMemoryEventLog, type EventSink } from "@labkit/core-domain";
 import {
   commandContext,
   mockGitContext,
   mockSessionContext,
   sessionRegistry,
-} from "../packages/core-domain/context";
-import type { TenantGraph } from "../packages/core-db/graph";
-import { buildServer } from "../packages/app-mcp/server";
-import { DOCS_TOOL, META_TOOLS } from "../packages/app-mcp/docs";
-import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../packages/app-mcp/tools";
+} from "@labkit/core-domain/context";
+import type { TenantGraph } from "@labkit/core-db/graph";
+import { buildServer } from "@labkit/app-mcp/server";
+import { DOCS_TOOL, META_TOOLS } from "@labkit/app-mcp/docs";
+import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
 let scenario: Scenario;

@@ -6,7 +6,7 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { connectScratch } from "../packages/core-db/connect";
+import { connectScratch } from "@labkit/core-db/connect";
 
 const NOWHERE = "postgres://nobody:nobody@127.0.0.1:1/labkit_should_never_be_touched";
 

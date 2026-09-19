@@ -12,16 +12,16 @@ import {
   type Clock,
   type DomainEvent,
   type EventSink,
-} from "../packages/core-domain";
+} from "@labkit/core-domain";
 import {
   graphProjector,
   type IdSource,
   type Projector,
   UnitOfWork,
-} from "../packages/core-domain/projection";
+} from "@labkit/core-domain/projection";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { scalar, vertexProps } from "../packages/core-db/cypher";
-import type { TenantGraph } from "../packages/core-db/graph";
+import { scalar, vertexProps } from "@labkit/core-db/cypher";
+import type { TenantGraph } from "@labkit/core-db/graph";
 
 /** The whole of a graph store, for a projector that has no store. */
 interface Projected {
