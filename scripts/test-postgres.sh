@@ -85,7 +85,10 @@ echo
 # fixed, the build got further, and failed here instead — the same defect in the
 # second of the two places that invoke the suite. `bunfig.toml`'s `[test]
 # timeout` is not an answer; measured against bun 1.3.14, it is ignored.
-LABKIT_DB_URL="$url" bun run test
+# A ceiling of its own: the same work takes longer over a socket than it does
+# in-process. `survey-after-reinterpretation` runs 28.8s here against 2.4s on
+# PGlite, and the suite's 20s would call that a hung test.
+LABKIT_DB_URL="$url" bun run test -- --timeout 60000
 status=$?
 
 echo

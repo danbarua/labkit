@@ -100,7 +100,10 @@ jobs:
           if-no-files-found: warn
 
   # The same suite against real Postgres and AGE, four shards against the four
-  # labkit_tests_NN databases the image ships. PGlite is single-writer and
+  # labkit_tests_NN databases the image ships. **On merge, not on a pull
+  # request**: a shard takes 2m08s-3m13s against PGlite's 29s-45s, and a pull
+  # request answering in 1m30s is worth more than catching a
+  # Postgres-only defect an hour earlier. PGlite is single-writer and
   # shares one session, so anything about isolation, a session-scoped role or
   # advisory locking under contention can only be *demonstrated* here. It is
   # also a disagreeing decoder: `count(*)` is a string over `pg` and a number
@@ -109,7 +112,7 @@ jobs:
   # The image is the one `docker/postgres` publishes, so a developer running
   # `test:pg` and this job are on the same Postgres.
   test-postgres:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'version-bump:')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -145,9 +148,29 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # **Health says the port answers, not that this server is the one that
+      # stays.** The entrypoint runs a temporary server during initdb, and a
+      # connection made to it dies when the real one takes over -- which is
+      # `error: Connection terminated`, twenty seconds into a test that does
+      # ten writes. Three consecutive good connections, then start.
+      - name: wait for postgres
+        run: |
+          ok=0
+          for _ in $(seq 1 60); do
+            if bun -e 'const {Client}=require("pg");const c=new Client({connectionString:process.env.LABKIT_DB_URL});c.connect().then(()=>c.query("select 1")).then(()=>c.end()).then(()=>process.exit(0)).catch(()=>process.exit(1))' 2>/dev/null; then
+              ok=$((ok + 1))
+              [ "$ok" -ge 3 ] && break
+            else
+              ok=0
+            fi
+            sleep 1
+          done
+          [ "$ok" -ge 3 ] || { echo "postgres never settled"; exit 1; }
+
       - name: test against postgres
         run: |
           bun run test -- $(bun scripts/shard.ts --of 4 --index ${{ matrix.shard }}) \
+            --timeout 60000 \
             --reporter=junit --reporter-outfile=junit-pg-${{ matrix.shard }}.xml
 
       - name: junit
@@ -186,7 +209,7 @@ jobs:
   # reports -- which is what happened on #463.
   run-ci-build:
     if: always() && github.event_name == 'pull_request'
-    needs: [test-shard, test-postgres, other-checks]
+    needs: [test-shard, other-checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read
