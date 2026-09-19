@@ -17,7 +17,7 @@ import type {
   ReviewRef,
   UnitRef,
 } from "../report";
-import { ref } from "../report";
+import { ref, stagedRef } from "../report";
 import type { ConcludeCommand, RecordAnalysisCommand } from "../commands";
 import { SessionCore } from "../core";
 import type { UnitOfWork } from "../projection";
@@ -228,12 +228,12 @@ export class Shared extends SessionCore {
     output: ObservationsRef;
     heldTo: CriterionRef[];
   }> {
-    const computation = await unitOfWork.node("Computation", {
+    const computation = unitOfWork.node("Computation", {
       method: input.method,
       status: "completed",
     });
-    const unit = await unitOfWork.node("EvidenceUnit", { role: "analysis" });
-    const output = await unitOfWork.node("Artefact", {
+    const unit = unitOfWork.node("EvidenceUnit", { role: "analysis" });
+    const output = unitOfWork.node("Artefact", {
       kind: "analysis-output",
       logical_name: `${input.method} output`,
     });
@@ -278,9 +278,9 @@ export class Shared extends SessionCore {
     }
 
     return {
-      analysis: ref("analysis", computation),
-      unit: ref("unit", unit),
-      output: ref("observations", output),
+      analysis: stagedRef("analysis", computation),
+      unit: stagedRef("unit", unit),
+      output: stagedRef("observations", output),
       heldTo,
     };
   }
@@ -391,8 +391,8 @@ export class Shared extends SessionCore {
             );
         }
 
-        const evidence = await unitOfWork.node("Evidence", { statement: input.finding });
-        const claim = await unitOfWork.node("Claim", {
+        const evidence = unitOfWork.node("Evidence", { statement: input.finding });
+        const claim = unitOfWork.node("Claim", {
           name: proposition,
           kind: input.standing ?? "exploratory",
         });
@@ -411,7 +411,7 @@ export class Shared extends SessionCore {
         // Per-finding supersession, on the edges the model already has.
         if (stands) {
           const superseded = stands;
-          const decision = await unitOfWork.node("Decision", {
+          const decision = unitOfWork.node("Decision", {
             decided_at: at,
             reason: `superseded by "${input.finding}"`,
             invalidation_check: "evidence that the superseded finding was right after all",
@@ -426,9 +426,9 @@ export class Shared extends SessionCore {
         }
 
         return {
-          claim: ref("claim", claim),
+          claim: stagedRef("claim", claim),
           asserts: proposition,
-          finding: ref("evidence", evidence),
+          finding: stagedRef("evidence", evidence),
           standing: input.standing ?? "exploratory",
         };
       }

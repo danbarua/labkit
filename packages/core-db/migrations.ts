@@ -19,6 +19,8 @@ import m0008 from "../../drizzle/0008_concerned_next_avengers.sql" with { type: 
 import m0009 from "../../drizzle/0009_fuzzy_sersi.sql" with { type: "text" };
 import m0010 from "../../drizzle/0010_parallel_greymalkin.sql" with { type: "text" };
 import m0011 from "../../drizzle/0011_workspace_natural_ids.sql" with { type: "text" };
+import m0012 from "../../drizzle/0012_freezing_sebastian_shaw.sql" with { type: "text" };
+import m0013 from "../../drizzle/0013_event_number_from_the_database.sql" with { type: "text" };
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -36,6 +38,8 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0009_fuzzy_sersi": m0009,
   "0010_parallel_greymalkin": m0010,
   "0011_workspace_natural_ids": m0011,
+  "0012_freezing_sebastian_shaw": m0012,
+  "0013_event_number_from_the_database": m0013,
 };
 
 /**

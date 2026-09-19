@@ -15,7 +15,7 @@ import type {
   QuestionRef,
   SharpenedQuestion,
 } from "../report";
-import { KIND_BY_LABEL, ref } from "../report";
+import { KIND_BY_LABEL, ref, stagedRef } from "../report";
 import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
@@ -36,7 +36,7 @@ export class Asking extends SessionCore {
   async pose(input: PoseCommand): Promise<Posed> {
     return this.handle("pose", input, async (unitOfWork) => {
       if (input.from) await this.noteExists(input.from);
-      const asked = ref("question", await this.posed(input.question, unitOfWork));
+      const asked = await this.posed(input.question, unitOfWork);
       if (input.from) unitOfWork.edge(input.from, "MOTIVATES", asked);
       return { subject: asked, result: { question: asked } };
     });
@@ -91,7 +91,7 @@ export class Asking extends SessionCore {
         return { subject: noted, result: { note: noted } };
       }
       if (input.prompted) await this.hasNoOriginYet(input.prompted);
-      const noted = ref("note", await unitOfWork.node("Note", { text: input.text }));
+      const noted = stagedRef("note", unitOfWork.node("Note", { text: input.text }));
       if (input.on) unitOfWork.edge(noted, "CONCERNS", input.on);
       // Handles the author typed into the prose. A note is where the model or
       // the tooling ran out, so what it names is only recoverable from its text.
@@ -109,8 +109,8 @@ export class Asking extends SessionCore {
       }
       if (input.prompted) unitOfWork.edge(noted, "MOTIVATES", input.prompted);
       for (const old of input.supersedes ?? []) {
-        // Mint first: a target equal to this note's new id is self, not "missing".
-        if (old === noted) throw new Error(`a note cannot supersede itself (${noted})`);
+        // No self check here, unlike the branch above: this note's handle is a placeholder
+        // until the store answers, and a caller cannot name it.
         await this.noteExistsToSupersede(old);
         unitOfWork.edge(noted, "SUPERSEDES", old);
       }
@@ -162,9 +162,9 @@ export class Asking extends SessionCore {
    * actions, and a researcher who opened an enquiry did one thing, not three.
    */
   private async posed(question: Prose, unitOfWork: UnitOfWork): Promise<QuestionRef> {
-    return ref(
+    return stagedRef(
       "question",
-      await unitOfWork.node("Question", { name: question, posed_at: this.clock.now() }),
+      unitOfWork.node("Question", { name: question, posed_at: this.clock.now() }),
     );
   }
 
@@ -180,12 +180,12 @@ export class Asking extends SessionCore {
 
   /** The write, without the event — see `posed`. */
   private async pursued(input: PursueCommand, unitOfWork: UnitOfWork): Promise<EnquiryRef> {
-    const enquiry = await unitOfWork.node("LineOfEnquiry", {
+    const enquiry = unitOfWork.node("LineOfEnquiry", {
       name: input.approach,
       started_at: this.clock.now(),
     });
     unitOfWork.edge(input.question, "MOTIVATES", enquiry);
-    return ref("enquiry", enquiry);
+    return stagedRef("enquiry", enquiry);
   }
 
   /**
@@ -220,7 +220,7 @@ export class Asking extends SessionCore {
 
       const standing = await this.standingFindings();
 
-      const decision = await unitOfWork.node("Decision", {
+      const decision = unitOfWork.node("Decision", {
         decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: "evidence that the sharper question was the wrong one to ask",
@@ -233,7 +233,7 @@ export class Asking extends SessionCore {
 
       return {
         subject: sharper,
-        result: { question: sharper, decision: ref("decision", decision) },
+        result: { question: sharper, decision: stagedRef("decision", decision) },
       };
     });
   }

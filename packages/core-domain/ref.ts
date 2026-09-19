@@ -3,7 +3,8 @@
  * events, commands, or reports, so those layers can brand a handle without a cycle.
  */
 
-import { labelForNaturalId, type NodeLabel } from "@labkit/core-db/domain";
+import { labelForNaturalId, NODE_TYPES, type NodeLabel } from "@labkit/core-db/domain";
+import type { Staged } from "./events";
 
 declare const KIND: unique symbol;
 
@@ -65,7 +66,31 @@ export function isRefOfKind(kind: string, id: string): boolean {
   }
 }
 
-export const ref = <K extends string>(kind: K, id: string): Ref<K> => {
+/**
+ * A handle for a record this act is creating, whose number the database has not yet said.
+ *
+ * Separate from {@link ref} because a placeholder must never be accepted from outside: a
+ * caller passing `{{Q}}` to a verb would have it rewritten to this act's own number and so
+ * name a record it did not mean. `ref` refuses one; this is the only way to build one, and
+ * the only callers are the verbs staging what they mint.
+ */
+export const stagedRef = <K extends string>(kind: K, placeholder: Staged): Ref<K> => {
+  const table: Record<string, NodeLabel> = LABEL_BY_KIND;
+  const expected = table[kind];
+  if (expected && placeholder !== `{{${NODE_TYPES[expected].prefix}}}`) {
+    throw new Error(`${kind} expected a staged ${expected}, got "${placeholder}"`);
+  }
+  return placeholder as string as Ref<K>;
+};
+
+/**
+ * A plain handle, never a staged one: `{{Q}}` reaching here from outside would be rewritten
+ * to this act's number and name a record the caller did not mean. {@link stagedRef} is the
+ * way in for what a verb is creating.
+ */
+type NotStaged = string & { readonly __staged?: undefined };
+
+export const ref = <K extends string>(kind: K, id: NotStaged): Ref<K> => {
   if (!isRefOfKind(kind, id)) {
     const table: Record<string, NodeLabel> = LABEL_BY_KIND;
     throw new Error(`${kind} handle expected a ${table[kind]} id, got "${id}"`);

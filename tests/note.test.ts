@@ -103,30 +103,6 @@ test("note --supersedes refuses non-note handle (treated as missing note target)
   );
 });
 
-test("note --supersedes refuses self", async () => {
-  // Patch reserveId for this graph instance to force the id minted for this note()
-  // to a known value present in the supersedes input. This exercises the exact
-  // post-mint `if (old === noted)` self guard in Asking.note.
-  const g = graph as unknown as {
-    reserveId: (label: import("@labkit/core-db/domain").NodeLabel) => Promise<string>;
-  };
-  const original = g.reserveId;
-  g.reserveId = async (label) => {
-    if (label === "Note") return "NOTE_SELF";
-    return original.call(graph, label);
-  };
-  try {
-    await expect(
-      session.writes.note({
-        text: "would supersede the note being created",
-        supersedes: ["NOTE_SELF"] as never,
-      }),
-    ).rejects.toThrow(/a note cannot supersede itself \(NOTE_SELF\)/);
-  } finally {
-    g.reserveId = original;
-  }
-});
-
 test("an existing note can supersede another without minting a third", async () => {
   const { note: old } = await session.writes.note({ text: "initial take" });
   const { note: newer } = await session.writes.note({ text: "later take" });

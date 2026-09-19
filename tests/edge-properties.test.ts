@@ -115,7 +115,7 @@ test("the change travels through an event's delta like every other change", asyn
   const graph = await graphFor("edge-delta");
   const { criterion, gate } = await governs(graph);
 
-  const unitOfWork = new UnitOfWork({ reserve: async () => "unused" });
+  const unitOfWork = new UnitOfWork();
   unitOfWork.setEdge(criterion, "GOVERNS", gate, { state: "satisfied" });
   const event = domainEvent({
     at: "2026-09-16T13:00:00.000Z",
@@ -141,7 +141,7 @@ test("undo restores an edge property to what it held", async () => {
   const { criterion, gate } = await governs(graph);
   await graph.setEdgeProperties(criterion, "GOVERNS", gate, { state: "failed" });
 
-  const unitOfWork = new UnitOfWork({ reserve: async () => "unused" });
+  const unitOfWork = new UnitOfWork();
   unitOfWork.setEdge(criterion, "GOVERNS", gate, { state: "satisfied" });
   const changes = await snapshotPriorValues(graph, unitOfWork.delta());
   expect(changes[0]).toMatchObject({ before: { state: "failed" }, after: { state: "satisfied" } });
@@ -150,7 +150,7 @@ test("undo restores an edge property to what it held", async () => {
   expect((await stateOf(graph, criterion, gate))?.state).toBe("satisfied");
 
   // What `undo` stages, applied: the prior value, written again.
-  const takingBack = new UnitOfWork({ reserve: async () => "unused" });
+  const takingBack = new UnitOfWork();
   takingBack.setEdge(criterion, "GOVERNS", gate, { state: "failed" });
   await applyDelta(graph, event(takingBack.delta()));
   expect((await stateOf(graph, criterion, gate))?.state).toBe("failed");
@@ -161,7 +161,7 @@ test("a property the edge never held is removed, not restored to nothing", async
   const graph = new TenantGraph(ctx, db, db.tx);
   const { criterion, gate } = await governs(graph);
 
-  const unitOfWork = new UnitOfWork({ reserve: async () => "unused" });
+  const unitOfWork = new UnitOfWork();
   unitOfWork.setEdge(criterion, "GOVERNS", gate, { state: "satisfied" });
   const changes = await snapshotPriorValues(graph, unitOfWork.delta());
   // Absent, not null: "there was no value" and "the value was null" undo differently.

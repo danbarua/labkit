@@ -21,7 +21,7 @@ import type {
   Undone,
   VerificationReport,
 } from "../report";
-import { byHandle, kindOf, ref } from "../report";
+import { byHandle, kindOf, ref, stagedRef } from "../report";
 import type {
   ClaimIsConfirmedCommand,
   ClaimIsUndecidedCommand,
@@ -181,9 +181,9 @@ export class Revising extends Shared {
     },
   ): Promise<Restated> {
     return this.handle(operation, input, async (unitOfWork) => {
-      const decision = ref(
+      const decision = stagedRef(
         "decision",
-        await unitOfWork.node("Decision", {
+        unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: spec.reason,
           invalidation_check: spec.invalidation_check,
@@ -397,9 +397,9 @@ export class Revising extends Shared {
       // **One decision carries the whole act**: this analysis stands in
       // place of that one, on this review, superseding these findings and
       // keeping those. A reader of the decision sees all of it.
-      const decision = ref(
+      const decision = stagedRef(
         "decision",
-        await unitOfWork.node("Decision", {
+        unitOfWork.node("Decision", {
           decided_at: at,
           reason: `superseded by a re-run: ${input.method}`,
           invalidation_check: "evidence that the superseded analysis was sound after all",
@@ -463,12 +463,12 @@ export class Revising extends Shared {
           );
 
         const withdrawn: ConcludedClaim[] = [{ claim: input.of, asserts: origin.asserts }];
-        const review = await unitOfWork.node("Review", { verdict: input.because });
-        const narrower = ref(
+        const review = unitOfWork.node("Review", { verdict: input.because });
+        const narrower = stagedRef(
           "claim",
-          await unitOfWork.node("Claim", { name: input.as, kind: "exploratory" }),
+          unitOfWork.node("Claim", { name: input.as, kind: "exploratory" }),
         );
-        const decision = await unitOfWork.node("Decision", {
+        const decision = unitOfWork.node("Decision", {
           decided_at: at,
           reason: input.because,
           invalidation_check: "evidence that the original reading was right after all",
@@ -547,15 +547,15 @@ export class Revising extends Shared {
       );
       const restingOnTheOldReading = await this.decidedOnTheStrengthOf(scope);
 
-      const review = await unitOfWork.node("Review", { verdict: input.because });
-      const narrower = ref(
+      const review = unitOfWork.node("Review", { verdict: input.because });
+      const narrower = stagedRef(
         "claim",
-        await unitOfWork.node("Claim", { name: input.as, kind: "exploratory" }),
+        unitOfWork.node("Claim", { name: input.as, kind: "exploratory" }),
       );
       // The review records that someone objected; the decision records that the
       // objection was acted on. Reviews also confirm, so a review alone cannot
       // mean "withdrawn" without reading its prose.
-      const decision = await unitOfWork.node("Decision", {
+      const decision = unitOfWork.node("Decision", {
         decided_at: this.clock.now(),
         reason: input.because,
         invalidation_check: "evidence that the original reading was right after all",

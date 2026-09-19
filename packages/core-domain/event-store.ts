@@ -5,7 +5,7 @@
 import { and, asc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { LabKitDB } from "@labkit/core-db/backend";
 import { ormOver, unwrapped } from "@labkit/core-db/orm";
-import { workspaceEvents } from "@labkit/core-db/schema";
+import { LABKIT_SCHEMA, workspaceEvents } from "@labkit/core-db/schema";
 import type { TenantContext } from "@labkit/core-db/tenant";
 import type {
   RecordedAttribution,
@@ -14,6 +14,13 @@ import type {
   EventSink,
   RecordedEvent,
 } from "./events";
+
+/** What `labkit_record_event` returns: the number it chose, and the row as it stored it. */
+interface Recorded {
+  seq: number | string;
+  subject: string;
+  changes: DomainEvent["changes"];
+}
 
 /** The row shape, as drizzle hands it back — derived from the table, not restated. */
 type EventRow = ReturnType<typeof workspaceEvents>["$inferSelect"];
@@ -106,34 +113,41 @@ export function pgEventLog(db: LabKitDB, ctx: TenantContext): EventSink {
     });
 
   return {
+    // **The database assigns the number and stamps it into the act's own ids.** One call:
+    // `labkit_record_event` takes the workspace's next number, rewrites every `{{Q}}` the act
+    // staged into `Q_<number>`, inserts the row, and returns what it wrote. Nothing here
+    // chooses a key, and nothing here formats a handle.
     record: (event) =>
       unwrapped(async () => {
-        const rows = await orm
-          .insert(labkitEvents)
-          .values({
-            tenant_id: tenantId,
-            at: event.at,
-            operation: event.operation,
-            subject: event.subject,
-            // Copied: `DomainEvent.changes` is `readonly` and drizzle's insert
-            // type is not.
-            changes: [...event.changes],
-            attribution_label: event.attribution.attribution_label,
-            attribution_id: event.attribution.attribution_id,
-            attribution_how: event.attribution.attribution_how,
-            git_hash: event.attribution.git_hash,
-            reconstructed_from: event.reconstructedFrom,
-            // `jsonb` takes the value, not a string: the driver serialises it.
-            // Hand-rolled SQL had to `JSON.stringify` here and a double-encoded
-            // payload is the classic way that goes wrong.
-            command: event.command,
-          })
-          .returning({ seq: labkitEvents.seq });
-        // `seq` is the one field the caller could not have supplied -- the
-        // store assigns it. Everything else on the returned event is what was
-        // just written, not a second read of the row. `rows[0]!`: a single
-        // insert always returns exactly one row.
-        return { ...event, seq: rows[0]!.seq };
+        const { rows } = await db.query<{ recorded: Recorded }>(
+          `SELECT ${LABKIT_SCHEMA}.labkit_record_event($1::text, $2::int, $3::jsonb) AS recorded`,
+          [
+            ctx.graphName,
+            tenantId,
+            JSON.stringify({
+              at: event.at,
+              operation: event.operation,
+              subject: event.subject,
+              changes: event.changes,
+              command: event.command,
+              attribution_label: event.attribution.attribution_label,
+              attribution_id: event.attribution.attribution_id,
+              attribution_how: event.attribution.attribution_how,
+              git_hash: event.attribution.git_hash,
+              reconstructed_from: event.reconstructedFrom,
+            }),
+          ],
+        );
+        const written = rows[0]?.recorded;
+        if (!written) throw new Error(`recording ${event.operation} returned no row`);
+        // What the row holds, not what was sent: the subject and the changes came back with
+        // their handles in them.
+        return {
+          ...event,
+          seq: Number(written.seq),
+          subject: written.subject,
+          changes: written.changes,
+        };
       }),
     all: () => select({}),
     select,

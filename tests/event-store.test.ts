@@ -171,18 +171,19 @@ describe("the two sinks answer one filter the same way", () => {
    */
   test("in-memory: since is a cursor, not a filter that empties the log", async () => {
     const log = inMemoryEventLog();
-    const ev = (subject: string) => ({
+    const ev = (n: number, subject: string) => ({
       at: "2026-08-28T00:00:00.000Z",
       attribution: UNATTRIBUTED,
       operation: "pose" as const,
       subject,
+      seq: n,
       command: { question: "does it hold?" },
       changes: [],
       reconstructedFrom: null,
     });
-    await log.record(ev("Q_1"));
-    await log.record(ev("Q_2"));
-    await log.record(ev("Q_3"));
+    await log.record(ev(1, "Q_1"));
+    await log.record(ev(2, "Q_2"));
+    await log.record(ev(3, "Q_3"));
 
     const all = await log.all();
     expect(all.map((e) => e.seq)).toEqual([1, 2, 3]);

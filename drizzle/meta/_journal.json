@@ -85,6 +85,20 @@
       "when": 1789800627277,
       "tag": "0011_workspace_natural_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789826362308,
+      "tag": "0012_freezing_sebastian_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789826363308,
+      "tag": "0013_event_number_from_the_database",
+      "breakpoints": true
     }
   ]
 }

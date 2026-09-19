@@ -9,7 +9,7 @@ import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 import { resolveTenantContext } from "@labkit/core-db/tenant";
 import { TenantGraph } from "@labkit/core-db/graph";
 import { inMemoryEventLog, domainEvent, UNATTRIBUTED } from "@labkit/core-domain";
-import type { DomainEvent, EventSink, GraphChange } from "@labkit/core-domain/events";
+import type { EventSink, GraphChange, RecordedEvent } from "@labkit/core-domain/events";
 import { eventFilter } from "@labkit/core-domain/queries";
 import { pgEventLog } from "@labkit/core-domain/event-store";
 
@@ -30,8 +30,10 @@ afterEach(async () => {
   await db.close();
 });
 
-const act = (operation: string, subject: string, changes: GraphChange[]): DomainEvent =>
+let nextSeq = 1;
+const act = (operation: string, subject: string, changes: GraphChange[]): RecordedEvent =>
   domainEvent({
+    seq: nextSeq++,
     at: "2026-09-16T09:00:00.000Z",
     attribution: UNATTRIBUTED,
     operation,
@@ -41,7 +43,7 @@ const act = (operation: string, subject: string, changes: GraphChange[]): Domain
   });
 
 /** One act per position `touching` has to reach, plus one it must not. */
-const ACTS: DomainEvent[] = [
+const ACTS: RecordedEvent[] = [
   act("pose", "Q_1", []),
   act("pursue", "LOE_1", [
     { change: "NodeCreated", id: "CLM_1", label: "Claim", props: {} } as GraphChange,
@@ -125,4 +127,40 @@ test("touching reaches an edge endpoint and a property change, not only what was
   // Reached only through a property set on an edge it is an endpoint of.
   expect(await sequenceOf(durable, "CRIT_1")).toEqual(["evaluateCriterion CEVAL_2"]);
   expect(await sequenceOf(durable, "GATE_1")).toEqual(["evaluateCriterion CEVAL_2"]);
+});
+
+test("both sinks stamp the act's number into the same places", async () => {
+  const ctx = await resolveTenantContext(db, db.tx, "placeholders");
+  new TenantGraph(ctx, db, db.tx);
+
+  // One act creating a question and an enquiry, wiring them together, staged the way a verb
+  // stages it: placeholders, because the number does not exist yet.
+  const staged = domainEvent({
+    at: "2026-09-19T00:00:00.000Z",
+    attribution: UNATTRIBUTED,
+    operation: "openEnquiry",
+    subject: "{{LOE}}",
+    command: {} as never,
+    changes: [
+      { change: "NodeCreated", id: "{{Q}}", label: "Question", props: {} },
+      { change: "NodeCreated", id: "{{LOE}}", label: "LineOfEnquiry", props: {} },
+      { change: "EdgeCreated", from: "{{Q}}", label: "MOTIVATES", to: "{{LOE}}" },
+    ] as GraphChange[],
+  });
+
+  const stamped = (e: RecordedEvent) => ({
+    subject: e.subject,
+    changes: e.changes,
+  });
+
+  const durable = await pgEventLog(db, ctx).record(staged);
+  const inMemory = await inMemoryEventLog().record(staged);
+
+  // Different numbers -- the database counts a workspace's acts, the in-memory sink counts
+  // its own -- so each is compared against its own, and against the other once renumbered.
+  expect(stamped(durable)).toEqual(
+    JSON.parse(JSON.stringify(stamped(inMemory)).replaceAll(`_${inMemory.seq}`, `_${durable.seq}`)),
+  );
+  expect(JSON.stringify(stamped(durable))).not.toContain("{{");
+  expect(durable.subject).toBe(`LOE_${durable.seq}`);
 });
