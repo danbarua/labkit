@@ -60,6 +60,15 @@ interface Step {
 
 const scripts: Record<string, string> = JSON.parse(readFileSync("package.json", "utf8")).scripts;
 
+/**
+ * Where the suite writes its machine-readable result.
+ *
+ * Under the repository rather than a temp directory, because a build that
+ * uploads artefacts should be able to find it without being told where to
+ * look. It is gitignored.
+ */
+const JUNIT = "junit.xml";
+
 /** The script file a `check:*` command runs, for `summaryOf` to read. */
 const fileFor = (name: string): string | undefined =>
   scripts[name]?.split(/\s+/).find((token) => token.startsWith("scripts/"));
@@ -104,7 +113,15 @@ export function stepsFor(): Step[] {
     // went on failing at bun's default ceiling with the flag apparently set. Two
     // definitions of one step is exactly the shape this file exists to avoid;
     // every other step below already goes through `bun run`.
-    { name: "test", argv: ["bun", "run", "test"], says: "Every test in the suite." },
+    {
+      name: "test",
+      // `--` so the flags reach `bun test` rather than `bun run`. The JUnit
+      // file is what `digestOf` reads for a failure's Expected and Received:
+      // the console reporter prints those beside the failure, hundreds of
+      // lines above the summary, and a build log is read from the bottom.
+      argv: ["bun", "run", "test", "--", "--reporter=junit", `--reporter-outfile=${JUNIT}`],
+      says: "Every test in the suite.",
+    },
     {
       name: "typecheck",
       argv: ["bun", "run", "typecheck"],
@@ -215,6 +232,56 @@ export async function runSteps(steps: Step[]): Promise<number> {
  * `tsc` and dependency-cruiser emit. A step that matches none falls back to its
  * last few lines, which is worse than a real match and better than nothing.
  */
+/** Turns bun's XML escapes back into text a person reads. */
+const unescapeXml = (text: string): string =>
+  text
+    .replace(/&#10;/g, "\n  ")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+
+/**
+ * The failing tests and why, from the suite's own JUnit output.
+ *
+ * bun's console reporter prints `Expected:` and `Received:` beside the
+ * failure, which in a build log is hundreds of lines above the summary — and
+ * a build log is read from the bottom. The XML carries the same text attached
+ * to the test it belongs to.
+ *
+ * Regex rather than an XML parser: the shape is bun's own, and a dependency
+ * for one file is the wrong trade. A shape it does not match yields nothing,
+ * and the caller falls back to the console lines.
+ */
+function failuresFromJunit(): string[] {
+  let xml: string;
+  try {
+    xml = readFileSync(JUNIT, "utf8");
+  } catch {
+    return [];
+  }
+  // Split rather than match a pair of tags: a passing test is written
+  // `<testcase … />` with no closing tag, so a `<testcase>…</testcase>`
+  // pattern spans every passing test between two failures and reports the
+  // wrong file and name against the right message.
+  const out: string[] = [];
+  for (const chunk of xml.split("<testcase").slice(1)) {
+    const head = chunk.slice(0, chunk.indexOf(">"));
+    const body = chunk.slice(chunk.indexOf(">"));
+    if (
+      !body.startsWith(">") ||
+      !body.slice(0, body.indexOf("</testcase>") + 1).includes("<failure")
+    )
+      continue;
+    const name = /name="([^"]*)"/.exec(head)?.[1];
+    const file = /file="([^"]*)"/.exec(head)?.[1];
+    const message = /<failure[^>]*message="([^"]*)"/.exec(body)?.[1];
+    out.push(`${file ? `${file} > ` : ""}${unescapeXml(name ?? "(unnamed)")}`);
+    if (message) out.push(`  ${unescapeXml(message).trimEnd()}`);
+  }
+  return out;
+}
+
 function digestOf(lines: string[]): string[] {
   const patterns = [
     /^\(fail\)/, // bun test
@@ -266,7 +333,10 @@ function report(results: Result[]): number {
     // and the point is to stop someone scrolling, not to reproduce the run.
     const CAP = 20;
     for (const f of failed) {
-      const digest = digestOf(f.lines);
+      // The suite's own structured output where there is one; the console
+      // lines for every other step, which have none.
+      const fromXml = f.name.startsWith("test") ? failuresFromJunit() : [];
+      const digest = fromXml.length > 0 ? fromXml : digestOf(f.lines);
       console.log(`\n${f.name}:`);
       for (const line of digest.slice(0, CAP)) console.log(`  ${line.trimEnd()}`);
       if (digest.length > CAP) console.log(`  … and ${digest.length - CAP} more`);

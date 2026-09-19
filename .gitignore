@@ -78,3 +78,5 @@ local:/
 # application_default_credentials.json -- a live refresh token. Never commit.
 .gcloud/
 .envrc
+# Written by `bun run check`; read back by its own failure digest.
+junit.xml
