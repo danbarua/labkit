@@ -126,7 +126,7 @@ export function stepsFor(): Step[] {
       .filter((name) => name.startsWith("check:"))
       // `check:quick` is a composite of the others, not a check. Running it
       // here would run this derivation again, from inside itself.
-      .filter((name) => name !== "check:quick")
+      .filter((name) => name !== "check:quick" && name !== "check:changed")
       .sort()
       .map((name) => {
         const file = fileFor(name);

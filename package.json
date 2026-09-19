@@ -2,7 +2,7 @@
 	"name": "labkit",
 	"description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
 	"license": "MIT",
-	"version": "0.7.453",
+	"version": "0.7.454",
 	"main": "packages/core-domain/entry.ts",
 	"type": "module",
 	"bin": {
@@ -49,7 +49,8 @@
 		"ports": "bash scripts/worktree-ports.sh",
 		"bonsai:record": "bash scripts/build-bonsai-record.sh",
 		"check:quick": "bun scripts/check-quick.ts",
-		"check:web-types": "bun scripts/check-web-types.ts"
+		"check:web-types": "bun scripts/check-web-types.ts",
+		"check:changed": "bun scripts/check-changed.ts"
 	},
 	"private": true,
 	"devDependencies": {
