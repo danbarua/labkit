@@ -13,7 +13,10 @@ const API_PATHS = /^\/(graph|collections|workspace|docs|sitemap\.xml|\.well-know
 
 const api = { target: `http://127.0.0.1:${apiPort}` };
 
-export default defineConfig({
+export default defineConfig(({ command, isPreview }) => ({
+  // The browser app is served under /app. Dev keeps Vite's own paths at the root, so only the
+  // bundle is built for it, and the preview of that bundle serves it from the same place.
+  base: command === "build" || isPreview ? "/app/" : "/",
   // The router plugin writes `src/routeTree.gen.ts` from `src/routes`, and must come before react().
   plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), labkitDev()],
   resolve: {
@@ -36,4 +39,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

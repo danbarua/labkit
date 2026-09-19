@@ -30,6 +30,8 @@ Neighbor queries filter `n.retracted IS NULL AND m.retracted IS NULL`. Unlabelle
 
 `LABKIT_DB_URL=… bun run test` from here. Each run creates its own database on that server, seeds two workspaces, and drops it afterwards. Without the variable the suite skips, and reports it as skipped.
 
+`LABKIT_DB_URL=… bun run e2e` drives the browser app in Chrome. `e2e/stack.ts` builds the same kind of database, starts the API and Vite, builds the app and previews it, and the tests run against both the dev server and the built bundle. A run killed hard can leave a `labkit_web_test_*` database behind. The specs are named `*.e2e.ts` so `bun test` does not pick them up.
+
 ## Do not
 
 - Use `MERGE` for edges. AGE can create an edge with `start_id` and `end_id` both 0. Ingest uses MATCH then CREATE.

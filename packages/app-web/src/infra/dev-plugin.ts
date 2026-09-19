@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { Plugin, ViteDevServer } from "vite";
+import type { Connect, Logger, Plugin, ViteDevServer } from "vite";
 import { LABKIT_PG_URL } from "./postgres";
 
 /** The router's base path. Everything the browser app serves lives under it. */
@@ -11,11 +11,14 @@ function isApp(pathname: string): boolean {
   return pathname === APP_BASE || pathname.startsWith(`${APP_BASE}/`);
 }
 
+/** The HTML the browser app is served as, for a request path. */
+type Page = (url: string, originalUrl: string | undefined) => Promise<string>;
+
 // Runs after Vite's own middlewares, so anything that reaches it is neither a module, an asset
 // nor a proxied API path. The browser app answers under `/app`, and `/` sends a browser there;
 // every other path is a 404 rather than index.html.
-function serveAppOrNotFound(server: ViteDevServer): void {
-  server.middlewares.use(async (req, res, next) => {
+function appOrNotFound(logger: Logger, page: Page): Connect.NextHandleFunction {
+  return async (req, res, next) => {
     try {
       const pathname = (req.url ?? "/").split("?")[0] ?? "/";
       const isRead = req.method === "GET" || req.method === "HEAD";
@@ -26,14 +29,12 @@ function serveAppOrNotFound(server: ViteDevServer): void {
         return;
       }
       if (isRead && isApp(pathname)) {
-        const raw = await readFile(path.join(server.config.root, "index.html"), "utf8");
-        const html = await server.transformIndexHtml(req.url ?? "/", raw, req.originalUrl);
         res.statusCode = 200;
         res.setHeader("content-type", "text/html");
-        res.end(html);
+        res.end(await page(req.url ?? "/", req.originalUrl));
         return;
       }
-      server.config.logger.warn(`${req.method ?? "GET"} ${pathname} 404`);
+      logger.warn(`${req.method ?? "GET"} ${pathname} 404`);
       res.statusCode = 404;
       res.setHeader("content-type", "application/problem+json");
       res.end(
@@ -47,7 +48,28 @@ function serveAppOrNotFound(server: ViteDevServer): void {
     } catch (err) {
       next(err);
     }
-  });
+  };
+}
+
+// `vite preview` takes the base off the path before this runs, and answers `/` and anything outside
+// the base itself, so every path that arrives is inside the app. It also runs this before serving
+// the built files, so a path with a file extension is left for it.
+function previewPage(page: Page): Connect.NextHandleFunction {
+  return async (req, res, next) => {
+    try {
+      const pathname = (req.url ?? "/").split("?")[0] ?? "/";
+      const isRead = req.method === "GET" || req.method === "HEAD";
+      if (!isRead || path.extname(pathname) !== "") {
+        next();
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader("content-type", "text/html");
+      res.end(await page(req.url ?? "/", req.originalUrl));
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 export function labkitDev(): Plugin {
@@ -62,7 +84,17 @@ export function labkitDev(): Plugin {
         printUrls();
         announceServices(server);
       };
-      return () => serveAppOrNotFound(server);
+      const page: Page = async (url, originalUrl) => {
+        const raw = await readFile(path.join(server.config.root, "index.html"), "utf8");
+        return server.transformIndexHtml(url, raw, originalUrl);
+      };
+      return () => server.middlewares.use(appOrNotFound(server.config.logger, page));
+    },
+    // The built bundle is served the same way, so what `vite preview` shows is what would ship.
+    configurePreviewServer(server) {
+      const built = path.resolve(server.config.root, server.config.build.outDir, "index.html");
+      const page: Page = () => readFile(built, "utf8");
+      return () => server.middlewares.use(previewPage(page));
     },
   };
 }

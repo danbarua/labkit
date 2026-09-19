@@ -12,6 +12,7 @@
     "db:down": "bash scripts/compose.sh stop db",
     "build": "vite build",
     "test": "bun test --timeout 60000",
+    "e2e": "playwright test",
     "ports": "bash scripts/worktree-ports.sh",
     "check:format": "biome format .",
     "check:lint": "biome lint .",
