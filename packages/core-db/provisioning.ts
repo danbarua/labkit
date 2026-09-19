@@ -269,6 +269,10 @@ class TenantGraphProvisioner {
   /**
    * Hides a retracted node from `labkit_app` — the compensating act `undo` writes stands in the
    * record, and this is what stops it being traversed.
+   *
+   * `retracted` is a key inside the agtype `properties` column, not a column. AGE creates
+   * these tables as the provisioning role, so `postgres` owns them and bypasses this.
+   * `_ag_label_vertex` has no policy and shows retracted rows to any reader.
    */
   private async ensureRetractionPolicy(label: NodeLabel, existing: Set<string>): Promise<void> {
     const policyName = `${label.toLowerCase()}_hide_retracted`;

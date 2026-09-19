@@ -101,6 +101,12 @@ remove. This is a convention rather than a check, because a check that reads
 other checks is the shape being retired — and every existing one carries the
 line, so a new one without it is the odd case rather than the normal one.
 
+## Environment variables
+
+`docs/environment.md` lists every one, what it does and its default. The one that
+catches people: `LABKIT_DB_URL` is read before `--db`, so setting it makes the flag
+silently void.
+
 ## Platform traps
 
 These cost real debugging time. Load the skill before you need it, not after:
