@@ -28,10 +28,10 @@
     "noPropertyAccessFromIndexSignature": false
   },
 
-  // `web/` is its own project with its own `tsconfig.json`, and it needs the
+  // `packages/app-web` is its own project with its own `tsconfig.json`, and it needs the
   // DOM lib and JSX that this one does not. Without this, `bun run typecheck`
-  // compiles `web/src/main.tsx` under the CLI's compiler options and reports
+  // compiles `packages/app-web/src/main.tsx` under the CLI's compiler options and reports
   // `Cannot find name 'document'` — a failure of where the file was read, not
   // of the file.
-  "exclude": ["web"]
+  "exclude": ["packages/app-web"]
 }

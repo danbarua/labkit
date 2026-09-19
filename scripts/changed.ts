@@ -112,7 +112,6 @@ export function changedPackages(base: string): Set<string> | null {
     if (TREE_WIDE.some((p) => file === p || file.startsWith(p))) return null;
     const m = /^packages\/([a-z-]+)\//.exec(file);
     if (m) packages.add(m[1] as string);
-    else if (file.startsWith("web/")) packages.add("web");
     else if (file.startsWith("tests/")) continue;
     else return null;
   }

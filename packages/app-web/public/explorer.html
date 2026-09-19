@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trace Console (live) — labkit-central.framesift.ai</title>
+<style>
+  :root{
+    --ink:#0a0f1c;
+    --panel:#10182b;
+    --panel-2:#0d1424;
+    --line:#22304a;
+    --text:#e2e8f5;
+    --text-dim:#8592b0;
+    --text-faint:#5a6785;
+    --accent:#5eead4;
+    --accent-dim:rgba(94,234,212,0.14);
+    --danger:#ef4444;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --c-question:#a78bfa;
+    --c-lineofenquiry:#7c9bf5;
+    --c-decision:#f0a13a;
+    --c-evidence:#38bdf8;
+    --c-evidenceunit:#2dd4bf;
+    --c-computation:#4ade80;
+    --c-artefact:#94a3b8;
+    --c-claim:#fb7185;
+    --c-criterion:#d946ef;
+    --c-criterionevaluation:#f472b6;
+    --c-gate:#ef4444;
+    --c-task:#34d399;
+    --c-review:#eab308;
+    --c-note:#fda4af;
+    --c-workspace:#a3e635;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --ink:#f5f7fb; --panel:#ffffff; --panel-2:#eef1f8; --line:#d7deeb;
+      --text:#16213a; --text-dim:#51617f; --text-faint:#8896b3;
+      --accent:#0d9488; --accent-dim:rgba(13,148,136,0.10);
+    }
+  }
+  :root[data-theme="light"]{
+    --ink:#f5f7fb; --panel:#ffffff; --panel-2:#eef1f8; --line:#d7deeb;
+    --text:#16213a; --text-dim:#51617f; --text-faint:#8896b3;
+    --accent:#0d9488; --accent-dim:rgba(13,148,136,0.10);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--ink); color:var(--text); font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased; font-size:14px; line-height:1.5;
+  }
+  button, input{ font-family:inherit; font-size:inherit; color:inherit; }
+  button{ cursor:pointer; }
+  a{ color:inherit; }
+  ::selection{ background:var(--accent-dim); }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+
+  .mono{ font-family:var(--font-mono); }
+  .dim{ color:var(--text-dim); }
+  .faint{ color:var(--text-faint); }
+
+  .app{ display:flex; flex-direction:column; height:100vh; }
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    flex:0 0 auto; display:flex; align-items:center; gap:14px;
+    padding:0 16px; height:52px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .brand{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
+  .brand-dot{
+    width:8px; height:8px; border-radius:50%; background:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-dim);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+  .brand-name{ font-weight:600; letter-spacing:0.01em; }
+  .brand-sub{ font-size:12px; color:var(--text-dim); }
+
+  .hamburger{
+    display:none; background:none; border:1px solid var(--line); border-radius:6px;
+    width:32px; height:32px; align-items:center; justify-content:center; color:var(--text);
+  }
+
+  .nav-controls{ display:flex; align-items:center; gap:4px; }
+  .nav-btn{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    color:var(--text); font-size:14px;
+  }
+  .nav-btn:disabled{ opacity:.35; cursor:default; }
+  .nav-btn:not(:disabled):hover{ border-color:var(--accent); color:var(--accent); }
+
+  .breadcrumb{
+    flex:1 1 auto; min-width:0; overflow-x:auto; white-space:nowrap;
+    display:flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:12.5px;
+    padding:4px 0; scrollbar-width:thin;
+  }
+  .crumb{
+    color:var(--text-dim); background:none; border:none; padding:3px 6px; border-radius:5px;
+  }
+  .crumb:hover{ color:var(--text); background:var(--panel-2); }
+  .crumb.current{ color:var(--accent); }
+  .crumb-sep{ color:var(--text-faint); }
+
+  .search-wrap{ position:relative; flex:0 0 220px; }
+  .search-wrap input{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:7px;
+    padding:6px 10px 6px 28px; color:var(--text);
+  }
+  .search-wrap input::placeholder{ color:var(--text-faint); }
+  .search-wrap .icon{ position:absolute; left:8px; top:50%; transform:translateY(-50%); color:var(--text-faint); font-size:12px; }
+
+  .theme-btn{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
+    padding:5px 9px; font-size:12px; color:var(--text-dim);
+  }
+  .theme-btn:hover{ color:var(--text); border-color:var(--accent); }
+
+  /* ---------- body layout ---------- */
+  .body{ flex:1 1 auto; display:flex; min-height:0; }
+
+  .sidebar{
+    flex:0 0 288px; border-right:1px solid var(--line); background:var(--panel);
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .sidebar-section{ padding:12px 14px; border-bottom:1px solid var(--line); }
+  .sidebar-section.grow{ flex:1 1 auto; overflow-y:auto; padding-bottom:6px; }
+  .section-label{ font-size:11.5px; color:var(--text-dim); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
+  .section-label .count{ color:var(--text-faint); }
+
+  .type-list{ display:flex; flex-direction:column; gap:2px; }
+  .type-row{
+    display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:6px;
+    background:none; border:1px solid transparent; width:100%; text-align:left;
+  }
+  .type-row:hover{ background:var(--panel-2); }
+  .type-row.active{ background:var(--accent-dim); border-color:var(--accent); }
+  .type-swatch{ width:9px; height:9px; border-radius:2px; flex:0 0 auto; }
+  .type-row .tname{ flex:1 1 auto; font-size:12.5px; }
+  .type-row .tcount{ font-size:11.5px; color:var(--text-faint); font-family:var(--font-mono); }
+
+  .res-list{ display:flex; flex-direction:column; }
+  .res-item{
+    display:flex; align-items:flex-start; gap:8px; padding:7px 8px; border-radius:6px;
+    background:none; border:1px solid transparent; width:100%; text-align:left; cursor:pointer;
+  }
+  .res-item:hover{ background:var(--panel-2); }
+  .res-item.active{ background:var(--accent-dim); border-color:var(--accent); }
+  .res-item .badge{ margin-top:1px; }
+  .res-item .rtext{ min-width:0; }
+  .res-item .rid{ font-family:var(--font-mono); font-size:12px; color:var(--text); }
+  .res-item .rlabel{
+    font-size:11.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .empty-note{ color:var(--text-faint); font-size:12.5px; padding:10px 4px; }
+
+  /* ---------- badges ---------- */
+  .badge{
+    display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-mono);
+    font-size:10.5px; font-weight:600; border-radius:4px; padding:2px 5px; line-height:1.3;
+    color:var(--ink); flex:0 0 auto;
+  }
+  .pill{
+    display:inline-flex; align-items:center; gap:5px; font-size:11px; border-radius:20px;
+    padding:2px 9px; border:1px solid var(--line); color:var(--text-dim);
+  }
+  .pill.outcome-pass{ color:#22c55e; border-color:#22c55e55; }
+  .pill.outcome-fail{ color:#ef4444; border-color:#ef444455; }
+  .pill.kind-confirmatory{ color:#38bdf8; border-color:#38bdf855; }
+  .pill.kind-exploratory{ color:#f0a13a; border-color:#f0a13a55; }
+
+  /* ---------- main / detail ---------- */
+  .main{ flex:1 1 auto; overflow-y:auto; min-width:0; }
+  .detail{ max-width:920px; margin:0 auto; padding:28px 28px 80px; }
+
+  .detail-header{ margin-bottom:22px; }
+  .header-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .header-top .badge{ font-size:12px; padding:3px 7px; }
+  .header-id{ font-family:var(--font-mono); font-size:20px; font-weight:600; }
+  .header-type{ font-size:12.5px; color:var(--text-dim); }
+  .header-label{ font-size:15.5px; color:var(--text); max-width:74ch; margin:0 0 10px; }
+  .header-pills{ display:flex; gap:8px; flex-wrap:wrap; }
+
+  .toolbar{ display:flex; gap:8px; margin-top:14px; }
+  .tbtn{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:7px;
+    padding:6px 11px; font-size:12.5px; color:var(--text-dim);
+  }
+  .tbtn:hover{ color:var(--text); border-color:var(--accent); }
+  .tbtn.on{ color:var(--accent); border-color:var(--accent); background:var(--accent-dim); }
+
+  .panel{ border:1px solid var(--line); border-radius:9px; background:var(--panel); margin-bottom:18px; overflow:hidden; }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; border-bottom:1px solid var(--line); font-size:12px; color:var(--text-dim);
+  }
+  .panel-body{ padding:4px 14px; }
+
+  .kv{ display:flex; padding:9px 0; border-bottom:1px solid var(--line); gap:16px; }
+  .kv:last-child{ border-bottom:none; }
+  .kv .k{ flex:0 0 168px; font-family:var(--font-mono); font-size:12px; color:var(--text-dim); padding-top:1px; }
+  .kv .v{ flex:1 1 auto; min-width:0; font-size:13.5px; word-break:break-word; }
+  .kv .v.mono{ font-size:12.5px; }
+
+  .rel-group{ padding:10px 0; border-bottom:1px solid var(--line); }
+  .rel-group:last-child{ border-bottom:none; }
+  .rel-key{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .rel-arrow{ color:var(--text-faint); }
+  .rel-chips{ display:flex; flex-direction:column; gap:5px; }
+  .rel-chip{
+    display:flex; align-items:center; gap:8px; padding:6px 9px; border:1px solid var(--line);
+    border-radius:7px; background:var(--panel-2); text-align:left; width:100%;
+  }
+  .rel-chip:hover{ border-color:var(--accent); }
+  .rel-chip .cid{ font-family:var(--font-mono); font-size:12px; flex:0 0 auto; }
+  .rel-chip .clabel{ font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rel-chip.unresolved{ border-style:dashed; }
+  .rel-chip.unresolved .clabel{ font-style:italic; color:var(--text-faint); }
+  .rel-chip.unresolved .badge{ opacity:.6; }
+
+  .res-item.unresolved .rlabel{ font-style:italic; }
+  .res-item.unresolved .badge{ opacity:.55; }
+
+  .fetchbar{ display:flex; align-items:center; gap:10px; padding:14px 0; color:var(--text-dim); font-size:13px; }
+  .spinner{
+    width:14px; height:14px; border-radius:50%; flex:0 0 auto;
+    border:2px solid var(--line); border-top-color:var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .empty-panel{ padding:16px 0; color:var(--text-faint); font-size:12.5px; }
+
+  pre.jsonview{
+    margin:0; padding:12px 14px; overflow-x:auto; font-family:var(--font-mono); font-size:12px;
+    color:var(--text-dim); background:var(--panel-2); border-top:1px solid var(--line);
+  }
+  pre.jsonview .k{ color:var(--c-lineofenquiry); }
+  pre.jsonview .s{ color:var(--c-evidenceunit); }
+  pre.jsonview .n{ color:var(--c-decision); }
+
+  .about{ font-size:12.5px; color:var(--text-dim); }
+  .about p{ margin:0 0 8px; max-width:74ch; }
+  .about p:last-child{ margin-bottom:0; }
+  .legend-row{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+  .legend-row .rel-arrow{ font-family:var(--font-mono); }
+
+  .stats-strip{
+    display:flex; gap:18px; padding:9px 14px; border-top:1px solid var(--line);
+    font-size:11.5px; color:var(--text-faint); flex-wrap:wrap;
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:1180px){
+    #hamburger-right{ display:flex; }
+    .relations-col{
+      position:fixed; z-index:20; top:52px; right:0; bottom:0; width:300px;
+      transform:translateX(100%); transition:transform .18s ease; box-shadow:-2px 0 16px rgba(0,0,0,.35);
+    }
+    .relations-col.open{ transform:translateX(0); }
+  }
+  @media (max-width:860px){
+    .search-wrap{ display:none; }
+    .hamburger{ display:flex; }
+    .sidebar{
+      position:fixed; z-index:20; top:52px; left:0; bottom:0; width:288px;
+      transform:translateX(-100%); transition:transform .18s ease; box-shadow:2px 0 16px rgba(0,0,0,.35);
+    }
+    .sidebar.open{ transform:translateX(0); }
+    .detail{ padding:20px 16px 60px; }
+    .kv{ flex-direction:column; gap:2px; }
+    .kv .k{ flex:none; }
+  }
+
+  .fetch-error{
+    border:1px solid var(--danger); border-radius:8px; padding:12px 14px; margin-bottom:14px;
+    background:rgba(239,68,68,0.08); font-size:12.5px; color:var(--text);
+  }
+  .fetch-error .title{ color:var(--danger); font-weight:600; margin-bottom:4px; }
+
+  .relations-col{
+    flex:0 0 300px; border-left:1px solid var(--line); background:var(--panel);
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .relations-col .panel-body{ padding:4px 0; }
+  .scrim{ display:none; position:fixed; inset:52px 0 0 0; background:rgba(0,0,0,.4); z-index:19; }
+  .scrim.open{ display:block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <button class="hamburger" id="hamburger" aria-label="Toggle collections column">☰</button>
+    <div class="brand">
+      <span class="brand-dot" aria-hidden="true"></span>
+      <span class="brand-name">Trace Console</span>
+      <span class="brand-sub">live · labkit-central.framesift.ai</span>
+    </div>
+    <div class="nav-controls">
+      <button class="nav-btn" id="btn-back" aria-label="Back">‹</button>
+      <button class="nav-btn" id="btn-fwd" aria-label="Forward">›</button>
+    </div>
+    <nav class="breadcrumb" id="breadcrumb" aria-label="Navigation history"></nav>
+    <div class="search-wrap">
+      <span class="icon">⌕</span>
+      <input id="search" type="text" placeholder="Filter…" autocomplete="off" />
+    </div>
+    <button class="theme-btn" id="theme-toggle">Light mode</button>
+    <button class="hamburger" id="hamburger-right" aria-label="Toggle relations column">⇆</button>
+  </header>
+
+  <div class="body">
+    <div class="scrim" id="scrim"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="section-label">Collections<span class="count" id="type-total-count"></span></div>
+        <div class="type-list" id="type-list"></div>
+      </div>
+      <div class="sidebar-section grow">
+        <div class="section-label">Items<span class="count" id="index-count"></span></div>
+        <div class="res-list" id="res-list"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="detail" id="detail"></div>
+    </main>
+
+    <aside class="relations-col" id="relations-col">
+      <div class="sidebar-section">
+        <div class="section-label">Outgoing relations<span class="count" id="out-count"></span></div>
+        <div class="panel-body" id="out-rel-body"></div>
+      </div>
+      <div class="sidebar-section grow">
+        <div class="section-label">Incoming relations<span class="count" id="in-count"></span></div>
+        <div class="panel-body" id="in-rel-body"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+
+<script>
+(function(){
+  "use strict";
+
+  var GRAPH_BASE = 'https://labkit-central.framesift.ai/graph/';
+  var COLLECTIONS_BASE = 'https://labkit-central.framesift.ai/collections';
+
+  /* ---------------- graph store (shared logic with the static console) ---------------- */
+  var resources = Object.create(null);
+  var edges = [];
+  var edgeKeys = Object.create(null);
+  var SKIP_ATTR = { id:1, type:1, dir:1, depth:1, _links:1, _embedded:1 };
+
+  function idFromHref(href){
+    if (!href) return null;
+    var m = href.match(/\/graph\/([A-Za-z0-9_]+)/);
+    return m ? m[1] : null;
+  }
+  function relVerb(key, entryType){
+    var i = key.indexOf(':');
+    if (i === -1) return key;
+    var a = key.slice(0, i), b = key.slice(i + 1);
+    var t = String(entryType || '').toLowerCase();
+    if (b.toLowerCase() === t) return a;
+    if (a.toLowerCase() === t) return b;
+    return key;
+  }
+  function ensureResource(id, type){
+    if (!resources[id]) resources[id] = { id: id, type: type, attrs: {}, resolved: false };
+    if (type && !resources[id].type) resources[id].type = type;
+    return resources[id];
+  }
+  function mergeAttrs(res, node){
+    for (var k in node){
+      if (SKIP_ATTR[k]) continue;
+      var v = node[k];
+      if (v !== null && typeof v === 'object') continue;
+      var cur = res.attrs[k];
+      if (cur === undefined || (typeof v === 'string' && typeof cur === 'string' && v.length > cur.length)){
+        res.attrs[k] = v;
+      }
+    }
+  }
+  function addEdge(parentId, otherId, rel, dir){
+    var from, to;
+    if (dir === 'out'){ from = parentId; to = otherId; }
+    else if (dir === 'in'){ from = otherId; to = parentId; }
+    else return;
+    var key = from + '|' + rel + '|' + to;
+    if (edgeKeys[key]) return;
+    edgeKeys[key] = true;
+    edges.push({ from: from, to: to, rel: rel });
+  }
+  function walk(node){
+    if (!node) return;
+    if (Array.isArray(node)){ for (var i=0;i<node.length;i++) walk(node[i]); return; }
+    if (typeof node !== 'object') return;
+    var isResource = node.type && node._links;
+    if (isResource){
+      var selfHref = node._links.self && node._links.self.href;
+      var id = node.id || idFromHref(selfHref);
+      if (id){
+        var res = ensureResource(id, node.type);
+        res.resolved = true;
+        mergeAttrs(res, node);
+        for (var rawRel in node._links){
+          if (rawRel === 'self' || rawRel === 'start') continue;
+          var val = node._links[rawRel];
+          var arr = Array.isArray(val) ? val : [val];
+          for (var j=0;j<arr.length;j++){
+            var entry = arr[j];
+            var targetId = idFromHref(entry.href);
+            if (targetId){
+              addEdge(id, targetId, relVerb(rawRel, entry.type), entry.dir);
+              ensureResource(targetId, entry.type);
+            }
+          }
+        }
+        if (node._embedded){
+          for (var rawErel in node._embedded){
+            var evArr = node._embedded[rawErel];
+            if (!Array.isArray(evArr)) evArr = [evArr];
+            for (var k2=0;k2<evArr.length;k2++){
+              var child = evArr[k2];
+              var childId = child.id || idFromHref(child._links && child._links.self && child._links.self.href);
+              if (childId) addEdge(id, childId, relVerb(rawErel, child.type), child.dir);
+              walk(child);
+            }
+          }
+        }
+        return;
+      }
+    }
+    for (var key in node){
+      if (key === '_links' || key === '_embedded') continue;
+      var v2 = node[key];
+      if (v2 && typeof v2 === 'object') walk(v2);
+    }
+  }
+
+  var outgoing = Object.create(null), incoming = Object.create(null);
+  function reindexEdges(){
+    outgoing = Object.create(null); incoming = Object.create(null);
+    edges.forEach(function(e){
+      (outgoing[e.from] = outgoing[e.from] || []).push(e);
+      (incoming[e.to] = incoming[e.to] || []).push(e);
+    });
+  }
+
+  var TYPE_ORDER = ['Question','LineOfEnquiry','Decision','Evidence','EvidenceUnit','Computation','Artefact','Claim','Criterion','CriterionEvaluation','Gate','Task','Review','Note','Workspace'];
+  var TYPE_ABBR = { Question:'Q', LineOfEnquiry:'LoE', Decision:'D', Evidence:'Ev', EvidenceUnit:'EU', Claim:'Cl', Computation:'Cp', Artefact:'Ar', Criterion:'Cr', CriterionEvaluation:'CE', Gate:'Ga', Task:'Tk', Review:'Rv', Note:'No', Workspace:'Ws' };
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  function typeClass(t){ return 'c-' + String(t).toLowerCase(); }
+  function humanRel(rel){ return rel.replace(/_/g, ' '); }
+  function fmtDate(iso){
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    var opts = { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'UTC' };
+    return d.toLocaleString('en-GB', opts) + ' UTC';
+  }
+  function isDateKey(k){ return /_at$/.test(k); }
+  function labelFor(res){
+    var a = res.attrs;
+    return a.name || a.statement || a.reason || a.verdict || a.value || a.proposition ||
+           a.method || a.logical_name || a.objective || a.consequence || '';
+  }
+  function truncate(s, n){ s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+  function badge(type){
+    return '<span class="badge" style="background:var(--' + typeClass(type) + ')">' + esc(TYPE_ABBR[type] || type.slice(0,2)) + '</span>';
+  }
+
+  /* ---------------- state ---------------- */
+  var state = { history: [], pointer: -1, currentId: null, activeType: null, search: '', rawOpen: false, loading: false, error: null };
+  var fetchToken = 0;
+  // Fixed, not user-adjustable: depth=1 (the graph API's own default when the
+  // param is omitted) only ever returns link stubs for this domain — the
+  // relationships that actually matter don't resolve until depth=2, even
+  // though the UI here only ever renders one hop of _embedded at a time.
+  var GRAPH_DEPTH = 2;
+
+  // catalog: the full list of collections the server exposes, independent of
+  // anything we've fetched into the graph — this is what makes the sidebar a
+  // directory into the whole dataset rather than a reflection of local history.
+  var catalog = [];          // [{ type, slug, href }]
+  var catalogError = null;
+  var collectionView = null; // { type, items:[{id,dataMap}], nextHref, loading, error }
+
+  function fetchCatalog(){
+    fetch(COLLECTIONS_BASE, { headers: { 'Accept': 'application/vnd.collection+json, application/json' } })
+      .then(function(resp){
+        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+        return resp.json();
+      })
+      .then(function(json){
+        var items = (json.collection && json.collection.items) || [];
+        catalog = items.map(function(it){
+          var d = {};
+          (it.data || []).forEach(function(kv){ d[kv.name] = kv.value; });
+          return { type: d.type, slug: d.slug, href: it.href };
+        }).filter(function(c){ return c.type; });
+        catalogError = null;
+        renderTypeList();
+      })
+      .catch(function(err){
+        catalogError = String(err && err.message || err);
+        renderTypeList();
+      });
+  }
+
+  function itemsFromCollectionJson(json){
+    var col = json.collection || {};
+    var items = (col.items || []).map(function(it){
+      var d = {};
+      (it.data || []).forEach(function(kv){ d[kv.name] = kv.value; });
+      var id = d.id || idFromHref(it.href);
+      return { id: id, dataMap: d, peekLinks: it.links || [] };
+    });
+    var next = null;
+    (col.links || []).forEach(function(l){ if (l.rel === 'next') next = l.href; });
+    return { items: items, nextHref: next };
+  }
+
+  function mergeCollectionAttrs(res, dataMap){
+    Object.keys(dataMap).forEach(function(k){
+      if (k === 'id' || k === 'type') return;
+      var v = dataMap[k];
+      var cur = res.attrs[k];
+      if (cur === undefined || (typeof v === 'string' && typeof cur === 'string' && v.length > cur.length)){
+        res.attrs[k] = v;
+      }
+    });
+  }
+
+  function loadCollection(type, href, append){
+    collectionView = collectionView && append ? collectionView : { type: type, items: [], nextHref: null, loading: true, error: null };
+    collectionView.type = type;
+    collectionView.loading = true;
+    collectionView.error = null;
+    renderResList();
+    fetch(href, { headers: { 'Accept': 'application/vnd.collection+json, application/json' } })
+      .then(function(resp){
+        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+        return resp.json();
+      })
+      .then(function(json){
+        var parsed = itemsFromCollectionJson(json);
+        parsed.items.forEach(function(it){
+          if (!it.id) return;
+          var res = ensureResource(it.id, it.dataMap.type || type);
+          mergeCollectionAttrs(res, it.dataMap);
+        });
+        collectionView.items = append ? collectionView.items.concat(parsed.items) : parsed.items;
+        collectionView.nextHref = parsed.nextHref;
+        collectionView.loading = false;
+        renderTypeList();
+        renderResList();
+      })
+      .catch(function(err){
+        collectionView.loading = false;
+        collectionView.error = String(err && err.message || err);
+        renderResList();
+      });
+  }
+
+  function fetchResource(id){
+    var url = GRAPH_BASE + id + '?depth=' + GRAPH_DEPTH;
+    var myToken = ++fetchToken;
+    state.loading = true; state.error = null;
+    render();
+    fetch(url, { headers: { 'Accept': 'application/hal+json, application/json' } })
+      .then(function(resp){
+        if (myToken !== fetchToken) return null;
+        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+        return resp.json();
+      })
+      .then(function(json){
+        if (myToken !== fetchToken || json === null) return;
+        walk(json);
+        reindexEdges();
+        state.loading = false;
+        state.currentId = id;
+        render();
+      })
+      .catch(function(err){
+        if (myToken !== fetchToken) return;
+        state.loading = false;
+        state.error = String(err && err.message || err);
+        render();
+      });
+  }
+
+  function navigate(id, push){
+    if (push !== false){
+      state.history = state.history.slice(0, state.pointer + 1);
+      state.history.push(id);
+      state.pointer = state.history.length - 1;
+    }
+    state.currentId = id;
+    state.rawOpen = false;
+    var res = resources[id];
+    if (res && res.resolved){
+      state.loading = false; state.error = null;
+      render();
+      return;
+    }
+    fetchResource(id);
+  }
+  function goBack(){ if (state.pointer > 0){ state.pointer--; navigate(state.history[state.pointer], false); } }
+  function goFwd(){ if (state.pointer < state.history.length - 1){ state.pointer++; navigate(state.history[state.pointer], false); } }
+
+  /* ---------------- sidebar ---------------- */
+  var typeListEl = document.getElementById('type-list');
+  var typeTotalEl = document.getElementById('type-total-count');
+  var resListEl = document.getElementById('res-list');
+  var indexCountEl = document.getElementById('index-count');
+
+  function renderTypeList(){
+    typeTotalEl.textContent = catalog.length ? catalog.length : '';
+
+    if (catalogError){
+      typeListEl.innerHTML = '<div class="empty-note">Couldn\'t load /collections: ' + esc(catalogError) + '</div>';
+      return;
+    }
+    if (!catalog.length){
+      typeListEl.innerHTML = '<div class="empty-note">Loading collections…</div>';
+      return;
+    }
+    var term = state.activeType ? '' : state.search.trim().toLowerCase();
+    var html = '';
+    catalog.forEach(function(c){
+      var t = c.type;
+      if (term && t.toLowerCase().indexOf(term) === -1 && c.slug.toLowerCase().indexOf(term) === -1) return;
+      var active = state.activeType === t ? ' active' : '';
+      html += '<button class="type-row' + active + '" data-type="' + esc(t) + '" data-href="' + esc(c.href) + '" title="' + esc(c.href) + '">' +
+        '<span class="type-swatch" style="background:var(--' + typeClass(t) + ')"></span>' +
+        '<span class="tname">' + esc(t) + '</span>' +
+      '</button>';
+    });
+    typeListEl.innerHTML = html || '<div class="empty-note">No matching collection.</div>';
+  }
+
+  function renderResList(){
+    var term = state.search.trim().toLowerCase();
+
+    if (!state.activeType || !collectionView){
+      indexCountEl.textContent = '';
+      resListEl.innerHTML = '<div class="empty-note">Pick a type above to browse its items from /collections.</div>';
+      return;
+    }
+
+    var items = collectionView.items.filter(function(it){
+      if (!term) return true;
+      var lbl = (it.dataMap.name || it.dataMap.value || '').toLowerCase();
+      return (it.id||'').toLowerCase().indexOf(term) !== -1 || lbl.indexOf(term) !== -1;
+    });
+    indexCountEl.textContent = items.length + (collectionView.nextHref ? '+' : '');
+    var html = '';
+    if (collectionView.error){
+      html += '<div class="empty-note">Fetch failed: ' + esc(collectionView.error) + '</div>';
+    }
+    if (!items.length && !collectionView.loading && !collectionView.error){
+      html += '<div class="empty-note">No ' + esc(state.activeType) + ' items on the server.</div>';
+    }
+    items.forEach(function(it){
+      var id = it.id;
+      var r = resources[id];
+      var active = id === state.currentId ? ' active' : '';
+      var resolvedCls = (r && r.resolved) ? '' : ' unresolved';
+      var lbl = truncate(it.dataMap.name || it.dataMap.value || (r ? labelFor(r) : '') || '—', 64);
+      html += '<button class="res-item' + active + resolvedCls + '" data-nav="' + esc(id) + '">' +
+        badge(state.activeType) +
+        '<span class="rtext"><span class="rid">' + esc(id) + '</span><br>' +
+        '<span class="rlabel">' + esc(lbl) + '</span></span>' +
+      '</button>';
+    });
+    if (collectionView.loading){
+      html += '<div class="fetchbar"><span class="spinner" aria-hidden="true"></span>loading ' + esc(state.activeType) + '…</div>';
+    } else if (collectionView.nextHref){
+      html += '<button class="tbtn" id="load-more-btn" style="margin-top:6px;width:100%;">Load more</button>';
+    }
+    resListEl.innerHTML = html;
+  }
+
+  /* ---------------- breadcrumb ---------------- */
+  var breadcrumbEl = document.getElementById('breadcrumb');
+  function renderBreadcrumb(){
+    var html = '';
+    state.history.forEach(function(id, i){
+      if (i > 0) html += '<span class="crumb-sep">›</span>';
+      var cur = i === state.pointer ? ' current' : '';
+      html += '<button class="crumb' + cur + '" data-hist="' + i + '">' + esc(id) + '</button>';
+    });
+    breadcrumbEl.innerHTML = html;
+    breadcrumbEl.scrollLeft = breadcrumbEl.scrollWidth;
+    document.getElementById('btn-back').disabled = state.pointer <= 0;
+    document.getElementById('btn-fwd').disabled = state.pointer >= state.history.length - 1;
+  }
+
+  /* ---------------- detail ---------------- */
+  var detailEl = document.getElementById('detail');
+
+  function renderRelGroup(list, arrowLeft){
+    if (!list || !list.length) return '<div class="empty-panel">None recorded.</div>';
+    var byRel = {};
+    list.forEach(function(e){ (byRel[e.rel] = byRel[e.rel] || []).push(e); });
+    var html = '';
+    Object.keys(byRel).sort().forEach(function(rel){
+      html += '<div class="rel-group"><div class="rel-key"><span class="rel-arrow">' + (arrowLeft ? '←' : '→') + '</span>' + esc(humanRel(rel)) + '</div><div class="rel-chips">';
+      byRel[rel].forEach(function(e){
+        var otherId = arrowLeft ? e.from : e.to;
+        var r = resources[otherId];
+        var cls = (r && r.resolved) ? '' : ' unresolved';
+        var tail = (r && r.resolved)
+          ? esc(truncate(labelFor(r) || r.type, 70))
+          : 'not yet fetched — GET /graph/' + esc(otherId) + '?depth=' + GRAPH_DEPTH;
+        html += '<button class="rel-chip' + cls + '" data-nav="' + esc(otherId) + '">' + badge(r ? r.type : '?') +
+          '<span class="cid mono">' + esc(otherId) + '</span>' +
+          '<span class="clabel">' + tail + '</span></button>';
+      });
+      html += '</div></div>';
+    });
+    return html;
+  }
+
+  function jsonHighlight(obj){
+    var s = esc(JSON.stringify(obj, null, 2));
+    s = s.replace(/"([^"]+)":/g, '<span class="k">"$1"</span>:');
+    s = s.replace(/: "([^"]*)"/g, ': <span class="s">"$1"</span>');
+    s = s.replace(/: (-?\d+(\.\d+)?)/g, ': <span class="n">$1</span>');
+    return s;
+  }
+
+  function renderDetail(){
+    var id = state.currentId;
+
+    if (!id){
+      detailEl.innerHTML = '<div class="empty-panel" style="padding-top:8px;">Pick a type on the left, then an item, to open it here.</div>';
+      return;
+    }
+
+    if (state.error){
+      detailEl.innerHTML =
+        '<div class="fetch-error"><div class="title">Fetch failed</div>' +
+        '<div>' + esc(state.error) + '</div>' +
+        '<div style="margin-top:8px;">Requested <span class="mono">' + esc(GRAPH_BASE + id + '?depth=' + GRAPH_DEPTH) + '</span>. ' +
+        'A generic "Failed to fetch" here is almost always CORS — check that the response for this origin includes an <span class="mono">Access-Control-Allow-Origin</span> header covering wherever this file is being served from (including <span class="mono">null</span> if opened as a local file). Open devtools\u2019 Network tab for the actual reason; browsers don\u2019t expose it to script.</div></div>';
+      return;
+    }
+
+    var res = resources[id];
+    if (!res){ detailEl.innerHTML = '<div class="empty-panel">Nothing loaded yet.</div>'; return; }
+
+    if (!res.resolved){
+      if (state.loading){
+        detailEl.innerHTML = '<div class="detail-header"><div class="header-top">' + badge(res.type || 'Question') + '<span class="header-id">' + esc(id) + '</span></div></div>' +
+          '<div class="panel"><div class="panel-head">GET /graph/' + esc(id) + '?depth=' + GRAPH_DEPTH + '</div><div class="panel-body"><div class="fetchbar"><span class="spinner" aria-hidden="true"></span>fetching ' + esc(id) + '…</div></div></div>';
+      } else {
+        detailEl.innerHTML = '<div class="empty-panel">Not fetched.</div>';
+      }
+      return;
+    }
+
+    var a = res.attrs;
+    var label = labelFor(res);
+    var pills = '';
+    if (a.kind) pills += '<span class="pill kind-' + esc(a.kind) + '">' + esc(a.kind) + '</span>';
+    if (a.outcome) pills += '<span class="pill outcome-' + esc(a.outcome) + '">' + esc(a.outcome) + '</span>';
+    if (a.resolution_kind) pills += '<span class="pill">' + esc(a.resolution_kind) + '</span>';
+    if (a.status) pills += '<span class="pill">' + esc(a.status) + '</span>';
+    if (a.role) pills += '<span class="pill">' + esc(a.role) + '</span>';
+
+    var propRows = '';
+    var propKeys = Object.keys(a).sort();
+    propKeys.forEach(function(k){
+      var v = a[k];
+      var isMono = /^(logical_name|content_hash|method)$/.test(k);
+      var display = isDateKey(k) ? fmtDate(v) : v;
+      propRows += '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v' + (isMono ? ' mono' : '') + '">' + esc(display) + '</div></div>';
+    });
+    if (!propKeys.length) propRows = '<div class="empty-panel">No additional properties.</div>';
+
+    var html = '';
+    html += '<div class="detail-header">';
+    html += '  <div class="header-top">' + badge(res.type) + '<span class="header-id">' + esc(id) + '</span><span class="header-type">' + esc(res.type) + '</span></div>';
+    if (label) html += '  <p class="header-label">' + esc(label) + '</p>';
+    if (pills) html += '  <div class="header-pills">' + pills + '</div>';
+    html += '  <div class="toolbar">';
+    html += '    <button class="tbtn' + (!state.rawOpen ? ' on' : '') + '" id="tab-overview">Overview</button>';
+    html += '    <button class="tbtn' + (state.rawOpen ? ' on' : '') + '" id="tab-raw">Raw resource</button>';
+    html += '    <button class="tbtn" id="refetch-btn">Re-fetch</button>';
+    html += '  </div>';
+    html += '</div>';
+
+    if (state.rawOpen){
+      html += '<div class="panel"><div class="panel-head">normalized resource · ' + esc(id) + '</div><pre class="jsonview">' + jsonHighlight({ id: res.id, type: res.type, attrs: res.attrs }) + '</pre></div>';
+    } else {
+      html += '<div class="panel"><div class="panel-head">Properties<span>' + propKeys.length + '</span></div><div class="panel-body">' + propRows + '</div></div>';
+    }
+    detailEl.innerHTML = html;
+  }
+
+  var outRelEl = document.getElementById('out-rel-body');
+  var inRelEl = document.getElementById('in-rel-body');
+  var outCountEl = document.getElementById('out-count');
+  var inCountEl = document.getElementById('in-count');
+
+  function renderRelations(){
+    var id = state.currentId;
+    var res = id && resources[id];
+
+    if (!id){
+      outRelEl.innerHTML = inRelEl.innerHTML = '<div class="empty-note">Nothing open yet.</div>';
+      outCountEl.textContent = inCountEl.textContent = '';
+      return;
+    }
+    if (!res || !res.resolved){
+      var msg = state.loading ? '<div class="empty-note">Waiting on ' + esc(id) + '…</div>' : '<div class="empty-note">' + esc(id) + ' hasn\'t loaded.</div>';
+      outRelEl.innerHTML = inRelEl.innerHTML = msg;
+      outCountEl.textContent = inCountEl.textContent = '';
+      return;
+    }
+    var out = outgoing[id] || [], inc = incoming[id] || [];
+    outCountEl.textContent = out.length;
+    inCountEl.textContent = inc.length;
+    outRelEl.innerHTML = renderRelGroup(out, false);
+    inRelEl.innerHTML = renderRelGroup(inc, true);
+  }
+
+  function render(){ renderTypeList(); renderResList(); renderBreadcrumb(); renderDetail(); renderRelations(); }
+
+  /* ---------------- events ---------------- */
+  document.body.addEventListener('click', function(e){
+    var navBtn = e.target.closest('[data-nav]');
+    if (navBtn){ navigate(navBtn.getAttribute('data-nav')); return; }
+
+    var typeBtn = e.target.closest('[data-type]');
+    if (typeBtn){
+      var t = typeBtn.getAttribute('data-type');
+      var href = typeBtn.getAttribute('data-href');
+      if (state.activeType === t){
+        state.activeType = null;
+        collectionView = null;
+      } else {
+        state.activeType = t;
+        loadCollection(t, href, false);
+      }
+      renderTypeList(); renderResList();
+      return;
+    }
+
+    if (e.target.id === 'load-more-btn'){
+      if (collectionView && collectionView.nextHref) loadCollection(collectionView.type, collectionView.nextHref, true);
+      return;
+    }
+
+    var histBtn = e.target.closest('[data-hist]');
+    if (histBtn){
+      var idx = parseInt(histBtn.getAttribute('data-hist'), 10);
+      state.pointer = idx;
+      navigate(state.history[idx], false);
+      return;
+    }
+
+    if (e.target.id === 'tab-overview'){ state.rawOpen = false; renderDetail(); return; }
+    if (e.target.id === 'tab-raw'){ state.rawOpen = true; renderDetail(); return; }
+    if (e.target.id === 'refetch-btn'){ if (state.currentId) fetchResource(state.currentId); return; }
+  });
+
+  document.getElementById('btn-back').addEventListener('click', goBack);
+  document.getElementById('btn-fwd').addEventListener('click', goFwd);
+  document.getElementById('search').addEventListener('input', function(e){ state.search = e.target.value; renderTypeList(); renderResList(); });
+
+  var themeBtn = document.getElementById('theme-toggle');
+  themeBtn.addEventListener('click', function(){
+    var root = document.documentElement;
+    var cur = root.getAttribute('data-theme');
+    if (cur === 'dark'){ root.setAttribute('data-theme','light'); themeBtn.textContent='Dark mode'; }
+    else if (cur === 'light'){ root.removeAttribute('data-theme'); themeBtn.textContent='Light mode'; }
+    else { root.setAttribute('data-theme','dark'); themeBtn.textContent='Light mode'; }
+  });
+
+  var sidebarEl = document.getElementById('sidebar');
+  var relationsEl = document.getElementById('relations-col');
+  var scrimEl = document.getElementById('scrim');
+  function closeDrawer(){ sidebarEl.classList.remove('open'); relationsEl.classList.remove('open'); scrimEl.classList.remove('open'); }
+  document.getElementById('hamburger').addEventListener('click', function(){
+    relationsEl.classList.remove('open');
+    sidebarEl.classList.toggle('open'); scrimEl.classList.toggle('open');
+  });
+  document.getElementById('hamburger-right').addEventListener('click', function(){
+    sidebarEl.classList.remove('open');
+    relationsEl.classList.toggle('open'); scrimEl.classList.toggle('open');
+  });
+  scrimEl.addEventListener('click', closeDrawer);
+  document.body.addEventListener('click', function(e){ if (e.target.closest('[data-nav]') && window.innerWidth <= 1180) closeDrawer(); });
+
+  /* ---------------- boot ----------------
+     The API entrypoint is /collections, not any particular graph resource —
+     so that's the only thing fetched on load. Center and right columns stay
+     empty until an item is picked from the left column (or a relation chip
+     is followed from whatever's already open). */
+  fetchCatalog();
+  render();
+})();
+</script>
+</body>
+</html>
