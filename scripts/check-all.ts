@@ -64,51 +64,68 @@ const scripts: Record<string, string> = JSON.parse(readFileSync("package.json", 
 const fileFor = (name: string): string | undefined =>
   scripts[name]?.split(/\s+/).find((token) => token.startsWith("scripts/"));
 
-const steps: Step[] = [
-  // The three CLAUDE.md names as the pre-commit bar, first, because they are
-  // the ones that fail for real reasons rather than for tidiness. Their
-  // sentences are written here because they have no script header to read.
-  //
-  // **`bun run test`, not `bun test`.** This said `["bun", "test"]` until
-  // 2026-08-26, which bypasses `package.json` entirely — so a `--timeout` added
-  // to the `test` script applied to `bun run test` and not to the sweep, and CI
-  // went on failing at bun's default ceiling with the flag apparently set. Two
-  // definitions of one step is exactly the shape this file exists to avoid;
-  // every other step below already goes through `bun run`.
-  { name: "test", argv: ["bun", "run", "test"], says: "Every test in the suite." },
-  {
-    name: "typecheck",
-    argv: ["bun", "run", "typecheck"],
-    says: "The types agree.",
-  },
-  {
-    // **`--bun`, or this runs under whatever `node` is on the caller's PATH.**
-    // `depcruise` and `tsc` both carry a `#!/usr/bin/env node` shebang, so
-    // plain `bunx` hands them to ambient node — and dependency-cruiser refuses
-    // to start on a node outside `^22||^24||>=26`. The sweep then reports the
-    // layering rules broken on one machine and green on another, from the same
-    // commit. `typecheck` takes the flag in `package.json`, where its command
-    // lives.
-    name: "depcruise",
-    argv: ["bunx", "--bun", "depcruise", "src", "tests", "--output-type", "err"],
-    says: "The layering rules hold, and nothing imports in a circle.",
-  },
-  ...Object.keys(scripts)
-    .filter((name) => name.startsWith("check:"))
-    .sort()
-    .map((name) => {
-      const file = fileFor(name);
-      return {
-        name,
-        argv: ["bun", "run", name],
-        // `check:all-checks` is what stops this falling back. If it is passing,
-        // every check script has a summary and this reads it.
-        says: (file && summaryOf(file)) ?? "(no summary — see check:all-checks)",
-      };
-    }),
-];
+/**
+ * Every step `check` runs, derived from `package.json`.
+ *
+ * Exported so `check:quick` runs the same derivation rather than a second copy
+ * of it — a list of step names in two files is the drift this file already
+ * refuses for the summaries.
+ */
+export function stepsFor(): Step[] {
+  return [
+    // The three CLAUDE.md names as the pre-commit bar, first, because they are
+    // the ones that fail for real reasons rather than for tidiness. Their
+    // sentences are written here because they have no script header to read.
+    //
+    // **`bun run test`, not `bun test`.** This said `["bun", "test"]` until
+    // 2026-08-26, which bypasses `package.json` entirely — so a `--timeout` added
+    // to the `test` script applied to `bun run test` and not to the sweep, and CI
+    // went on failing at bun's default ceiling with the flag apparently set. Two
+    // definitions of one step is exactly the shape this file exists to avoid;
+    // every other step below already goes through `bun run`.
+    { name: "test", argv: ["bun", "run", "test"], says: "Every test in the suite." },
+    {
+      name: "typecheck",
+      argv: ["bun", "run", "typecheck"],
+      says: "The types agree.",
+    },
+    {
+      // **`--bun`, or this runs under whatever `node` is on the caller's PATH.**
+      // `depcruise` and `tsc` both carry a `#!/usr/bin/env node` shebang, so
+      // plain `bunx` hands them to ambient node — and dependency-cruiser refuses
+      // to start on a node outside `^22||^24||>=26`. The sweep then reports the
+      // layering rules broken on one machine and green on another, from the same
+      // commit. `typecheck` takes the flag in `package.json`, where its command
+      // lives.
+      name: "depcruise",
+      argv: ["bunx", "--bun", "depcruise", "src", "tests", "--output-type", "err"],
+      says: "The layering rules hold, and nothing imports in a circle.",
+    },
+    ...Object.keys(scripts)
+      .filter((name) => name.startsWith("check:"))
+      // `check:quick` is a composite of the others, not a check. Running it
+      // here would run this derivation again, from inside itself.
+      .filter((name) => name !== "check:quick")
+      .sort()
+      .map((name) => {
+        const file = fileFor(name);
+        return {
+          name,
+          argv: ["bun", "run", name],
+          // `check:all-checks` is what stops this falling back. If it is
+          // passing, every check script has a summary and this reads it.
+          says: (file && summaryOf(file)) ?? "(no summary — see check:all-checks)",
+        };
+      }),
+  ];
+}
 
-const results: Array<{ name: string; ok: boolean; ms: number; lines: string[] }> = [];
+interface Result {
+  name: string;
+  ok: boolean;
+  ms: number;
+  lines: string[];
+}
 
 /**
  * Copies a stream to the terminal as it arrives **and** keeps it.
@@ -133,22 +150,33 @@ async function tee(
   }
 }
 
-for (const step of steps) {
-  console.log(`\n▸ ${step.name} — ${step.says}`);
-  const started = performance.now();
-  const proc = Bun.spawn(step.argv, { stdout: "pipe", stderr: "pipe" });
-  const kept: string[] = [];
-  await Promise.all([
-    tee(proc.stdout, process.stdout, kept),
-    tee(proc.stderr, process.stderr, kept),
-  ]);
-  const exitCode = await proc.exited;
-  results.push({
-    name: step.name,
-    ok: exitCode === 0,
-    ms: performance.now() - started,
-    lines: kept.join("").split("\n"),
-  });
+/**
+ * Runs every step, prints the table, and answers with the exit code.
+ *
+ * Exported for `check:quick`, which runs a subset. Everything runs even after a
+ * failure: stopping at the first one tells you about one problem when you have
+ * three, and the whole point of a sweep is the summary.
+ */
+export async function runSteps(steps: Step[]): Promise<number> {
+  const results: Result[] = [];
+  for (const step of steps) {
+    console.log(`\n▸ ${step.name} — ${step.says}`);
+    const started = performance.now();
+    const proc = Bun.spawn(step.argv, { stdout: "pipe", stderr: "pipe" });
+    const kept: string[] = [];
+    await Promise.all([
+      tee(proc.stdout, process.stdout, kept),
+      tee(proc.stderr, process.stderr, kept),
+    ]);
+    const exitCode = await proc.exited;
+    results.push({
+      name: step.name,
+      ok: exitCode === 0,
+      ms: performance.now() - started,
+      lines: kept.join("").split("\n"),
+    });
+  }
+  return report(results);
 }
 
 /**
@@ -198,28 +226,36 @@ function digestOf(lines: string[]): string[] {
   return lines.filter((l) => l.trim() !== "").slice(-8);
 }
 
-const failed = results.filter((r) => !r.ok);
-const width = Math.max(...results.map((r) => r.name.length));
+/** The table, and what failed in it. Answers with the exit code. */
+function report(results: Result[]): number {
+  const failed = results.filter((r) => !r.ok);
+  const width = Math.max(...results.map((r) => r.name.length));
 
-console.log(`\n${"─".repeat(width + 16)}`);
-for (const { name, ok, ms } of results) {
-  console.log(`${ok ? "✅" : "❌"} ${name.padEnd(width)}  ${(ms / 1000).toFixed(1)}s`);
-}
-console.log("─".repeat(width + 16));
-
-if (failed.length > 0) {
-  console.log(
-    `\n${failed.length} of ${results.length} failed: ${failed.map((f) => f.name).join(", ")}`,
-  );
-  // Say what, not only which. Capped, because a cascade can produce hundreds
-  // and the point is to stop someone scrolling, not to reproduce the run.
-  const CAP = 20;
-  for (const f of failed) {
-    const digest = digestOf(f.lines);
-    console.log(`\n${f.name}:`);
-    for (const line of digest.slice(0, CAP)) console.log(`  ${line.trimEnd()}`);
-    if (digest.length > CAP) console.log(`  … and ${digest.length - CAP} more`);
+  console.log(`\n${"─".repeat(width + 16)}`);
+  for (const { name, ok, ms } of results) {
+    console.log(`${ok ? "✅" : "❌"} ${name.padEnd(width)}  ${(ms / 1000).toFixed(1)}s`);
   }
-  process.exit(1);
+  console.log("─".repeat(width + 16));
+
+  if (failed.length > 0) {
+    console.log(
+      `\n${failed.length} of ${results.length} failed: ${failed.map((f) => f.name).join(", ")}`,
+    );
+    // Say what, not only which. Capped, because a cascade can produce hundreds
+    // and the point is to stop someone scrolling, not to reproduce the run.
+    const CAP = 20;
+    for (const f of failed) {
+      const digest = digestOf(f.lines);
+      console.log(`\n${f.name}:`);
+      for (const line of digest.slice(0, CAP)) console.log(`  ${line.trimEnd()}`);
+      if (digest.length > CAP) console.log(`  … and ${digest.length - CAP} more`);
+    }
+    return 1;
+  }
+  console.log(`\nall ${results.length} passed.`);
+  return 0;
 }
-console.log(`\nall ${results.length} passed.`);
+
+// Importing this file must not run the sweep: `check:quick` imports `stepsFor`
+// and `runSteps` from here.
+if (import.meta.main) process.exit(await runSteps(stepsFor()));
