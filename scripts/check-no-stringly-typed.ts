@@ -9,7 +9,7 @@
  *
  * Two vocabularies remove it. A **handle** — `GateRef`, `ClaimRef`, … — is what
  * a parameter takes when it names a record. A **taxonomy alias** from
- * `src/db/domain.ts` — `IndexedString`, `Timestamp`, `IdentityString`,
+ * `packages/core-db/domain.ts` — `IndexedString`, `Timestamp`, `IdentityString`,
  * `ReadOnlyString`, `Prose` — is what it takes when it carries a value. The
  * taxonomy is what makes this rule satisfiable at all: without somewhere to put
  * `pose(question: …)`, "no bare strings" would have no answer.
@@ -41,10 +41,10 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 // Every surface file, whether a surface is one file or a directory. The
 // hardcoded triple examined nothing the day either became a directory.
-const FILES = ["src/domain/core.ts", ...surfaceFiles("read"), ...surfaceFiles("write")];
+const FILES = ["packages/core-domain/core.ts", ...surfaceFiles("read"), ...surfaceFiles("write")];
 
 function surfaceFiles(surface: string): string[] {
-  const dir = `src/domain/${surface}`;
+  const dir = `packages/core-domain/${surface}`;
   if (existsSync(dir) && statSync(dir).isDirectory())
     return readdirSync(dir)
       .filter((f) => f.endsWith(".ts"))

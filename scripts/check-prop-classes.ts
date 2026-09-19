@@ -2,7 +2,7 @@
 /**
  * Holds `INDEXED_PROPS` and `SEARCHABLE_TEXT`(`_ARRAYS`) to the string taxonomy they mirror.
  *
- * `src/db/domain.ts` says what LabKit does with each stored string by annotating
+ * `packages/core-db/domain.ts` says what LabKit does with each stored string by annotating
  * it `IndexedString`, `Timestamp`, `IdentityString`, `ReadOnlyString` or
  * `Prose`. TypeScript erases all five, so `provisionTenantGraph()` cannot read
  * them and loops `INDEXED_PROPS` instead, and `search()` cannot read them
@@ -23,7 +23,7 @@
  * at which point this script deletes itself. Note what that does *not* mean:
  * this repo tried checking a generated file in beside the code it describes,
  * with a test holding the two equal, and retired it on 2026-08-26 — see
- * `src/mcp/docs.ts`. Generate it into the running program, not into the tree.
+ * `packages/app-mcp/docs.ts`. Generate it into the running program, not into the tree.
  *
  * It reads the **written type node**, not the resolved type. All five
  * aliases resolve to `string`, so a checker asking the type checker what
@@ -35,7 +35,7 @@
 import ts from "typescript";
 import { readFileSync } from "node:fs";
 
-const DOMAIN = "src/db/domain.ts";
+const DOMAIN = "packages/core-db/domain.ts";
 /** Annotations whose properties must be indexed. The other three must not be. */
 const INDEXED_TYPES = new Set(["IndexedString", "Timestamp"]);
 /**
@@ -106,7 +106,9 @@ source.forEachChild((node) => {
   }
 });
 
-const { INDEXED_PROPS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } = await import("../src/db/domain");
+const { INDEXED_PROPS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } = await import(
+  "../packages/core-db/domain"
+);
 
 const problems: string[] = [];
 

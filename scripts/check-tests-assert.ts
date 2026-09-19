@@ -53,6 +53,7 @@ const silent: string[] = [];
 const tautologies: Array<{ path: string; line: number; text: string }> = [];
 
 for await (const path of glob.scan(".")) {
+  if (path.includes("node_modules")) continue;
   scanned++;
   const source = readFileSync(path, "utf8");
   // Strip comments before counting: a commented-out assertion is not one, and

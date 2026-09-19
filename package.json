@@ -2,15 +2,15 @@
 	"name": "labkit",
 	"description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
 	"license": "MIT",
-	"version": "0.7.451",
-	"main": "src/index.ts",
+	"version": "0.7.452",
+	"main": "packages/core-domain/entry.ts",
 	"type": "module",
 	"bin": {
-		"labkit": "src/cli/cli.ts"
+		"labkit": "packages/app-cli/cli.ts"
 	},
 	"scripts": {
-		"dev": "bun run src/cli/cli.ts",
-		"mcp": "bun run src/cli/cli.ts mcp",
+		"dev": "bun run packages/app-cli/cli.ts",
+		"mcp": "bun run packages/app-cli/cli.ts mcp",
 		"build": "bash scripts/build-binary.sh",
 		"test": "bun test --timeout 20000",
 		"test:pg": "bash scripts/test-postgres.sh",
@@ -77,6 +77,7 @@
 		"zod": "^4.4.3"
 	},
 	"workspaces": [
+		"packages/*",
 		"web"
 	]
 }

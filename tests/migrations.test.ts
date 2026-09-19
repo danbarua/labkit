@@ -5,13 +5,13 @@
 import { expect, test } from "bun:test";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 
-import { embeddedMigrations } from "../src/db/migrations";
+import { embeddedMigrations } from "../packages/core-db/migrations";
 
 test("the embedded migrations are byte-identical to what drizzle reads off disk", () => {
   // `readMigrationFiles` is drizzle's own public API and reads the real folder.
   // Using it here is not a second implementation — it *is* the thing being
   // matched, which is why this test cannot drift with the copy in
-  // `src/db/migrations.ts`.
+  // `packages/core-db/migrations.ts`.
   const fromDisk = readMigrationFiles({ migrationsFolder: "drizzle" });
   const embedded = embeddedMigrations();
 

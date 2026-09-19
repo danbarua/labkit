@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compiles src/cli/cli.ts to bin/labkit, from a scratch directory.
+# Compiles packages/app-cli/cli.ts to bin/labkit, from a scratch directory.
 #
 # **`bun build --compile` leaves a copy of the `bun` binary behind on every
 # successful run** -- 61MB on bun 1.3.14, 57MB on 1.4.0; it is whatever `bun`
@@ -34,4 +34,4 @@ staging="$(mktemp -d "${TMPDIR:-/tmp}/labkit-build.XXXXXX")"
 trap 'rm -rf "$staging"' EXIT
 
 cd "$staging"
-bun build --compile --outfile "$root/bin/labkit" "$root/src/cli/cli.ts"
+bun build --compile --outfile "$root/bin/labkit" "$root/packages/app-cli/cli.ts"

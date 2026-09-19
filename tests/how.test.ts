@@ -3,8 +3,8 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
-import { ResearchSession } from "../src/domain";
-import type { TenantGraph } from "../src/db/graph";
+import { ResearchSession } from "../packages/core-domain";
+import type { TenantGraph } from "../packages/core-db/graph";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { recordAnalysis, replaceAnalysis } from "./helpers/analysis";
 import { claimOf } from "./helpers/claims";

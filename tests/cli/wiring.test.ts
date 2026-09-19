@@ -12,8 +12,8 @@ const code = (path: string): string =>
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
 
-const session = code("src/cli/session.ts");
-const open = code("src/domain/open.ts");
+const session = code("packages/app-cli/session.ts");
+const open = code("packages/core-domain/open.ts");
 
 test("the wiring under test was found at all", () => {
   // Guards the derivation. A moved or renamed file would otherwise make every
@@ -51,8 +51,8 @@ test("the CLI holds both surfaces separately and not the session that joins them
   // `tests/mcp.test.ts` calls the whole safety story. Checked across the tree,
   // not just the root, because any module could reach for it.
   const tree = ["session", "program", "cli", "output", "args"]
-    .map((f) => code(`src/cli/${f}.ts`))
-    .concat(["reads", "writes"].map((f) => code(`src/cli/commands/${f}.ts`)))
+    .map((f) => code(`packages/app-cli/${f}.ts`))
+    .concat(["reads", "writes"].map((f) => code(`packages/app-cli/commands/${f}.ts`)))
     .join("\n");
   expect(tree).toContain("ReadSurface");
   expect(tree).toContain("WriteSurface");

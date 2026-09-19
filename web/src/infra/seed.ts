@@ -6,15 +6,15 @@ import { cpSync, existsSync, mkdtempSync, rmSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Client } from "pg";
-import { pgliteBackend, type LabKitDBConnection } from "../../../src/db/backend";
-import { connectDb } from "../../../src/db/connect";
-import { edge as edgeColumn, vertex as vertexColumn } from "../../../src/db/cypher";
-import { NODE_LABELS, type NodeLabel } from "../../../src/db/domain";
-import { TenantGraph } from "../../../src/db/graph";
-import { runMigrationsOnPostgres } from "../../../src/db/migrate";
-import { LABKIT_SCHEMA } from "../../../src/db/schema";
-import { resolveTenantContext } from "../../../src/db/tenant";
-import { validateIdentifier } from "../../../src/db/agtype";
+import { pgliteBackend, type LabKitDBConnection } from "../../../packages/core-db/backend";
+import { connectDb } from "../../../packages/core-db/connect";
+import { edge as edgeColumn, vertex as vertexColumn } from "../../../packages/core-db/cypher";
+import { NODE_LABELS, type NodeLabel } from "../../../packages/core-db/domain";
+import { TenantGraph } from "../../../packages/core-db/graph";
+import { runMigrationsOnPostgres } from "../../../packages/core-db/migrate";
+import { LABKIT_SCHEMA } from "../../../packages/core-db/schema";
+import { resolveTenantContext } from "../../../packages/core-db/tenant";
+import { validateIdentifier } from "../../../packages/core-db/agtype";
 
 const SOURCE_LABKIT = resolve(
   process.env.LABKIT_SOURCE ?? join(import.meta.dir, "../../../../08_overlap_bench/.labkit"),

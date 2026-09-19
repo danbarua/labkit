@@ -3,10 +3,10 @@
  */
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { setupTestDb, type TestDb } from "./helpers/db";
-import { resolveTenantContext } from "../src/db/tenant";
-import { dropTenantGraph } from "../src/db/provisioning";
-import { TenantGraph } from "../src/db/graph";
-import { scalar } from "../src/db/cypher";
+import { resolveTenantContext } from "../packages/core-db/tenant";
+import { dropTenantGraph } from "../packages/core-db/provisioning";
+import { TenantGraph } from "../packages/core-db/graph";
+import { scalar } from "../packages/core-db/cypher";
 
 let testDb: TestDb;
 beforeAll(async () => {

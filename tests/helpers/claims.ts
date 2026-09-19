@@ -2,7 +2,7 @@
  * Picking a claim out of what `recordAnalysis` returned.
  */
 
-import type { ClaimRef, ConcludedClaim } from "../../src/domain";
+import type { ClaimRef, ConcludedClaim } from "../../packages/core-domain";
 
 /** The claim asserting this proposition, from one analysis's results. */
 export function claimOf(claims: ConcludedClaim[], proposition: string): ClaimRef {

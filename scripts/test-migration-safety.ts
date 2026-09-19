@@ -13,7 +13,7 @@
  *
  * **The "before" count is taken without migrating**, from a raw connection
  * to the freshly-restored data directory -- `connectDb`'s own pglite backend
- * runs migrations as part of connecting (`src/db/backend.ts`'s
+ * runs migrations as part of connecting (`packages/core-db/backend.ts`'s
  * `pgliteBackend`), so the only way to see the record *before* that run is
  * to not go through it. It still calls `bootstrapSession` (`LOAD 'age'` plus
  * `search_path`) directly, which is session setup and not a migration --
@@ -38,16 +38,16 @@ import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import { age, pgliteAssets } from "../src/db/extensions";
-import { transactor } from "../src/db/transactor";
-import { resolveTenantContext } from "../src/db/tenant";
-import { scopeToTenant } from "../src/db/scoped";
-import { TenantGraph } from "../src/db/graph";
-import { connectDb } from "../src/db/connect";
-import { pgEventLog } from "../src/domain/event-store";
-import { NODE_LABELS, EDGE_LABELS } from "../src/db/domain";
-import { scalar } from "../src/db/cypher";
-import { bootstrapSession, type LabKitDB } from "../src/db/backend";
+import { age, pgliteAssets } from "../packages/core-db/extensions";
+import { transactor } from "../packages/core-db/transactor";
+import { resolveTenantContext } from "../packages/core-db/tenant";
+import { scopeToTenant } from "../packages/core-db/scoped";
+import { TenantGraph } from "../packages/core-db/graph";
+import { connectDb } from "../packages/core-db/connect";
+import { pgEventLog } from "../packages/core-domain/event-store";
+import { NODE_LABELS, EDGE_LABELS } from "../packages/core-db/domain";
+import { scalar } from "../packages/core-db/cypher";
+import { bootstrapSession, type LabKitDB } from "../packages/core-db/backend";
 
 const args = process.argv.slice(2);
 const value = (name: string, fallback?: string): string | undefined => {

@@ -9,7 +9,7 @@ import {
   inMemoryEventLog,
   type Clock,
   type DependencyReport,
-} from "../../src/domain";
+} from "../../packages/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
 

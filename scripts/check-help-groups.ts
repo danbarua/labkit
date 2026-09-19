@@ -8,7 +8,7 @@
  * default section at the bottom, which is where a reader stops looking.
  *
  * **Two properties, and the second is the one that rots.** A group name that
- * is not in `src/domain/groups.ts` is caught by `tsc` — the arrays are `as
+ * is not in `packages/core-domain/groups.ts` is caught by `tsc` — the arrays are `as
  * const` and the type is a literal union. What the compiler cannot see is
  * *ordering*: commander renders groups in the order their first command is
  * declared, so a command appended to the wrong place silently moves a whole
@@ -20,7 +20,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { READ_GROUPS, WRITE_GROUPS, OPERATING_GROUPS } from "../src/domain/groups";
+import { READ_GROUPS, WRITE_GROUPS, OPERATING_GROUPS } from "../packages/core-domain/groups";
 
 /**
  * Every command module, and which groups each may use.
@@ -31,7 +31,7 @@ import { READ_GROUPS, WRITE_GROUPS, OPERATING_GROUPS } from "../src/domain/group
  * surface files use their surface's groups, and anything else under
  * `commands/` is an operating command.
  */
-const COMMANDS_DIR = "src/cli/commands";
+const COMMANDS_DIR = "packages/app-cli/commands";
 const SURFACE_GROUPS: Record<string, readonly string[]> = {
   "reads.ts": READ_GROUPS,
   "writes.ts": WRITE_GROUPS,

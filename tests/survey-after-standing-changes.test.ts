@@ -4,7 +4,7 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { ResearchSession, inMemoryEventLog, type Clock } from "../src/domain";
+import { ResearchSession, inMemoryEventLog, type Clock } from "../packages/core-domain";
 import { recordAnalysis, replaceAnalysis } from "./helpers/analysis";
 
 const clock: Clock = { now: () => "2026-09-11T12:00:00.000Z" };

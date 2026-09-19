@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { connectDb, dotGitProjectRoot, resolveProjectRoot } from "../src/db/connect";
+import { connectDb, dotGitProjectRoot, resolveProjectRoot } from "../packages/core-db/connect";
 
 const scratch = () => mkdtempSync(join(tmpdir(), "labkit-root-"));
 

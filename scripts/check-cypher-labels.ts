@@ -31,11 +31,11 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { EDGE_LABELS, NODE_LABELS } from "../src/db/domain";
+import { EDGE_LABELS, NODE_LABELS } from "../packages/core-db/domain";
 
-const ROOT = "src";
+const ROOT = "packages";
 
-/** Every `.ts` under `src/` — the whole of where this repo writes Cypher. */
+/** Every `.ts` under `packages/` — the whole of where this repo writes Cypher. */
 function sources(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -120,12 +120,12 @@ if (problems.length > 0) {
   for (const p of problems) console.error(`   ${p}`);
   console.error(
     "\n   A label that does not exist binds nothing and raises nothing: the query runs\n" +
-      "   and the answer is silently empty. Check the spelling against src/db/domain.ts.",
+      "   and the answer is silently empty. Check the spelling against packages/core-db/domain.ts.",
   );
   process.exit(1);
 }
 
 console.log(
   `OK: ${edgeUses} edge and ${nodeUses} node label uses across ${filesWithCypher.size} files, ` +
-    `every one declared in src/db/domain.ts.`,
+    `every one declared in packages/core-db/domain.ts.`,
 );

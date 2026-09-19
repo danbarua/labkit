@@ -5,11 +5,11 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { connectDb, type LabKitDBConnection } from "../src/db/connect";
-import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
-import { scopeToTenant } from "../src/db/scoped";
-import { pgEventLog } from "../src/domain/event-store";
-import { domainEvent, type DomainEvent } from "../src/domain/events";
+import { connectDb, type LabKitDBConnection } from "../packages/core-db/connect";
+import { resolveTenantContext, type TenantContext } from "../packages/core-db/tenant";
+import { scopeToTenant } from "../packages/core-db/scoped";
+import { pgEventLog } from "../packages/core-domain/event-store";
+import { domainEvent, type DomainEvent } from "../packages/core-domain/events";
 
 let home: string;
 

@@ -3,10 +3,10 @@
  */
 
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "../../src/domain";
+import { ResearchSession, type Clock } from "../../packages/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { ref } from "../../src/domain/report";
+import { ref } from "../../packages/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;
@@ -181,7 +181,8 @@ describe("S-21: a finding drawn across findings", () => {
       because: "the headline overstates what the comparisons establish",
     });
     const edges = report.events[0]!.changes.filter(
-      (change): change is import("../../src/domain").EdgeCreated => change.change === "EdgeCreated",
+      (change): change is import("../../packages/core-domain").EdgeCreated =>
+        change.change === "EdgeCreated",
     );
     const expectedParts = [...new Set(restingOn)].sort();
 
@@ -249,7 +250,8 @@ describe("S-21: a finding drawn across findings", () => {
       inLightOf: synthesis,
     });
     const edges = accepted.events[0]!.changes.filter(
-      (change): change is import("../../src/domain").EdgeCreated => change.change === "EdgeCreated",
+      (change): change is import("../../packages/core-domain").EdgeCreated =>
+        change.change === "EdgeCreated",
     );
     const expectedEvidence = [
       ...(await session.reads.whySupported({ claim: claims[0]!.claim })).support,

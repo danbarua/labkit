@@ -7,7 +7,7 @@
 # **The Postgres arm moved to `cloudbuild.pg.yaml` on 2026-08-28**, and this
 # file's own rule is what licensed the split: it said *"split when something
 # here starts being skipped, not before"*, and `test:pg` is now skipped on the
-# pull requests that cannot affect it. That arm runs on `src/db/**` and
+# pull requests that cannot affect it. That arm runs on `packages/core-db/**` and
 # `drizzle/**` changes, and on every merge to main.
 #
 # **What that leaves here is not a downgrade.** `bun run check` is the gate a

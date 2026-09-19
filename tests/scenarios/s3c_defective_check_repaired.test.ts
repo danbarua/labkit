@@ -11,7 +11,7 @@ import {
   type EventSink,
   type EnquiryRef,
   type ObservationsRef,
-} from "../../src/domain";
+} from "../../packages/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
@@ -594,12 +594,12 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     const reader = await afterwards();
 
-    // 1. gateStatus (src/domain/read.ts:1030).
+    // 1. gateStatus (packages/core-domain/read.ts:1030).
     const status = await reader.reads.gateStatus({ gate });
     expect(status.state).toBe("incomplete");
     expect(status.unmet.map((u) => u.requires)).toEqual([ROBUSTNESS]);
 
-    // 2. gateList (src/domain/read.ts:1924) -- the same fact, the other reader.
+    // 2. gateList (packages/core-domain/read.ts:1924) -- the same fact, the other reader.
     const listed = await reader.reads.gateList({});
     const ourGate = listed.find((g) => g.gate === gate);
     expect(ourGate?.state).toBe("incomplete");

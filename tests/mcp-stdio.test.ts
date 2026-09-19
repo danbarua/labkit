@@ -19,7 +19,7 @@ const id = (v: unknown): string =>
   // layers from the mistake.
   typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
-const SERVER = join(import.meta.dir, "..", "src", "mcp", "server.ts");
+const SERVER = join(import.meta.dir, "..", "packages", "app-mcp", "server.ts");
 
 /**
  * This process's environment with `LABKIT_DB_URL` removed.

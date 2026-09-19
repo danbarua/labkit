@@ -43,7 +43,7 @@ trap 'rm -rf "$db"' EXIT
 # One place that knows how to invoke the CLI. `--author` because a script is not
 # the account it runs under, and the record should say so rather than naming a
 # person who was asleep.
-lab() { bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@"; }
+lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@"; }
 
 # The record-creation announcement: once, on stderr, and never on stdout.
 #
@@ -55,13 +55,13 @@ lab() { bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh "$@"; }
 # The stdout half matters more than it looks: the whole of a write command's
 # stdout is an id the next command consumes, so a line printed to the wrong
 # stream turns `$(labkit criterion 'x')` into a captured error message.
-first_err="$(bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
+first_err="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
 case "$first_err" in
   *"creating a new record"*) printf '  ok  %s\n' "the first command says it is creating a record" ;;
   *) printf '\nFAILED: the first command did not announce a new record\n  stderr was: %s\n' "$first_err" >&2; exit 1 ;;
 esac
 
-second_err="$(bun "$root/src/cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
+second_err="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
 case "$second_err" in
   *"creating a new record"*) printf '\nFAILED: it announced a new record twice\n' >&2; exit 1 ;;
   *) printf '  ok  %s\n' "the second says nothing" ;;
@@ -235,7 +235,7 @@ expect "attribution names the script, not the account it ran under" "$log" "full
 # nobody checked. This one does not, so the OS answers -- and before
 # 2026-08-28 the two were byte-identical in the record, which is what earned
 # the field.
-bare() { bun "$root/src/cli/cli.ts" --db "$db" "$@"; }
+bare() { bun "$root/packages/app-cli/cli.ts" --db "$db" "$@"; }
 bare pose 'written with no --author, so the OS answered' >/dev/null
 graded=$(lab happened)
 expect "an asserted actor is marked claimed" "$graded" "(claimed)"

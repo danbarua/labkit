@@ -25,7 +25,7 @@
         "noNonNullAssertion": "off"
       },
       "suspicious": {
-        // **Off for two sites, both in `src/db/backend.ts`**: `catch (err: any)`
+        // **Off for two sites, both in `packages/core-db/backend.ts`**: `catch (err: any)`
         // around the lockfile, so `err.code` can be read. A caught value is
         // `unknown` and `Error` carries no `code`, so `unknown` plus a cast at
         // every use is the same hole with more ceremony. It was previously off
@@ -42,7 +42,10 @@
   // than in most repos, because the comments are argued paragraphs and a
   // reflow would rewrite the arguments' line breaks.
   "files": {
-    "includes": ["src/**", "tests/**", "scripts/**", "examples/**", "*.ts"],
+    // `!.claude/**` because a git worktree created under `.claude/worktrees/`
+    // is a whole checkout of this repo, `biome.jsonc` included, and biome
+    // refuses to run at all when it finds a second root config.
+    "includes": ["packages/**", "tests/**", "scripts/**", "*.ts", "!.claude/**"],
     "ignoreUnknown": true
   },
 

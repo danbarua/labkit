@@ -6,8 +6,8 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { scalar } from "../src/db/cypher";
-import { ResearchSession } from "../src/domain";
+import { scalar } from "../packages/core-db/cypher";
+import { ResearchSession } from "../packages/core-domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
 let scenario: Scenario;

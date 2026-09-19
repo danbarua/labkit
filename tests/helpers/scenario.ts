@@ -2,8 +2,8 @@
  * Harness for the acceptance scenarios.
  */
 
-import { resolveTenantContext, type TenantContext } from "../../src/db/tenant";
-import { TenantGraph } from "../../src/db/graph";
+import { resolveTenantContext, type TenantContext } from "../../packages/core-db/tenant";
+import { TenantGraph } from "../../packages/core-db/graph";
 import { setupTestDb, type TestClient, type TestDb } from "./db";
 
 export interface Scenario {
@@ -50,7 +50,7 @@ export async function openScenario(): Promise<Scenario> {
       const db = open[open.length - 1];
       if (!db || !ctx) throw new Error("scenario not begun");
       // The *same* transactor as `begin()`'s graph, not a second one: they are
-      // one connection, so they are one transaction. See src/db/transactor.ts.
+      // one connection, so they are one transaction. See packages/core-db/transactor.ts.
       return new TenantGraph(ctx, db, db.tx);
     },
     async end() {

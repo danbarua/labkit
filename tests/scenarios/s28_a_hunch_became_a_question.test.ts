@@ -3,7 +3,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "../../src/domain";
+import { ResearchSession, type Clock } from "../../packages/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
 let scenario: Scenario;

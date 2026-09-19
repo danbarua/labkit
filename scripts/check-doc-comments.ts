@@ -28,11 +28,12 @@
 import { readFileSync } from "node:fs";
 import { Glob } from "bun";
 
-const glob = new Glob("src/**/*.ts");
+const glob = new Glob("packages/**/*.ts");
 let strays = 0;
 let scanned = 0;
 
 for await (const path of glob.scan(".")) {
+  if (path.includes("node_modules")) continue;
   scanned++;
   const lines = readFileSync(path, "utf8").split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -87,7 +88,7 @@ if (strays > 0) {
 // reporting success over it -- `check:empty-population` holds every check
 // here to that.
 if (scanned === 0) {
-  console.error("FAILED: no TypeScript sources under src/ — this check examined nothing.");
+  console.error("FAILED: no TypeScript sources under packages/ — this check examined nothing.");
   process.exit(1);
 }
 console.log(`OK: ${scanned} sources, every doc comment directly above what it describes.`);

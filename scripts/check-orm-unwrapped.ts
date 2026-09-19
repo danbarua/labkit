@@ -4,11 +4,11 @@
  *
  * A `DrizzleQueryError`'s message is `Failed query: <sql>\nparams: <values>`,
  * and the values are the ones that were bound. LabKit binds propositions,
- * findings, verdicts and event payloads. `src/mcp/server.ts` deliberately does
+ * findings, verdicts and event payloads. `packages/app-mcp/server.ts` deliberately does
  * not catch, so that message reaches the calling agent verbatim as
- * `isError: true` — `src/db/trace.ts` already refuses to log parameters for
+ * `isError: true` — `packages/core-db/trace.ts` already refuses to log parameters for
  * this reason, and moving the relational half onto an ORM must not quietly
- * undo it. `unwrapped()` (`src/db/orm.ts`) rethrows the driver's own error,
+ * undo it. `unwrapped()` (`packages/core-db/orm.ts`) rethrows the driver's own error,
  * SQLSTATE intact, from the `cause`.
  *
  * Drizzle offers no hook for this, so it is applied per operation by the
@@ -29,7 +29,7 @@ import ts from "typescript";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const ROOTS = ["src"];
+const ROOTS = ["packages"];
 const WRAPPER = "unwrapped";
 const FACTORY = "ormOver";
 
@@ -113,7 +113,7 @@ if (failures.length > 0) {
 // reporting success over it -- `check:empty-population` holds every check here
 // to that.
 if (scanned.length === 0) {
-  console.error("FAILED: no TypeScript sources under src/ — this check examined nothing.");
+  console.error("FAILED: no TypeScript sources under packages/ — this check examined nothing.");
   process.exit(1);
 }
 console.log(`OK: ${scanned.length} sources, every ORM handle used only inside ${WRAPPER}().`);

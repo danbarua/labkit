@@ -11,12 +11,12 @@ import {
   WriteSurface,
   inMemoryEventLog,
   type Clock,
-} from "../src/domain";
-import { buildServer } from "../src/mcp/server";
-import { sessionRegistry } from "../src/attribution";
+} from "../packages/core-domain";
+import { buildServer } from "../packages/app-mcp/server";
+import { sessionRegistry } from "../packages/core-domain/context";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimNamed, claimOf } from "./helpers/claims";
-import { ref } from "../src/domain/report";
+import { ref } from "../packages/core-domain/report";
 import { recordAnalysis } from "./helpers/analysis";
 
 /**

@@ -18,9 +18,9 @@
 #
 # **The MCP arm is here for the same reason the CLI arm is**, and it caught the
 # same shape of bug the first time it ran. `labkit mcp` connected and exited 0
-# with no output: `src/cli/cli.ts` ends with `process.exit(await main())`, and
+# with no output: `packages/app-cli/cli.ts` ends with `process.exit(await main())`, and
 # the server's `main()` resolved as soon as the transport was connected --
-# correct while `src/mcp/server.ts` was its own entry point, wrong the moment it
+# correct while `packages/app-mcp/server.ts` was its own entry point, wrong the moment it
 # became a subcommand. Invisible to every other test, all of which run the
 # server as a module rather than as the thing anyone ships.
 #

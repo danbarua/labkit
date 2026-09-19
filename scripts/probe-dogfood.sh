@@ -31,7 +31,7 @@ keep=${1:-}
 db=${keep:-$(mktemp -d)}
 [ -n "$keep" ] || trap 'rm -rf "$db"' EXIT
 
-lab() { bun "$root/src/cli/cli.ts" --db "$db" --author probe-dogfood.sh "$@"; }
+lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author probe-dogfood.sh "$@"; }
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 

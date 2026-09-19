@@ -5,16 +5,16 @@ import {
   validateIdentifier,
   type AgtypeNumeric,
   type AgtypeUnknown,
-} from "../src/db/agtype";
-import { TenantGraph } from "../src/db/graph";
-import { agtypeValue } from "../src/db/cypher";
-import { resolveTenantContext } from "../src/db/tenant";
+} from "../packages/core-db/agtype";
+import { TenantGraph } from "../packages/core-db/graph";
+import { agtypeValue } from "../packages/core-db/cypher";
+import { resolveTenantContext } from "../packages/core-db/tenant";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
 
 /**
  * Validates parseAgtype's assumptions and uncovers gaps, per the review that motivated
  * rewriting it as a real recursive-descent parser rather than a strip-and-delegate-to-
- * JSON.parse shortcut (see src/db/agtype.ts's file-level comment).
+ * JSON.parse shortcut (see packages/core-db/agtype.ts's file-level comment).
  */
 
 describe("parseAgtype — pure parsing", () => {

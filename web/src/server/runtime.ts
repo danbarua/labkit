@@ -1,8 +1,8 @@
 import { basename } from "node:path";
 import { Pool, type PoolClient } from "pg";
-import { APP_ROLE } from "../../../src/db/schema";
-import { TENANT_SETTING } from "../../../src/db/scoped";
-import { worktreeName } from "../../../src/worktree";
+import { APP_ROLE } from "../../../packages/core-db/schema";
+import { TENANT_SETTING } from "../../../packages/core-db/scoped";
+import { worktreeName } from "../../../packages/app-cli/worktree";
 
 /** The workspace a bare `/graph` or `/collections` resolves to. */
 const DEFAULT_TENANT_ID = 1;
