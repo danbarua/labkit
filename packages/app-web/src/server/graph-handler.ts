@@ -32,7 +32,7 @@ export async function graphHandler(
   const m = MATCHER.exec({ pathname: path });
   const id = m?.pathname.groups.id;
   if (!id) {
-    console.log("request: /graph without id, redirecting to /graph/Q_1", req.url);
+    console.error("request: /graph without id, redirecting to /graph/Q_1", req.url);
     return Response.redirect(new URL(`${scope.prefix}/graph/Q_1`, publicOrigin(req)), 302);
   }
 

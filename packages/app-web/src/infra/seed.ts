@@ -398,7 +398,7 @@ export async function ensureOverlapBench(): Promise<void> {
     const destMax = await destEventMax(destUrl, await destWorkspace(destUrl));
     if (destMax === sourceSeq && destMax > 0) {
       await writeStamp(destUrl, sourceSeq);
-      console.log(`labkit-web seed: ${destMax} events already imported`);
+      console.error(`labkit-web seed: ${destMax} events already imported`);
       return;
     }
 
@@ -425,13 +425,13 @@ export async function ensureOverlapBench(): Promise<void> {
         if (!(await nodeExists(graph, WALK_END))) {
           throw new Error(`dest is missing ${WALK_END} after copy`);
         }
-        console.log(`labkit-web seed: copied ${nodes.length} nodes ${edges.length} edges`);
+        console.error(`labkit-web seed: copied ${nodes.length} nodes ${edges.length} edges`);
       }
 
       const events = await dumpEvents(src, source.ctx.graphName);
       await copyEvents(destUrl, ctx, events);
       await writeStamp(destUrl, sourceSeq);
-      console.log(`labkit-web seed: copied ${events.length} events seq ${sourceSeq}`);
+      console.error(`labkit-web seed: copied ${events.length} events seq ${sourceSeq}`);
     } finally {
       await dest.close();
     }

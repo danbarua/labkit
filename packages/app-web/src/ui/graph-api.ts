@@ -1,10 +1,5 @@
 import { EDGE_LABELS, type EdgeLabel, type NodeLabel } from "@labkit/core-db/domain";
 
-export const START_HREF = "/graph/Q_1";
-
-// One hop: the resource and everything directly linked to it.
-const DEPTH = 1;
-
 export type Dir = "in" | "out";
 
 export interface Neighbor {
@@ -12,13 +7,11 @@ export interface Neighbor {
   dir: Dir;
   id: string;
   type: NodeLabel;
-  href: string;
 }
 
 export interface Resource {
   id: string;
   type: NodeLabel;
-  href: string;
   properties: Record<string, unknown>;
   neighbors: Neighbor[];
 }
@@ -27,17 +20,11 @@ interface WireNode {
   id: string;
   type: NodeLabel;
   dir?: Dir;
-  _links: { self: { href: string } };
   _embedded?: Record<string, WireNode[]>;
   [key: string]: unknown;
 }
 
 const RESERVED = new Set(["id", "type", "dir", "depth", "_links", "_embedded"]);
-
-// Links come back absolute, and behind the tunnel the origin can be the wrong scheme.
-function toPath(href: string): string {
-  return new URL(href, window.location.origin).pathname;
-}
 
 // An `_embedded` key is `relation:type` for an outbound neighbor and `type:relation` for an inbound one.
 function relationOf(key: string, dir: Dir): EdgeLabel | null {
@@ -59,36 +46,38 @@ function decode(node: WireNode): Resource {
       const dir = item.dir ?? "out";
       const rel = relationOf(key, dir);
       if (rel === null) continue;
-      neighbors.push({
-        rel,
-        dir,
-        id: item.id,
-        type: item.type,
-        href: toPath(item._links.self.href),
-      });
+      neighbors.push({ rel, dir, id: item.id, type: item.type });
     }
   }
-  return {
-    id: node.id,
-    type: node.type,
-    href: toPath(node._links.self.href),
-    properties,
-    neighbors,
-  };
+  return { id: node.id, type: node.type, properties, neighbors };
 }
 
-export async function fetchResource(href: string): Promise<Resource> {
-  const url = `${toPath(href)}?depth=${DEPTH}`;
-  const res = await fetch(url, { headers: { Accept: "application/hal+json" } });
+/** The API's path for a workspace: the default workspace is addressed by its slug like any other. */
+export function workspacePath(workspace: string): string {
+  return `/workspace/${encodeURIComponent(workspace)}`;
+}
+
+export function graphPath(workspace: string, id: string): string {
+  return `${workspacePath(workspace)}/graph/${encodeURIComponent(id)}`;
+}
+
+/** GETs JSON, and says what went wrong in words a person can act on. */
+export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
   const text = await res.text();
   if (!res.ok) throw new Error(`${res.status}: ${text.trim() || res.statusText}`);
-  const type = res.headers.get("content-type") ?? "";
-  if (text.startsWith("<") && !type.includes("json")) {
-    throw new Error(`expected JSON from ${url}`);
-  }
   try {
-    return decode(JSON.parse(text) as WireNode);
+    return JSON.parse(text) as T;
   } catch {
     throw new Error(`expected JSON from ${url}`);
   }
+}
+
+export async function fetchResource(
+  workspace: string,
+  id: string,
+  depth: number,
+  signal?: AbortSignal,
+): Promise<Resource> {
+  return decode(await getJson<WireNode>(`${graphPath(workspace, id)}?depth=${depth}`, signal));
 }

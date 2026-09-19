@@ -82,7 +82,6 @@
 		"zod": "^4.4.3"
 	},
 	"workspaces": [
-		"packages/*",
-		"web"
+		"packages/*"
 	]
 }

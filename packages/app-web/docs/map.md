@@ -8,7 +8,7 @@ This package is a window on one such recording: the first dogfood of using LabKi
 
 `labkit_event` is the WAL. Each row is one act: `seq`, `at`, `operation`, `subject`, `changes[]` (`NodeCreated`, `EdgeCreated`, `PropsChanged`), who did it.
 
-The AGE graph is a **projection** of that stream. `applyDelta` in `src/domain/projection.ts` is the projector. Handles (`Q_1`, `LOE_7`, `NOTE_68`) are points on the drawing, not a schema you fill in advance.
+The AGE graph is a **projection** of that stream. `applyDelta` in `@labkit/core-domain/projection` is the projector. Handles (`Q_1`, `LOE_7`, `NOTE_68`) are points on the drawing, not a schema you fill in advance.
 
 A copy that takes vertices and edges and leaves `labkit_event` empty is a screenshot without the film. Time queries have nothing to stand on. The ingest here now copies the event log. Replaying it through `applyDelta` to rebuild the graph is the honest next ingest. `createEdge` will refuse some stored pairs. That is a fact about today's verbs, not a reason to skip the WAL.
 

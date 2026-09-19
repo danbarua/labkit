@@ -1,6 +1,6 @@
 # Infra
 
-Daily dest is the pg0 instance `labkit` at `127.0.0.1:5433` (`~/.pg0/instances/labkit`). AGE 1.7.0 is installed (`age.dylib`, `CREATE EXTENSION age`). `bootstrapSession()` in `src/db/backend.ts` runs `LOAD 'age'` and `SET search_path = ag_catalog, "$user", public` on every direct connection.
+Daily dest is the pg0 instance `labkit` at `127.0.0.1:5433` (`~/.pg0/instances/labkit`). AGE 1.7.0 is installed (`age.dylib`, `CREATE EXTENSION age`). `bootstrapSession()` in `@labkit/core-db/backend` runs `LOAD 'age'` and `SET search_path = ag_catalog, "$user", public` on every direct connection.
 
 ## Docker Postgres
 

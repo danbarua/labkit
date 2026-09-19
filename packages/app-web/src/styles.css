@@ -125,3 +125,78 @@ main {
   width: 100%;
   height: 100%;
 }
+
+/* Pages other than the graph: workspaces, collections. */
+.crumb {
+  color: var(--text-dim);
+  font-size: 13px;
+  text-decoration: none;
+}
+.crumb:hover {
+  color: var(--accent);
+}
+
+.page {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 20px 24px;
+}
+.page h2 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.page a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.page a:hover {
+  text-decoration: underline;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cards li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.items td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--panel-border);
+  vertical-align: top;
+}
+
+.paging {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+/* After the page rules: the same element, and this one is the more specific. */
+#bar h1 a {
+  color: inherit;
+  text-decoration: none;
+}

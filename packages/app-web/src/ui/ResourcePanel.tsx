@@ -1,12 +1,11 @@
-import { Fragment, type MouseEvent } from "react";
+import { Fragment } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import type { Neighbor, Resource } from "./graph-api";
+import { Link } from "@tanstack/react-router";
+import { graphPath, type Neighbor, type Resource } from "./graph-api";
 
 export interface ResourcePanelProps {
-  resource: Resource | null;
-  error: string | null;
-  loading: boolean;
-  onNavigate: (href: string) => void;
+  workspace: string;
+  resource: Resource;
 }
 
 function formatProp(value: unknown): string {
@@ -20,61 +19,41 @@ function formatProp(value: unknown): string {
   }
 }
 
-function follow(
-  event: MouseEvent<HTMLAnchorElement>,
-  href: string,
-  onNavigate: (href: string) => void,
-): void {
-  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-    return;
-  }
-  event.preventDefault();
-  onNavigate(href);
-}
-
 function LinkRel({
+  workspace,
   label,
   neighbors,
   currentId,
-  onNavigate,
 }: {
+  workspace: string;
   label: string;
   neighbors: Neighbor[];
-  currentId: string | undefined;
-  onNavigate: (href: string) => void;
+  currentId: string;
 }) {
   return (
     <div className="link-rel">
       <h4>{label}</h4>
       <ul>
-        {neighbors.map((neighbor) => {
-          const href = neighbor.href;
-          return (
-            <li key={`${label}:${neighbor.dir}:${neighbor.id}`}>
-              <a
-                href={href}
-                data-id={neighbor.id}
-                data-dir={neighbor.dir}
-                aria-current={neighbor.id === currentId ? "page" : undefined}
-                onClick={(event) => follow(event, href, onNavigate)}
-              >
-                {neighbor.id}
-              </a>
-            </li>
-          );
-        })}
+        {neighbors.map((neighbor) => (
+          <li key={`${label}:${neighbor.dir}:${neighbor.id}`}>
+            <Link
+              to="/workspace/$slug/graph/$id"
+              params={{ slug: workspace, id: neighbor.id }}
+              search={(current) => current}
+              data-id={neighbor.id}
+              data-dir={neighbor.dir}
+              aria-current={neighbor.id === currentId ? "page" : undefined}
+            >
+              {neighbor.id}
+            </Link>
+          </li>
+        ))}
       </ul>
     </div>
   );
 }
 
-function EmbeddedRels({
-  resource,
-  onNavigate,
-}: {
-  resource: Resource;
-  onNavigate: (href: string) => void;
-}) {
+function EmbeddedRels({ workspace, resource }: ResourcePanelProps) {
   const byRel = new Map<string, Neighbor[]>();
   for (const neighbor of resource.neighbors) {
     byRel.set(neighbor.rel, [...(byRel.get(neighbor.rel) ?? []), neighbor]);
@@ -89,10 +68,10 @@ function EmbeddedRels({
         entries.map(([label, neighbors]) => (
           <LinkRel
             key={label}
+            workspace={workspace}
             label={label}
             neighbors={neighbors}
             currentId={resource.id}
-            onNavigate={onNavigate}
           />
         ))
       )}
@@ -100,27 +79,7 @@ function EmbeddedRels({
   );
 }
 
-export function ResourcePanel({ resource, error, loading, onNavigate }: ResourcePanelProps) {
-  if (!resource) {
-    return (
-      <aside id="resource">
-        <ScrollArea.Root className="resource-scroll" type="always">
-          <ScrollArea.Viewport className="resource-viewport">
-            <h2>Resource</h2>
-            {error ? (
-              <div className="empty">{error}</div>
-            ) : (
-              <div className="empty">{loading ? "loading…" : "no resource"}</div>
-            )}
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar className="resource-scrollbar" orientation="vertical">
-            <ScrollArea.Thumb className="resource-thumb" />
-          </ScrollArea.Scrollbar>
-        </ScrollArea.Root>
-      </aside>
-    );
-  }
-
+export function ResourcePanel({ workspace, resource }: ResourcePanelProps) {
   const properties = resource.properties;
   const propKeys = Object.keys(properties);
 
@@ -131,8 +90,11 @@ export function ResourcePanel({ resource, error, loading, onNavigate }: Resource
           <h2>Resource</h2>
           <div className="kind">{resource.type}</div>
           <div className="handle">{resource.id}</div>
-          <div className="href">{resource.href}</div>
-          {loading ? <div className="empty">loading…</div> : null}
+          <div className="href">
+            <a href={graphPath(workspace, resource.id)} target="_blank" rel="noreferrer">
+              {graphPath(workspace, resource.id)}
+            </a>
+          </div>
 
           <h3>properties</h3>
           {propKeys.length === 0 ? (
@@ -148,7 +110,7 @@ export function ResourcePanel({ resource, error, loading, onNavigate }: Resource
             </dl>
           )}
 
-          <EmbeddedRels resource={resource} onNavigate={onNavigate} />
+          <EmbeddedRels workspace={workspace} resource={resource} />
         </ScrollArea.Viewport>
         <ScrollArea.Scrollbar className="resource-scrollbar" orientation="vertical">
           <ScrollArea.Thumb className="resource-thumb" />

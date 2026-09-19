@@ -58,7 +58,7 @@ That is the first `labkit pose` question on overlap_bench, then the enquiry it m
 
 ## Parent project
 
-- Persistence: `../src/db` (`TenantGraph`, migrations, AGE session bootstrap).
-- Node/edge vocabulary: `../src/db/domain.ts`.
+- Persistence: `@labkit/core-db` (`TenantGraph`, migrations, AGE session bootstrap).
+- Node/edge vocabulary: `@labkit/core-db/domain`.
 - Ingest copies stored edges even when current `EDGE_SCHEMA` would refuse them. The web app shows what was recorded.
 - Shared CLI/MCP/web contracts live under GitHub issue 393 (`danbarua/labkit`). This package reads the graph. It does not wait on those children.

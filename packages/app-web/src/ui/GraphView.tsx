@@ -7,7 +7,6 @@ export type Overlay = "structural" | "standing" | "temporal";
 export interface GraphNodeSeed {
   id: string;
   type: string;
-  href: string;
 }
 
 export interface GraphEdgeSeed {
@@ -22,7 +21,7 @@ export interface GraphViewProps {
   selectedId: string | null;
   view: ViewMode;
   overlay: Overlay;
-  onNavigate: (href: string) => void;
+  onNavigate: (id: string) => void;
 }
 
 type SimNode = GraphNodeSeed & {
@@ -142,7 +141,6 @@ function mergeSeeds(
     const existing = sim.nodes.get(seed.id);
     if (existing) {
       existing.type = seed.type;
-      existing.href = seed.href;
       continue;
     }
     const near =
@@ -558,8 +556,7 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
       const rect = canvas.getBoundingClientRect();
       const id = hitTest(s, event.clientX - rect.left, event.clientY - rect.top);
       if (!id) return;
-      const node = s.nodes.get(id);
-      if (node?.href) navigateRef.current(node.href);
+      if (s.nodes.has(id)) navigateRef.current(id);
     };
     const onWheel = (event: WheelEvent) => {
       if (simRef.current.view !== "3d") return;

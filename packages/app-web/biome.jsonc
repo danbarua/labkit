@@ -21,7 +21,7 @@
   },
 
   "files": {
-    "includes": ["src/**", "scripts/**", "tests/**", "*.ts", "*.json"],
+    "includes": ["src/**", "scripts/**", "tests/**", "*.ts", "*.json", "!src/routeTree.gen.ts"],
     "ignoreUnknown": true
   },
 

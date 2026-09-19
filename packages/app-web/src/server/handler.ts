@@ -22,11 +22,6 @@ function problem(status: number, title: string, detail?: string): Response {
   );
 }
 
-function acceptsDocument(accept: string | null): boolean {
-  if (accept == null || accept === "" || accept === "*/*") return true;
-  return /\bapplication\/(hal\+)?json\b/.test(accept);
-}
-
 export function notFound(detail?: string): Response {
   return problem(404, "Not Found", detail);
 }
@@ -34,22 +29,6 @@ export function notFound(detail?: string): Response {
 // function isCollectionSlug(value: string): value is CollectionSlug {
 //   return Object.hasOwn(LABEL_BY_COLLECTION, value);
 // }
-
-export function isLabkitApiPath(pathname: string, accept: string): boolean {
-  if (pathname === "/healthz" || pathname === "/sitemap.xml") return true;
-  if (pathname === "/.well-known/api-catalog") return true;
-  if (pathname === "/api" || pathname.startsWith("/api/")) return true;
-  if (pathname === "/docs" || pathname.startsWith("/docs/")) return true;
-  if (pathname === "/collections" || pathname.startsWith("/collections/")) return true;
-  if (pathname.startsWith("/workspace/")) return true;
-  if (pathname === "/graph" || pathname.startsWith("/graph/")) return true;
-  if (pathname === "/") {
-    return acceptsDocument(accept);
-  }
-  // const slug = pathname.split("/").filter((part) => part.length > 0)[0];
-  // return slug !== undefined && isCollectionSlug(slug);
-  return false;
-}
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 

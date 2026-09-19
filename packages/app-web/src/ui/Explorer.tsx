@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
+import { Bar } from "./Bar";
 import {
   GraphView,
   type GraphEdgeSeed,
@@ -7,7 +8,7 @@ import {
   type Overlay,
   type ViewMode,
 } from "./GraphView";
-import { fetchResource, START_HREF, type Resource } from "./graph-api";
+import type { Resource } from "./graph-api";
 import { ResourcePanel } from "./ResourcePanel";
 import "./graph.css";
 
@@ -18,15 +19,16 @@ interface GraphState {
 
 const EMPTY_GRAPH: GraphState = { nodes: [], edges: [] };
 
+/** Adds a resource and its neighbours to what the canvas has already been shown. */
 function absorb(graph: GraphState, doc: Resource): GraphState {
   const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
-  nodeMap.set(doc.id, { id: doc.id, type: doc.type, href: doc.href });
+  nodeMap.set(doc.id, { id: doc.id, type: doc.type });
   const edgeKeys = new Set(graph.edges.map((e) => `${e.from}\0${e.label}\0${e.to}`));
   const edges = [...graph.edges];
 
   for (const neighbor of doc.neighbors) {
     if (!nodeMap.has(neighbor.id)) {
-      nodeMap.set(neighbor.id, { id: neighbor.id, type: neighbor.type, href: neighbor.href });
+      nodeMap.set(neighbor.id, { id: neighbor.id, type: neighbor.type });
     }
     const from = neighbor.dir === "in" ? neighbor.id : doc.id;
     const to = neighbor.dir === "in" ? doc.id : neighbor.id;
@@ -40,43 +42,25 @@ function absorb(graph: GraphState, doc: Resource): GraphState {
   return { nodes: [...nodeMap.values()], edges };
 }
 
-export function App() {
+export interface ExplorerProps {
+  workspace: string;
+  resource: Resource;
+  onNavigate: (id: string) => void;
+}
+
+/** The graph canvas and resource panel. It keeps every node it has been shown, across navigation. */
+export function Explorer({ workspace, resource, onNavigate }: ExplorerProps) {
   const [view, setView] = useState<ViewMode>("2d");
   const [overlay, setOverlay] = useState<Overlay>("structural");
-  const [resource, setResource] = useState<Resource | null>(null);
   const [graph, setGraph] = useState<GraphState>(EMPTY_GRAPH);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const loadResource = useCallback(async (href: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const doc = await fetchResource(href);
-      setResource(doc);
-      setGraph((g) => absorb(g, doc));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    void loadResource(START_HREF);
-  }, [loadResource]);
+    setGraph((g) => absorb(g, resource));
+  }, [resource]);
 
   return (
     <>
-      <header id="bar">
-        <h1>
-          LabKit <span>Explorer</span>
-        </h1>
-        {error ? (
-          <span className="load-error" title={error}>
-            {error}
-          </span>
-        ) : null}
+      <Bar workspace={workspace}>
         <ToggleGroup.Root
           id="view-toggle"
           className="view-toggle"
@@ -139,26 +123,19 @@ export function App() {
             </ToggleGroup.Item>
           </ToggleGroup.Root>
         </div>
-        <span className="current-handle">{resource?.id ?? (loading ? "loading…" : "")}</span>
-      </header>
+        <span className="current-handle">{resource.id}</span>
+      </Bar>
       <main>
         <GraphView
           nodes={graph.nodes}
           edges={graph.edges}
-          selectedId={resource?.id ?? null}
+          selectedId={resource.id}
           view={view}
           overlay={overlay}
-          onNavigate={loadResource}
+          onNavigate={onNavigate}
         />
-        <ResourcePanel
-          resource={resource}
-          error={error}
-          loading={loading}
-          onNavigate={loadResource}
-        />
+        <ResourcePanel workspace={workspace} resource={resource} />
       </main>
     </>
   );
 }
-
-export default App;
