@@ -2,7 +2,7 @@
 	"name": "labkit",
 	"description": "LabKit is a toolkit for scientific research orchestration. It formalizes bureaucracy so agents focus on science.",
 	"license": "MIT",
-	"version": "0.7.450",
+	"version": "0.7.447",
 	"main": "src/index.ts",
 	"type": "module",
 	"bin": {
@@ -48,7 +48,8 @@
 		"db:generate:custom": "drizzle-kit generate --custom",
 		"ports": "bash scripts/worktree-ports.sh",
 		"bonsai:record": "bash scripts/build-bonsai-record.sh",
-		"check:quick": "bun scripts/check-quick.ts"
+		"check:quick": "bun scripts/check-quick.ts",
+		"check:web-types": "bun scripts/check-web-types.ts"
 	},
 	"private": true,
 	"devDependencies": {
@@ -74,5 +75,8 @@
 		"pg": "^8.23.0",
 		"picocolors": "^1.1.1",
 		"zod": "^4.4.3"
-	}
+	},
+	"workspaces": [
+		"web"
+	]
 }

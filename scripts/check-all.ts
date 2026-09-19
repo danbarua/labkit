@@ -65,6 +65,23 @@ const fileFor = (name: string): string | undefined =>
   scripts[name]?.split(/\s+/).find((token) => token.startsWith("scripts/"));
 
 /**
+ * The steps that run or build the product rather than reading it, measured:
+ * test 162.0s, check:cli 13.7s, check:binary 3.6s. Everything else is under a
+ * second.
+ *
+ * One definition, two uses: these sort last here, and `check:quick` drops them.
+ * Named rather than timed at runtime -- a threshold moves with the machine, and
+ * a slow laptop would silently reorder or drop a check.
+ */
+export const SLOW: ReadonlySet<string> = new Set(["test", "check:cli", "check:binary"]);
+
+/** Cheap steps first, in their existing order within each half. */
+const order = (steps: Step[]): Step[] => [
+  ...steps.filter((s) => !SLOW.has(s.name)),
+  ...steps.filter((s) => SLOW.has(s.name)),
+];
+
+/**
  * Every step `check` runs, derived from `package.json`.
  *
  * Exported so `check:quick` runs the same derivation rather than a second copy
@@ -72,7 +89,11 @@ const fileFor = (name: string): string | undefined =>
  * refuses for the summaries.
  */
 export function stepsFor(): Step[] {
-  return [
+  // **Cheapest first.** A formatter disagreement and a three-minute test suite
+  // are both one red build, and running the suite first means waiting out the
+  // three minutes to be told about the formatter. Ordered here rather than in
+  // the CI config, so a local sweep and a build fail in the same order.
+  return order([
     // The three CLAUDE.md names as the pre-commit bar, first, because they are
     // the ones that fail for real reasons rather than for tidiness. Their
     // sentences are written here because they have no script header to read.
@@ -117,7 +138,7 @@ export function stepsFor(): Step[] {
           says: (file && summaryOf(file)) ?? "(no summary — see check:all-checks)",
         };
       }),
-  ];
+  ]);
 }
 
 interface Result {

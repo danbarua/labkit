@@ -41,7 +41,9 @@ export const INDEXED_PROPS: { readonly [L in NodeLabel]?: readonly string[] } = 
 /**
  * Which scalar node properties `search()` scans, per label.
  */
-export const SEARCHABLE_TEXT: { readonly [L in NodeLabel]?: readonly string[] } = {
+export const SEARCHABLE_TEXT: {
+  readonly [L in NodeLabel]?: readonly string[];
+} = {
   Question: ["name"],
   LineOfEnquiry: ["name"],
   Claim: ["name"],
@@ -60,7 +62,9 @@ export const SEARCHABLE_TEXT: { readonly [L in NodeLabel]?: readonly string[] } 
 /**
  * Which `Prose[]` (array) node properties `search()` scans, per label.
  */
-export const SEARCHABLE_TEXT_ARRAYS: { readonly [L in NodeLabel]?: readonly string[] } = {
+export const SEARCHABLE_TEXT_ARRAYS: {
+  readonly [L in NodeLabel]?: readonly string[];
+} = {
   Task: ["mayRead"],
 };
 
@@ -527,12 +531,8 @@ export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
   CriterionEvaluation: { prefix: "CEVAL" },
   Gate: { prefix: "GATE" },
   Review: { prefix: "REV" },
-  Artefact: {
-    prefix: "ART",
-  },
-  Computation: {
-    prefix: "COMP",
-  },
+  Artefact: { prefix: "ART" },
+  Computation: { prefix: "COMP" },
   Task: { prefix: "TASK" },
   Note: { prefix: "NOTE" },
 };

@@ -1,0 +1,44 @@
+{
+  // **This file is `.jsonc`, not `.json`, and that is load-bearing.** Biome's
+  // JSON config rejects comments, and `biome format --write` then falls back to
+  // its defaults **silently** -- no parse error, just "Formatted N files".
+  "root": false,
+  // **This file is `.jsonc`, not `.json`, and that is load-bearing.** Biome's
+  // JSON config rejects comments, and `biome format --write` then falls back to
+  // its defaults **silently** -- no parse error, just "Formatted N files".
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // Same as the repo root: `tsconfig.json` runs `noUncheckedIndexedAccess`,
+        // so `rows[0]!` after a proven-non-empty check is the compiler's idiom.
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
+
+  "files": {
+    "includes": ["src/**", "scripts/**", "tests/**", "*.ts", "*.json"],
+    "ignoreUnknown": true
+  },
+
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
+  },
+
+  "assist": { "actions": { "source": { "organizeImports": "off" } } }
+}

@@ -1,0 +1,21 @@
+services:
+  db:
+    # Built rather than pulled -- see docker/postgres/Dockerfile for what the
+    # image adds (a database, and nothing else) and the rule that keeps it that
+    # way. The base image tag is pinned in the Dockerfile so one file names the
+    # version.
+    build: ./docker/postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=agens
+      - POSTGRES_DB=postgres
+    ports:
+      - ${LABKIT_PORT_DB:-5432}:5432
+    # `depends_on: condition: service_healthy` needs this, and the web service
+    # needs that: the entrypoint migrates before it serves, and migrating a
+    # Postgres that is still starting fails rather than waiting.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -q"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
