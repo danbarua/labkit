@@ -115,9 +115,9 @@ class TenantGraphProvisioner {
   /**
    * This workspace's event log, in its own schema.
    *
-   * Made from `public.labkit_event` with `LIKE`, so the columns cannot drift from the drizzle
-   * declaration that owns the shape. `LIKE` is creation-time only: a column added to the
-   * template later does not reach a workspace that already has the table.
+   * Copied from `public.labkit_event` with `LIKE`, which is where the column list is still
+   * written down. `LIKE` runs once: a column added there later never reaches a workspace
+   * that already has the table.
    */
   private async ensureEventTable(): Promise<void> {
     const { rows } = await this.db.query<{ exists: boolean }>(
@@ -170,12 +170,12 @@ class TenantGraphProvisioner {
   }
 
   /**
-   * Brings a workspace that has a second counter onto the one.
+   * Removes the `seq` default a workspace made by 0.7.459 still carries, and lifts the id
+   * counter above the event numbers already written.
    *
-   * Outside `ensureEventTable`'s existence gate on purpose: a workspace provisioned before the
-   * act supplied its own number has a default pointing at that second counter, and a gate that
-   * returns early would never reach it. The presence of the default is the tell, and dropping
-   * it is what stops this running again.
+   * Those workspaces draw event numbers from `labkit_event_seq_seq` and ids from
+   * `labkit_natural_id_seq`. One counter does both jobs now, so the second one goes — and
+   * the first has to clear what it handed out, or the next act writes a `seq` a row holds.
    */
   private async ensureSuppliedEventSeq(): Promise<void> {
     const { rows } = await this.db.query<{ has_default: boolean }>(
@@ -205,11 +205,7 @@ class TenantGraphProvisioner {
    * Lets the application role reach this tenant's graph.
    */
   private async ensureGrants(): Promise<void> {
-    // Validated before interpolation even though `graph_name` is a generated
-    // column the server derives from a trusted id — an identifier cannot be a
-    // bind parameter, so the check is the only thing standing where
-    // a parameter would be. The rest of this file interpolates the same value
-    // unvalidated; this is the one that grants privileges.
+    // An identifier cannot be a bind parameter, and these statements grant privileges.
     validateGraphName(this.graphName);
     const g = `"${this.graphName}"`;
     await this.db.query(`GRANT USAGE ON SCHEMA ${g} TO ${APP_ROLE}`);

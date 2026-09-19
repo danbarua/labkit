@@ -39,11 +39,11 @@ export const APP_ROLE = "labkit_app";
 export const labkitApp = p.pgRole(APP_ROLE).existing();
 
 /**
- * The durable event log — **the second LabKit-owned relational table**, and the first that is
- * per-tenant data rather than the tenancy boundary itself.
+ * The columns of an event log.
  *
- * A fresh object each call, not a shared literal: drizzle binds a column builder to the table
- * that consumes it, so handing the same builders to two tables rebinds the first one's columns.
+ * A fresh object each call, not a shared literal: drizzle binds a column builder to the
+ * table that consumes it, so handing the same builders to two tables rebinds the first
+ * one's columns.
  */
 const eventColumns = () =>
   ({
@@ -117,11 +117,11 @@ const eventExtras = (t: Record<keyof ReturnType<typeof eventColumns>, p.PgColumn
 ];
 
 /**
- * The shape's owner, in `public`, and what `drizzle-kit` reads.
- *
- * Events are stored per workspace — `workspaceEvents` below is what the application queries.
- * This table is the template every workspace copy is made from, and the home of any rows
- * written before that was true. Nothing writes to it.
+ * `public.labkit_event`: the table every workspace copy is stamped from, and **still full of
+ * rows** — every event written before the log moved, for every tenant, now duplicated into
+ * the workspaces. Nothing reads or writes it. It should not exist; removing it means
+ * building a workspace's table from this declaration instead of `LIKE`, and deleting the
+ * rows once, which nothing has done yet.
  */
 export const labkitEvents = p.pgTable("labkit_event", eventColumns(), eventExtras).enableRLS();
 
