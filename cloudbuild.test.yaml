@@ -53,7 +53,21 @@ steps:
       - |
         set -e
         bun install --frozen-lockfile
-        bun run check
+
+        # **A pull request tests what it can reach; a merge build tests
+        # everything.** `check:changed` narrows the suite to the packages a
+        # diff touches, and on a merge build there is no diff to narrow by —
+        # HEAD is already main, so it would scope to nothing. `_PR_NUMBER` is
+        # empty exactly there, which is the distinction already in hand.
+        #
+        # Every failure mode of the narrowing runs the whole suite: a fetch
+        # that does not land, a base that does not resolve, an empty diff, or
+        # a change to anything outside a package.
+        if [ -n "$_PR_NUMBER" ] && git fetch --no-tags --depth=50 origin main; then
+          bun run check:changed origin/main
+        else
+          bun run check
+        fi
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -27,6 +27,8 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$root/scripts/lib/throwaway-db.sh"
+refuse_db_url "scripts/probe-dogfood.sh"
 keep=${1:-}
 db=${keep:-$(mktemp -d)}
 [ -n "$keep" ] || trap 'rm -rf "$db"' EXIT

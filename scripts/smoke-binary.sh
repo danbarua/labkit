@@ -29,6 +29,8 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$root/scripts/lib/throwaway-db.sh"
+refuse_db_url "scripts/smoke-binary.sh"
 db="$(mktemp -d "${TMPDIR:-/tmp}/labkit-binary.XXXXXX")"
 trap 'rm -rf "$db"' EXIT
 
