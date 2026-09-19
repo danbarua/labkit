@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# The checks that answer in seconds, before the commit rather than after the build.
+#
+# `bun run check:quick` is everything in the sweep except the three steps that
+# run or build the product — about six seconds against three minutes. What it
+# catches is what CI would otherwise tell you twenty minutes later: a formatter
+# disagreement, a type error, a layering violation.
+#
+# `git commit --no-verify` skips it. That is not a loophole to close: a commit
+# mid-rebase, or one saving work in progress, has no reason to be green.
+set -euo pipefail
+
+if ! command -v bun > /dev/null 2>&1; then
+  echo "pre-commit: no bun on PATH, skipping check:quick" >&2
+  exit 0
+fi
+
+# Quiet on success. A hook that prints twenty-three green ticks before every
+# commit trains people to stop reading it.
+if output=$(bun run check:quick 2>&1); then
+  exit 0
+fi
+
+echo "$output"
+echo
+echo "pre-commit: check:quick failed. Fix it, or \`git commit --no-verify\` to commit anyway."
+exit 1
