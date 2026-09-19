@@ -10,8 +10,14 @@
 -- Substitution is per field, not over the serialised text: `id`, `from` and
 -- `to` are the only places a handle appears in a change, and a regex over the
 -- whole payload would also rewrite a researcher's prose.
+--
+-- Every function here carries its own `search_path`, so it works whatever the
+-- caller's session is set to. Without it, a caller whose session has not put
+-- `ag_catalog` on the path gets an error about a missing type or operator, and
+-- the fix is in the session rather than anywhere near the failure.
 CREATE FUNCTION public.labkit_resolve_handle(handle text, number bigint)
-RETURNS text LANGUAGE sql IMMUTABLE AS $fn$
+RETURNS text LANGUAGE sql IMMUTABLE
+SET search_path = ag_catalog, public AS $fn$
   SELECT CASE
     WHEN handle ~ '^\{\{[A-Z]+\}\}$'
       THEN substring(handle from '^\{\{([A-Z]+)\}\}$') || '_' || number::text
@@ -20,7 +26,8 @@ RETURNS text LANGUAGE sql IMMUTABLE AS $fn$
 $fn$;--> statement-breakpoint
 
 CREATE FUNCTION public.labkit_resolve_change(change jsonb, number bigint)
-RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$
+RETURNS jsonb LANGUAGE sql IMMUTABLE
+SET search_path = ag_catalog, public AS $fn$
   SELECT change
     || CASE WHEN change ? 'id'
          THEN jsonb_build_object('id', public.labkit_resolve_handle(change->>'id', number))
@@ -34,7 +41,8 @@ RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$
 $fn$;--> statement-breakpoint
 
 CREATE FUNCTION public.labkit_record_event(workspace text, tenant integer, payload jsonb)
-RETURNS jsonb LANGUAGE plpgsql AS $fn$
+RETURNS jsonb LANGUAGE plpgsql
+SET search_path = ag_catalog, public AS $fn$
 DECLARE
   number bigint;
   resolved_subject text;
@@ -68,3 +76,13 @@ $fn$;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.labkit_resolve_handle(text, bigint) TO labkit_app;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.labkit_resolve_change(jsonb, bigint) TO labkit_app;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.labkit_record_event(text, integer, jsonb) TO labkit_app;
+--> statement-breakpoint
+
+-- The same for the two older functions. `labkit_prop` is the one with a real
+-- AGE dependency -- `agtype` is its first parameter -- though note that a
+-- function's own `search_path` governs its body, not a caller's parsing of the
+-- argument types at the call site.
+ALTER FUNCTION public.labkit_next_workspace_id(text, text)
+SET search_path = ag_catalog, public;--> statement-breakpoint
+ALTER FUNCTION public.labkit_prop(agtype, text)
+SET search_path = ag_catalog, public;
