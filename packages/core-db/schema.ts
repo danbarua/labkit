@@ -99,15 +99,15 @@ const eventColumns = () =>
  */
 const eventExtras = (t: Record<keyof ReturnType<typeof eventColumns>, p.PgColumn>) => [
   // The stream, per tenant. Every read is tenant-scoped, so every index is.
-  p.index("labkit_event_tenant_seq_idx").on(t.tenant_id, t.seq),
+  p.index("domain_event_tenant_seq_idx").on(t.tenant_id, t.seq),
   // "What happened to this record" -- the only lookup keyed by a handle.
-  p.index("labkit_event_tenant_subject_idx").on(t.tenant_id, t.subject),
+  p.index("domain_event_tenant_subject_idx").on(t.tenant_id, t.subject),
   // "What has this agent been doing", in order.
-  p.index("labkit_event_tenant_agent_idx").on(t.tenant_id, t.attribution_id, t.seq),
+  p.index("domain_event_tenant_agent_idx").on(t.tenant_id, t.attribution_id, t.seq),
   /**
    * Rows belong to the tenant the session is scoped to, and to no other.
    */
-  p.pgPolicy("labkit_event_tenant_isolation", {
+  p.pgPolicy("domain_event_tenant_isolation", {
     as: "permissive",
     for: "all",
     to: labkitApp,
@@ -116,25 +116,16 @@ const eventExtras = (t: Record<keyof ReturnType<typeof eventColumns>, p.PgColumn
   }),
 ];
 
-/**
- * `public.labkit_event`: the table every workspace copy is stamped from, and **still full of
- * rows** — every event written before the log moved, for every tenant, now duplicated into
- * the workspaces. Nothing reads or writes it. It should not exist; removing it means
- * building a workspace's table from this declaration instead of `LIKE`, and deleting the
- * rows once, which nothing has done yet.
- */
-export const labkitEvents = p.pgTable("labkit_event", eventColumns(), eventExtras).enableRLS();
-
-export type LabkitEvent = typeof labkitEvents.$inferSelect;
+export type LabkitEvent = ReturnType<typeof workspaceEvents>["$inferSelect"];
 
 /** One table object per workspace schema; the same object on every later call. */
 const perWorkspace = new Map<string, ReturnType<typeof buildWorkspaceEvents>>();
 
 const buildWorkspaceEvents = (schema: string) =>
-  p.pgSchema(schema).table("labkit_event", eventColumns(), eventExtras);
+  p.pgSchema(schema).table("domain_event", eventColumns(), eventExtras);
 
 /**
- * `<workspace>.labkit_event` — the table a tenant's events actually live in.
+ * `<workspace>.domain_event` — where a tenant's events live.
  *
  * The **one** exception to the rule at the top of this file: the schema here is the tenant's,
  * not `LABKIT_SCHEMA`, and it is bound per call rather than statically. `search_path` is still

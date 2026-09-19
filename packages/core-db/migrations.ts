@@ -21,6 +21,7 @@ import m0010 from "../../drizzle/0010_parallel_greymalkin.sql" with { type: "tex
 import m0011 from "../../drizzle/0011_workspace_natural_ids.sql" with { type: "text" };
 import m0012 from "../../drizzle/0012_freezing_sebastian_shaw.sql" with { type: "text" };
 import m0013 from "../../drizzle/0013_event_number_from_the_database.sql" with { type: "text" };
+import m0014 from "../../drizzle/0014_events_leave_public.sql" with { type: "text" };
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -40,6 +41,7 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0011_workspace_natural_ids": m0011,
   "0012_freezing_sebastian_shaw": m0012,
   "0013_event_number_from_the_database": m0013,
+  "0014_events_leave_public": m0014,
 };
 
 /**
