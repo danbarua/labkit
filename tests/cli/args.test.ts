@@ -217,8 +217,10 @@ test("main prints one labkit line when closing an enquiry twice", async () => {
   const error = console.error;
   try {
     db = await mkdtemp(join(tmpdir(), "labkit-close-twice-"));
+    // `open` poses and pursues in one act, and the workspace has one counter,
+    // so the question takes 1 and the enquiry takes 2.
     expect(await main(["--db", db, "open", "does width matter?"])).toBe(0);
-    expect(await main(["--db", db, "close", "enquiry", "LOE_1"])).toBe(0);
+    expect(await main(["--db", db, "close", "enquiry", "LOE_2"])).toBe(0);
 
     process.stderr.write = ((chunk: string | Uint8Array) => {
       chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
@@ -228,10 +230,10 @@ test("main prints one labkit line when closing an enquiry twice", async () => {
       chunks.push(args.map(String).join(" "));
     };
 
-    const code = await main(["--db", db, "close", "enquiry", "LOE_1"]);
+    const code = await main(["--db", db, "close", "enquiry", "LOE_2"]);
     const stderr = chunks.join("");
     expect(code).toBe(1);
-    expect(stderr).toContain("labkit: LOE_1 is already closed by DEC_");
+    expect(stderr).toContain("labkit: LOE_2 is already closed by DEC_");
     expect(stderr.match(/^labkit:/gm) ?? []).toHaveLength(1);
     expect(stderr).not.toContain('"labkit":"request-failed"');
   } finally {

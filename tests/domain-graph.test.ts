@@ -476,13 +476,18 @@ describe("tenant isolation", () => {
 
     const claimA = await graphA.createNode("Claim", { name: "x" });
     const claimB = await graphB.createNode("Claim", { name: "x" });
-    expect(claimA.natural_id).not.toBe(claimB.natural_id); // natural ids are global, but the nodes are still in disjoint graphs
-
+    // **Not compared.** Each workspace counts its own, seeded from what its
+    // graph already holds, so whether these coincide depends on what else has
+    // run against this database. They were globally unique before the counter
+    // moved into the workspace; asserting either way tests the order the
+    // tests happened to run in. What isolation means is below: A's query
+    // returns A's claim and nothing of B's.
     const rowsA = await graphA.query(`MATCH (c:Claim) RETURN c`, {
-      c: vertexProps<ClaimProps>(),
+      c: vertexProps<ClaimProps & { natural_id: string }>(),
     });
     expect(rowsA).toHaveLength(1);
     expect(rowsA[0]!.c).toMatchObject({ name: "x" });
+    expect(rowsA[0]!.c.natural_id).toBe(claimA.natural_id);
   });
 
   test("an edge operation in tenant A cannot address a node that lives in tenant B", async () => {

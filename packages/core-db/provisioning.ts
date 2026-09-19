@@ -62,9 +62,51 @@ class TenantGraphProvisioner {
     for (const label of NODE_LABELS) await this.ensureNaturalIdIndex(label, indexes);
     for (const label of NODE_LABELS) await this.ensurePropertyIndexes(label, indexes);
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
+    await this.ensureNaturalIdSequence();
     const policies = await this.existingPolicies();
     for (const label of NODE_LABELS) await this.ensureRetractionPolicy(label, policies);
     await this.ensureGrants();
+  }
+
+  /**
+   * One id sequence for this workspace, in its own schema.
+   *
+   * Asked of the catalogue rather than `CREATE IF NOT EXISTS`: a sequence
+   * created now must be seeded past what the graph already holds, and only a
+   * first creation should do that.
+   */
+  private async ensureNaturalIdSequence(): Promise<void> {
+    const { rows } = await this.db.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE c.relkind = 'S' AND c.relname = 'labkit_natural_id_seq' AND n.nspname = $1
+       ) AS exists`,
+      [this.graphName],
+    );
+    if (rows[0]?.exists) return;
+
+    await this.db.query(`CREATE SEQUENCE "${this.graphName}".labkit_natural_id_seq`);
+
+    // **Start above what the workspace already holds.** A record minted before
+    // this sequence existed took its ids from the per-label sequences in
+    // `public`, and a counter starting at 1 hands out `Q_1` again. Retracted
+    // nodes count — their ids are taken whether or not a read can see them.
+    const used = await this.db.query<{ high: number | null }>(
+      `SELECT max((regexp_match(id, '_(\\d+)$'))[1]::bigint) AS high
+       FROM (
+         SELECT ag_catalog.agtype_access_operator(properties, '"natural_id"'::agtype)::text AS id
+         FROM "${this.graphName}"."_ag_label_vertex"
+       ) ids
+       WHERE id ~ '_\\d+"?$'`,
+    );
+    const high = used.rows[0]?.high;
+    if (high) {
+      await this.db.query(`SELECT setval($1, $2)`, [
+        `"${this.graphName}".labkit_natural_id_seq`,
+        high,
+      ]);
+    }
   }
 
   /**

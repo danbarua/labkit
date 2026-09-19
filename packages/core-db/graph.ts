@@ -76,9 +76,13 @@ export class TenantGraph {
    * Reserves the next natural id for a label, creating nothing.
    */
   async reserveId(label: NodeLabel): Promise<string> {
+    // The sequence is this workspace's, so the number counts everything the
+    // workspace has minted rather than everything of one label. `graphName` is
+    // a generated column on `tenants` and validated by `CypherRunner`, which is
+    // what makes it safe to interpolate where a parameter cannot go.
     const { rows } = await this.db.query<{ id: string }>(
-      `SELECT ${LABKIT_SCHEMA}.labkit_next_natural_id($1::text, $2::text) AS id`,
-      [label.toLowerCase(), NODE_TYPES[label].prefix],
+      `SELECT ${LABKIT_SCHEMA}.labkit_next_workspace_id($1::text, $2::text) AS id`,
+      [this.ctx.graphName, NODE_TYPES[label].prefix],
     );
     const reserved = rows[0];
     if (!reserved) throw new Error(`reserving an id for ${label} returned no rows`);
@@ -98,7 +102,7 @@ export class TenantGraph {
     const validated = nodeType.validate ? nodeType.validate(props) : props;
     const naturalIdClause =
       id === undefined
-        ? `natural_id: ${LABKIT_SCHEMA}.labkit_next_natural_id('${label.toLowerCase()}'::text, '${nodeType.prefix}'::text)`
+        ? `natural_id: ${LABKIT_SCHEMA}.labkit_next_workspace_id('${this.ctx.graphName}'::text, '${nodeType.prefix}'::text)`
         : `natural_id: $__reserved_id`;
     const propsClause = buildPropertyClause(validated as unknown as Record<string, unknown>);
     const clause = propsClause ? `${propsClause}, ${naturalIdClause}` : naturalIdClause;
