@@ -11,7 +11,8 @@ import { resolveTenantContext } from "@labkit/core-db/tenant";
 import { scopeToTenant } from "@labkit/core-db/scoped";
 import { NODE_LABELS } from "@labkit/core-db/domain";
 import { TenantGraph } from "@labkit/core-db/graph";
-import { ResearchSession, inMemoryEventLog } from "@labkit/core-domain";
+import { ResearchSession } from "@labkit/core-domain";
+import { pgEventLog } from "@labkit/core-domain/event-store";
 import { kindOf, ref } from "@labkit/core-domain/report";
 
 let home: string;
@@ -28,7 +29,7 @@ test("undo hides what it retracted from the role every ordinary session runs as"
     const ctx = await resolveTenantContext(connection.db, connection.tx, "labkit");
     await scopeToTenant(connection.db, ctx);
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
-    const session = new ResearchSession(graph, { events: inMemoryEventLog() });
+    const session = new ResearchSession(graph, { events: pgEventLog(connection.db, ctx) });
 
     const wording = "retraction end-to-end probe: does this hide?";
     const { question, events } = await session.writes.pose({ question: wording });
@@ -57,7 +58,7 @@ test("every retracted node label is unreachable by lookup and traversal", async 
     const ctx = await resolveTenantContext(connection.db, connection.tx, "labkit");
     await scopeToTenant(connection.db, ctx);
     const graph = new TenantGraph(ctx, connection.db, connection.tx);
-    const session = new ResearchSession(graph, { events: inMemoryEventLog() });
+    const session = new ResearchSession(graph, { events: pgEventLog(connection.db, ctx) });
     const { note: anchor } = await session.writes.note({ text: "live traversal anchor" });
     const at = "2026-09-11T00:00:00.000Z";
     const nodes = [

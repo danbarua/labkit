@@ -14,6 +14,7 @@ export {
   LABEL_BY_KIND,
   KIND_BY_LABEL,
   ref,
+  stagedRef,
   kindOf,
   isRefOfKind,
   type Ref,

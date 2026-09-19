@@ -48,9 +48,12 @@ export const labkitApp = p.pgRole(APP_ROLE).existing();
 const eventColumns = () =>
   ({
     /**
-     * The stream's order, and the reason it is a sequence rather than `at`.
+     * The stream's order, and the reason it is a number rather than `at`.
+     *
+     * No column default: `labkit_record_event` takes the workspace's next number and writes
+     * it here, and into the id of every record the act creates.
      */
-    seq: p.bigserial({ mode: "number" }).primaryKey(),
+    seq: p.bigint({ mode: "number" }).primaryKey(),
     tenant_id: p
       .integer()
       .notNull()

@@ -15,7 +15,7 @@ import type {
   PlannedWork,
   StatedCriterion,
 } from "../report";
-import { ref } from "../report";
+import { ref, stagedRef } from "../report";
 import type {
   AmendDesignCommand,
   CitedBasis,
@@ -41,9 +41,9 @@ export class Counting extends SessionCore {
   /** Records a piece of work whose start a gate may protect. */
   async planWork(input: PlanWorkCommand): Promise<PlannedWork> {
     return this.handle("planWork", input, async (unitOfWork) => {
-      const work = ref(
+      const work = stagedRef(
         "work",
-        await unitOfWork.node("Task", {
+        unitOfWork.node("Task", {
           objective: input.objective,
           mayRead: input.mayRead ?? [],
           outputs: "",
@@ -62,7 +62,7 @@ export class Counting extends SessionCore {
   /** States a condition that must hold. Stating it is not evaluating it. */
   async stateCriterion(proposition: Prose): Promise<StatedCriterion> {
     return this.handle("stateCriterion", { proposition }, async (unitOfWork) => {
-      const criterion = ref("criterion", await unitOfWork.node("Criterion", { proposition }));
+      const criterion = stagedRef("criterion", unitOfWork.node("Criterion", { proposition }));
 
       return {
         subject: criterion,
@@ -94,7 +94,7 @@ export class Counting extends SessionCore {
             "— name it in protecting, or hold the analysis to the criterion instead if nothing " +
             "downstream depends on it",
         );
-      const gate = ref("gate", await unitOfWork.node("Gate", { consequence: input.consequence }));
+      const gate = stagedRef("gate", unitOfWork.node("Gate", { consequence: input.consequence }));
       for (const criterion of input.governedBy) unitOfWork.edge(criterion, "GOVERNS", gate);
       for (const work of input.protecting) unitOfWork.edge(gate, "GATES", work);
 
@@ -116,9 +116,9 @@ export class Counting extends SessionCore {
       const at = this.clock.now();
       const gates = await this.gatesGovernedBy(input.criterion);
 
-      const evaluation = ref(
+      const evaluation = stagedRef(
         "evaluation",
-        await unitOfWork.node("CriterionEvaluation", {
+        unitOfWork.node("CriterionEvaluation", {
           value: input.value,
           outcome: input.outcome,
           evaluated_at: at,
@@ -204,15 +204,15 @@ export class Counting extends SessionCore {
       const rerun = await this.workGatedBy(gates);
       const confirmatoryAffected = await this.confirmatoryResultsBehind(gates);
 
-      const replacement = ref(
+      const replacement = stagedRef(
         "criterion",
-        await unitOfWork.node("Criterion", { proposition: input.nowRequires }),
+        unitOfWork.node("Criterion", { proposition: input.nowRequires }),
       );
       for (const gate of gates) unitOfWork.edge(replacement, "GOVERNS", gate);
 
-      const decision = ref(
+      const decision = stagedRef(
         "decision",
-        await unitOfWork.node("Decision", {
+        unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check: "evidence that the amended setting was not the constraint after all",

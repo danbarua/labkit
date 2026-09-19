@@ -6,9 +6,11 @@ import type {
   EdgeCreated,
   GraphChange,
   NodeCreated,
+  NodeLabel,
   Prose,
   NodePropsChanged,
 } from "@labkit/core-db/domain";
+import { NODE_TYPES } from "@labkit/core-db/domain";
 import type { Command } from "./commands";
 import type { EventFilter } from "./queries";
 
@@ -137,6 +139,39 @@ export function domainEvent(fields: EventFields): DomainEvent {
   };
 }
 
+/**
+ * Stands where a new record's id will go, until the database says what the number is:
+ * `{{Q}}` for a Question, `{{COMP}}` for a Computation.
+ *
+ * Not a handle, and deliberately unlike one — nothing that scans prose for `Q_1` shaped text
+ * can mistake it for a record that exists.
+ */
+export type Staged = string & { readonly __staged: unique symbol };
+
+export const placeholderFor = (label: NodeLabel): Staged =>
+  `{{${NODE_TYPES[label].prefix}}}` as Staged;
+
+/** `{{Q}}` -> `Q_17`, and anything else through unchanged. */
+const resolveHandle = (value: string, n: number): string => {
+  const m = /^\{\{([A-Z]+)\}\}$/.exec(value);
+  return m ? `${m[1]}_${n}` : value;
+};
+
+/**
+ * Every placeholder in a verb's result, replaced by the number the database gave the act.
+ *
+ * Walks strings, arrays and plain objects: a result is `{ question: "{{Q}}" }` or
+ * `{ evidence: ["{{EV}}"] }`, never anything deeper.
+ */
+export function resolveIn<T>(value: T, n: number): T {
+  if (typeof value === "string") return resolveHandle(value, n) as T;
+  if (Array.isArray(value)) return value.map((v) => resolveIn(v, n)) as T;
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveIn(v, n)])) as T;
+  }
+  return value;
+}
+
 /** Every handle an act created. */
 export const createdIn = (event: DomainEvent): string[] =>
   event.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : []));
@@ -187,7 +222,10 @@ export type RecordedEvent = DomainEvent & { seq: number };
  * Where events go.
  */
 export interface EventSink {
-  /** Returns the stored event, `seq` included -- the caller built one without it. */
+  /**
+   * Stores an act, and hands back what was written: the number the store gave it, and every
+   * placeholder in `subject` and `changes` replaced by a handle carrying that number.
+   */
   record(event: DomainEvent): Promise<RecordedEvent>;
   /** Everything recorded so far, oldest first. */
   all(): Promise<readonly RecordedEvent[]>;
@@ -202,10 +240,6 @@ export interface EventSink {
  */
 export function inMemoryEventLog(): EventSink {
   const events: RecordedEvent[] = [];
-  // **Numbered, because `matches` below reads `(e.seq ?? 0) > f.since`.** Leaving it undefined
-  // scores every event 0, so `select({since})` returns nothing for every value of `since` while
-  // `pgEventLog` answers the same filter correctly: two sinks behind one interface,
-  // disagreeing.
   let n = 0;
   const matches = (e: RecordedEvent, f: EventFilter): boolean =>
     (f.since === undefined || e.seq > f.since) &&
@@ -217,8 +251,12 @@ export function inMemoryEventLog(): EventSink {
     // Copied rather than mutated: `WriteSurface.emit` builds the object and
     // still holds it, and a sink that writes back into its caller's argument is
     // a surprise nobody asked for.
+    // Numbered here rather than by a sequence, and resolved the same way the durable sink
+    // resolves it -- two sinks disagreeing about what a handle became is the failure this
+    // shares an assertion with `pgEventLog` to catch.
     record: async (event) => {
-      const stored = { ...event, seq: ++n };
+      const seq = ++n;
+      const stored = { ...resolveIn(event, seq), seq };
       events.push(stored);
       return stored;
     },

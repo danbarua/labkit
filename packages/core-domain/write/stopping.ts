@@ -11,7 +11,7 @@ import type {
   QuestionRef,
   StoppedWork,
 } from "../report";
-import { ref } from "../report";
+import { ref, stagedRef } from "../report";
 import { DomainRefusal } from "../refusal";
 import type {
   AcceptAsUnresolvedCommand,
@@ -143,9 +143,9 @@ export class Stopping extends SessionCore {
       }
 
       const closure = answer === undefined ? ("abandoned" as const) : ("answered" as const);
-      const decided = ref(
+      const decided = stagedRef(
         "decision",
-        await unitOfWork.node("Decision", {
+        unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason:
             answer === undefined
@@ -208,9 +208,9 @@ export class Stopping extends SessionCore {
         });
       const basis = origin.kind === "direct" ? [origin.evidence] : origin.evidence;
 
-      const decision = ref(
+      const decision = stagedRef(
         "decision",
-        await unitOfWork.node("Decision", {
+        unitOfWork.node("Decision", {
           decided_at: at,
           reason: input.because,
           invalidation_check: input.until,
@@ -255,9 +255,9 @@ export class Stopping extends SessionCore {
           subject: input.gate,
         });
 
-      const decision = ref(
+      const decision = stagedRef(
         "decision",
-        await unitOfWork.node("Decision", {
+        unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check: "a reason for this gate to govern work again",
@@ -298,9 +298,9 @@ export class Stopping extends SessionCore {
           subject: input.work,
         });
 
-      const decision = ref(
+      const decision = stagedRef(
         "decision",
-        await unitOfWork.node("Decision", {
+        unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check: "a reason to do this work after all",

@@ -3,6 +3,7 @@
  * than the privileged one.
  */
 
+import { NODE_TYPES } from "@labkit/core-db/domain";
 import type {
   EdgeLabel,
   EdgeProps,
@@ -12,7 +13,7 @@ import type {
   NodePropsByLabel,
 } from "@labkit/core-db/domain";
 import type { TenantGraph } from "@labkit/core-db/graph";
-import type { DomainEvent } from "./events";
+import { placeholderFor, type DomainEvent, type Staged } from "./events";
 
 /**
  * One `NodeCreated`, for one label.
@@ -25,27 +26,16 @@ function nodeCreated<L extends NodeLabel>(
   return { change: "NodeCreated", id, label, props } as Extract<NodeCreated, { label: L }>;
 }
 
-/**
- * Where a new record's id comes from.
- */
-export interface IdSource {
-  reserve(label: NodeLabel): Promise<string>;
-}
-
-/** The natural-id sequences, which are the record's own id source. */
-export const naturalIds = (graph: TenantGraph): IdSource => ({
-  reserve: (label) => graph.reserveId(label),
-});
-
 /** One command's changes, accumulated in the order the command made them. */
 export class UnitOfWork {
   readonly changes: GraphChange[] = [];
 
-  constructor(private readonly ids: IdSource) {}
-
-  /** Reserves an id and records the node under it. */
-  async node<L extends NodeLabel>(label: L, props: NodePropsByLabel[L]): Promise<string> {
-    const id = await this.ids.reserve(label);
+  /**
+   * Stages a new record under a placeholder and hands it back. One act creates at most one
+   * record of a label, so the placeholder names it unambiguously for the rest of the act.
+   */
+  node<L extends NodeLabel>(label: L, props: NodePropsByLabel[L]): Staged {
+    const id = placeholderFor(label);
     this.changes.push(nodeCreated(id, label, { ...props }));
     return id;
   }

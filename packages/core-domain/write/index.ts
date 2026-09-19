@@ -59,8 +59,8 @@ import type {
   SynthesiseCommand,
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
-import type { DomainEvent } from "../events";
-import { snapshotPriorValues, naturalIds, UnitOfWork } from "../projection";
+import { resolveIn, type DomainEvent } from "../events";
+import { snapshotPriorValues, UnitOfWork } from "../projection";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
@@ -236,12 +236,14 @@ export class WriteSurface extends SessionCore {
     work: (unitOfWork: UnitOfWork) => Promise<Act<R>>,
   ): Promise<R & { events: DomainEvent[] }> {
     return this.graph.inTransaction(async () => {
-      const unitOfWork = new UnitOfWork(naturalIds(this.graph));
+      const unitOfWork = new UnitOfWork();
       const act = await work(unitOfWork);
       // **Here and nowhere else.** The graph still holds the old values at this
       // instant -- the act only staged, and the projectors below have not run --
       // so this is the one point where a change can record what it replaced.
       const changes = await snapshotPriorValues(this.graph, unitOfWork.delta());
+      // The store takes the workspace's next number, stamps it into every placeholder the
+      // act staged, and hands back what it wrote. `Q_17` is what event 17 created.
       const recorded = await this.events.record({
         at: this.clock.now(),
         attribution: this.attribution,
@@ -255,7 +257,8 @@ export class WriteSurface extends SessionCore {
       // a projector that reads the graph must come after the one that writes
       // it -- see `ResearchSessionOptions.projectors`.
       for (const projector of this.projectors) await projector.apply(recorded);
-      return { ...act.result, events: [recorded] };
+      // The verb built its result out of placeholders, because the number did not exist yet.
+      return { ...resolveIn(act.result, recorded.seq), events: [recorded] };
     });
   }
 }

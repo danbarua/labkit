@@ -135,10 +135,8 @@ describe("a scoped session is confined to its tenant", () => {
   /**
    * The point of the move: a workspace's stream is numbered in the workspace.
    *
-   * Asserted as a gap, not a value — three events into A must not move B's numbering. A
-   * shared counter, which a `LIKE`-copied `bigserial` default leaves behind, makes B's step
-   * 4. Absolute numbers would depend on what the tests above wrote, including the insert RLS
-   * refused after the sequence had handed out its number.
+   * Asserted as a gap, not a value — three acts recorded in A must not move B's numbering.
+   * One counter serves both the event's number and the ids the act creates.
    */
   test("each workspace numbers its own stream", async () => {
     const write = (slug: string, subject: string) =>

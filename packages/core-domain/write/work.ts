@@ -8,7 +8,7 @@ import type {
   RecordedReview,
   Synthesised,
 } from "../report";
-import { ref } from "../report";
+import { ref, stagedRef } from "../report";
 import type {
   ConcludeCommand,
   SynthesiseCommand,
@@ -36,17 +36,17 @@ export class Work extends Shared {
    */
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
     return this.handle("recordObservations", input, async (unitOfWork) => {
-      const artefact = await unitOfWork.node("Artefact", {
+      const artefact = unitOfWork.node("Artefact", {
         kind: "observations",
         logical_name: input.name,
         ...(input.contentHash ? { content_hash: input.contentHash } : {}),
       });
-      const evidence = await unitOfWork.node("Evidence", { statement: input.finding });
+      const evidence = unitOfWork.node("Evidence", { statement: input.finding });
       // A measurement taken, not an experiment run. Nothing reads the field
       // yet; what it says is true either way, and what a later reader finds
       // depends on what was written at this moment rather than on when the
       // reader arrived.
-      const unit = await unitOfWork.node("EvidenceUnit", { role: "observation" });
+      const unit = unitOfWork.node("EvidenceUnit", { role: "observation" });
       unitOfWork.edge(evidence, "RECORDED_IN", artefact);
       unitOfWork.edge(unit, "PRODUCES", evidence);
       unitOfWork.edge(unit, "ADDRESSES", input.enquiry);
@@ -55,7 +55,7 @@ export class Work extends Shared {
       // this edge no longer stands in for it.
       unitOfWork.edge(input.enquiry, "REQUIRES", evidence);
 
-      const observations = ref("observations", artefact);
+      const observations = stagedRef("observations", artefact);
       return {
         subject: observations,
         result: { observations },
@@ -111,9 +111,9 @@ export class Work extends Shared {
       const missing = input.restingOn.filter((c) => !present.has(c));
       if (missing.length > 0) throw new Error(`${missing.join(", ")} not found`);
 
-      const claim = ref(
+      const claim = stagedRef(
         "claim",
-        await unitOfWork.node("Claim", { name: input.proposition, kind: "exploratory" }),
+        unitOfWork.node("Claim", { name: input.proposition, kind: "exploratory" }),
       );
       for (const on of new Set(input.restingOn)) unitOfWork.edge(claim, "RESTS_ON", on);
 
@@ -140,7 +140,7 @@ export class Work extends Shared {
     return this.handle("recordReview", input, async (unitOfWork) => {
       const unit = await this.unitOf(input.of);
 
-      const review = ref("review", await unitOfWork.node("Review", { verdict: input.verdict }));
+      const review = stagedRef("review", unitOfWork.node("Review", { verdict: input.verdict }));
       unitOfWork.edge(review, "EVALUATES", unit);
 
       return {

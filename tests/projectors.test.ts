@@ -13,12 +13,7 @@ import {
   type DomainEvent,
   type EventSink,
 } from "@labkit/core-domain";
-import {
-  graphProjector,
-  type IdSource,
-  type Projector,
-  UnitOfWork,
-} from "@labkit/core-domain/projection";
+import { graphProjector, type Projector, UnitOfWork } from "@labkit/core-domain/projection";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { scalar, vertexProps } from "@labkit/core-db/cypher";
 import type { TenantGraph } from "@labkit/core-db/graph";
@@ -163,32 +158,29 @@ describe("the event stream is a write-ahead log for a graph store", () => {
     expect(confirmed.props.kind).toBe("confirmatory");
   });
 
-  test("staging needs an id source, not a graph", async () => {
-    // The command half of the pipeline touches no store. A counter is a valid
-    // `IdSource`, which is the whole claim `naturalIds` narrowed the coupling
-    // to — before it, a `UnitOfWork` held a `TenantGraph` to reach one number.
-    let n = 0;
-    const counter: IdSource = { reserve: async (label) => `${label}_${++n}` };
-    const unitOfWork = new UnitOfWork(counter);
+  test("staging touches no store, and names what it makes", () => {
+    // The command half of the pipeline reaches nothing: a unit of work stages placeholders,
+    // and the number that replaces them does not exist until the store answers.
+    const unitOfWork = new UnitOfWork();
 
-    const asked = await unitOfWork.node("Question", { name: "does it hold?", posed_at: "t" });
-    const pursued = await unitOfWork.node("LineOfEnquiry", { name: "check it" });
+    const asked = unitOfWork.node("Question", { name: "does it hold?", posed_at: "t" });
+    const pursued = unitOfWork.node("LineOfEnquiry", { name: "check it" });
     unitOfWork.edge(asked, "MOTIVATES", pursued);
 
     expect(unitOfWork.delta()).toEqual([
       {
         change: "NodeCreated",
-        id: "Question_1",
+        id: "{{Q}}",
         label: "Question",
         props: { name: "does it hold?", posed_at: "t" },
       },
       {
         change: "NodeCreated",
-        id: "LineOfEnquiry_2",
+        id: "{{LOE}}",
         label: "LineOfEnquiry",
         props: { name: "check it" },
       },
-      { change: "EdgeCreated", from: "Question_1", label: "MOTIVATES", to: "LineOfEnquiry_2" },
+      { change: "EdgeCreated", from: "{{Q}}", label: "MOTIVATES", to: "{{LOE}}" },
     ]);
   });
 

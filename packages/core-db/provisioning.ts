@@ -65,6 +65,7 @@ class TenantGraphProvisioner {
     for (const edge of EDGE_LABELS) await this.ensureEdgeUniqueIndex(edge, indexes);
     await this.ensureNaturalIdSequence();
     await this.ensureEventTable();
+    await this.ensureSuppliedEventSeq();
     const policies = await this.existingPolicies();
     for (const label of NODE_LABELS) await this.ensureRetractionPolicy(label, policies);
     await this.ensureGrants();
@@ -136,15 +137,6 @@ class TenantGraphProvisioner {
       `CREATE TABLE ${g}.labkit_event (LIKE public.labkit_event INCLUDING DEFAULTS INCLUDING INDEXES)`,
     );
 
-    // **`LIKE` copies the default verbatim, and `bigserial` is not an identity column**, so
-    // without this the workspace draws `seq` from `public.labkit_event_seq_seq` and every
-    // tenant shares one counter — the exact thing a per-workspace event log is for. `OWNED BY`
-    // is what `pg_get_serial_sequence` and `TRUNCATE ... RESTART IDENTITY` resolve through.
-    await this.db.query(`CREATE SEQUENCE ${g}.labkit_event_seq_seq`);
-    await this.db.query(
-      `ALTER TABLE ${g}.labkit_event ALTER COLUMN seq SET DEFAULT nextval('${this.graphName}.labkit_event_seq_seq')`,
-    );
-    await this.db.query(`ALTER SEQUENCE ${g}.labkit_event_seq_seq OWNED BY ${g}.labkit_event.seq`);
     await this.db.query(
       `ALTER TABLE ${g}.labkit_event ADD CONSTRAINT labkit_event_tenant_id_tenants_id_fk
          FOREIGN KEY (tenant_id) REFERENCES public.tenants(id)`,
@@ -164,12 +156,48 @@ class TenantGraphProvisioner {
       `INSERT INTO ${g}.labkit_event SELECT * FROM public.labkit_event WHERE tenant_id = $1`,
       [this.tenantId],
     );
-    // Past what was copied, keeping the numbers the events already have: renumbering would
-    // break a stored `--since`.
+    // The one counter has to clear the copied events too: an act takes its number from
+    // `labkit_natural_id_seq`, and that number is now a `seq` as well as an id. The `WHERE`
+    // is what makes this do nothing on an empty workspace — an unconditional `setval` would
+    // burn number 1 and the first act of a new record would be event 2.
     await this.db.query(
-      `SELECT setval($1, greatest((SELECT coalesce(max(seq), 0) FROM ${g}.labkit_event), 1),
-                     (SELECT count(*) > 0 FROM ${g}.labkit_event))`,
-      [`${this.graphName}.labkit_event_seq_seq`],
+      `SELECT setval($1, m.high, true)
+         FROM (SELECT max(seq) AS high FROM ${g}.labkit_event) m
+        WHERE m.high IS NOT NULL
+          AND m.high >= (SELECT last_value FROM ${g}.labkit_natural_id_seq)`,
+      [`${this.graphName}.labkit_natural_id_seq`],
+    );
+  }
+
+  /**
+   * Brings a workspace that has a second counter onto the one.
+   *
+   * Outside `ensureEventTable`'s existence gate on purpose: a workspace provisioned before the
+   * act supplied its own number has a default pointing at that second counter, and a gate that
+   * returns early would never reach it. The presence of the default is the tell, and dropping
+   * it is what stops this running again.
+   */
+  private async ensureSuppliedEventSeq(): Promise<void> {
+    const { rows } = await this.db.query<{ has_default: boolean }>(
+      `SELECT a.atthasdef AS has_default
+         FROM pg_attribute a
+         JOIN pg_class c ON c.oid = a.attrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = $1 AND c.relname = 'labkit_event' AND a.attname = 'seq'`,
+      [this.graphName],
+    );
+    if (rows[0]?.has_default !== true) return;
+    await this.db.query(
+      `ALTER TABLE "${this.graphName}".labkit_event ALTER COLUMN seq DROP DEFAULT`,
+    );
+    // Past the numbers the old counter handed out, or the next act collides with an event
+    // that already holds its number.
+    await this.db.query(
+      `SELECT setval($1, m.high, true)
+         FROM (SELECT max(seq) AS high FROM "${this.graphName}".labkit_event) m
+        WHERE m.high IS NOT NULL
+          AND m.high >= (SELECT last_value FROM "${this.graphName}".labkit_natural_id_seq)`,
+      [`${this.graphName}.labkit_natural_id_seq`],
     );
   }
 

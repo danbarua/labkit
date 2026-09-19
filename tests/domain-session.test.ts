@@ -82,7 +82,9 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
   // Fourth edge: MOTIVATES, EVALUATES, the CHANGES that withdraws the original,
   // and then the SUPPORTS that carries the evidence across to the narrower
   // claim. Failing on the last one is the damaging moment.
-  const interrupted = new ResearchSession(failingOn(graph, "createEdge", 4));
+  const interrupted = new ResearchSession(failingOn(graph, "createEdge", 4), {
+    events: session.events,
+  });
   await expect(
     interrupted.writes.reinterpret({
       of: claimOf(analysisClaims, "T beats rewired"),
@@ -149,7 +151,9 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
 
   // Second edge: GOVERNS for the replacement, then the CHANGES that retires
   // the original.
-  const interrupted = new ResearchSession(failingOn(graph, "createEdge", 2));
+  const interrupted = new ResearchSession(failingOn(graph, "createEdge", 2), {
+    events: session.events,
+  });
   await expect(
     interrupted.writes.amendDesign({
       criterion,
