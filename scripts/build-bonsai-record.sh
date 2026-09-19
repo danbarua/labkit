@@ -64,13 +64,28 @@ echo
 rm -rf "$db"
 mkdir -p "$db"
 
+# Logs are written outside the record and copied in afterwards. `--db` refuses a directory
+# that holds no record and is not empty, so a log file created here before the first probe
+# runs is enough to stop the build -- with the reason inside the log nobody is looking at.
+staging="$(mktemp -d)"
+trap 'rm -rf "$staging"' EXIT
+
+probe() {
+  local name=$1
+  shift
+  echo "=== $name.sh"
+  if ! bash "$root/scripts/$name.sh" "$@" > "$staging/build-$name.log" 2>&1; then
+    tail -20 "$staging/build-$name.log" >&2
+    exit 1
+  fi
+  cp "$staging/build-$name.log" "$db/build-$name.log"
+}
+
 for stage in 1a 1b2-1d 2a 2b; do
-  echo "=== probe-bonsai-$stage.sh"
-  bash "$root/scripts/probe-bonsai-$stage.sh" "$db" > "$db/build-$stage.log" 2>&1
+  probe "probe-bonsai-$stage" "$db"
 done
 
-echo "=== probe-bonsai-3-gates.sh"
-bash "$root/scripts/probe-bonsai-3-gates.sh" "$db" "$gates_source" > "$db/build-3-gates.log" 2>&1
+probe "probe-bonsai-3-gates" "$db" "$gates_source"
 
 # The record is only worth keeping if it is the one the scripts describe, which
 # is the question `probe-bonsai-replay.sh` exists to answer: it replays every
