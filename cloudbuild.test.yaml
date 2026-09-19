@@ -39,14 +39,10 @@ steps:
   - id: check
     name: labkit-ci
     entrypoint: bash
-    # `check:version` holds the patch number to the pull request that ships it,
-    # and is the only step that needs to know which pull request this is. The
-    # substitution is empty on a merge build, where the check passes and says so.
+    # `_PR_NUMBER` is empty on a merge build and set on a pull request, which
+    # is how the narrowing below tells the two apart.
     env:
       - _PR_NUMBER=$_PR_NUMBER
-      # `check:version` refuses to pass without a pull request number when this
-      # is set, so a step that quietly stops passing one fails here rather than
-      # reporting success over nothing.
       - CI=true
     args:
       - -c
@@ -73,8 +69,8 @@ options:
   logging: CLOUD_LOGGING_ONLY
   # An unmatched substitution fails the build before a step runs. Only
   # `test-on-pr` uses this file and it always has `_PR_NUMBER`, but the cost of
-  # being wrong is every build red, and `check:version` already treats an empty
-  # value as "no pull request here" and passes.
+  # being wrong is every build red, and an empty value only means "run
+  # everything" to the narrowing below.
   substitutionOption: ALLOW_LOOSE
 
 # **Measured on the first green run, 2026-08-26** (build `9907cb31`, 394s total,

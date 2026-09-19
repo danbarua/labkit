@@ -58,7 +58,6 @@ const NOT_SCANNED = new Set([
   "check:cli",
   "check:compositions",
   "check:all-checks",
-  "check:version",
   "check:empty-population",
 ]);
 
