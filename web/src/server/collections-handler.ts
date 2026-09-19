@@ -1,4 +1,4 @@
-import { NODE_LABELS, SEARCHABLE_TEXT, type NodeLabel } from "../../../src/db/domain";
+import { NODE_LABELS, SEARCHABLE_TEXT, type NodeLabel } from "../../../packages/core-db/domain";
 import { problem, publicOrigin } from "./graph-handler";
 import type { TenantScope } from "./runtime";
 

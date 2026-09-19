@@ -1,0 +1,12 @@
+{
+  "name": "@labkit/core-db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.7",
+    "@electric-sql/pglite-age": "^0.0.8",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.23.0"
+  }
+}

@@ -49,7 +49,7 @@ common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || ec
 
 # The main checkout is the one whose working tree is the parent of the single
 # `.git` every worktree shares -- the same discriminator `resolveProjectRoot`
-# uses in `src/db/connect.ts`, one question over.
+# uses in `packages/core-db/connect.ts`, one question over.
 offset=0
 if [ -n "$toplevel" ] && [ -n "$common" ] && [ "$toplevel" != "$(dirname "$common")" ]; then
   # 10000-19999, so every port stays well clear of its base and of 65535

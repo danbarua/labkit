@@ -4,10 +4,10 @@
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import type { z } from "zod";
-import { ReadSurface, WriteSurface, inMemoryEventLog } from "../../src/domain";
-import { buildProgram } from "../../src/cli/program";
-import type { Answer } from "../../src/cli/output";
-import type { Run, Surfaces } from "../../src/cli/session";
+import { ReadSurface, WriteSurface, inMemoryEventLog } from "../../packages/core-domain";
+import { buildProgram } from "../../packages/app-cli/program";
+import type { Answer } from "../../packages/app-cli/output";
+import type { Run, Surfaces } from "../../packages/app-cli/session";
 import {
   claimsAsserting,
   conflictVerdict,
@@ -37,7 +37,7 @@ import {
   evaluatedCriterion,
   restated,
   closedEnquiry,
-} from "../../src/domain/reports";
+} from "../../packages/core-domain/reports";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
 /**

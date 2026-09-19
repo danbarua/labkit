@@ -2,16 +2,21 @@
  * The spike's question: is an event a delta?
  */
 
-import { createdIn } from "../src/domain";
+import { createdIn } from "../packages/core-domain";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
-import { ResearchSession, WriteSurface, inMemoryEventLog, UNATTRIBUTED } from "../src/domain";
-import type { DomainEvent, EventSink } from "../src/domain";
-import { applyDelta } from "../src/domain/projection";
+import {
+  ResearchSession,
+  WriteSurface,
+  inMemoryEventLog,
+  UNATTRIBUTED,
+} from "../packages/core-domain";
+import type { DomainEvent, EventSink } from "../packages/core-domain";
+import { applyDelta } from "../packages/core-domain/projection";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { TenantGraph } from "../src/db/graph";
-import { resolveTenantContext } from "../src/db/tenant";
+import { TenantGraph } from "../packages/core-db/graph";
+import { resolveTenantContext } from "../packages/core-db/tenant";
 import { setupTestDb } from "./helpers/db";
-import { vertexProps, edgeProps } from "../src/db/cypher";
+import { vertexProps, edgeProps } from "../packages/core-db/cypher";
 
 let scenario: Scenario;
 let graph: TenantGraph;

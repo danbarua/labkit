@@ -31,7 +31,7 @@
 # ## What transcribing this by hand found
 #
 # **One still-open design gap.** `why <claim>`'s "Held to" line is
-# criterion-scoped by design (`checkStatusOver`, src/domain/survey-facts.ts)
+# criterion-scoped by design (`checkStatusOver`, packages/core-domain/survey-facts.ts)
 # -- every standing evaluation of a criterion counts, and one failure fails it
 # for every claim held to it. Bonsai's re-verification decision rule is ONE
 # rule instantiated PER COMPARISON (4 of them), which LabKit has no way to
@@ -67,7 +67,7 @@ export LABKIT_RECONSTRUCTED_FROM="bonsai-2026 git history"
 
 [ -n "$db" ] || { echo "usage: LABKIT_HOME=<dir> $0, or $0 <db-dir>" >&2; exit 2; }
 
-lab() { bun "$root/src/cli/cli.ts" --db "$db" --author probe-bonsai-1a.sh "$@"; }
+lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author probe-bonsai-1a.sh "$@"; }
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 

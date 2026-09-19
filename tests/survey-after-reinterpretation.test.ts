@@ -4,8 +4,8 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { vertexProps } from "../src/db/cypher";
-import { ResearchSession, inMemoryEventLog, type Clock } from "../src/domain";
+import { vertexProps } from "../packages/core-db/cypher";
+import { ResearchSession, inMemoryEventLog, type Clock } from "../packages/core-domain";
 import { recordAnalysis } from "./helpers/analysis";
 
 const clock: Clock = { now: () => "2026-08-29T09:00:00.000Z" };

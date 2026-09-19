@@ -2,16 +2,16 @@
  * The durable event log, and the six things about it that could break quietly.
  */
 
-import { createdIn, edgesIn } from "../src/domain/events";
-import type { DomainEvent, GraphChange } from "../src/domain/events";
-import type { PoseCommand } from "../src/domain/commands";
+import { createdIn, edgesIn } from "../packages/core-domain/events";
+import type { DomainEvent, GraphChange } from "../packages/core-domain/events";
+import type { PoseCommand } from "../packages/core-domain/commands";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
-import { resolveTenantContext } from "../src/db/tenant";
-import { TenantGraph } from "../src/db/graph";
-import { WriteSurface, UNATTRIBUTED, inMemoryEventLog, type Clock } from "../src/domain";
-import { eventFilter } from "../src/domain/queries";
-import { pgEventLog } from "../src/domain/event-store";
+import { resolveTenantContext } from "../packages/core-db/tenant";
+import { TenantGraph } from "../packages/core-db/graph";
+import { WriteSurface, UNATTRIBUTED, inMemoryEventLog, type Clock } from "../packages/core-domain";
+import { eventFilter } from "../packages/core-domain/queries";
+import { pgEventLog } from "../packages/core-domain/event-store";
 import { recordAnalysis } from "./helpers/analysis";
 
 let testDb: TestDb;
@@ -364,7 +364,7 @@ describe("the log answers what the graph cannot", () => {
     await write.closeEnquiry({ enquiry });
 
     const decisions = await graph.query(`MATCH (d:Decision) RETURN d`, {
-      d: (await import("../src/db/cypher")).vertexProps<{
+      d: (await import("../packages/core-db/cypher")).vertexProps<{
         natural_id: string;
       }>(),
     });

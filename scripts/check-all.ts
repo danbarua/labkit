@@ -119,7 +119,7 @@ export function stepsFor(): Step[] {
       // commit. `typecheck` takes the flag in `package.json`, where its command
       // lives.
       name: "depcruise",
-      argv: ["bunx", "--bun", "depcruise", "src", "tests", "--output-type", "err"],
+      argv: ["bunx", "--bun", "depcruise", "packages", "tests", "--output-type", "err"],
       says: "The layering rules hold, and nothing imports in a circle.",
     },
     ...Object.keys(scripts)

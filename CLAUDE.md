@@ -35,21 +35,21 @@ bun run format         # biome writes; check:format and check:lint are in the sw
 bun run build          # compile bin/labkit
 bun run dev            # the CLI
 bun run mcp            # the MCP server over stdio
-bun run db:generate    # after editing src/db/schema.ts
+bun run db:generate    # after editing packages/core-db/schema.ts
 bun run bonsai:record  # rebuild .labkit-bonsai from the probe scripts
 ```
 
 ## Layout
 
 ```
-src/db/       nodes and edges. All graph access goes through TenantGraph.
-src/domain/   research actions. Verb-first: no createClaim(), only recordAnalysis().
-src/mcp/      the agent surface.
-src/cli/      the terminal surface. A composition root, nothing else.
+packages/core-db/       nodes and edges. All graph access goes through TenantGraph.
+packages/core-domain/   research actions. Verb-first: no createClaim(), only recordAnalysis().
+packages/app-mcp/       the agent surface.
+packages/app-cli/       the terminal surface. A composition root, nothing else.
 ```
 
-`src/db/domain.ts` is the domain as graph structure — labels, edges, property
-shapes. `src/domain/` is the domain as it matters to a researcher.
+`packages/core-db/domain.ts` is the domain as graph structure — labels, edges, property
+shapes. `packages/core-domain/` is the domain as it matters to a researcher.
 
 A session is assembled in one order: `connect → bootstrapSession → migrate →
 resolveTenantContext → scopeToTenant → domain`.
@@ -62,15 +62,15 @@ writes it describes.
 `tests/scenarios/` and the Bonsai probe scripts are both the acceptance suite.
 
 Scenarios are researcher conversations as executable tests. They may import
-`src/domain` and never `src/db` — enforced by dependency-cruiser. A scenario
+`packages/core-domain` and never `packages/core-db` — enforced by dependency-cruiser. A scenario
 that needs the persistence layer has found a missing verb.
 
-Everything else in `tests/` tests persistence directly and may import `src/db`
+Everything else in `tests/` tests persistence directly and may import `packages/core-db`
 freely.
 
 Two layering rules are dependency-cruiser errors, not conventions:
-`tests/scenarios/` may not import `src/db`, and `src/db` may not import
-`src/domain`.
+`tests/scenarios/` may not import `packages/core-db`, and `packages/core-db` may not import
+`packages/core-domain`.
 
 ## Rules
 

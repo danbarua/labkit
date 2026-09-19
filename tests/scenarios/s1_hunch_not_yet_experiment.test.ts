@@ -9,10 +9,10 @@ import {
   type Clock,
   type EventSink,
   type QuestionRef,
-} from "../../src/domain";
+} from "../../packages/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { ref } from "../../src/domain/report";
+import { ref } from "../../packages/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { TenantGraph } from "../src/db/graph";
-import { agtypeValue, edgeProps, optional, scalar, vertexProps } from "../src/db/cypher";
+import { TenantGraph } from "../packages/core-db/graph";
+import { agtypeValue, edgeProps, optional, scalar, vertexProps } from "../packages/core-db/cypher";
 import {
   NODE_LABELS,
   NODE_TYPES,
@@ -11,11 +11,11 @@ import {
   type DecisionProps,
   type EvidenceProps,
   type LineOfEnquiryProps,
-} from "../src/db/domain";
-import type { LabKitDB } from "../src/db/backend";
-import { resolveTenantContext, type TenantContext } from "../src/db/tenant";
+} from "../packages/core-db/domain";
+import type { LabKitDB } from "../packages/core-db/backend";
+import { resolveTenantContext, type TenantContext } from "../packages/core-db/tenant";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
-import { transactor } from "../src/db/transactor";
+import { transactor } from "../packages/core-db/transactor";
 
 /**
  * Exercises the LabKit domain model revised by and ) against Apache AGE, migrated and
@@ -403,7 +403,7 @@ describe("Gate is reconnected to what it actually gates", () => {
 });
 
 describe("all node labels", () => {
-  // Minimal valid props per label's *Props interface in src/db/domain.ts. Exists so every label
+  // Minimal valid props per label's *Props interface in packages/core-db/domain.ts. Exists so every label
   // (not just the ones exercised by the acceptance queries above) actually round-trips through
   // createNode(), which is the only thing that would catch a NODE_TYPES[label].prefix entry
   // drifting out of sync with the sequence names in drizzle/0002_natural_ids.sql.

@@ -4,16 +4,16 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { setupTestDb, type TestClient, type TestDb } from "./helpers/db";
-import { resolveTenantContext } from "../src/db/tenant";
-import { TenantGraph } from "../src/db/graph";
+import { resolveTenantContext } from "../packages/core-db/tenant";
+import { TenantGraph } from "../packages/core-db/graph";
 import {
   ReadSurface,
   WriteSurface,
   inMemoryEventLog,
   type Clock,
   type EventSink,
-} from "../src/domain";
-import { pgEventLog } from "../src/domain/event-store";
+} from "../packages/core-domain";
+import { pgEventLog } from "../packages/core-domain/event-store";
 
 let testDb: TestDb;
 let db: TestClient;

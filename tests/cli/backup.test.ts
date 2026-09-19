@@ -8,7 +8,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const CLI = join(import.meta.dir, "../../src/cli/cli.ts");
+const CLI = join(import.meta.dir, "../../packages/app-cli/cli.ts");
 
 let record: string;
 let out: string;

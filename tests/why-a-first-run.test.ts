@@ -5,7 +5,7 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession } from "../src/domain";
+import { ResearchSession } from "../packages/core-domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { recordAnalysis } from "./helpers/analysis";
 

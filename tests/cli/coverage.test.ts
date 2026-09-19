@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ReadSurface, WriteSurface } from "../../src/domain";
+import { ReadSurface, WriteSurface } from "../../packages/core-domain";
 import {
   publicVerbsOf,
   verbsCalledOn,
@@ -13,7 +13,7 @@ import {
   WRITE_SURFACE,
 } from "../helpers/surface-coverage";
 
-const COMMANDS_DIR = "src/cli/commands";
+const COMMANDS_DIR = "packages/app-cli/commands";
 
 /** Every command module. */
 const commandFiles = readdirSync(COMMANDS_DIR)
@@ -33,10 +33,10 @@ const commandSource = commandFiles
  * Verbs deliberately without a command, and why.
  */
 const NO_COMMAND_FOR: Readonly<Record<string, string>> = {
-  // Both reached only through `why`'s dispatch table in src/domain/read.ts,
+  // Both reached only through `why`'s dispatch table in packages/core-domain/read.ts,
   // not called directly from any command module -- the `why` command itself
   // calls `read.why(subject)`. `whySupported` is still called directly from
-  // src/mcp/tools.ts, so it keeps an MCP tool of its own.
+  // packages/app-mcp/tools.ts, so it keeps an MCP tool of its own.
   whySupported: "reached only through `why`, as the Claim case's body",
   enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",
   analysisRevision: "reached only through `why`, as the Computation case's body",

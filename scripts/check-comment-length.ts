@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * No comment block in src/ or tests/ runs longer than eight lines.
+ * No comment block in packages/ or tests/ runs longer than eight lines.
  *
  * Length separates an essay from a doc comment; density does not. A file of
  * interface declarations with a one-line doc per field is 44% comment and
@@ -14,11 +14,14 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const MAX = 8;
-const ROOTS = ["src", "tests"];
+const ROOTS = ["packages", "tests"];
 
 function tsFiles(dir: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(dir)) {
+    // A workspace package holds its own `node_modules` under the isolated
+    // linker, and a dependency's `.d.ts` is not this repo's code.
+    if (entry === "node_modules") continue;
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) found.push(...tsFiles(path));
     else if (path.endsWith(".ts")) found.push(path);
@@ -62,7 +65,7 @@ for (const file of files) {
 }
 
 if (files.length === 0) {
-  console.error("FAILED: no TypeScript files found under src/ or tests/.");
+  console.error("FAILED: no TypeScript files found under packages/ or tests/.");
   process.exit(1);
 }
 if (over.length > 0) {

@@ -2,7 +2,7 @@
  * Attribution: who ran a command, recorded beside when.
  */
 
-import type { PoseCommand } from "../src/domain/commands";
+import type { PoseCommand } from "../packages/core-domain/commands";
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, test } from "bun:test";
 import {
   ResearchSession,
@@ -11,7 +11,7 @@ import {
   inMemoryEventLog,
   type AttributionContext,
   type Clock,
-} from "../src/domain";
+} from "../packages/core-domain";
 import {
   commandContext,
   mockGitContext,
@@ -19,9 +19,9 @@ import {
   personContext,
   type GitContextProvider,
   type SessionContextProvider,
-} from "../src/attribution";
+} from "../packages/core-domain/context";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import type { TenantGraph } from "../src/db/graph";
+import type { TenantGraph } from "../packages/core-db/graph";
 
 let scenario: Scenario;
 let graph: TenantGraph;

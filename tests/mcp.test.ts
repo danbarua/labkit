@@ -16,28 +16,34 @@ import {
   WriteSurface,
   inMemoryEventLog,
   type Clock,
-} from "../src/domain";
-import type { TenantGraph } from "../src/db/graph";
-import { buildServer } from "../src/mcp/server";
+} from "../packages/core-domain";
+import type { TenantGraph } from "../packages/core-db/graph";
+import { buildServer } from "../packages/app-mcp/server";
 import {
   commandContext,
   mockGitContext,
   registeredSession,
   sessionRegistry,
   type SessionRegistry,
-} from "../src/attribution";
-import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../src/mcp/tools";
-import { GATE_STATES } from "../src/domain/vocab";
-import { GATE_CLOSURES } from "../src/domain/commands";
+} from "../packages/core-domain/context";
+import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "../packages/app-mcp/tools";
+import { GATE_STATES } from "../packages/core-domain/vocab";
+import { GATE_CLOSURES } from "../packages/core-domain/commands";
 import {
   explanationSchema,
   historicalSurveySchema,
   knowledgeSurveySchema,
-} from "../src/mcp/schemas";
-import { DOCS_TOOL, DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "../src/mcp/docs";
+} from "../packages/app-mcp/schemas";
+import {
+  DOCS_TOOL,
+  DOCS_URI,
+  INSTRUCTIONS,
+  META_TOOLS,
+  renderToolDocs,
+} from "../packages/app-mcp/docs";
 import { z } from "zod";
 import { Command } from "commander";
-import { globalOptions } from "../src/cli/program";
+import { globalOptions } from "../packages/app-cli/program";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import {
   NOT_EXPOSED,
@@ -59,7 +65,7 @@ const id = (v: unknown): string =>
   typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
 /**
- * The composition `src/mcp/server.ts` uses: one graph, one sink owned here, and handed to a
+ * The composition `packages/app-mcp/server.ts` uses: one graph, one sink owned here, and handed to a
  * **scope** the server enters per tool call.
  */
 async function connectServer(
@@ -118,7 +124,7 @@ describe("structure", () => {
     expect(reads).toContain("gateStatus");
     expect(writes).toContain("recordAnalysis");
 
-    const TOOLS_FILE = ["src/mcp/tools.ts"];
+    const TOOLS_FILE = ["packages/app-mcp/tools.ts"];
     const readsCalled = verbsCalledOn(TOOLS_FILE, "read");
     const writesCalled = verbsCalledOn(TOOLS_FILE, "write");
     const unreachable = [
@@ -371,7 +377,7 @@ describe("an agent can track work through the tools alone", () => {
         because: "the suite is not representative of the general case",
       });
       // Over the wire the pairs survive as objects, not sentences. The domain
-      // codec in src/domain/reports.ts is the schema this value must match.
+      // codec in packages/core-domain/reports.ts is the schema this value must match.
       const previously = report.previously as Array<{
         claim: string;
         asserts: string;
@@ -797,7 +803,7 @@ describe("behaviour — the same answers, over the wire", () => {
       await parsed("enquiry_status", { enquiry: enquiry });
 
       // `known` is the one tool with no declared schema -- the SDK cannot carry
-      // a union (see src/mcp/tools.ts). Its two shapes are still checked, here.
+      // a union (see packages/app-mcp/tools.ts). Its two shapes are still checked, here.
       expect(knowledgeSurveySchema.safeParse(await structured(client, "known", {})).success).toBe(
         true,
       );
@@ -831,7 +837,7 @@ describe("behaviour — the same answers, over the wire", () => {
   test("every tool but `known` and `why` declares an output schema", () => {
     // Derived, not listed: a tool added later without one fails here rather
     // than shipping unvalidated. `why`'s reason is on its own definition in
-    // `src/mcp/tools.ts` -- the same SDK limitation `known`'s comment
+    // `packages/app-mcp/tools.ts` -- the same SDK limitation `known`'s comment
     // documents, measured against `explanationSchema`'s discriminated union
     // rather than assumed to be the same failure.
     expect(TOOLS.filter((t) => !t.outputSchema).map((t) => t.name)).toEqual(["known", "why"]);

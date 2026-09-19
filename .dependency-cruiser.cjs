@@ -6,35 +6,35 @@ module.exports = {
       severity: 'error',
       comment:
         "An acceptance scenario must be expressible through research verbs alone " +
-        "(src/domain). Reaching into src/db proves nothing about the surface a user " +
+        "(packages/core-domain). Reaching into packages/core-db proves nothing about the surface a user " +
         "has: it means the verb the scenario wanted is missing, so add it. " +
         "tests/helpers/ is exempt: it is harness, not caller.",
       from: { path: '^tests/scenarios' },
-      to: { path: '^src/db' }
+      to: { path: '^packages/core-db' }
     },
     {
       name: 'consumer-probe-no-persistence',
       severity: 'error',
       comment:
         "The consumer vertical slice asks whether the *public read surface* can tell two " +
-        "research worlds apart. Reaching into src/db would let a probe answer from the " +
+        "research worlds apart. Reaching into packages/core-db would let a probe answer from the " +
         "graph directly and report a distinction no consumer could ever make, which is " +
         "the one result the exercise must not be able to fake. tests/helpers/ is exempt.",
       from: { path: '^tests/consumer' },
-      to: { path: '^src/db' }
+      to: { path: '^packages/core-db' }
     },
     {
       name: 'reads-and-writes-do-not-mix',
       severity: 'error',
       comment:
-        "src/domain/session.ts was split on a seam the domain already asserts: events explain " +
+        "packages/core-domain/session.ts was split on a seam the domain already asserts: events explain " +
         "how state changed, the graph explains what the state is. Measured, that seam was exact " +
         "-- 18 write verbs, 14 read verbs, no member doing both, and all 18 callers of emit on " +
         "the write side. Either half importing the other would let a read emit or a write answer, " +
         "and the seam would rot back into one file. Shared helpers go in core.ts, which is small " +
         "and enumerated on purpose so it cannot become a junk drawer.",
-      from: { path: '^src/domain/read(/|\\.ts$)' },
-      to: { path: '^src/domain/write(/|\\.ts$)' }
+      from: { path: '^packages/core-domain/read(/|\\.ts$)' },
+      to: { path: '^packages/core-domain/write(/|\\.ts$)' }
     },
     {
       name: 'writes-do-not-read',
@@ -43,8 +43,8 @@ module.exports = {
         "The mirror of reads-and-writes-do-not-mix. It was one rule with a `pathNot: '$1'` " +
         "backreference, which worked only while the alternation had exactly two members and " +
         "matched nothing once either surface became a directory.",
-      from: { path: '^src/domain/write(/|\\.ts$)' },
-      to: { path: '^src/domain/read(/|\\.ts$)' }
+      from: { path: '^packages/core-domain/write(/|\\.ts$)' },
+      to: { path: '^packages/core-domain/read(/|\\.ts$)' }
     },
     {
       name: 'core-knows-no-verbs',
@@ -52,31 +52,31 @@ module.exports = {
       comment:
         "SessionCore holds the graph, the clock, the sink and the nine helpers both halves need. " +
         "If it reaches back to a surface the layering inverts and the split buys nothing.",
-      from: { path: '^src/domain/core\\.ts$' },
-      to: { path: '^src/domain/(read|write|session)(/|\\.ts$)' }
+      from: { path: '^packages/core-domain/core\\.ts$' },
+      to: { path: '^packages/core-domain/(read|write|session)(/|\\.ts$)' }
     },
     {
       name: 'an-app-does-not-assemble-a-session',
       severity: 'error',
       comment:
         "Connecting, resolving the tenant, stepping down to labkit_app and building the " +
-        "graph is one order, and `openRecord` in src/domain performs it. An adapter that " +
+        "graph is one order, and `openRecord` in packages/core-domain performs it. An adapter that " +
         "writes it out again is a fourth copy that can drift: it was written out by hand " +
         "in the CLI, the MCP server and twice in the web seeder, and each copy had to " +
-        "reach into src/db to do it. src/db/connect stays reachable — `backup` and " +
+        "reach into packages/core-db to do it. packages/core-db/connect stays reachable — `backup` and " +
         "`restore` act on a data directory rather than a session.",
       from: { path: '^src/(cli|mcp)' },
-      to: { path: '^src/db/(tenant|scoped|graph)' }
+      to: { path: '^packages/core-db/(tenant|scoped|graph)' }
     },
     {
       name: 'persistence-knows-no-domain',
       severity: 'error',
       comment:
-        "Layering direction: src/db knows nodes and edges, src/domain knows research " +
+        "Layering direction: packages/core-db knows nodes and edges, packages/core-domain knows research " +
         "actions. Persistence importing the service layer would inverse that and make " +
         "the graph model depend on today's verbs.",
-      from: { path: '^src/db' },
-      to: { path: '^src/domain' }
+      from: { path: '^packages/core-db' },
+      to: { path: '^packages/core-domain' }
     },
     {
       name: 'no-circular',

@@ -19,12 +19,12 @@ function parse(path: string): ts.SourceFile {
  *
  * Named here rather than at four call sites so a split moves one line.
  */
-export const READ_SURFACE = existsSync("src/domain/read")
-  ? "src/domain/read"
-  : "src/domain/read.ts";
-export const WRITE_SURFACE = existsSync("src/domain/write")
-  ? "src/domain/write"
-  : "src/domain/write.ts";
+export const READ_SURFACE = existsSync("packages/core-domain/read")
+  ? "packages/core-domain/read"
+  : "packages/core-domain/read.ts";
+export const WRITE_SURFACE = existsSync("packages/core-domain/write")
+  ? "packages/core-domain/write"
+  : "packages/core-domain/write.ts";
 
 /**
  * Every source under a path: the file itself, or every `.ts` in a directory.
@@ -108,7 +108,7 @@ export function verbsCalledOn(paths: readonly string[], receiver: string): Set<s
  * When something belongs here, the reason goes here with it.
  */
 export const NOT_EXPOSED: Readonly<Record<string, string>> = {
-  // `explainEnquiry` in src/domain/read.ts is its one caller, and it is a
+  // `explainEnquiry` in packages/core-domain/read.ts is its one caller, and it is a
   // module-level function rather than a class member (see `Explainer`), so
   // this stays public rather than `private`.
   enquiryInContext: "reached only through `why`, as the LineOfEnquiry case's body",

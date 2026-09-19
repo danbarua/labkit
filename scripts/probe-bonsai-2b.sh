@@ -44,7 +44,7 @@ export LABKIT_RECONSTRUCTED_FROM="bonsai-2026 git history"
 
 [ -n "$db" ] || { echo "usage: LABKIT_HOME=<dir> $0, or $0 <db-dir>" >&2; exit 2; }
 
-lab() { bun "$root/src/cli/cli.ts" --db "$db" --author probe-bonsai-2b.sh "$@"; }
+lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author probe-bonsai-2b.sh "$@"; }
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 

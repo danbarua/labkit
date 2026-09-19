@@ -15,7 +15,7 @@
  * scenario files reset the database"* — so the number was in the operator's
  * face and the exit code ignored it.
  *
- * It runs each check in a scaffold holding empty `src/`, `tests/`, `scripts/`,
+ * It runs each check in a scaffold holding empty `packages/`, `tests/`, `scripts/`,
  * `drizzle/` and `fragments/` directories, and requires a non-zero exit. A
  * crash counts as a pass here: an unhandled throw is loud, which is the
  * property being asked for. What is refused is a clean `OK:` over nothing.
@@ -72,7 +72,7 @@ const scanning = Object.entries(pkg.scripts as Record<string, string>)
 /** An empty tree with the directories a check might scan, and real dependencies. */
 function emptyWorld(): string {
   const dir = mkdtempSync(join(tmpdir(), "labkit-empty-world."));
-  for (const d of ["src", "tests", "scripts", "drizzle", "fragments"])
+  for (const d of ["packages", "tests", "scripts", "drizzle", "fragments"])
     mkdirSync(join(dir, d), { recursive: true });
   for (const f of ["package.json", "tsconfig.json"]) copyFileSync(join(REPO, f), join(dir, f));
   symlinkSync(join(REPO, "node_modules"), join(dir, "node_modules"));

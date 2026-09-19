@@ -2,7 +2,7 @@
  * A clock you can wind, for tests about time.
  */
 
-import type { Clock } from "../../src/domain";
+import type { Clock } from "../../packages/core-domain";
 
 export interface WindableClock extends Clock {
   /** Move forward by a duration. Negative values are rejected: a clock that can go backwards is a variable. */

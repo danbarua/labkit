@@ -3,11 +3,11 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog } from "../src/domain";
+import { ResearchSession, inMemoryEventLog } from "../packages/core-domain";
 import { openScenario, type Scenario } from "./helpers/scenario";
 import { claimOf } from "./helpers/claims";
 import { recordAnalysis } from "./helpers/analysis";
-import { workStateFrom } from "../src/domain/read/blocked";
+import { workStateFrom } from "../packages/core-domain/read/blocked";
 import { windableClock, days } from "./helpers/clock";
 
 let scenario: Scenario;

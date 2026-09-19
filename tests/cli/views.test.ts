@@ -3,21 +3,21 @@
  */
 
 import { expect, test } from "bun:test";
-import { ref } from "../../src/domain/report";
-import { domainEvent } from "../../src/domain/events";
-import { asHandles } from "../../src/cli/output";
-import { PLAIN, palette } from "../../src/cli/palette";
+import { ref } from "../../packages/core-domain/report";
+import { domainEvent } from "../../packages/core-domain/events";
+import { asHandles } from "../../packages/app-cli/output";
+import { PLAIN, palette } from "../../packages/app-cli/palette";
 import {
   renderKnown,
   renderWhy,
   renderWhyDispatch,
   renderClaims,
   renderConflict,
-} from "../../src/cli/views/knowledge";
-import { renderEnquiry, renderOrigin } from "../../src/cli/views/enquiry";
-import { renderContract, renderGate } from "../../src/cli/views/gates";
-import { renderReproducibility, renderReproduction } from "../../src/cli/views/analysis";
-import { renderHappened } from "../../src/cli/views/events";
+} from "../../packages/app-cli/views/knowledge";
+import { renderEnquiry, renderOrigin } from "../../packages/app-cli/views/enquiry";
+import { renderContract, renderGate } from "../../packages/app-cli/views/gates";
+import { renderReproducibility, renderReproduction } from "../../packages/app-cli/views/analysis";
+import { renderHappened } from "../../packages/app-cli/views/events";
 import type {
   ConflictVerdict,
   RecordedEvent,
@@ -29,7 +29,7 @@ import type {
   ReproductionReport,
   SupportExplanation,
   TaskContract,
-} from "../../src/domain";
+} from "../../packages/core-domain";
 
 test("an enquiry accepted as unresolved does not render as merely open", () => {
   const status: EnquiryStatus = {

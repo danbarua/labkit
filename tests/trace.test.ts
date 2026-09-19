@@ -2,8 +2,8 @@
  * `traced()` must be free when off and useful when on.
  */
 import { afterEach, expect, test } from "bun:test";
-import { traced, traceTotals, tracedInFlight } from "../src/db/trace";
-import type { LabKitDB } from "../src/db/backend";
+import { traced, traceTotals, tracedInFlight } from "../packages/core-db/trace";
+import type { LabKitDB } from "../packages/core-db/backend";
 
 const stub: LabKitDB = {
   async query() {

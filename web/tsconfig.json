@@ -24,5 +24,5 @@
     },
     "rootDirs": ["src", "../src"]
   },
-  "include": ["src", "scripts", "../src/db/sql-modules.d.ts"]
+  "include": ["src", "scripts", "../packages/core-db/sql-modules.d.ts"]
 }

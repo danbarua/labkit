@@ -113,7 +113,7 @@ read_side() {
   local db="$1"; shift
   local err out rc
   err="$(mktemp)"
-  out="$(bun "$root/src/cli/cli.ts" --db "$db" "$@" 2>"$err")"
+  out="$(bun "$root/packages/app-cli/cli.ts" --db "$db" "$@" 2>"$err")"
   rc=$?
   if [ "$rc" -ne 0 ]; then
     echo "ERROR: labkit $* against $db failed:" >&2

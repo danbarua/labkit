@@ -2,7 +2,7 @@
  * The scenario harness itself, under the one condition that produces a teardown cascade.
  */
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { vertexProps } from "../src/db/cypher";
+import { vertexProps } from "../packages/core-db/cypher";
 import { openScenario, type Scenario } from "./helpers/scenario";
 
 let scenario: Scenario;

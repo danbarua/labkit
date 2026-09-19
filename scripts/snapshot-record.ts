@@ -18,7 +18,7 @@
  * a second, unlocked open of the same directory is the concurrent-writer
  * corruption case the lock exists to prevent, and a `dataDir` argument
  * missing its final path segment doesn't error, it silently initialises a
- * fresh empty cluster there. `connection.pglite` (`src/db/backend.ts`)
+ * fresh empty cluster there. `connection.pglite` (`packages/core-db/backend.ts`)
  * reaches PGlite's dump capability through the same connection that already
  * holds the lock, rather than opening the directory a second way.
  *
@@ -41,7 +41,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
-import { connectDb } from "../src/db/connect";
+import { connectDb } from "../packages/core-db/connect";
 
 const args = process.argv.slice(2);
 const value = (name: string, fallback?: string): string | undefined => {

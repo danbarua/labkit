@@ -3,7 +3,12 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ReadSurface, ResearchSession, inMemoryEventLog, type Clock } from "../../src/domain";
+import {
+  ReadSurface,
+  ResearchSession,
+  inMemoryEventLog,
+  type Clock,
+} from "../../packages/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";

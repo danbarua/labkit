@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Nothing under src/ may write to stdout except the CLI.
+# Nothing under packages/ may write to stdout except the CLI.
 #
-# This became load-bearing on 2026-08-21, when src/mcp/server.ts started
+# This became load-bearing on 2026-08-21, when packages/app-mcp/server.ts started
 # speaking MCP over stdio. stdout IS the protocol channel there: one stray
 # `console.log` anywhere the server transitively imports — the DB layer, the
 # domain layer, a helper — interleaves a non-JSON line into the stream and the
 # client's parser fails on it. Query tracing already writes to stderr for this
-# reason (src/db/trace.ts); the point of this script is that the next person
+# reason (packages/core-db/trace.ts); the point of this script is that the next person
 # adding a debug print does not have to know why.
 #
 # It replaces a transplant. The file here used to be
@@ -26,31 +26,31 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT"
 
-# `src/cli/cli.ts` is the exception and the only one: printing to stdout is its
+# `packages/app-cli/cli.ts` is the exception and the only one: printing to stdout is its
 # whole job, and it is never imported by the MCP server.
 #
-# It names the **entry point**, not the `src/cli/` tree. The views under it
+# It names the **entry point**, not the `packages/app-cli/` tree. The views under it
 # return strings, and one of them printing instead of returning is a defect this
 # check should still catch -- demonstrated on 2026-08-25 by adding a console.log
-# to `src/cli/views/format.ts` and watching this go red.
+# to `packages/app-cli/views/format.ts` and watching this go red.
 #
 # Comment lines are dropped before matching. Naming the banned call in prose is
 # not making it -- the first version of this script failed on its own docstring,
 # which is the same trap tests/cli/coverage.test.ts already strips comments to avoid.
-matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' src/ \
+matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' packages/ \
   --include='*.ts' 2>/dev/null \
-  | grep -v '^src/cli/cli\.ts:' \
+  | grep -v '^packages/app-cli/cli\.ts:' \
   | grep -vE '^[^:]+:[0-9]+: *(\*|//|/\*)' || true)"
 
 if [ -n "$matches" ]; then
-  echo "FAILED: writes to stdout under src/, outside src/cli/cli.ts:"
+  echo "FAILED: writes to stdout under packages/, outside packages/app-cli/cli.ts:"
   echo
   echo "$matches"
   echo
-  echo "stdout is the MCP protocol channel (src/mcp/server.ts). Use stderr"
-  echo "for diagnostics -- console.error, or the tracing in src/db/trace.ts,"
+  echo "stdout is the MCP protocol channel (packages/app-mcp/server.ts). Use stderr"
+  echo "for diagnostics -- console.error, or the tracing in packages/core-db/trace.ts,"
   echo "which is gated behind LABKIT_TRACE and already writes to stderr."
   exit 1
 fi
 
-echo "OK: nothing under src/ writes to stdout except the CLI."
+echo "OK: nothing under packages/ writes to stdout except the CLI."

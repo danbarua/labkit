@@ -22,7 +22,7 @@
 # **Why it is no longer on every pull request.** ~153s of a ~394s build, on a
 # backend nothing deploys to yet, to check a divergence that has never been
 # observed (first green run 2026-08-26: 360 pass, 4 skip, 0 fail). Its trigger
-# now fires on changes to `src/db/**` and `drizzle/**`, and on every merge to
+# now fires on changes to `packages/core-db/**` and `drizzle/**`, and on every merge to
 # main. See `infra/ci/triggers.tf` for why that filter is an allowlist here and
 # a denylist there.
 

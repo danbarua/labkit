@@ -2,7 +2,7 @@
 /**
  * The three rules a fact has to follow, each learned by breaking it.
  *
- * `src/domain/facts.ts`'s header states them in prose; this makes two of them
+ * `packages/core-domain/facts.ts`'s header states them in prose; this makes two of them
  * fail loudly and explains why the third cannot be checked here. All three were
  * live defects during the port, and none of them errored at the time — that is
  * the point. A fact that gets one wrong returns a plausible answer.
@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { Glob } from "bun";
 
 const failures: string[] = [];
-const files = [...new Glob("src/domain/*facts.ts").scanSync(".")].sort();
+const files = [...new Glob("packages/core-domain/*facts.ts").scanSync(".")].sort();
 
 /** A `key: value` from an object literal, if it is there. */
 function prop(node: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined {
@@ -125,7 +125,7 @@ if (failures.length > 0) {
   console.error(`FAILED: ${failures.length} fact declaration(s) break a rule:`);
   for (const f of failures) console.error(`  ${f}`);
   console.error("");
-  console.error("  See src/domain/facts.ts's header for why each rule exists.");
+  console.error("  See packages/core-domain/facts.ts's header for why each rule exists.");
   process.exit(1);
 }
 
@@ -135,7 +135,7 @@ if (failures.length > 0) {
 // to that.
 if (files.length === 0) {
   console.error(
-    "FAILED: no src/domain/*facts.ts modules — this check examined nothing. It printed\n" +
+    "FAILED: no packages/core-domain/*facts.ts modules — this check examined nothing. It printed\n" +
       "        the zero and exited 0 until 2026-09-03.",
   );
   process.exit(1);

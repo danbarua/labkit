@@ -12,16 +12,16 @@ import {
   type Clock,
   type DomainEvent,
   type EventSink,
-} from "../src/domain";
+} from "../packages/core-domain";
 import {
   graphProjector,
   type IdSource,
   type Projector,
   UnitOfWork,
-} from "../src/domain/projection";
+} from "../packages/core-domain/projection";
 import { openScenario, type Scenario } from "./helpers/scenario";
-import { scalar, vertexProps } from "../src/db/cypher";
-import type { TenantGraph } from "../src/db/graph";
+import { scalar, vertexProps } from "../packages/core-db/cypher";
+import type { TenantGraph } from "../packages/core-db/graph";
 
 /** The whole of a graph store, for a projector that has no store. */
 interface Projected {

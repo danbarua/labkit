@@ -14,8 +14,8 @@ import type {
   WorkRef,
   ReviewRef,
   ReplacementReport,
-} from "../../src/domain/report";
-import type { ResearchWrites, ReplacementConclusion } from "../../src/domain";
+} from "../../packages/core-domain/report";
+import type { ResearchWrites, ReplacementConclusion } from "../../packages/core-domain";
 
 /** Every fragment writes through the public surface and nothing else. */
 type W = ResearchWrites;

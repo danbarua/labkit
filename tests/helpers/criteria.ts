@@ -2,7 +2,7 @@
  * Reaching a check's evaluations, now that a check does not carry them.
  */
 
-import type { CheckStatus, EvaluationRecord, ResearchSession } from "../../src/domain";
+import type { CheckStatus, EvaluationRecord, ResearchSession } from "../../packages/core-domain";
 
 /** Every evaluation of the criterion a check names, oldest first. */
 export async function evaluationsOf(

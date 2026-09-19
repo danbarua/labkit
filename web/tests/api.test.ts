@@ -11,9 +11,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
-import { directPostgresBackend } from "../../src/db/backend";
-import { runMigrationsOnPostgres } from "../../src/db/migrate";
-import { resolveTenantContext } from "../../src/db/tenant";
+import { directPostgresBackend } from "../../packages/core-db/backend";
+import { runMigrationsOnPostgres } from "../../packages/core-db/migrate";
+import { resolveTenantContext } from "../../packages/core-db/tenant";
 import { handle } from "../src/server/handler";
 import { openRuntime, type Runtime } from "../src/server/runtime";
 

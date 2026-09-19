@@ -3,10 +3,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "../../src/domain";
+import {
+  ResearchSession,
+  inMemoryEventLog,
+  type Clock,
+  type EventSink,
+} from "../../packages/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { ref, type DesignHistory } from "../../src/domain/report";
+import { ref, type DesignHistory } from "../../packages/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 
 let scenario: Scenario;

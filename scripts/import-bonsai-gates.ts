@@ -75,7 +75,7 @@ const db: string = dbOrNone;
 const sourceDir = sourceArg ?? db;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const cliPath = join(root, "src/cli/cli.ts");
+const cliPath = join(root, "packages/app-cli/cli.ts");
 const relPath = "experiments/stage2b_denoising/gates.toml";
 const gatesPath = join(sourceDir, relPath);
 
