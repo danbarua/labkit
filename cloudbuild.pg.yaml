@@ -77,7 +77,7 @@ steps:
     name: labkit-ci
     entrypoint: bash
     env:
-      - LABKIT_DB_URL=postgres://postgres:agens@labkit-pg:5432/labkit_tests
+      - LABKIT_DB_URL=postgres://postgres:agens@labkit-pg:5432/labkit_tests_01
     args:
       - -c
       - |

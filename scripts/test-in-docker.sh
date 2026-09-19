@@ -103,7 +103,7 @@ if [ "$gate_only" != "--gate-only" ] && [ "$status" -eq 0 ]; then
   echo "test:in-docker: bun run test:pg"
   # The same readiness wait cloudbuild.test.yaml does, and for the same reason:
   # with LABKIT_DB_URL pre-set, scripts/test-postgres.sh skips its own.
-  run_in_ci -e "LABKIT_DB_URL=postgres://postgres:agens@labkit-pg-$$:5432/labkit_tests" \
+  run_in_ci -e "LABKIT_DB_URL=postgres://postgres:agens@labkit-pg-$$:5432/labkit_tests_01" \
     labkit-ci bash -c '
       set -e
       for _ in $(seq 1 60); do
