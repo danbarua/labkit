@@ -26,33 +26,17 @@
 # system schemas** between tests, so it must only ever point at a throwaway
 # database.
 #
-# Which is why the default is a database called **`labkit_tests`**, and not
-# `postgres` and not `labkit`. `postgres` is the cluster's own maintenance
-# database and every tool defaults to it, so a suite that truncated *there*
-# would eat whatever a developer had been poking at with psql; `labkit` is the
-# name a real deployment would pick, which is precisely the name a destructive
-# test run must not be able to reach by default. An explicit `LABKIT_DB_URL` is
-# still honoured verbatim — a caller who named a database has made that decision
-# — so the guard is a safe default rather than a restriction.
+# The default is `labkit_tests_01`, never `postgres` and never `labkit`: this
+# truncates what it points at. An explicit `LABKIT_DB_URL` is honoured as given.
 #
-# **That database is created by the image, not by this script.** It used to be
-# a check-then-`CREATE DATABASE` in shell here, which existed only because we
-# did not own the image; `docker/postgres/initdb/` does it now, once, on an
-# empty data directory. What the image may and may not contain is argued in
-# `docker/postgres/Dockerfile`, and the short version is that it is a
-# convenience and never a requirement — LabKit must keep working against a
-# stock Postgres + AGE somebody else administers.
-#
-# Two files opt out, both deliberately: `tests/connection-lock.test.ts` skips
-# (its subject is the PGlite lockfile, which a real Postgres does not have) and
-# `tests/mcp-stdio.test.ts` strips `LABKIT_DB_URL` from the servers it spawns
-# (it gives each one a private directory, and this variable would win over it).
+# There are four, `_01` to `_04`, so shards can run at once without truncating
+# each other.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-test_db="labkit_tests"
+test_db="labkit_tests_01"
 
 # This worktree's published port, not a literal 5432 -- two worktrees running
 # `test:pg` at once would otherwise be one truncating the other's database.
