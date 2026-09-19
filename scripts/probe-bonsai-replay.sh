@@ -59,6 +59,8 @@
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$root/scripts/lib/throwaway-db.sh"
+refuse_db_url "scripts/probe-bonsai-replay.sh"
 live="${1:-${LABKIT_HOME:-}}"
 [ -n "$live" ] || { echo "usage: LABKIT_HOME=<live-db-dir> $0, or $0 <live-db-dir> [<gates-source-dir>]" >&2; exit 2; }
 [ -d "$live/.labkit" ] || { echo "no .labkit record at $live" >&2; exit 2; }

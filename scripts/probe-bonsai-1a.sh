@@ -58,6 +58,8 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$root/scripts/lib/throwaway-db.sh"
+refuse_db_url "scripts/probe-bonsai-1a.sh"
 db="${1:-${LABKIT_HOME:-}}"
 # Nothing here was watched happening: every act below is transcribed from a
 # source, so every event it writes says which one. One export covers the file;

@@ -37,6 +37,8 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$root/scripts/lib/throwaway-db.sh"
+refuse_db_url "scripts/smoke-cli.sh"
 db="$(mktemp -d "${TMPDIR:-/tmp}/labkit-lifecycle.XXXXXX")"
 trap 'rm -rf "$db"' EXIT
 
@@ -55,10 +57,21 @@ lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.s
 # The stdout half matters more than it looks: the whole of a write command's
 # stdout is an id the next command consumes, so a line printed to the wrong
 # stream turns `$(labkit criterion 'x')` into a captured error message.
-first_err="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
+# Both streams and the status, because the three failures read alike on stderr
+# alone: a wrong message, a crash that printed to stdout, and a run that never
+# reached the announcement at all. The last one reported an empty `stderr was:`
+# and said nothing about why.
+first_out="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>/tmp/labkit-first-err.$$)" || first_status=$?
+first_status="${first_status:-0}"
+first_err="$(cat /tmp/labkit-first-err.$$)"; rm -f /tmp/labkit-first-err.$$
 case "$first_err" in
   *"creating a new record"*) printf '  ok  %s\n' "the first command says it is creating a record" ;;
-  *) printf '\nFAILED: the first command did not announce a new record\n  stderr was: %s\n' "$first_err" >&2; exit 1 ;;
+  *)
+    printf '\nFAILED: the first command did not announce a new record\n' >&2
+    printf '  exit status: %s\n' "$first_status" >&2
+    printf '  stderr     : %s\n' "${first_err:-(empty)}" >&2
+    printf '  stdout     : %s\n' "${first_out:-(empty)}" >&2
+    exit 1 ;;
 esac
 
 second_err="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"

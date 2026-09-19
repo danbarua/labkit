@@ -102,7 +102,11 @@ export function changedPackages(base: string): Set<string> | null {
   const proc = Bun.spawnSync(["git", "diff", "--name-only", base]);
   if (proc.exitCode !== 0) return null;
   const files = new TextDecoder().decode(proc.stdout).trim().split("\n").filter(Boolean);
-  if (files.length === 0) return new Set();
+  // An empty diff is not "nothing to test". It is also what a base that does
+  // not resolve, or a checkout that is not what it was thought to be, looks
+  // like — and those must run everything rather than the five files that
+  // import no package.
+  if (files.length === 0) return null;
   const packages = new Set<string>();
   for (const file of files) {
     if (TREE_WIDE.some((p) => file === p || file.startsWith(p))) return null;
