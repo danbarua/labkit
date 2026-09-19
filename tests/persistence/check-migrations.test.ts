@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const SCRIPT = join(import.meta.dir, "..", "scripts", "check-migrations.ts");
+const SCRIPT = join(import.meta.dir, "..", "..", "scripts", "check-migrations.ts");
 
 /** Runs the check over a throwaway `drizzle/` holding `sql`, or nothing. */
 function runOver(sql?: string): { code: number; out: string } {
