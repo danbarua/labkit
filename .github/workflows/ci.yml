@@ -1,5 +1,5 @@
-# The patch number is the pull request that shipped it, written when it ships,
-# and the gate that runs on every pull request.
+# Two jobs: `check` runs the gate on every pull request, and `stamp` writes
+# the version number on main after a merge.
 #
 # `labkit --version` names its own change: 0.7.426 came from #426. The number
 # is written **on main, after the merge**, and never on a branch.
@@ -17,7 +17,7 @@
 # `retire-when:` is why: "the version is written by the merge rather than by
 # hand". It is.
 
-name: Version, and the gate
+name: CI
 
 on:
   pull_request:
