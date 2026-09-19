@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs the whole test suite against a real Postgres + AGE container instead of embedded PGlite.
 #
-# `bun run test:pg`. Optional, and nothing runs it for you: there is no CI, and
-# `bun run check` uses the default PGlite path. It is `test:` rather than
+# `bun run test:pg`. CI runs the same suite against the same image, four
+# shards at a time; `bun run check` uses the default PGlite path. It is `test:` rather than
 # `check:` for that reason — `check:` means "green is fine, red is yours to fix"
 # and `bun run check` derives its list from that prefix, so a task needing
 # docker must not wear it.

@@ -99,6 +99,65 @@ jobs:
           path: junit-${{ matrix.shard }}.xml
           if-no-files-found: warn
 
+  # The same suite against real Postgres and AGE, four shards against the four
+  # labkit_tests_NN databases the image ships. PGlite is single-writer and
+  # shares one session, so anything about isolation, a session-scoped role or
+  # advisory locking under contention can only be *demonstrated* here. It is
+  # also a disagreeing decoder: `count(*)` is a string over `pg` and a number
+  # over a raw PGlite.
+  #
+  # The image is the one `docker/postgres` publishes, so a developer running
+  # `test:pg` and this job are on the same Postgres.
+  test-postgres:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    services:
+      postgres:
+        image: ghcr.io/danbarua/labkit-pg18_age170-base:latest
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: agens
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        # Over TCP, because the entrypoint runs a temporary server during
+        # initdb that answers on the unix socket while TCP is still closed.
+        options: >-
+          --health-cmd "pg_isready -U postgres -h 127.0.0.1"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      LABKIT_DB_URL: postgres://postgres:agens@127.0.0.1:5432/labkit_tests_0${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - name: test against postgres
+        run: |
+          bun run test -- $(bun scripts/shard.ts --of 4 --index ${{ matrix.shard }}) \
+            --reporter=junit --reporter-outfile=junit-pg-${{ matrix.shard }}.xml
+
+      - name: junit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-pg-${{ matrix.shard }}
+          path: junit-pg-${{ matrix.shard }}.xml
+          if-no-files-found: warn
+
   # Everything the suite is not: typecheck, depcruise, every `check:*`, the
   # compiled binary and the CLI. `check:quick` is the first three.
   other-checks:
@@ -127,7 +186,7 @@ jobs:
   # reports -- which is what happened on #463.
   run-ci-build:
     if: always() && github.event_name == 'pull_request'
-    needs: [test-shard, other-checks]
+    needs: [test-shard, test-postgres, other-checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read
