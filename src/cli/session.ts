@@ -2,12 +2,8 @@
  * What a command is handed, and what happens around it.
  */
 
-import { connectDb } from "../db/connect";
-import { resolveTenantContext } from "../db/tenant";
-import { scopeToTenant } from "../db/scoped";
-import { TenantGraph } from "../db/graph";
-import { ReadSurface, WriteSurface } from "../domain";
-import { pgEventLog } from "../domain/event-store";
+import { openRecord } from "../domain";
+import type { ReadSurface, WriteSurface } from "../domain";
 import { commandContext, gitContext, personContext } from "../attribution";
 import type { Clock } from "../domain";
 import { asJson, type Answer } from "./output";
@@ -63,30 +59,19 @@ export type Run = (work: (surfaces: Surfaces) => Promise<Answer>) => Promise<voi
 export function runner(globals: () => Globals, write: (line: string) => void): Run {
   return async (work) => {
     const opts = globals();
-    const connection = await connectDb(opts.db);
+    const clock: Clock | undefined = opts.date ? { now: () => opts.date! } : undefined;
+    const record = await openRecord({
+      ...(opts.db === undefined ? {} : { db: opts.db }),
+      ...(opts.tenant === undefined ? {} : { tenant: opts.tenant }),
+      context: commandContext(
+        gitContext,
+        personContext(opts.author),
+        clock,
+        opts.reconstructedFrom ?? process.env.LABKIT_RECONSTRUCTED_FROM,
+      ),
+    });
     try {
-      const ctx = await resolveTenantContext(connection.db, connection.tx, opts.tenant ?? "labkit");
-      // Everything above this line needs the superuser it connected as -- `LOAD
-      // 'age'` and the graph DDL both. Everything below runs as `labkit_app`
-      // with its tenant pinned, so a read that forgets to filter still cannot
-      // see another tenant's events. See src/db/scoped.ts for what that is and
-      // is not worth.
-      await scopeToTenant(connection.db, ctx);
-      const events = pgEventLog(connection.db, ctx.tenantId);
-      const graph = new TenantGraph(ctx, connection.db, connection.tx);
-      const clock: Clock | undefined = opts.date ? { now: () => opts.date! } : undefined;
-      const answered = await work({
-        read: new ReadSurface(graph, { events }),
-        write: new WriteSurface(graph, {
-          ...commandContext(
-            gitContext,
-            personContext(opts.author),
-            clock,
-            opts.reconstructedFrom ?? process.env.LABKIT_RECONSTRUCTED_FROM,
-          ),
-          events,
-        }),
-      });
+      const answered = await work({ read: record.read, write: record.write });
       // Wrapped here, not in each view: every report goes out through this
       // line, and a view that forgot was a 1,300-column line in `now`.
       const colours = coloursFor(opts);
@@ -101,7 +86,7 @@ export function runner(globals: () => Globals, write: (line: string) => void): R
             ),
       );
     } finally {
-      await connection.close();
+      await record.close();
     }
   };
 }

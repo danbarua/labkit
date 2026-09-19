@@ -56,6 +56,19 @@ module.exports = {
       to: { path: '^src/domain/(read|write|session)(/|\\.ts$)' }
     },
     {
+      name: 'an-app-does-not-assemble-a-session',
+      severity: 'error',
+      comment:
+        "Connecting, resolving the tenant, stepping down to labkit_app and building the " +
+        "graph is one order, and `openRecord` in src/domain performs it. An adapter that " +
+        "writes it out again is a fourth copy that can drift: it was written out by hand " +
+        "in the CLI, the MCP server and twice in the web seeder, and each copy had to " +
+        "reach into src/db to do it. src/db/connect stays reachable — `backup` and " +
+        "`restore` act on a data directory rather than a session.",
+      from: { path: '^src/(cli|mcp)' },
+      to: { path: '^src/db/(tenant|scoped|graph)' }
+    },
+    {
       name: 'persistence-knows-no-domain',
       severity: 'error',
       comment:

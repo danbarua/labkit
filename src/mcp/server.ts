@@ -8,11 +8,7 @@ import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "../request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { connectDb } from "../db/connect";
-import { resolveTenantContext } from "../db/tenant";
-import { scopeToTenant } from "../db/scoped";
-import { TenantGraph } from "../db/graph";
-import { ReadSurface, WriteSurface } from "../domain";
+import { ReadSurface, WriteSurface, openRecord } from "../domain";
 import { pgEventLog } from "../domain/event-store";
 import {
   commandContext,
@@ -212,46 +208,22 @@ let inFlight = 0;
  */
 export function surfacesOver(tenant: string, session: SessionRegistry): WithSurfaces {
   return async (work) => {
-    const connection = await connectDb();
+    // Providers are sampled per call, so a long-running server records the commit each piece
+    // of work was actually done against — and the agent registered at that moment rather than
+    // at server start.
+    const record = await openRecord({
+      tenant,
+      context: commandContext(
+        mockGitContext,
+        registeredSession(session),
+        undefined,
+        session.registered()?.reconstructedFrom ?? undefined,
+      ),
+    });
     try {
-      // `tenantCtx`, not `ctx`. There are two contexts in scope here and they
-      // are unrelated: this one is which tenant's graph to talk to, and the
-      // `CommandContext` below is who is talking and when.
-      const tenantCtx = await resolveTenantContext(connection.db, connection.tx, tenant);
-
-      // Superuser work is done: `LOAD 'age'` and the graph DDL both needed it.
-      // From here the session is `labkit_app` with its tenant pinned, so a tool
-      // that forgets to filter still cannot read another tenant's events. See
-      // src/db/scoped.ts for what that is and is not worth.
-      await scopeToTenant(connection.db, tenantCtx);
-
-      // One graph for both halves, so `inTransaction`'s re-entrancy depth is
-      // shared. This is the composition `src/domain/session.ts` specifies for
-      // an adapter that needs both.
-      const graph = new TenantGraph(tenantCtx, connection.db, connection.tx);
-
-      // **Durable, and on the same connection as the graph** — that is the atomicity story:
-      // `emit` runs inside each verb's `inTransaction`, so an event and the writes it describes
-      // commit together. A second connection would silently end that.
-      const events = pgEventLog(connection.db, tenantCtx.tenantId);
-
-      // Providers are sampled per call, so a long-running server records the commit each piece
-      // of work was actually done against — and, now, the agent that was registered at that
-      // moment rather than at server start.
-      return await work({
-        read: new ReadSurface(graph, { events }),
-        write: new WriteSurface(graph, {
-          ...commandContext(
-            mockGitContext,
-            registeredSession(session),
-            undefined,
-            session.registered()?.reconstructedFrom ?? undefined,
-          ),
-          events,
-        }),
-      });
+      return await work({ read: record.read, write: record.write });
     } finally {
-      await connection.close();
+      await record.close();
     }
   };
 }
