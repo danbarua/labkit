@@ -28,15 +28,7 @@
  * Exit:  0 when everything passed, 1 otherwise.
  */
 
-import { stepsFor, runSteps } from "./check-all";
-
-/**
- * The steps that run or build the product rather than reading it.
- *
- * Named rather than measured at runtime: a timing threshold would move with
- * the machine, and a slow laptop would silently drop a check.
- */
-const SLOW = new Set(["test", "check:cli", "check:binary"]);
+import { SLOW, stepsFor, runSteps } from "./check-all";
 
 const all = stepsFor();
 const quick = all.filter((step) => !SLOW.has(step.name));

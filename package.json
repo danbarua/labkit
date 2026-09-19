@@ -48,7 +48,8 @@
 		"db:generate:custom": "drizzle-kit generate --custom",
 		"ports": "bash scripts/worktree-ports.sh",
 		"bonsai:record": "bash scripts/build-bonsai-record.sh",
-		"check:quick": "bun scripts/check-quick.ts"
+		"check:quick": "bun scripts/check-quick.ts",
+		"check:web-types": "bun scripts/check-web-types.ts"
 	},
 	"private": true,
 	"devDependencies": {
