@@ -8,6 +8,9 @@ import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "@labkit/app-cli/cli";
+import { ignoreLabkitDbUrl } from "../helpers/scratch-record";
+
+ignoreLabkitDbUrl();
 import { buildProgram } from "@labkit/app-cli/program";
 import type { Run } from "@labkit/app-cli/session";
 

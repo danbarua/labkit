@@ -52,7 +52,7 @@ const toEvent = (r: EventRow): RecordedEvent => {
 };
 
 /**
- * An `EventSink` backed by the tenant's own `labkit_event`, in its workspace schema.
+ * An `EventSink` backed by the tenant's own `domain_event`.
  *
  * `tenant_id` is still on every row and every query: the column is what the policy reads, and
  * the schema boundary and the policy are two answers to the same question rather than one.

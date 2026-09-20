@@ -3,7 +3,7 @@
  */
 
 import { Command } from "commander";
-import pkg from "../../package.json" with { type: "json" };
+import { labkitVersion } from "@labkit/core-domain/version";
 import { worktreeName } from "./worktree";
 import { isoInstant } from "./args";
 import { registerReads } from "./commands/reads";
@@ -12,7 +12,7 @@ import { registerBackup, registerRestore } from "./commands/backup";
 import { registerServe } from "./commands/serve";
 import type { Run } from "./session";
 
-const VERSION = pkg.version;
+const VERSION = labkitVersion();
 
 /**
  * The options every command shares.

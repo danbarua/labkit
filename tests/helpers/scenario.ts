@@ -19,6 +19,11 @@ export interface Scenario {
 
 export async function openScenario(): Promise<Scenario> {
   const testDb: TestDb = await setupTestDb();
+  // The file before this one left its rows behind: `begin()` resets only when a previous
+  // test in *this* file did not, and the last test of the previous file resets in its own
+  // `end()` — which runs after this. An inherited graph was survivable while ids came from a
+  // sequence that only climbs; a scenario numbering its own acts from 1 collides with it.
+  await testDb.reset();
 
   /**
    * Connections opened by `begin()` and not yet closed by `end()`, oldest first. **Normally

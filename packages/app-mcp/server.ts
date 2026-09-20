@@ -3,7 +3,7 @@
  * The MCP server — the door an agent works through.
  */
 
-import pkg from "../../package.json" with { type: "json" };
+import { labkitVersion } from "@labkit/core-domain/version";
 import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
@@ -55,7 +55,7 @@ export function buildServer(
   // while being wrong. It said `0.0.1` from before the first release until 2026-09-05, while
   // `labkit --version` was right — one binary, two surfaces, disagreeing about what they were.
   const server = new McpServer(
-    { name: "labkit", version: pkg.version },
+    { name: "labkit", version: labkitVersion() },
     { instructions: INSTRUCTIONS },
   );
 

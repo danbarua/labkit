@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs the whole test suite against a real Postgres + AGE container instead of embedded PGlite.
 #
-# `bun run test:pg`. Optional, and nothing runs it for you: there is no CI, and
-# `bun run check` uses the default PGlite path. It is `test:` rather than
+# `bun run test:pg`. CI runs the same suite against the same image, four
+# shards at a time; `bun run check` uses the default PGlite path. It is `test:` rather than
 # `check:` for that reason — `check:` means "green is fine, red is yours to fix"
 # and `bun run check` derives its list from that prefix, so a task needing
 # docker must not wear it.
@@ -26,33 +26,17 @@
 # system schemas** between tests, so it must only ever point at a throwaway
 # database.
 #
-# Which is why the default is a database called **`labkit_tests`**, and not
-# `postgres` and not `labkit`. `postgres` is the cluster's own maintenance
-# database and every tool defaults to it, so a suite that truncated *there*
-# would eat whatever a developer had been poking at with psql; `labkit` is the
-# name a real deployment would pick, which is precisely the name a destructive
-# test run must not be able to reach by default. An explicit `LABKIT_DB_URL` is
-# still honoured verbatim — a caller who named a database has made that decision
-# — so the guard is a safe default rather than a restriction.
+# The default is `labkit_tests_01`, never `postgres` and never `labkit`: this
+# truncates what it points at. An explicit `LABKIT_DB_URL` is honoured as given.
 #
-# **That database is created by the image, not by this script.** It used to be
-# a check-then-`CREATE DATABASE` in shell here, which existed only because we
-# did not own the image; `docker/postgres/initdb/` does it now, once, on an
-# empty data directory. What the image may and may not contain is argued in
-# `docker/postgres/Dockerfile`, and the short version is that it is a
-# convenience and never a requirement — LabKit must keep working against a
-# stock Postgres + AGE somebody else administers.
-#
-# Two files opt out, both deliberately: `tests/connection-lock.test.ts` skips
-# (its subject is the PGlite lockfile, which a real Postgres does not have) and
-# `tests/mcp-stdio.test.ts` strips `LABKIT_DB_URL` from the servers it spawns
-# (it gives each one a private directory, and this variable would win over it).
+# There are four, `_01` to `_04`, so shards can run at once without truncating
+# each other.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-test_db="labkit_tests"
+test_db="labkit_tests_01"
 
 # This worktree's published port, not a literal 5432 -- two worktrees running
 # `test:pg` at once would otherwise be one truncating the other's database.
@@ -101,7 +85,10 @@ echo
 # fixed, the build got further, and failed here instead — the same defect in the
 # second of the two places that invoke the suite. `bunfig.toml`'s `[test]
 # timeout` is not an answer; measured against bun 1.3.14, it is ignored.
-LABKIT_DB_URL="$url" bun run test
+# A ceiling of its own: the same work takes longer over a socket than it does
+# in-process. `survey-after-reinterpretation` runs 28.8s here against 2.4s on
+# PGlite, and the suite's 20s would call that a hung test.
+LABKIT_DB_URL="$url" bun run test -- --timeout 60000
 status=$?
 
 echo
