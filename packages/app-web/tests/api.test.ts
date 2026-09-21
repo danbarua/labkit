@@ -9,6 +9,7 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: response bodies are read loosely; each test asserts only the part of the shape it is about
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { NODE_LABELS, NODE_TYPES } from "@labkit/core-db/domain";
 import { handle } from "../src/server/handler";
 import { createRuntime, type Runtime } from "../src/server/runtime";
 import { createFixture, defaultBackend, type Fixture } from "./support/fixture";
@@ -487,6 +488,33 @@ describe("acts", () => {
     expect(act.body._links.subject.href).toBe(`${PUBLIC}/workspace/alpha/NOTE_1?depth=0`);
     const events = await get("/workspace/alpha/Q_1/events?depth=0");
     expect(events.body._embedded.events[0]._links.parent.href).toEndWith("/act/1?depth=0");
+  });
+});
+
+describe("sql functions", () => {
+  const labelOf = async (handle: string) => {
+    const session = await runtime.connections.connect();
+    try {
+      const { rows } = await session.query<{ label: string }>(
+        `SELECT public.labkit_get_label_for_handle($1) AS label`,
+        [handle],
+      );
+      return rows[0]?.label;
+    } finally {
+      session.release();
+    }
+  };
+
+  // The function repeats the domain's prefixes, so a type added there and not here fails here.
+  test.each([...NODE_LABELS])(
+    "labkit_get_label_for_handle names %s from its prefix",
+    async (label) => {
+      expect(await labelOf(`${NODE_TYPES[label].prefix}_1`)).toBe(label);
+    },
+  );
+
+  test("labkit_get_label_for_handle refuses a prefix no node type has", async () => {
+    await expect(labelOf("NOPE_1")).rejects.toThrow("Unrecognized natural id prefix");
   });
 });
 

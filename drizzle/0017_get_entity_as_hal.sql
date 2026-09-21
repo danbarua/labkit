@@ -1,15 +1,23 @@
-LOAD 'age';
-
-SET search_path = ag_catalog, "$user", public, labkit_t1;
-
-
-CREATE OR REPLACE FUNCTION public.derive_label_from_handle(
+-- lock-strategy: online
+-- The two functions the HTTP API reads a node with, created where every other
+-- `public.labkit_*` function is created, so a migrated database has them.
+--
+-- `labkit_get_label_for_handle` maps a handle's prefix to the node label it
+-- names (`Q_1` -> `Question`). It repeats `NODE_TYPES` in
+-- `packages/core-db/domain.ts`, and a test fails when the two disagree.
+-- Named `get`, not `resolve`: `labkit_resolve_handle` replaces a staged
+-- placeholder with the number the database chose, which is a different thing.
+--
+-- `labkit_get_entity_as_hal` returns one node and the neighbours within `depth`
+-- hops as a HAL resource. It runs as the caller, so a workspace's policies apply.
+CREATE FUNCTION public.labkit_get_label_for_handle(
   p_natural_id text
 )
 RETURNS text
 LANGUAGE plpgsql
 IMMUTABLE
 STRICT
+SET search_path = ag_catalog, public
 AS $function$
 DECLARE
   node_label text;
@@ -38,16 +46,16 @@ BEGIN
 
   RETURN node_label;
 END;
-$function$;
+$function$;--> statement-breakpoint
 
-
-CREATE OR REPLACE FUNCTION public.entity_as_hal(
+CREATE FUNCTION public.labkit_get_entity_as_hal(
   p_graph_name text,
   p_natural_id text,
   p_depth integer
 )
 RETURNS jsonb
 LANGUAGE plpgsql
+SET search_path = ag_catalog, public
 AS $function$
 DECLARE
   result jsonb;
@@ -78,7 +86,7 @@ BEGIN
     RAISE EXCEPTION 'Invalid natural_id: %', p_natural_id;
   END IF;
 
-  root_label := public.derive_label_from_handle(p_natural_id);
+  root_label := public.labkit_get_label_for_handle(p_natural_id);
 
   FOR walk_row IN EXECUTE format($sql$
     WITH RECURSIVE
@@ -294,8 +302,8 @@ BEGIN
 
   RETURN result;
 END;
-$function$;
+$function$;--> statement-breakpoint
 
-ALTER FUNCTION public.entity_as_hal(text, text, integer)
-SET search_path = ag_catalog;
+GRANT EXECUTE ON FUNCTION public.labkit_get_label_for_handle(text) TO labkit_app;--> statement-breakpoint
 
+GRANT EXECUTE ON FUNCTION public.labkit_get_entity_as_hal(text, text, integer) TO labkit_app;

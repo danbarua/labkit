@@ -1,7 +1,7 @@
 import type { NodeLabel } from "@labkit/core-db/domain";
 import { collectionPath, EVENTS_SEGMENT, slugFor } from "./collection-paths";
 import type { TenantScope } from "./runtime";
-// Bare links return one hop of neighbours. MAX_DEPTH mirrors the limit in entity_as_hal.
+// Bare links return one hop of neighbours. MAX_DEPTH mirrors the limit in labkit_get_entity_as_hal.
 const DEFAULT_DEPTH = 1;
 const MAX_DEPTH = 6;
 
@@ -49,17 +49,16 @@ export async function graphHandler(
   }
 
   try {
-    const queryResult = await scope.query("SELECT entity_as_hal($1, $2, $3)", [
-      scope.graphName,
-      id,
-      depth,
-    ]);
+    const queryResult = await scope.query(
+      "SELECT public.labkit_get_entity_as_hal($1, $2, $3) AS resource",
+      [scope.graphName, id, depth],
+    );
 
     if (!queryResult?.rows.length) {
       return problem(404, "Not Found");
     }
 
-    const resource = queryResult!.rows.at(0)!.entity_as_hal as Record<string, unknown>;
+    const resource = queryResult.rows[0]?.resource as Record<string, unknown>;
     // Links carry the depth that was applied, so following one repeats this view.
     const search = new URLSearchParams(url.search);
     search.set("depth", String(depth));

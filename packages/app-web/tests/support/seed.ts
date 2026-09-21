@@ -1,17 +1,12 @@
-import { readFileSync } from "node:fs";
 import type { LabKitDB } from "@labkit/core-db/backend";
 import { resolveTenantContext } from "@labkit/core-db/tenant";
 import type { Transactor } from "@labkit/core-db/transactor";
 
 /**
  * Two workspaces holding different data: `alpha`, which is tenant 1 and so the default, and
- * `beta`. `applySql` runs a script of several statements, which the two backends do differently.
+ * `beta`.
  */
-export async function seed(
-  db: LabKitDB,
-  tx: Transactor,
-  applySql: (sql: string) => Promise<unknown>,
-): Promise<void> {
+export async function seed(db: LabKitDB, tx: Transactor): Promise<void> {
   const alpha = await resolveTenantContext(db, tx, "alpha");
   const beta = await resolveTenantContext(db, tx, "beta");
   // The default workspace is tenant 1, so the first one created has to be it.
@@ -85,6 +80,4 @@ export async function seed(
     command: { event: 2 },
     changes: [{ change: "NodePropsChanged", id: "Q_2", before: {}, after: { retracted: true } }],
   });
-
-  await applySql(readFileSync(new URL("../../queries/entity_as_hal.sql", import.meta.url), "utf8"));
 }
