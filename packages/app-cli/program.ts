@@ -31,6 +31,11 @@ export function globalOptions(program: Command): Command {
         "what these writes were read off, for work you did not perform — not for your own results written up later (default: $LABKIT_RECONSTRUCTED_FROM)",
       )
       .option("--json", "emit the report as JSON instead of prose")
+      .option(
+        "--depth <n>",
+        "with --json, how many hops of neighbours an act embeds in what it minted",
+        (raw) => Number.parseInt(raw, 10),
+      )
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only
       // subtracts: colour is off already when stdout is not a terminal or
       // `NO_COLOR` is set, and `--json` is never coloured at all.

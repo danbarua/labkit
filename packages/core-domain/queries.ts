@@ -141,6 +141,13 @@ export const whyQuery = z.object({
 });
 export type WhyQuery = z.infer<typeof whyQuery>;
 
+/** How far `resource` embeds neighbours. Six is `labkit_get_entity_as_hal`'s own ceiling. */
+export const resourceQuery = z.object({
+  handle: z.string(),
+  depth: z.number().int().min(0).max(6).default(1),
+});
+export type ResourceQuery = z.infer<typeof resourceQuery>;
+
 export const howQuery = z.object({
   subject: z.string(),
   since: z.number().int().optional(),

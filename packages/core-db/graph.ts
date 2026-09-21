@@ -73,6 +73,21 @@ export class TenantGraph {
   }
 
   /**
+   * One node and its neighbours within `depth` hops, as the HAL resource the HTTP API serves.
+   *
+   * The same `public.labkit_get_entity_as_hal` the API calls, so both surfaces read a node
+   * through one query. The links come back relative: the HTTP API rewrites them to absolute
+   * and adds its own, which is the API's job and not this one's.
+   */
+  async entityAsHal(naturalId: string, depth: number): Promise<unknown> {
+    const { rows } = await this.db.query<{ resource: unknown }>(
+      "SELECT public.labkit_get_entity_as_hal($1, $2, $3) AS resource",
+      [this.ctx.graphName, naturalId, depth],
+    );
+    return rows[0]?.resource ?? null;
+  }
+
+  /**
    * Reserves the next natural id for a label, creating nothing.
    */
   async reserveId(label: NodeLabel): Promise<string> {
