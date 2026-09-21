@@ -77,6 +77,7 @@ import type {
   WhyQuery,
   HowQuery,
   WhySupportedQuery,
+  ResourceQuery,
   WorkListQuery,
 } from "../queries";
 import { HappenedGroup } from "./happened";
@@ -256,6 +257,17 @@ export class ReadSurface extends SessionCore {
   /** Whether two findings actually conflict. */
   async doTheseConflict(query: DoTheseConflictQuery): Promise<ConflictVerdict> {
     return this.#story.doTheseConflict(query);
+  }
+
+  /**
+   * One record and its neighbours within `depth` hops, as the resource the HTTP API serves.
+   *
+   * Every other read here answers a researcher's question. This one answers "what is
+   * actually stored under this handle", which is what you want open when a read disagrees
+   * with the record. Its links are relative; the API rewrites them.
+   */
+  async resource(query: ResourceQuery): Promise<unknown> {
+    return this.graph.entityAsHal(query.handle, query.depth);
   }
 
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */

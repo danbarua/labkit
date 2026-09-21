@@ -24,6 +24,7 @@ import {
   pursuitsOfQuery,
   reproducibilityOfQuery,
   reproductionOfQuery,
+  resourceQuery,
   searchQuery,
   whatDependsOnQuery,
   whyQuery,
@@ -145,6 +146,28 @@ export function registerReads(program: Command, run: Run): void {
         ...(opts.since === undefined ? {} : { since: opts.since }),
       });
       return run(async ({ read }) => answer(await read.how(query), renderHow));
+    });
+  program
+    .command("get")
+    .helpGroup("Finding a handle")
+    .summary("what is stored under a handle, and what it is wired to")
+    .description(
+      "The record as stored, rather than an answer drawn from it: one node's properties and " +
+        "the neighbours within --depth hops, each with the edge that reaches it. Reach for " +
+        "this when a read says something the record does not seem to support. The same " +
+        "resource the HTTP API serves, with relative links.",
+    )
+    .argument("<handle>", "a handle of any kind, e.g. CLM_20")
+    .action(async (handle: string) => {
+      return run(async ({ read }) => {
+        const query = parseCommand(resourceQuery, {
+          handle,
+          ...(program.opts().depth === undefined ? {} : { depth: program.opts().depth }),
+        });
+        const resource = await read.resource(query);
+        if (resource === null) throw new Error(`${handle} not found`);
+        return answer(resource, () => renderResource(resource));
+      });
     });
   program
     .command("search")
@@ -480,4 +503,31 @@ export function registerReads(program: Command, run: Run): void {
         return run(async ({ read }) => answer(await read.whatHappenedPage(query), renderHappened));
       },
     );
+}
+
+/**
+ * A stored record, as lines rather than JSON.
+ *
+ * Not `JSON.stringify`: every report goes out through the runner's `wrap()`, which folds
+ * long lines and would break the quoting. `--json` is the machine-readable form.
+ */
+function renderResource(resource: unknown): string {
+  const node = resource as {
+    id?: string;
+    type?: string;
+    _embedded?: Record<string, Array<{ id?: string; type?: string }>>;
+    [key: string]: unknown;
+  };
+  const skip = new Set(["id", "type", "_links", "_embedded", "dir", "depth"]);
+  const lines = [`${node.id ?? "?"}  ${node.type ?? "?"}`, ""];
+  for (const [key, value] of Object.entries(node)) {
+    if (skip.has(key) || value === null || typeof value === "object") continue;
+    lines.push(`  ${key.padEnd(14)} ${String(value)}`);
+  }
+  const embedded = Object.entries(node._embedded ?? {});
+  if (embedded.length > 0) lines.push("");
+  for (const [edge, neighbours] of embedded) {
+    lines.push(`  ${edge.padEnd(24)} ${neighbours.map((n) => n.id ?? "?").join("  ")}`);
+  }
+  return lines.join("\n");
 }

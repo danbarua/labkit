@@ -137,4 +137,8 @@ export const NOT_EXPOSED: Readonly<Record<string, string>> = {
   howMuchWasTranscribed:
     "reached through `now`, which prints the count — a command of its own would be a second spelling of one question",
   proseFor: "reached only through `why`, as the walked kinds' body",
+  // `labkit get` is a debugging read: it answers with the stored shape, which is what you
+  // want when a read and the record disagree. The MCP surface is the verbs a researcher
+  // would say, and an agent handed raw storage will answer from it instead of asking.
+  resource: "`labkit get` only — the stored shape, which is not a question a researcher asks",
 };
