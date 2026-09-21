@@ -1,0 +1,84 @@
+<!doctype html><html lang=en><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>LabKit Language Audit</title><style>
+:root{--bg:#fbfaf8;--fg:#1c1a17;--dim:#6b6560;--line:#e0dbd4;--cli:#2f6f4f;--dom:#8a4b2a;--scn:#3a5a8c;--card:#fff}
+:root:not([data-theme=light]){@media(prefers-color-scheme:dark){:root{--bg:#141310;--fg:#ece7e0;--dim:#948c84;--line:#2e2a26;--cli:#6fbf92;--dom:#d9906a;--scn:#8aaee0;--card:#1c1a17}}}
+:root[data-theme=dark]{--bg:#141310;--fg:#ece7e0;--dim:#948c84;--line:#2e2a26;--cli:#6fbf92;--dom:#d9906a;--scn:#8aaee0;--card:#1c1a17}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif;padding:0 16px}
+main{max-width:940px;margin:0 auto;padding:40px 0 80px}
+h1{font-size:1.9rem;margin:0 0 .2em;letter-spacing:-.02em}h2{font-size:1.15rem;margin:2.4em 0 .6em;letter-spacing:-.01em}
+.sub{color:var(--dim);margin:0 0 2em}
+code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:color-mix(in srgb,var(--fg) 8%,transparent);padding:1px 5px;border-radius:4px}
+svg{width:100%;height:auto;display:block;margin:0 auto}
+.key{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:.6em 0 1.6em;font-size:.85rem;color:var(--dim)}
+.key b{font-weight:600}
+.reg{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:10px 0}
+.reg h3{margin:0 0 .5em;font-size:.82rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:600}
+.c{display:inline-block;font:12px/1.4 ui-monospace,Menlo,monospace;background:color-mix(in srgb,var(--fg) 7%,transparent);border-radius:4px;padding:2px 7px;margin:2px 3px 2px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem;margin:.4em 0}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+td:first-child{white-space:nowrap}
+.big{font-size:2.4rem;font-weight:700;letter-spacing:-.03em}
+.note{border-left:3px solid var(--dom);padding:2px 0 2px 14px;margin:1.2em 0;color:var(--dim)}
+</style></head><body><main>
+<h1>LabKit language audit</h1>
+<p class=sub>Three vocabularies, counted from the code: CLI command names, the domain&rsquo;s node and edge labels, and the words the scenarios use for themselves.</p>
+
+<svg viewBox="0 0 640 400" role=img aria-label="Venn diagram of the three vocabularies">
+ <circle cx="235" cy="165" r="140" fill="var(--cli)" fill-opacity=".16" stroke="var(--cli)" stroke-width="1.5"/>
+ <circle cx="405" cy="165" r="140" fill="var(--dom)" fill-opacity=".16" stroke="var(--dom)" stroke-width="1.5"/>
+ <circle cx="320" cy="285" r="140" fill="var(--scn)" fill-opacity=".16" stroke="var(--scn)" stroke-width="1.5"/>
+ <text x="150" y="60"  fill="var(--cli)" font-size="15" font-weight="600">CLI 43</text>
+ <text x="452" y="60"  fill="var(--dom)" font-size="15" font-weight="600">Domain 46</text>
+ <text x="278" y="392" fill="var(--scn)" font-size="15" font-weight="600">Scenarios 128</text>
+ <text x="175" y="130" text-anchor=middle font-size="26" font-weight="700" fill="var(--fg)">31</text>
+ <text x="465" y="130" text-anchor=middle font-size="26" font-weight="700" fill="var(--fg)">24</text>
+ <text x="320" y="345" text-anchor=middle font-size="26" font-weight="700" fill="var(--fg)">110</text>
+ <text x="320" y="120" text-anchor=middle font-size="20" font-weight="700" fill="var(--fg)">7</text>
+ <text x="228" y="258" text-anchor=middle font-size="20" font-weight="700" fill="var(--fg)">3</text>
+ <text x="412" y="258" text-anchor=middle font-size="20" font-weight="700" fill="var(--fg)">13</text>
+ <text x="320" y="212" text-anchor=middle font-size="26" font-weight="700" fill="var(--fg)">2</text>
+</svg>
+<div class=key><span><b style="color:var(--cli)">&#9679;</b> CLI commands</span><span><b style="color:var(--dom)">&#9679;</b> node &amp; edge labels</span><span><b style="color:var(--scn)">&#9679;</b> scenario titles</span></div>
+
+<div class=note><span class=big>2</span><br>words in the centre. One of them is <code>review</code>; the other is the stopword <em>not</em>. A researcher reading a scenario, a developer reading the schema and a user reading <code>--help</code> share essentially no vocabulary.</div>
+
+<div class=reg><h3>CLI &cap; Domain &mdash; 7</h3><span class=c>claim</span><span class=c>criterion</span><span class=c>enquiry</span><span class=c>evaluat</span><span class=c>gat</span><span class=c>keep</span><span class=c>reverify</span></div>
+<div class=reg><h3>Domain &cap; Scenarios &mdash; 13</h3><span class=c>about</span><span class=c>address</span><span class=c>answer</span><span class=c>artefact</span><span class=c>chang</span><span class=c>consum</span><span class=c>invalidat</span><span class=c>narrow</span><span class=c>promot</span><span class=c>question</span><span class=c>record</span><span class=c>rest</span><span class=c>task</span></div>
+<div class=reg><h3>CLI &cap; Scenarios &mdash; 3</h3><span class=c>clos</span><span class=c>design</span><span class=c>work</span></div>
+<div class=reg><h3>CLI alone &mdash; 31</h3><span class=c>accept</span><span class=c>affect</span><span class=c>amend</span><span class=c>analys</span><span class=c>conclud</span><span class=c>condition</span><span class=c>confirm</span><span class=c>conflict</span><span class=c>contract</span><span class=c>criteria</span><span class=c>declar</span><span class=c>happen</span><span class=c>interpretation</span><span class=c>known</span><span class=c>learn</span><span class=c>observ</span><span class=c>open</span><span class=c>origin</span><span class=c>plan</span><span class=c>pos</span><span class=c>pursu</span><span class=c>pursuit</span><span class=c>reinterpret</span><span class=c>replac</span><span class=c>reproducibility</span><span class=c>reproduction</span><span class=c>search</span><span class=c>sharpen</span><span class=c>synthesis</span><span class=c>undecid</span><span class=c>undo</span></div>
+<div class=reg><h3>Domain alone &mdash; 24</h3><span class=c>bas</span><span class=c>challeng</span><span class=c>computation</span><span class=c>concern</span><span class=c>decision</span><span class=c>defer</span><span class=c>evaluation</span><span class=c>evidenc</span><span class=c>govern</span><span class=c>grad</span><span class=c>implement</span><span class=c>light</span><span class=c>lin</span><span class=c>mention</span><span class=c>motivat</span><span class=c>produc</span><span class=c>qualify</span><span class=c>requir</span><span class=c>resolv</span><span class=c>supersed</span><span class=c>support</span><span class=c>trigger</span><span class=c>unit</span><span class=c>us</span></div>
+
+<h2>One word, several meanings</h2>
+<table><thead><tr><th>term</th><th>spread</th><th>what it covers</th></tr></thead><tbody>
+<tr><td><code>evaluate</code></td><td>4 things</td><td><code>EVALUATES</code> is a Review judging a Claim/Decision/Evidence/EvidenceUnit. <code>EVALUATED_AS</code> is a Criterion pointing at its verdict. <code>CriterionEvaluation</code> is that verdict. <code>labkit evaluate</code> records a prespecified check. Same root, unrelated acts.</td></tr><tr><td><code>CHANGES</code></td><td>2 verbs</td><td><code>amend</code> writes it to a Criterion (counting.ts:221). <code>reinterpret</code> writes it to a Claim (revising.ts:478,567). One edge, two acts, two node kinds.</td></tr><tr><td><code>MOTIVATES</code></td><td>6 pairs</td><td>Question→LineOfEnquiry, Decision→Question, Note→Question, Decision→Claim, Decision→Criterion, Decision→Computation. "Gave rise to" covering six different relationships.</td></tr><tr><td><code>PROMOTES</code> / <code>GRADES</code></td><td>2 edges, 1 shape</td><td>Both Decision→Claim, written by sibling verbs <code>is confirmed</code> and <code>is undecided</code>. Nothing in the names says why they differ.</td></tr><tr><td><code>ABOUT</code> / <code>CONCERNS</code></td><td>2 edges, 1 meaning</td><td>CriterionEvaluation→Claim and Note→anything. Both render as "is about".</td></tr><tr><td><code>BASED_ON</code> / <code>IN_LIGHT_OF</code> / <code>RESTS_ON</code></td><td>3 edges, 1 meaning</td><td>All three mean "rests on", separated only by their endpoints.</td></tr>
+</tbody></table>
+
+<h2>Several words, one meaning</h2>
+<table><thead><tr><th>the thing</th><th colspan=4>what it is called, by surface</th></tr></thead><tbody>
+<tr><td><b>a condition</b></td><td><code>Criterion</code> (node)</td><td><code>criterion</code> (write)</td><td><code>conditions</code> (list)</td><td><code>criteria</code> (read)</td></tr><tr><td><b>an analysis</b></td><td><code>Computation</code> (node)</td><td><code>analyse</code> (write)</td><td><code>analyses</code> (list)</td><td>"run" (scenarios)</td></tr><tr><td><b>a conclusion</b></td><td><code>Claim</code> (node)</td><td><code>conclude</code> (write)</td><td><code>claims</code> (list)</td><td>"finding", "proposition"</td></tr><tr><td><b>planned work</b></td><td><code>Task</code> (node)</td><td><code>plan</code> (write)</td><td><code>work</code> (list)</td><td><code>contract</code> (read)</td></tr><tr><td><b>a line of enquiry</b></td><td><code>LineOfEnquiry</code></td><td><code>pursue</code> (write)</td><td><code>enquiries</code> (list)</td><td><code>pursuits</code> (read)</td></tr><tr><td><b>ending something</b></td><td><code>close</code>, <code>accept</code></td><td><code>RESOLVES</code></td><td>sidestepped, retired</td><td>abandoned, stopped, deferred</td></tr><tr><td><b>standing instead of</b></td><td><code>replace</code>, <code>amend</code></td><td><code>SUPERSEDES</code>, <code>CHANGES</code></td><td><code>reinterpret</code>, <code>keep</code></td><td>invalidated, withdrawn, retracted</td></tr>
+</tbody></table>
+
+<h2>Property names: several words, one meaning</h2>
+<p class=sub>Found while rendering the API. Counted from the property interfaces in <code>packages/core-db/domain.ts</code> and checked against what the API serves.</p>
+<div class=note><span class=big>11</span><br>names for the one main text of a record, across the 13 types that have one. Only <code>Decision</code> and <code>Task</code> have a second prose field, and <code>EvidenceUnit</code> has none, so &ldquo;title and description&rdquo; has nothing to pair on 12 of 14 types.</div>
+<table><thead><tr><th>the thing</th><th>what it is called, by type</th></tr></thead><tbody>
+<tr><td><b>the main text</b></td><td><code>name</code> (Question, LineOfEnquiry, Claim), <code>statement</code> (Evidence), <code>reason</code> (Decision), <code>proposition</code> (Criterion), <code>value</code> (CriterionEvaluation), <code>consequence</code> (Gate), <code>verdict</code> (Review), <code>logical_name</code> (Artefact), <code>method</code> (Computation), <code>objective</code> (Task), <code>text</code> (Note). A collection already lists every one of them as <code>name</code>; a resource serves the native word.</td></tr>
+<tr><td><b>a state or class</b></td><td><code>kind</code> (Claim, Artefact), <code>outcome</code> (CriterionEvaluation), <code>resolution_kind</code> (Decision), <code>status</code> (Computation), <code>role</code> (EvidenceUnit). Five words, and a page has to know all five to draw a pill.</td></tr>
+<tr><td><b>when it happened</b></td><td><code>posed_at</code> (Question), <code>started_at</code> (LineOfEnquiry, Computation), <code>decided_at</code> (Decision), <code>evaluated_at</code> (CriterionEvaluation), <code>finished_at</code> (Computation), and plain <code>at</code> on an act. The other nine types carry no time at all, so the acts are the only timeline.</td></tr>
+<tr><td><b>a type, shortened</b></td><td>handle prefix <code>CLM</code> <code>CRIT</code> <code>CEVAL</code> <code>TASK</code> <code>REV</code> (domain), explorer chip <code>Cl</code> <code>Cr</code> <code>CE</code> <code>Tk</code> <code>Rv</code>, URL slug <code>enquiry</code> <code>evaluation</code>, type name <code>LineOfEnquiry</code> <code>CriterionEvaluation</code>. Four spellings, and the explorer made the second set up.</td></tr>
+<tr><td><b>a recorded command</b></td><td><code>command</code> (domain), <b>act</b> (the team, <code>/act</code>), <code>DomainEvent</code> and <code>domain_event</code> (code and table), <code>operation</code> (its kind), <code>changes</code>, &ldquo;delta&rdquo;, and <code>/events</code> for what happened to one record.</td></tr>
+</tbody></table>
+
+<h2>Property names: one word, several meanings</h2>
+<table><thead><tr><th>term</th><th>spread</th><th>what it covers</th></tr></thead><tbody>
+<tr><td><code>kind</code></td><td>2 meanings</td><td><code>Claim.kind</code> is one of <code>exploratory</code> or <code>confirmatory</code>. <code>Artefact.kind</code> is a free string. The same word, no shared values, and <code>resolution_kind</code> on a Decision is a third list.</td></tr>
+<tr><td><code>subject</code></td><td>3 things</td><td>An act&rsquo;s <code>subject</code> is what the command addressed or created. An event&rsquo;s <code>dir: subject</code> means the change is to the record itself, whatever the act was about. The <code>subject</code> link on an act points at the first, and <code>acts:about</code> on a record collects the second.</td></tr>
+<tr><td><code>event</code></td><td>2 things</td><td><code>DomainEvent</code> and the <code>domain_event</code> table hold one act each, with its changes inside. <code>/{id}/events</code> lists the changes that name a record, so an event there is one change, not one act.</td></tr>
+<tr><td><code>outputs</code> / <code>mayRead</code></td><td>2 shapes</td><td>Both plural, both on <code>Task</code>. <code>mayRead</code> is a list and <code>outputs</code> is one string.</td></tr>
+</tbody></table>
+
+<h2>Method</h2>
+<p class=sub>Terms are lowercased, split on camelCase and underscores, stemmed, and stripped of stopwords. CLI = every <code>.command()</code> name. Domain = <code>NODE_LABELS</code> + <code>EDGE_LABELS</code>. Scenarios = the words of each <code>describe()</code> title. Stemming merges <code>gate</code>/<code>gates</code> and <code>evaluate</code>/<code>evaluated</code>, which is why the overlap is generous rather than strict. Property names = the fields of each <code>*Props</code> interface, checked against the API&rsquo;s responses across three workspaces.</p>
+</main></body></html>
