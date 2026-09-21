@@ -1,0 +1,13 @@
+{
+  // The explorer page's script is plain JavaScript that the browser loads as it is. This checks it
+  // for what a typo costs there: a name that does not exist, a call with the wrong arguments.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["public/explorer*.js"]
+}
