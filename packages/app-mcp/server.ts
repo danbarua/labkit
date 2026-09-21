@@ -3,7 +3,7 @@
  * The MCP server — the door an agent works through.
  */
 
-import { labkitVersion } from "@labkit/core-domain/version";
+import { labkitVersion } from "@labkit/core-db/version";
 import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";

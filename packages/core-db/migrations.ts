@@ -22,6 +22,8 @@ import m0011 from "../../drizzle/0011_workspace_natural_ids.sql" with { type: "t
 import m0012 from "../../drizzle/0012_freezing_sebastian_shaw.sql" with { type: "text" };
 import m0013 from "../../drizzle/0013_event_number_from_the_database.sql" with { type: "text" };
 import m0014 from "../../drizzle/0014_events_leave_public.sql" with { type: "text" };
+import m0015 from "../../drizzle/0015_next_workspace_id_exists.sql" with { type: "text" };
+import m0016 from "../../drizzle/0016_migration_provenance.sql" with { type: "text" };
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -42,6 +44,8 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0012_freezing_sebastian_shaw": m0012,
   "0013_event_number_from_the_database": m0013,
   "0014_events_leave_public": m0014,
+  "0015_next_workspace_id_exists": m0015,
+  "0016_migration_provenance": m0016,
 };
 
 /**

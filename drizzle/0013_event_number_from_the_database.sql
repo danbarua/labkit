@@ -76,13 +76,3 @@ $fn$;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.labkit_resolve_handle(text, bigint) TO labkit_app;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.labkit_resolve_change(jsonb, bigint) TO labkit_app;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION public.labkit_record_event(text, integer, jsonb) TO labkit_app;
---> statement-breakpoint
-
--- The same for the two older functions. `labkit_prop` is the one with a real
--- AGE dependency -- `agtype` is its first parameter -- though note that a
--- function's own `search_path` governs its body, not a caller's parsing of the
--- argument types at the call site.
-ALTER FUNCTION public.labkit_next_workspace_id(text, text)
-SET search_path = ag_catalog, public;--> statement-breakpoint
-ALTER FUNCTION public.labkit_prop(ag_catalog.agtype, text)
-SET search_path = ag_catalog, public;

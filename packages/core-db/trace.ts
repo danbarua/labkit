@@ -38,6 +38,18 @@ function emit(event: Record<string, unknown>): void {
   process.stderr.write(`${JSON.stringify(event)}\n`);
 }
 
+/**
+ * Records a decision: what was read, what was chosen, and why.
+ *
+ * At every point where the code branches on something it did not compute itself — a variable,
+ * a flag, a row that may or may not be there — so the run can be read rather than reasoned
+ * about. Silent unless `LABKIT_TRACE` is set.
+ */
+export function noteDecision(decision: string, facts: Record<string, unknown>): void {
+  if (!options()) return;
+  emit({ trace: "decision", decision, ...facts });
+}
+
 /** Enough of the statement to recognise it; never the parameters. */
 function shorten(sql: string): string {
   const flat = sql.replace(/\s+/g, " ").trim();

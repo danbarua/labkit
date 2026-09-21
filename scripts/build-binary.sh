@@ -37,7 +37,7 @@ cd "$staging"
 # The provenance of this checkout, defined into the binary: a compiled binary has no git
 # to ask. One owner for the shape -- `describeCheckout` -- rather than a second copy of
 # `git describe` here that drifts from it.
-version="$(cd "$root" && bun -e 'import { describeCheckout } from "./packages/core-domain/version"; console.log(describeCheckout() ?? "")')"
+version="$(cd "$root" && bun -e 'import { describeCheckout } from "./packages/core-db/version"; console.log(describeCheckout() ?? "")')"
 
 bun build --compile --define "LABKIT_BUILD_VERSION=\"${version}\"" \
   --outfile "$root/bin/labkit" "$root/packages/app-cli/cli.ts"

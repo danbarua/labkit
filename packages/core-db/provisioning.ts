@@ -7,6 +7,8 @@ import type { LabKitDB } from "./backend";
 import type { Transactor } from "./transactor";
 import { validateGraphName } from "./agtype";
 import { APP_ROLE } from "./schema";
+import { noteDecision } from "./trace";
+import { labkitVersion } from "./version";
 
 /**
  * Reconciles a tenant's AGE graph, unconditionally, every time it's called — inside one
@@ -18,9 +20,18 @@ export async function provisionTenantGraph(
   tenantId: number,
   graphName: string,
 ): Promise<void> {
+  const current = labkitVersion();
+  noteDecision("provisioning", { tenantId, graphName, version: current });
   await tx.inTransaction(async () => {
     await db.query("SELECT pg_advisory_xact_lock($1)", [tenantId]);
     await new TenantGraphProvisioner(db, graphName).reconcile();
+    await db.query(
+      `INSERT INTO public.__workspace (tenant_id, labkit_version, provisioned_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (tenant_id) DO UPDATE
+         SET labkit_version = EXCLUDED.labkit_version, provisioned_at = EXCLUDED.provisioned_at`,
+      [tenantId, current],
+    );
   });
 }
 
