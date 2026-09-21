@@ -3,12 +3,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** Named apart from the per-act `events` a write verb returns. */
+let eventLog: EventSink;
 
 const clock: Clock = { now: () => "2026-09-05T09:00:00.000Z" };
 
@@ -19,7 +22,12 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  eventLog = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: eventLog,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -37,6 +45,16 @@ describe("S-24 — a mistaken act taken back", () => {
     });
     expect(undone.event).toBe(seq);
     expect(undone.retracted).toContain(question);
+
+    await captureConversation(
+      {
+        id: "S-24",
+        title: "a mistaken act taken back",
+        about:
+          "A question entered twice by accident is taken back, and the act that undoes it names every handle it retracted.",
+      },
+      eventLog,
+    );
   });
 
   test("puts back the value an act set in place", async () => {

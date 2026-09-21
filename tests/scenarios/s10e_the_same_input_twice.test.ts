@@ -4,12 +4,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 const clock: Clock = { now: () => "2026-08-24T13:00:00.000Z" };
 
@@ -20,9 +22,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -65,6 +69,16 @@ describe("S-10e — the same record, read twice by one run", () => {
 
     expect(report.ofRead.map((i) => i.part)).toEqual([series, series]);
     expect(report.verificationRead.map((i) => i.part)).toEqual([series]);
+
+    await captureConversation(
+      {
+        id: "S-10e",
+        title: "The same record, read twice by one run",
+        about:
+          "A null test puts one series on both sides of a difference, and a re-run reads it only once. The record keeps how many times each run read the series, so the two are not reported as having read the same thing.",
+      },
+      events,
+    );
   });
 
   test("and the order of a repeat is kept, not just its count", async () => {

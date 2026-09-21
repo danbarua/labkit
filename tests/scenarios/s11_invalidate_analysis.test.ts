@@ -7,9 +7,12 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** The same graph, spoken to by the person who reviews rather than the one who ran it. */
+let reviewer: ResearchSession;
 let events: EventSink;
 
 /** Fixed so the temporal seam can be asserted exactly rather than raced. */
@@ -27,7 +30,8 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+  reviewer = new ResearchSession(graph, { clock, events, attribution: as("Reviewer") });
 });
 
 afterEach(async () => {
@@ -103,7 +107,7 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
 
     // Reviewer: your bootstrap is centred on the observed effect. It isn't a null test.
-    const { review } = await session.writes.recordReview({
+    const { review } = await reviewer.writes.recordReview({
       of: analysis,
       verdict:
         "bootstrap is centred on the observed effect; it does not implement the intended null",
@@ -152,6 +156,17 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     for (const u of explained.report.restated) expect(minted.has(u.claim)).toBe(true);
     expect(minted.has(explained.report.changed[0]!.claim)).toBe(true);
     expect(minted.has(explained.report.changed[0]!.was)).toBe(false);
+
+    await captureConversation(
+      {
+        id: "S-11",
+        title: "The analysis was wrong; the observations were fine",
+        about:
+          "A reviewer finds the analysis does not implement the null it claims. The observations stand; the analysis is replaced, and only the conclusion that moved is marked as changed.",
+      },
+      events,
+      explained,
+    );
   });
 
   test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {

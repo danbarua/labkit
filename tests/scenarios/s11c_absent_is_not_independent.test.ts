@@ -9,12 +9,15 @@ import {
   inMemoryEventLog,
   type Clock,
   type DependencyReport,
+  type EventSink,
 } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
 beforeAll(async () => {
@@ -24,9 +27,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -100,6 +105,16 @@ describe("S-11c: nothing found is not nothing there", () => {
     expect(affected.claims.map((c) => c.asserts)).toEqual([CALIBRATION]);
     expect(affected.claims.map((c) => c.asserts)).not.toContain(TREND);
     expect(affected.complete).toBe(false);
+
+    await captureConversation(
+      {
+        id: "S-11c",
+        title: "Nothing found is not nothing there",
+        about:
+          "Raw sensor data is calibrated, and the calibrated series is re-entered by hand as fresh observations before the trend analysis reads it. Asking what depends on the raw series reaches only the first stage, and the answer says it is a lower bound rather than a complete list.",
+      },
+      events,
+    );
   });
 
   /**

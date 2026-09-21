@@ -3,12 +3,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
 beforeAll(async () => {
@@ -18,9 +20,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -82,6 +86,16 @@ describe("S-11d: a stage cannot read a stage", () => {
     });
     expect(report.unverifiable.map((p) => p.name)).toEqual(["raw sensor series"]);
     expect(report.reproducible).toBe(false);
+
+    await captureConversation(
+      {
+        id: "S-11d",
+        title: "A stage cannot read a stage",
+        about:
+          "A raw series came off an instrument whose settings were never logged, it is calibrated, and the trend analysis reads the calibration's output directly. The calibration reports itself unreproducible because what it rests on cannot be checked.",
+      },
+      events,
+    );
   });
 
   /**

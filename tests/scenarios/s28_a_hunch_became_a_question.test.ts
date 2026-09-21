@@ -3,11 +3,13 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -22,7 +24,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -44,6 +51,16 @@ describe("S-28: a hunch became a question", () => {
     // The note's own words, not a restatement: a hunch is worth reading back
     // exactly as it was written down.
     expect(origin?.said).toBe(HUNCH);
+
+    await captureConversation(
+      {
+        id: "S-28",
+        title: "A hunch became a question",
+        about:
+          "A vague hunch is written down, later sharpens into a precise question, and the question still says which note it came out of.",
+      },
+      events,
+    );
   });
 
   test("Afterward 2: opening an enquiry from a hunch keeps it too", async () => {

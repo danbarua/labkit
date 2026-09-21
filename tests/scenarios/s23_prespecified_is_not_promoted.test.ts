@@ -7,6 +7,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -26,7 +27,11 @@ afterAll(async () => {
 beforeEach(async () => {
   tick = 0;
   events = inMemoryEventLog();
-  session = new ResearchSession(await scenario.begin(), { clock, events });
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -74,6 +79,16 @@ describe("S-23: prespecified is not promoted", () => {
       "confirmatory",
     );
     expect((await reader.reads.whySupported({ claim: promoted })).standing).toBe("confirmatory");
+
+    await captureConversation(
+      {
+        id: "S-23",
+        title: "prespecified is not promoted",
+        about:
+          "Two claims end up confirmatory by different routes: one was said in advance to count, the other was promoted afterwards, and the record keeps the two apart.",
+      },
+      events,
+    );
   });
 
   test("the promotion names itself, and the prespecified result has none", async () => {

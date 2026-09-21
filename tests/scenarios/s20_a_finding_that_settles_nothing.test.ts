@@ -3,12 +3,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 const clock: Clock = { now: () => "2026-09-02T09:00:00.000Z" };
 
@@ -19,7 +21,12 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -98,6 +105,17 @@ describe("S-20 — a finding that settles the proposition neither way", () => {
     // claim carrying a finding.
     const explained = await (await afterwards()).reads.why({ subject: w.claim });
     expect(explained.is).not.toMatch(/nothing has examined/);
+
+    await captureConversation(
+      {
+        id: "S-20",
+        title: "a finding that settles the proposition neither way",
+        about:
+          "A re-analysis narrows the disagreement between three tests without resolving it, and the researcher records the claim as undecided rather than calling it either way.",
+      },
+      events,
+      explained,
+    );
   });
 
   test("the question is not counted as answered by a finding that settles nothing", async () => {

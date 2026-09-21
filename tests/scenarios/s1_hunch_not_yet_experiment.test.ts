@@ -14,6 +14,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -31,7 +32,7 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -145,6 +146,16 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     });
 
     expect(sharper).not.toBe(hunch);
+
+    await captureConversation(
+      {
+        id: "S-1",
+        title: "A hunch that is not yet an experiment",
+        about:
+          "A researcher has a vague idea about what a learned topology is doing. Before anything is run, the record says what is already established, what is still open and what has never been tested, and the hunch is narrowed into a question that could be answered.",
+      },
+      events,
+    );
   });
 
   /**

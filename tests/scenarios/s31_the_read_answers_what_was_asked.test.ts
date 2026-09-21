@@ -3,11 +3,13 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -22,7 +24,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -44,6 +51,16 @@ describe("S-31: the read answers what was asked", () => {
     expect(closed.question).toMatch(/^Q_/);
     expect(closed.closure).toBe("abandoned");
     expect(closed.answered).toBeUndefined();
+
+    await captureConversation(
+      {
+        id: "S-31",
+        title: "The read answers what was asked",
+        about:
+          "An enquiry is closed with nothing settling it, and the act says which enquiry, which question and that it was abandoned rather than answered.",
+      },
+      events,
+    );
   });
 
   test("a close with a result behind it says so, and names the claim", async () => {

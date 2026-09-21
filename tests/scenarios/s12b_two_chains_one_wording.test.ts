@@ -4,13 +4,17 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** The same graph, spoken to by the person who reviews rather than the one who ran it. */
+let reviewer: ResearchSession;
+let events: EventSink;
 
 const clock: Clock = { now: () => "2026-08-24T09:00:00.000Z" };
 
@@ -21,10 +25,10 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), {
-    clock,
-    events: inMemoryEventLog(),
-  });
+  const graph = await scenario.begin();
+  events = inMemoryEventLog();
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+  reviewer = new ResearchSession(graph, { clock, events, attribution: as("Reviewer") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -90,6 +94,16 @@ describe("S-12b — two revision chains that pass through one sentence", () => {
     expect(a.middle.asserts).toBe(SHARED);
     expect(b.middle.asserts).toBe(SHARED);
     expect(a.middle.claim).not.toBe(b.middle.claim);
+
+    await captureConversation(
+      {
+        id: "S-12b",
+        title: "Two revision chains that pass through one sentence",
+        about:
+          "Two unrelated lines of enquiry are each narrowed until they read as the same sentence, and the record keeps them apart as two separate claims.",
+      },
+      events,
+    );
   });
 
   test("each history reads back its own chain, and none of the other's", async () => {
@@ -359,7 +373,7 @@ describe("S-12b — a reading is narrowed once", () => {
       from: [observations],
       concludes: [{ proposition: ONCE, finding: `${ONCE}, on the fit` }],
     });
-    const { review } = await session.writes.recordReview({
+    const { review } = await reviewer.writes.recordReview({
       of: analysis,
       verdict: "the fit was taken over the wrong window",
     });

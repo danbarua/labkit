@@ -16,6 +16,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
 import { decidedOn, evaluationsOf } from "../helpers/criteria";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -41,7 +42,7 @@ beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -160,6 +161,17 @@ describe("S-3c: the check was wrong, not the result", () => {
     // Both runs remain readable. The failure is not erased, it is out-ranked
     // by nothing.
     expect((await evaluationsOf(session, check!)).map((e) => e.outcome)).toEqual(["fail", "pass"]);
+
+    await captureConversation(
+      {
+        id: "S-3c",
+        title: "The check was wrong, not the result",
+        about:
+          "A robustness check fails, and running the same check again until it comes back green does not clear the failure.",
+      },
+      events,
+      why,
+    );
   });
 
   /**

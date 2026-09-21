@@ -3,14 +3,16 @@
  */
 
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -25,7 +27,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -80,6 +87,16 @@ describe("S-21: a finding drawn across findings", () => {
     // measurements bearing on this sentence, when what exists is four
     // measurements bearing on four other sentences.
     expect(why.support).toEqual([]);
+
+    await captureConversation(
+      {
+        id: "S-21",
+        title: "a finding drawn across findings",
+        about:
+          "Four separate comparisons each conclude that T shows no advantage, and the headline drawn across them rests on those four findings without measuring anything itself.",
+      },
+      events,
+    );
   });
 
   /**

@@ -9,6 +9,7 @@ import { claimOf } from "../helpers/claims";
 import { claimNamed } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -26,7 +27,7 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -122,6 +123,16 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
       "discriminative amplitude ratio 0.81, non-discriminative 0.44",
     ]);
     void programme;
+
+    await captureConversation(
+      {
+        id: "S-12",
+        title: "The numbers are right; the sentence about them is wrong",
+        about:
+          "Two cohorts reach the same conclusion, and the wording of that conclusion overstates what the measurements show. The sentence is narrowed; every finding underneath it still stands.",
+      },
+      events,
+    );
   });
 
   /**

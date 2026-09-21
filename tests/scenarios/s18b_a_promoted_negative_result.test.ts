@@ -3,13 +3,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 const NOW = "2026-08-24T14:00:00.000Z";
 const clock: Clock = { now: () => NOW };
@@ -21,10 +23,9 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), {
-    clock,
-    events: inMemoryEventLog(),
-  });
+  const graph = await scenario.begin();
+  events = inMemoryEventLog();
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -75,6 +76,16 @@ describe("S-18b — a negative result that somebody vouched for", () => {
     // The promotion happened and is what a reader deciding whether to build on
     // this needs to see. `exploratory` here says nobody vouched for it.
     expect(status.restsOn).toBe("confirmatory");
+
+    await captureConversation(
+      {
+        id: "S-18b",
+        title: "A negative result that somebody vouched for",
+        about:
+          "A coating turns out not to work, a second reader confirms the counts, and the question closes as answered no on work somebody vouched for.",
+      },
+      events,
+    );
   });
 
   test("the survey counts it as established, not as resting on scratch", async () => {

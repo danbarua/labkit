@@ -4,12 +4,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 const clock: Clock = { now: () => "2026-08-24T11:00:00.000Z" };
 
@@ -20,9 +22,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -83,6 +87,16 @@ describe("S-10d — the order a run read its inputs in", () => {
       "control series",
       "treated series",
     ]);
+
+    await captureConversation(
+      {
+        id: "S-10d",
+        title: "The order a run read its inputs in",
+        about:
+          "A run takes the difference between two series, and a re-run reads the same two records the other way round. The same records are on both sides, so nothing differs, and the record still shows the order each run read them in.",
+      },
+      events,
+    );
   });
 
   test("a rerun that read them in the same order is shown as that", async () => {

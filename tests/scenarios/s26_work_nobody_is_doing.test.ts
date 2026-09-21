@@ -3,11 +3,13 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -22,7 +24,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -83,6 +90,17 @@ describe("S-26: work nobody is doing", () => {
     const why = await (await afterwards()).reads.why({ subject: work });
     expect(why.is).toBe("abandoned");
     expect(why.because.map((c) => c.wording)).toEqual([DROPPED]);
+
+    await captureConversation(
+      {
+        id: "S-26",
+        title: "work nobody is doing",
+        about:
+          "A planned port is stopped because the hardware went back to the vendor, and the work reads as abandoned with the reason still readable from the record.",
+      },
+      events,
+      why,
+    );
   });
 
   test("Afterward 2: it leaves the standing, wherever it stood", async () => {

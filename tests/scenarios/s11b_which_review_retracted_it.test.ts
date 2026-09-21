@@ -7,6 +7,7 @@ import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-doma
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { as } from "../helpers/conversation";
 
 let scenario: Scenario;
 
@@ -30,7 +31,13 @@ async function afterwards(): Promise<ResearchSession> {
 async function inOneWorld<T>(build: (s: ResearchSession) => Promise<T>): Promise<T> {
   const graph = await scenario.begin();
   try {
-    return await build(new ResearchSession(graph, { clock, events: inMemoryEventLog() }));
+    return await build(
+      new ResearchSession(graph, {
+        clock,
+        events: inMemoryEventLog(),
+        attribution: as("Researcher"),
+      }),
+    );
   } finally {
     await scenario.end();
   }

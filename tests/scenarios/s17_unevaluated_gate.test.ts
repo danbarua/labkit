@@ -5,6 +5,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -22,7 +23,7 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -64,6 +65,16 @@ describe("S-17: does the guard actually guard?", () => {
     expect(status.state).not.toBe("satisfied");
 
     expect((await (await afterwards()).reads.gateStatus({ gate })).state).toBe("never-evaluated");
+
+    await captureConversation(
+      {
+        id: "S-17",
+        title: "Does the guard actually guard?",
+        about:
+          "A gate is declared over a condition that has never been checked, and the record says so rather than letting an unrun check read as a pass.",
+      },
+      events,
+    );
   });
 
   test("Afterward 2: the evidence that its criterion was evaluated is stated as none", async () => {

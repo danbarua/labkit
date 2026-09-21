@@ -8,6 +8,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, whyOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
 import { decidedOn, evaluationsOf } from "../helpers/criteria";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -25,7 +26,7 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -98,6 +99,16 @@ describe("S-3: significant by the primary test, untrustworthy by its own robustn
     // drill-down: a gate carries states, not verdict text (#241).
     const perCheck = await Promise.all(status.checks.map((c) => evaluationsOf(session, c)));
     expect(perCheck.flat()).toHaveLength(3);
+
+    await captureConversation(
+      {
+        id: "S-3",
+        title: "Significant by the primary test, untrustworthy by its own robustness checks",
+        about:
+          "Three checks were agreed before the run: the primary test passes and both robustness checks disagree with it, so the work they gate stays blocked rather than reading as a result.",
+      },
+      events,
+    );
   });
 
   test("Afterward 2: the unmet condition is named before anyone spends the compute", async () => {

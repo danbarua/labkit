@@ -8,9 +8,12 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref, type DesignHistory } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** The same graph, spoken to by the agent that ran the feasibility sweep. */
+let agent: ResearchSession;
 let events: EventSink;
 
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
@@ -25,7 +28,8 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+  agent = new ResearchSession(graph, { clock, events, attribution: as("Agent") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -107,13 +111,14 @@ async function lockedProgramme() {
 async function diagnose(
   enquiry: Awaited<ReturnType<typeof lockedProgramme>>["enquiry"],
   work: Awaited<ReturnType<typeof lockedProgramme>>["feasibilityWork"],
+  who: ResearchSession = session,
 ) {
-  const { observations: traces } = await session.writes.recordObservations({
+  const { observations: traces } = await who.writes.recordObservations({
     enquiry,
     name: "non-convergence traces",
     finding: "solver hits the iteration cap on 9 of 10 sweeps",
   });
-  const { analysis, claims: analysisClaims } = await recordAnalysis(session.writes, {
+  const { analysis, claims: analysisClaims } = await recordAnalysis(who.writes, {
     enquiry,
     method: "convergence-diagnosis",
     implementing: work,
@@ -151,7 +156,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // limit. Researcher: is that evidence against the hypothesis, or an implementation
     // constraint? Agent:      diagnosis points to severe feature multicollinearity; increasing
     // the sample doesn't fix it.
-    const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
+    const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork, agent);
 
     // Researcher: raise the limit to 10,000 and rerun the affected feasibility
     //             work. Preserve the original setting and this diagnosis.
@@ -168,6 +173,16 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     expect(report.rerun.map((w) => w.objective)).toEqual([
       "feasibility sweep of the evolved condition",
     ]);
+
+    await captureConversation(
+      {
+        id: "S-7",
+        title: "locked design, then feasibility finds a mechanical defect",
+        about:
+          "The solver cannot reach the iteration limit the design locked, for reasons unrelated to the effect under test. The limit is raised in the open, citing the diagnosis, and the confirmatory comparison is left untouched.",
+      },
+      events,
+    );
   });
 
   /**

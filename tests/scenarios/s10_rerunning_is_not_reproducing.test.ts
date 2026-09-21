@@ -8,6 +8,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -28,7 +29,7 @@ beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -92,6 +93,16 @@ describe("S-10: rerunning is not reproducing", () => {
       "annealing-v1",
       "annealing-v1, re-run",
     ]);
+
+    await captureConversation(
+      {
+        id: "S-10",
+        title: "Rerunning is not reproducing",
+        about:
+          "An old result says the protocol converges, but nobody wrote down what it started from. Running it again and recording the new result as a second analysis makes the two look like independent confirmation of each other.",
+      },
+      events,
+    );
   });
 
   /**

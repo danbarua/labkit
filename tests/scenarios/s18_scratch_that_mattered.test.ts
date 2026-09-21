@@ -7,6 +7,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -27,7 +28,7 @@ beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -90,6 +91,16 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     const known = await reader.reads.whatIsKnown();
     expect(known.established).toEqual([]);
     expect(known.provisional.map((q) => q.asks)).toEqual([QUESTION]);
+
+    await captureConversation(
+      {
+        id: "S-18",
+        title: "Scratch work that unexpectedly mattered",
+        about:
+          "A question is settled on a quick notebook sweep, and the record answers it provisionally rather than treating exploratory work as if it had been careful.",
+      },
+      events,
+    );
   });
 
   /**

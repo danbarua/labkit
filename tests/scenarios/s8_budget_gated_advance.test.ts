@@ -9,9 +9,12 @@ import { claimOf } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** The same graph, spoken to by the agent that ran the feasibility step. */
+let agent: ResearchSession;
 let events: EventSink;
 
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
@@ -26,7 +29,8 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+  agent = new ResearchSession(graph, { clock, events, attribution: as("Agent") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -93,12 +97,12 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     expect(contract.mayRead).not.toContain("the held-out official test set");
 
     // Agent:      first step passed.
-    const { observations: readings } = await session.writes.recordObservations({
+    const { observations: readings } = await agent.writes.recordObservations({
       enquiry: programme.enquiry,
       name: "feasibility slice timings",
       finding: "1,000 images processed, wall-clock and per-fold solver traces recorded",
     });
-    const { claims: measuredClaims } = await recordAnalysis(session.writes, {
+    const { claims: measuredClaims } = await recordAnalysis(agent.writes, {
       enquiry: programme.enquiry,
       method: "throughput-and-convergence",
       implementing: programme.feasibility,
@@ -128,6 +132,16 @@ describe("S-8 — don't spend the whole budget discovering the pipeline is broke
     const status = await session.reads.gateStatus({ gate: programme.advancement });
     expect(status.state).toBe("incomplete");
     expect(status.unmet.map((u) => u.requires)).toEqual([SOLVER_HEALTH]);
+
+    await captureConversation(
+      {
+        id: "S-8",
+        title: "don't spend the whole budget discovering the pipeline is broken",
+        about:
+          "A cheap feasibility slice runs first, and the expensive full run may not start until throughput and solver health are both established. One condition passes; the other has never been run, so the run stays held.",
+      },
+      events,
+    );
   });
 
   /**

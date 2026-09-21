@@ -3,13 +3,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -24,7 +26,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -73,6 +80,16 @@ describe("S-22: a check decided by measurement says so", () => {
     const [verdict] = standing.evaluations;
     expect(verdict!.basis).toHaveLength(1);
     expect(verdict!.basis[0]!.states).toContain("0/240,000");
+
+    await captureConversation(
+      {
+        id: "S-22",
+        title: "a check decided by measurement says so",
+        about:
+          "A go/no-go check is decided by a run's measurements, and the verdict names the observations it was decided against rather than reading as somebody's assertion.",
+      },
+      events,
+    );
   });
 
   test("citing nothing still reads as asserted, which is the contrast", async () => {

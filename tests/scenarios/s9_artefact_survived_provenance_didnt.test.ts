@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -26,7 +27,7 @@ beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -119,6 +120,16 @@ describe("S-9: the artefact survived; its provenance didn't", () => {
     expect(report.unverifiable.map((p) => p.name)).toEqual([CONTROL]);
     expect(report.differing.map((p) => p.name)).toEqual([]);
     expect(report.reproducible).toBe(false);
+
+    await captureConversation(
+      {
+        id: "S-9",
+        title: "the artefact survived; its provenance didn't",
+        about:
+          "A cached construction from an old study is rebuilt. Three of its four parts match their recorded hashes; the fourth has no hash at all, so nobody can check it, and that is not the same as its having come back different.",
+      },
+      events,
+    );
   });
 
   /**

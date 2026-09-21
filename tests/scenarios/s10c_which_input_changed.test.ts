@@ -3,12 +3,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
 beforeAll(async () => {
@@ -18,9 +20,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -89,6 +93,16 @@ describe("S-10c: which input changed?", () => {
     const { verification } = await aReVerificationAgainstTheRegeneratedControl(session);
     const report = await (await afterwards()).reads.reproductionOf({ verification });
     expect(report.differs).toHaveLength(2);
+
+    await captureConversation(
+      {
+        id: "S-10c",
+        title: "Which input changed?",
+        about:
+          "The original control series was lost and the finding was re-checked against a regenerated one with the same name. The record reports two differences, and the reader has to be able to say which series each of them is about.",
+      },
+      events,
+    );
   });
 
   /**

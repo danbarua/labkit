@@ -8,9 +8,12 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** The same graph, spoken to by the agent that ran the comparison. */
+let agent: ResearchSession;
 let events: EventSink;
 
 const FIXED_NOW = "2026-08-19T10:00:00.000Z";
@@ -25,7 +28,8 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+  agent = new ResearchSession(graph, { clock, events, attribution: as("Agent") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -83,7 +87,7 @@ describe("S-4: a negative result that closes the question", () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
 
     // Agent: no detectable evidence of that. All five form a tight cluster.
-    const { claims: nullResultClaims } = await recordAnalysis(session.writes, {
+    const { claims: nullResultClaims } = await recordAnalysis(agent.writes, {
       enquiry: specificity,
       method: "cluster-comparison",
       from: [observations],
@@ -107,6 +111,16 @@ describe("S-4: a negative result that closes the question", () => {
       status,
     );
     expect(status.open).toBe(false);
+
+    await captureConversation(
+      {
+        id: "S-4",
+        title: "a negative result that closes the question",
+        about:
+          "A comparison finds no separation between the five graph constructions, and the question is closed on that null result rather than left open or abandoned.",
+      },
+      events,
+    );
   });
 
   test("Afterward 1 & 2: closed, and specifically ANSWERED — not abandoned, not deferred", async () => {

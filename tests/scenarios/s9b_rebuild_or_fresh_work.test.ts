@@ -4,12 +4,15 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
+/** The acts of the world currently open, so a scenario page can be rendered from them. */
+let events: EventSink;
 
 /**
  * Frozen, not merely fixed. Two worlds that a read could separate only because wall-clock time
@@ -38,8 +41,11 @@ async function afterwards(): Promise<ResearchSession> {
  */
 async function inOneWorld<T>(build: (s: ResearchSession) => Promise<T>): Promise<T> {
   const graph = await scenario.begin();
+  events = inMemoryEventLog();
   try {
-    return await build(new ResearchSession(graph, { clock, events: inMemoryEventLog() }));
+    return await build(
+      new ResearchSession(graph, { clock, events, attribution: as("Researcher") }),
+    );
   } finally {
     await scenario.end();
   }
@@ -126,6 +132,16 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     expect(a.reproducible).toBe(true);
     expect(b.differing.map((p) => p.name)).toEqual(["second control"]);
     expect(b.reproducible).toBe(false);
+
+    await captureConversation(
+      {
+        id: "S-9b",
+        title: "was this a rebuild, or new work?",
+        about:
+          "A second control is recorded against an old cached construction. Whether it is a reconstruction of the original or independent fresh work is currently only wording, and the record reads the same either way.",
+      },
+      events,
+    );
   });
 
   /**

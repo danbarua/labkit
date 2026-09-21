@@ -4,13 +4,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 const clock: Clock = { now: () => "2026-08-24T12:00:00.000Z" };
 
@@ -21,10 +23,9 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), {
-    clock,
-    events: inMemoryEventLog(),
-  });
+  const graph = await scenario.begin();
+  events = inMemoryEventLog();
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -73,6 +74,16 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
     // with the id it sat beside.
     expect(why.restingOn[0]!.part).toMatch(/^ART_/);
     expect(why.restingOn[0]!.name).toBe("calibrate output");
+
+    await captureConversation(
+      {
+        id: "S-11f",
+        title: "A computed input, asked about by the reads that touch inputs",
+        about:
+          "One analysis calibrates a raw series and a second fits a trend to that calibrated output, so the second analysis rests on something computed rather than measured.",
+      },
+      events,
+    );
   });
 
   test("accounting for a computed input declines, and does not report it unequal", async () => {
