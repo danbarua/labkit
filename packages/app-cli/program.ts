@@ -3,7 +3,7 @@
  */
 
 import { Command } from "commander";
-import { labkitVersion } from "@labkit/core-domain/version";
+import { labkitVersion } from "@labkit/core-db/version";
 import { worktreeName } from "./worktree";
 import { isoInstant } from "./args";
 import { registerReads } from "./commands/reads";

@@ -3,6 +3,7 @@ import { dirname, join, sep } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { directPostgresBackend, pgliteBackend, type LabKitDBConnection } from "./backend";
+import { noteDecision } from "./trace";
 
 export type { LabKitDBConnection };
 
@@ -97,10 +98,22 @@ function discoverProjectRoot(from: string): string {
 export async function connectDb(projectRoot?: string): Promise<LabKitDBConnection> {
   const url = process.env.LABKIT_DB_URL;
   if (url) {
+    noteDecision("record", {
+      backend: "postgres",
+      from: "LABKIT_DB_URL",
+      database: url.replace(/\/\/[^@]*@/, "//"),
+      askedFor: projectRoot ?? null,
+    });
     return withTrace(await directPostgresBackend({ connectionString: url }).connect(), "postgres");
   }
 
   const dataDir = dataDirFor(projectRoot);
+  noteDecision("record", {
+    backend: "pglite",
+    from: projectRoot ? "--db" : process.env.LABKIT_HOME ? "LABKIT_HOME" : "search",
+    dataDir,
+    askedFor: projectRoot ?? null,
+  });
   announceNewRecord(dataDir, projectRoot);
   const connection = await pgliteBackend({
     dataDir,
