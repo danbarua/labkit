@@ -127,11 +127,11 @@
   .body{ flex:1 1 auto; display:flex; min-height:0; }
 
   .sidebar{
-    flex:0 0 288px; border-right:1px solid var(--line); background:var(--panel);
+    flex:0 0 288px; width:288px; min-width:288px; overflow-x:hidden; border-right:1px solid var(--line); background:var(--panel);
     display:flex; flex-direction:column; min-height:0;
   }
   .sidebar-section{ padding:12px 14px; border-bottom:1px solid var(--line); }
-  .sidebar-section.grow{ flex:1 1 auto; overflow-y:auto; padding-bottom:6px; }
+  .sidebar-section.grow{ flex:1 1 auto; overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable; padding-bottom:6px; }
   .section-label{ font-size:11.5px; color:var(--text-dim); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; }
   .section-label .count{ color:var(--text-faint); }
 
@@ -154,10 +154,12 @@
   .res-item:hover{ background:var(--panel-2); }
   .res-item.active{ background:var(--accent-dim); border-color:var(--accent); }
   .res-item .badge{ margin-top:1px; }
-  .res-item .rtext{ min-width:0; }
-  .res-item .rid{ font-family:var(--font-mono); font-size:12px; color:var(--text); }
+  .res-item .rtext{ display:block; flex:1 1 auto; min-width:0; }
+  .res-item .rid{ display:block; font-family:var(--font-mono); font-size:12px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* A skim of what the item is about: two lines, and the centre view has the rest. */
   .res-item .rlabel{
-    font-size:11.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    font-size:11.5px; color:var(--text-dim); overflow-wrap:anywhere;
   }
   .empty-note{ color:var(--text-faint); font-size:12.5px; padding:10px 4px; }
 
@@ -201,18 +203,31 @@
     padding:10px 14px; border-bottom:1px solid var(--line); font-size:12px; color:var(--text-dim);
   }
   .panel-body{ padding:4px 14px; }
+  .panel-head.toggle{ cursor:pointer; user-select:none; }
+  .panel-head.toggle:hover{ background:var(--panel-2); }
+  .caret{ display:inline-block; width:1em; color:var(--text-faint); }
 
   .kv{ display:flex; padding:9px 0; border-bottom:1px solid var(--line); gap:16px; }
   .kv:last-child{ border-bottom:none; }
   .kv .k{ flex:0 0 168px; font-family:var(--font-mono); font-size:12px; color:var(--text-dim); padding-top:1px; }
   .kv .v{ flex:1 1 auto; min-width:0; font-size:13.5px; word-break:break-word; }
+  .tscroll{ overflow-x:auto; }
+  .ntable{ border-collapse:collapse; width:100%; font-size:12px; word-break:normal; overflow-wrap:break-word; }
+  .ntable .mention{ white-space:nowrap; }
+  .ntable td > .tscroll{ min-width:260px; }
+  .ntable th, .ntable td{ padding:4px 8px; border:1px solid var(--line); vertical-align:top; text-align:left; }
+  .ntable th{ font-family:var(--font-mono); font-weight:500; color:var(--text-dim); background:var(--panel-2); white-space:nowrap; }
+  .ntable td.idx{ font-family:var(--font-mono); color:var(--text-faint); }
+  .ntable .ntable{ font-size:11.5px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:4px; }
+  .chip{ border:1px solid var(--line); border-radius:10px; padding:0 8px; font-family:var(--font-mono); font-size:11.5px; }
+  .nest > div + div{ margin-top:4px; }
   .kv .v.mono{ font-size:12.5px; }
 
   .rel-group{ padding:10px 0; border-bottom:1px solid var(--line); }
   .rel-group:last-child{ border-bottom:none; }
   .rel-key{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
   .rel-arrow{ color:var(--text-faint); }
-  .rel-chips{ display:flex; flex-direction:column; gap:5px; }
   .rel-chip{
     display:flex; align-items:center; gap:8px; padding:6px 9px; border:1px solid var(--line);
     border-radius:7px; background:var(--panel-2); text-align:left; width:100%;
@@ -285,7 +300,7 @@
   .fetch-error .title{ color:var(--danger); font-weight:600; margin-bottom:4px; }
 
   .relations-col{
-    flex:0 0 300px; border-left:1px solid var(--line); background:var(--panel);
+    flex:0 0 300px; width:300px; min-width:300px; overflow-x:hidden; border-left:1px solid var(--line); background:var(--panel);
     display:flex; flex-direction:column; min-height:0;
   }
   .relations-col .panel-body{ padding:4px 0; }
@@ -381,7 +396,10 @@
     for (var k in node){
       if (SKIP_ATTR[k]) continue;
       var v = node[k];
-      if (v !== null && typeof v === 'object') continue;
+      if (v !== null && typeof v === 'object'){
+        if (res.attrs[k] === undefined) res.attrs[k] = v;
+        continue;
+      }
       var cur = res.attrs[k];
       if (cur === undefined || (typeof v === 'string' && typeof cur === 'string' && v.length > cur.length)){
         res.attrs[k] = v;
@@ -459,8 +477,11 @@
   function isDateKey(k){ return /_at$/.test(k); }
   function labelFor(res){
     var a = res.attrs;
-    return res.summary || a.name || a.statement || a.text || a.reason || a.verdict || a.value || a.proposition ||
-           a.method || a.logical_name || a.objective || a.consequence || '';
+    var main = ['name', 'statement', 'text', 'reason', 'verdict', 'value', 'proposition', 'method', 'logical_name', 'objective', 'consequence'];
+    for (var i = 0; i < main.length; i++){
+      if (typeof a[main[i]] === 'string' && a[main[i]]) return res.summary || a[main[i]];
+    }
+    return res.summary || '';
   }
   function truncate(s, n){ s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
   // The chip for a type, with its abbreviation unless `text` says otherwise.
@@ -472,7 +493,7 @@
   /* ---------------- state ---------------- */
   var ENTRY = '/collections/workspace';
   var ACCEPT = 'application/vnd.collection+json, application/hal+json, application/json';
-  var state = { history: [], pointer: -1, currentId: null, search: '', rawOpen: false, loading: false, error: null, errorHref: null };
+  var state = { history: [], pointer: -1, currentId: null, search: '', rawOpen: false, responseOpen: false, loading: false, error: null, errorHref: null };
   var fetchToken = 0, listToken = 0;
   // Fixed, not user-adjustable: depth=1 (the graph API's own default when the
   // param is omitted) only ever returns link stubs for this domain — the
@@ -542,6 +563,7 @@
       resources[key].full = true;
       resources[key].selfHref = self || href;
       resources[key].events = undefined;
+      resources[key].raw = json;
     }
     if (state.history[state.pointer] !== key) pushHistory(key);
     state.currentId = key;
@@ -652,7 +674,7 @@
     if (custom) return custom(it);
     return {
       chipType: it.data.type || '?', chipText: undefined, title: it.id,
-      sub: truncate(it.data.name || it.data.value || (r ? labelFor(r) : '') || '—', 64)
+      sub: truncate(it.data.name || it.data.value || (r ? labelFor(r) : '') || '—', 160)
     };
   }
 
@@ -668,7 +690,7 @@
         var view = itemView(it, r);
         html += '<button class="res-item' + (key === state.currentId ? ' active' : '') + (r && r.resolved ? '' : ' unresolved') + '" data-nav="' + esc(key) + '">' +
           badge(view.chipType, view.chipText) +
-          '<span class="rtext"><span class="rid">' + esc(view.title) + '</span><br>' +
+          '<span class="rtext"><span class="rid">' + esc(view.title) + '</span>' +
           '<span class="rlabel">' + esc(view.sub) + '</span></span>' +
         '</button>';
         return;
@@ -729,10 +751,15 @@
 
   // Handles written in prose (Q_1, CLM_23) become chips. A candidate counts only if its
   // prefix starts the id of some resource this page holds, which leaves K_1 or A_2 in
-  // mathematical prose alone. One that names a resource held in the same directory as
-  // the open resource loads it when clicked; any other is a dashed chip.
+  // mathematical prose alone. One that names a resource held beside the open resource, or beside
+  // anything it links to, loads it when clicked; any other is a dashed chip.
   function mentionHtml(text){
-    var base = state.currentId ? state.currentId.slice(0, state.currentId.lastIndexOf('/') + 1) : '';
+    var open = resources[state.currentId];
+    var bases = [];
+    [state.currentId].concat(open && open.rels ? open.rels.map(function(e){ return e.key; }) : []).forEach(function(k){
+      var dir = k ? k.slice(0, k.lastIndexOf('/') + 1) : '';
+      if (dir && bases.indexOf(dir) === -1) bases.push(dir);
+    });
     var prefixes = Object.create(null);
     Object.keys(resources).forEach(function(k){ prefixes[shortId(k).split('_')[0]] = true; });
     var re = /\b[A-Z]{1,6}_\d+\b/g, out = '', last = 0, m;
@@ -740,22 +767,68 @@
       out += esc(text.slice(last, m.index));
       last = m.index + m[0].length;
       if (!prefixes[m[0].split('_')[0]]){ out += esc(m[0]); continue; }
-      var r = resources[base + m[0]];
+      var found = bases.map(function(b){ return b + m[0]; }).filter(function(k){ return resources[k]; })[0];
+      var r = found && resources[found];
       out += r
-        ? '<button class="mention" data-nav="' + esc(base + m[0]) + '" style="--mention:' + (r.type ? 'var(--' + typeClass(r.type) + ')' : 'var(--line)') + '" title="' + esc(r.type || '') + '">' + m[0] + '</button>'
+        ? '<button class="mention" data-nav="' + esc(found) + '" style="--mention:' + (r.type ? 'var(--' + typeClass(r.type) + ')' : 'var(--line)') + '" title="' + esc(r.type || '') + '">' + m[0] + '</button>'
         : '<span class="mention unknown">' + m[0] + '</span>';
     }
     return out + esc(text.slice(last));
   }
+  // A property value as HTML. A scalar is text: prose gets mention chips and `_at` keys a date. A
+  // list of scalars is a run of chips, a list of objects a table with a column per key, and an
+  // object a table of its own keys. Past three levels it is compact JSON, since a table of tables
+  // is no easier to read; the Debug tab has the response itself.
+  function isScalar(v){ return v === null || typeof v !== 'object'; }
+  function valueHtml(v, key, depth){
+    depth = depth || 0;
+    if (v === null || v === undefined) return '<span class="faint">—</span>';
+    if (Array.isArray(v)){
+      if (!v.length) return '<span class="faint">none</span>';
+      if (v.every(isScalar)) return '<span class="chips">' + v.map(function(x){ return '<span class="chip">' + valueHtml(x, key, depth + 1) + '</span>'; }).join('') + '</span>';
+      return depth >= 3 ? compactJson(v) : arrayTable(v, depth);
+    }
+    if (typeof v === 'object') return depth >= 3 ? compactJson(v) : objectTable(v, depth);
+    if (typeof v === 'string') return isDateKey(key) ? esc(fmtDate(v)) : mentionHtml(v);
+    return esc(String(v));
+  }
+  function compactJson(v){ return '<span class="mono faint" title="' + esc(JSON.stringify(v)) + '">' + esc(truncate(JSON.stringify(v), 200)) + '</span>'; }
+  function isPlain(v){ return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function arrayTable(rows, depth){
+    if (!rows.every(isPlain)) return '<div class="nest">' + rows.map(function(x){ return '<div>' + valueHtml(x, '', depth + 1) + '</div>'; }).join('') + '</div>';
+    var cols = [];
+    rows.forEach(function(r){ Object.keys(r).forEach(function(k){ if (cols.indexOf(k) === -1) cols.push(k); }); });
+    // Columns that hold nested values go last, so the plain ones stay narrow and side by side.
+    var nested = {};
+    rows.forEach(function(r){ cols.forEach(function(c){ if (c in r && !isScalar(r[c])) nested[c] = true; }); });
+    cols = cols.filter(function(c){ return !nested[c]; }).concat(cols.filter(function(c){ return nested[c]; }));
+    return '<div class="tscroll"><table class="ntable"><thead><tr><th>#</th>' + cols.map(function(c){ return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function(r, i){
+        return '<tr><td class="idx">' + (i + 1) + '</td>' + cols.map(function(c){ return '<td>' + (c in r ? valueHtml(r[c], c, depth + 1) : '') + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  function objectTable(o, depth){
+    var keys = Object.keys(o);
+    if (!keys.length) return '<span class="faint">empty</span>';
+    return '<div class="tscroll"><table class="ntable"><tbody>' + keys.map(function(k){ return '<tr><th>' + esc(k) + '</th><td>' + valueHtml(o[k], k, depth + 1) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+
   function propRows(a){
     var keys = Object.keys(a).sort();
     if (!keys.length) return '<div class="empty-panel">No additional properties.</div>';
     return keys.map(function(k){
       var isMono = /^(logical_name|content_hash|method)$/.test(k);
-      var display = isDateKey(k) ? fmtDate(a[k]) : a[k];
-      var body = typeof display === 'string' ? mentionHtml(display) : esc(display);
-      return '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v' + (isMono ? ' mono' : '') + '">' + body + '</div></div>';
+      return '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v' + (isMono ? ' mono' : '') + '">' + valueHtml(a[k], k, 0) + '</div></div>';
     }).join('');
+  }
+
+  // A related resource as a row of the right column, drawn as the left column draws its items.
+  function relItem(key){
+    var r = resources[key];
+    var resolved = r && r.resolved;
+    var sub = resolved ? truncate(labelFor(r) || r.type, 160) : 'not yet fetched';
+    return '<button class="res-item' + (resolved ? '' : ' unresolved') + (key === state.currentId ? ' active' : '') + '" data-nav="' + esc(key) + '" title="' + esc(pathOf(withDepth(key))) + '">' + badge(r ? r.type : '?') +
+      '<span class="rtext"><span class="rid">' + esc(shortId(key)) + '</span><span class="rlabel">' + esc(sub) + '</span></span></button>';
   }
 
   function relChip(key){
@@ -891,7 +964,10 @@
 
     if (state.rawOpen){
       var selfLink = res.selfHref ? '<a href="' + esc(res.selfHref) + '" target="_blank" rel="noopener" title="Open in a new tab">' + esc(pathOf(res.selfHref)) + '</a>' : '';
-      html += '<div class="panel"><div class="panel-head">' + selfLink + '<span>normalized resource</span></div><pre class="jsonview">' + jsonHighlight({ id: res.id, type: res.type, attrs: res.attrs }) + '</pre></div>';
+      // Collapsed until asked for: the events below it are what Debug is usually opened for.
+      html += '<div class="panel"><div class="panel-head toggle" id="response-toggle" title="Show or hide the response">' +
+        '<span><span class="caret">' + (state.responseOpen ? '▾' : '▸') + '</span> ' + selfLink + '</span><span>response</span></div>' +
+        (state.responseOpen ? '<pre class="jsonview">' + (res.raw ? jsonHighlight(res.raw) : 'loading…') + '</pre>' : '') + '</div>';
       html += eventsPanel(res);
     } else {
       html += '<div class="panel"><div class="panel-head">Properties<span>' + propKeys.length + '</span></div><div class="panel-body">' + propRows(a) + '</div></div>';
@@ -919,7 +995,7 @@
     var groups = relGroups(res, 'in');
     inCountEl.textContent = groups.reduce(function(n, g){ return n + g.keys.length; }, 0);
     inRelEl.innerHTML = groups.map(function(g){
-      return '<div class="rel-group"><div class="rel-key"><span class="rel-arrow">←</span>' + esc(humanRel(g.rel)) + '</div><div class="rel-chips">' + g.keys.map(relChip).join('') + '</div></div>';
+      return '<div class="rel-group"><div class="rel-key"><span class="rel-arrow">←</span>' + esc(humanRel(g.rel)) + '</div><div class="res-list">' + g.keys.map(relItem).join('') + '</div></div>';
     }).join('') || '<div class="empty-panel">None recorded.</div>';
   }
 
@@ -959,6 +1035,7 @@
       return;
     }
 
+    if (e.target.closest('#response-toggle') && !e.target.closest('a')){ state.responseOpen = !state.responseOpen; renderDetail(); return; }
     if (e.target.id === 'tab-overview'){ state.rawOpen = false; renderDetail(); return; }
     if (e.target.id === 'tab-raw'){ state.rawOpen = true; renderDetail(); return; }
     if (e.target.id === 'refetch-btn'){ if (state.currentId) follow(state.currentId, { node: true }); return; }
@@ -1010,6 +1087,7 @@
   function openHash(){
     var path = location.hash.slice(1);
     if (path.charAt(0) === '/' && (!state.currentId || pathnameOf(state.currentId) !== path)){
+      state.rawOpen = false;
       follow(location.origin + path, { node: true });
     }
   }
