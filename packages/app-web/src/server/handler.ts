@@ -5,6 +5,7 @@ import {
   workspaceCollectionsHandler,
 } from "./collections-handler";
 import { docsHandler } from "./docs-handler";
+import { eventsHandler, isEventsPath } from "./events-handler";
 import {
   apiCatalogHandler,
   graphHandler,
@@ -93,6 +94,9 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
     const slug = decodeURIComponent(workspace[1]!);
     const rest = workspace[2] ?? "";
     console.debug("request: workspace", slug, rest);
+    if (isEventsPath(rest)) {
+      return inWorkspace(runtime, slug, (scope) => eventsHandler(req, scope, rest));
+    }
     const name = /^\/([^/]+)$/.exec(rest)?.[1];
     if (name !== undefined && !isCollectionSlug(name)) {
       const id = decodeURIComponent(name);

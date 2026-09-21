@@ -120,6 +120,13 @@
       "when": 1789826366308,
       "tag": "0016_migration_provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789826367308,
+      "tag": "0017_get_entity_as_hal",
+      "breakpoints": true
     }
   ]
 }

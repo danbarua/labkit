@@ -20,12 +20,9 @@ function urlFor(serverUrl: string, database: string): string {
 
 async function seedOn(url: string): Promise<void> {
   const { db, tx, close } = await directPostgresBackend({ connectionString: url }).connect();
-  const client = new Client({ connectionString: url });
-  await client.connect();
   try {
-    await seed(db, tx, (sql) => client.query(sql));
+    await seed(db, tx);
   } finally {
-    await client.end();
     await close();
   }
 }

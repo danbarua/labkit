@@ -43,6 +43,6 @@ export async function createFixture(backend: Backend = defaultBackend()): Promis
   await runMigrations(raw);
   await bootstrapSession(raw);
   const db: LabKitDB = { query: (sql, params, opts) => raw.query(sql, params as unknown[], opts) };
-  await seed(db, transactor(db), (sql) => raw.exec(sql));
+  await seed(db, transactor(db));
   return { backend, connections: serialised(raw, () => raw.close()), close: () => raw.close() };
 }
