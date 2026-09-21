@@ -80,7 +80,7 @@ export class Shared extends SessionCore {
   ): Promise<{ old: AnalysisRef; decision: Ref<"decision">; because?: ReviewRef } | undefined> {
     const rows = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
-       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
+       OPTIONAL MATCH (d)-[:BASED_ON]->(rev:Review)
        RETURN old, rev, d`,
       {
         old: vertexProps<{ natural_id: string }>(),
@@ -422,7 +422,7 @@ export class Shared extends SessionCore {
           // decision so a reader asking why THIS finding fell gets the verdict
           // that caused it rather than any review of the same unit.
           if (revision?.because !== undefined)
-            unitOfWork.edge(decision, "INVALIDATED_BY", revision.because);
+            unitOfWork.edge(decision, "BASED_ON", revision.because);
         }
 
         return {
