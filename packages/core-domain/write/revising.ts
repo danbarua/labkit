@@ -407,7 +407,7 @@ export class Revising extends Shared {
       );
       unitOfWork.edge(decision, "SUPERSEDES", input.supersedes);
       unitOfWork.edge(decision, "MOTIVATES", replacement);
-      unitOfWork.edge(decision, "INVALIDATED_BY", input.because);
+      unitOfWork.edge(decision, "BASED_ON", input.because);
 
       // Every conclusion not kept falls now. A kept one is **not
       // re-parented**: it keeps the evidence that produced it, so asking

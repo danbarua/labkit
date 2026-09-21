@@ -89,7 +89,7 @@ export const EDGE_LABELS = [
   "TRIGGERS", // CriterionEvaluation -> Gate
   "GATES", // Gate -> Task/Computation
   "CHANGES", // Decision -> Criterion
-  "BASED_ON", // Decision -> Evidence | CriterionEvaluation -> Evidence
+  "BASED_ON", // Decision -> Evidence | Review, CriterionEvaluation -> Evidence
   "IN_LIGHT_OF", // Decision -> Claim it was accepted in light of
   "RESOLVES", // Decision -> Question | LineOfEnquiry | Task | Gate
   "ANSWERS", // Decision -> Claim named as an enquiry's answer
@@ -97,7 +97,7 @@ export const EDGE_LABELS = [
   "DEFERS", // Decision -> Question
   "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
   "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
-  "INVALIDATED_BY", // Artefact -> Review (which review the retraction rested on)
+  "INVALIDATED_BY", // Artefact -> Review (the artefact is invalidated; this review found it so)
   "IMPLEMENTS", // Task -> EvidenceUnit
   "RESTS_ON", // Claim -> Claim (a synthesis over findings it does not re-run)
   "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
@@ -250,8 +250,13 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Criterion"],
     ["Decision", "Claim"],
   ],
+  /**
+   * What the researcher cited as the cause — `--because`. A review is the same reading as a
+   * finding: the thing the decision rests on.
+   */
   BASED_ON: [
     ["Decision", "Evidence"],
+    ["Decision", "Review"],
     ["CriterionEvaluation", "Evidence"],
   ],
   IN_LIGHT_OF: [["Decision", "Claim"]],
@@ -289,12 +294,13 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Review", "EvidenceUnit"],
   ],
   /**
-   * Which review a retraction actually rested on.
+   * The artefact is invalidated, and this is the review that found it so.
+   *
+   * Only the invalidated thing carries it. A decision that rests on a review is `BASED_ON`:
+   * pointing this at the decision asserts the decision was retracted, which is the opposite
+   * of what it did.
    */
-  INVALIDATED_BY: [
-    ["Artefact", "Review"],
-    ["Decision", "Review"],
-  ],
+  INVALIDATED_BY: [["Artefact", "Review"]],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
   /**
    * A claim that synthesises others and computes nothing new.

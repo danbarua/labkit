@@ -193,7 +193,7 @@ export class ExplainGroup extends SessionCore {
   async analysisRevision({ analysis }: AnalysisRevisionQuery): Promise<AnalysisRevision> {
     const lineage = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
-       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(rev:Review)
+       OPTIONAL MATCH (d)-[:BASED_ON]->(rev:Review)
        RETURN old, rev, d`,
       {
         old: vertexProps<{ natural_id: string }>(),

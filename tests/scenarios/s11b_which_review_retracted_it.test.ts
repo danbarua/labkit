@@ -161,4 +161,26 @@ describe("S-11b: which review retracted it?", () => {
     // reasons contradict each other.
     expect(reasons).toEqual([UNSOUND]);
   });
+
+  /**
+   * The decision did the retracting. Asking why it was made must not report it as the thing
+   * that fell.
+   */
+  test("the decision rests on the review, and is not reported as retracted by it", async () => {
+    const wording = await inOneWorld(async (s) => {
+      const w = await anAnalysisWithTwoReviews(s);
+      const report = await replaceAnalysis(s.writes, {
+        supersedes: w.analysis,
+        because: w.critical,
+        enquiry: w.enquiry,
+        method: "sigmoid-onset-fit",
+        from: [w.readings],
+        concludes: [{ proposition: SHIFTS, finding: "onset moves by 2.8 K" }],
+      });
+      const why = await (await afterwards()).reads.why({ subject: report.decision });
+      return why.because.map((cause) => cause.wording);
+    });
+    expect(wording).toContainEqual(expect.stringContaining("rests on"));
+    expect(wording).not.toContainEqual(expect.stringContaining("retracted"));
+  });
 });

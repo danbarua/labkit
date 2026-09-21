@@ -241,7 +241,7 @@ export class StoryGroup extends SessionCore {
        // question is asked. Distinct from the 'r' above, which is any review of
        // the unit -- reading that as the cause is what reported a confirming
        // review as a reason work was retracted.
-       OPTIONAL MATCH (d)-[:INVALIDATED_BY]->(caused:Review)
+       OPTIONAL MATCH (d)-[:BASED_ON]->(caused:Review)
        RETURN e, comp, a, r, d, caused`,
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
