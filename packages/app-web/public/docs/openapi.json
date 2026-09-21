@@ -244,6 +244,193 @@
         }
       }
     },
+    "/workspace/{slug}/act": {
+      "get": {
+        "summary": "The workspace's acts, oldest first",
+        "description": "Every write is recorded as an act: the command that was issued, and the changes it made. Each item links to what it affected: `subject`, and `touched` for the rest.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "A workspace slug from /collections/workspace.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "Only acts after this position (`seq`). A `since` link on each page names the last act on it, so following it again asks for anything new.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A collection of acts (type `Command`).",
+            "content": {
+              "application/vnd.collection+json": {}
+            }
+          },
+          "default": {
+            "description": "The handle is malformed or not in the graph, or depth is out of range.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/{slug}/act/{seq}": {
+      "get": {
+        "summary": "One act",
+        "description": "The command as issued (`command`) and every change it made (`changes`), shaped like the workspace's `domain_event` row. Its links run out to the entities it affected.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "A workspace slug from /collections/workspace.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "seq",
+            "in": "path",
+            "required": true,
+            "description": "An act's position in the workspace's record.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The act.",
+            "content": {
+              "application/hal+json": {}
+            }
+          },
+          "default": {
+            "description": "The handle is malformed or not in the graph, or depth is out of range.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/{slug}/{id}/events": {
+      "get": {
+        "summary": "What happened to one entity, change by change",
+        "description": "A document, not a resource, so it has no `self`. It rolls up the changes that name the entity out of the acts that made them. Each embedded event has its act (`_links.parent`), its position in that act (`index`, from 1) and `dir`: `in`, `out` or `subject`. The same events are grouped as links `acts:about`, `edgeCreated:in` and `edgeCreated:out`. `limit` counts acts, not changes.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "A workspace slug from /collections/workspace.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Entity handle, e.g. Q_1, LOE_1, CLM_27.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9]+_[A-Za-z0-9]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "Only acts after this position (`seq`). A `since` link on each page names the last act on it, so following it again asks for anything new.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entity's events.",
+            "content": {
+              "application/hal+json": {}
+            }
+          },
+          "default": {
+            "description": "The handle is malformed or not in the graph, or depth is out of range.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspace/{slug}": {
       "get": {
         "summary": "A workspace's collections: one per node type",

@@ -1,3 +1,5 @@
+import type { NodeLabel } from "@labkit/core-db/domain";
+import { collectionPath, EVENTS_SEGMENT, slugFor } from "./collection-paths";
 import type { TenantScope } from "./runtime";
 // Bare links return one hop of neighbours. MAX_DEPTH mirrors the limit in entity_as_hal.
 const DEFAULT_DEPTH = 1;
@@ -66,11 +68,20 @@ export async function graphHandler(
       search: `?${search}`,
       prefix: scope.prefix,
     });
-    (resource._links as Record<string, unknown>).expand = {
+    const links = resource._links as Record<string, unknown>;
+    links.expand = {
       href: `${publicOrigin(req).origin}${nodePath(scope.prefix, id)}{?depth}`,
       templated: true,
       title: `depth: hops of neighbours to embed, 0 to ${MAX_DEPTH}`,
     };
+    // The collection this node is listed in, carrying the same parameters as every other link.
+    const collection = collectionPath(scope.prefix, slugFor(resource.type as NodeLabel));
+    links.index = { href: `${publicOrigin(req).origin}${collection}?${search}` };
+    // Only a workspace has an event log to read.
+    if (scope.prefix !== "") {
+      const events = `${nodePath(scope.prefix, id)}/${EVENTS_SEGMENT}`;
+      links.events = { href: `${publicOrigin(req).origin}${events}?${search}` };
+    }
 
     return new Response(JSON.stringify(resource), {
       status: 200,

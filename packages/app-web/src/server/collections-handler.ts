@@ -1,22 +1,9 @@
 import { NODE_LABELS, SEARCHABLE_TEXT, type NodeLabel } from "@labkit/core-db/domain";
+import { ACT_SLUG, LABEL_BY_SLUG, slugFor } from "./collection-paths";
 import { nodePath, problem, publicOrigin } from "./graph-handler";
 import type { TenantScope } from "./runtime";
 
 const COLLECTION_JSON = "application/vnd.collection+json";
-
-// A collection is named for its node type, kebab-cased. These say it better.
-const SLUG_OVERRIDES: { readonly [L in NodeLabel]?: string } = {
-  LineOfEnquiry: "enquiry",
-  CriterionEvaluation: "evaluation",
-};
-
-function slugFor(label: NodeLabel): string {
-  return SLUG_OVERRIDES[label] ?? label.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
-}
-
-const LABEL_BY_SLUG = new Map<string, NodeLabel>(
-  NODE_LABELS.map((label) => [slugFor(label), label]),
-);
 
 // Not a node type: workspaces are the tenants, and only the default workspace can see them all.
 const WORKSPACE_SLUG = "workspace";
@@ -27,28 +14,70 @@ export function isCollectionSlug(name: string): boolean {
   return LABEL_BY_SLUG.has(name);
 }
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+export const DEFAULT_LIMIT = 50;
+export const MAX_LIMIT = 200;
 
-function pageParam(value: string | null, fallback: number, min: number, max: number): number {
+export function pageParam(
+  value: string | null,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   const n = Number.parseInt(value ?? "", 10);
   return Number.isInteger(n) ? Math.min(Math.max(n, min), max) : fallback;
 }
 
-function collectionJson(collection: Record<string, unknown>): Response {
-  return new Response(JSON.stringify({ collection: { version: "1.0", ...collection } }), {
+// A parameter this handler does not read is the client's preference, such as `depth`, and every
+// link in the response carries it on unchanged.
+const PAGING = new Set(["limit", "offset"]);
+
+function carry(href: string, extras: [string, string][]): string {
+  const url = new URL(href);
+  for (const name of new Set(extras.map(([n]) => n))) url.searchParams.delete(name);
+  for (const [name, value] of extras) url.searchParams.append(name, value);
+  return url.toString();
+}
+
+// `handled` names the parameters the caller reads itself, which are not carried on.
+export function extrasOf(req: Request, handled: ReadonlySet<string> = PAGING): [string, string][] {
+  return [...new URL(req.url).searchParams].filter(([name]) => !handled.has(name));
+}
+
+export function withExtras(value: unknown, extras: [string, string][]): unknown {
+  if (Array.isArray(value)) return value.map((one) => withExtras(one, extras));
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, inner]) => [
+      key,
+      key === "href" && typeof inner === "string"
+        ? carry(inner, extras)
+        : withExtras(inner, extras),
+    ]),
+  );
+}
+
+export function collectionJson(
+  req: Request,
+  collection: Record<string, unknown>,
+  handled?: ReadonlySet<string>,
+): Response {
+  const extras = extrasOf(req, handled);
+  const body = { collection: { version: "1.0", ...collection } };
+  return new Response(JSON.stringify(extras.length === 0 ? body : withExtras(body, extras)), {
     status: 200,
     headers: { "content-type": COLLECTION_JSON },
   });
 }
 
 // The index lists one collection per node type, and the workspaces from the default workspace.
-function index(root: string, withWorkspaces: boolean): Response {
+function index(req: Request, root: string, withWorkspaces: boolean): Response {
   const entries = [
     ...NODE_LABELS.map((label) => ({ slug: slugFor(label), type: label as string })),
-    ...(withWorkspaces ? [{ slug: WORKSPACE_SLUG, type: "Workspace" }] : []),
+    ...(withWorkspaces
+      ? [{ slug: WORKSPACE_SLUG, type: "Workspace" }]
+      : [{ slug: ACT_SLUG, type: "Command" }]),
   ];
-  return collectionJson({
+  return collectionJson(req, {
     href: root,
     items: entries.map((entry) => ({
       href: `${root}/${entry.slug}`,
@@ -60,14 +89,16 @@ function index(root: string, withWorkspaces: boolean): Response {
   });
 }
 
-function pagingLinks(
+export function pagingLinks(
   root: string,
   self: string,
   limit: number,
   offset: number,
   hasMore: boolean,
+  fixed = "",
 ): { rel: string; href: string }[] {
-  const pageHref = (o: number) => `${self}?limit=${limit}&offset=${o}`;
+  // `fixed` is a query fragment that holds across pages, such as `&since=40`.
+  const pageHref = (o: number) => `${self}?limit=${limit}&offset=${o}${fixed}`;
   const links = [{ rel: "index", href: root }];
   if (offset > 0) links.push({ rel: "prev", href: pageHref(Math.max(offset - limit, 0)) });
   if (hasMore) links.push({ rel: "next", href: pageHref(offset + limit) });
@@ -151,7 +182,7 @@ async function listing(
 
   const self = `${root}/${slugFor(label)}`;
 
-  return collectionJson({
+  return collectionJson(req, {
     href: `${self}?limit=${limit}&offset=${offset}`,
     links: pagingLinks(root, self, limit, offset, rows.length > limit),
     items: page.map((row) => {
@@ -188,7 +219,7 @@ async function workspaceListing(req: Request, scope: TenantScope, root: string):
   const rows = (await scope.workspaces()).slice(offset, offset + limit + 1);
 
   const self = `${root}/${WORKSPACE_SLUG}`;
-  return collectionJson({
+  return collectionJson(req, {
     href: `${self}?limit=${limit}&offset=${offset}`,
     links: pagingLinks(root, self, limit, offset, rows.length > limit),
     items: rows.slice(0, limit).map((workspace) => {
@@ -212,7 +243,7 @@ function serve(
   name: string,
   withWorkspaces: boolean,
 ): Promise<Response> | Response {
-  if (name === "") return index(root, withWorkspaces);
+  if (name === "") return index(req, root, withWorkspaces);
   if (name === WORKSPACE_SLUG && withWorkspaces) return workspaceListing(req, scope, root);
 
   const label = LABEL_BY_SLUG.get(name);
