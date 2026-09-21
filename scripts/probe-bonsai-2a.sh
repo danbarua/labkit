@@ -122,20 +122,20 @@ say "found via search, not hardcoded: the Level-3 question the prior script acce
 # the guard now: it fails loudly (empty, or more than one match) rather
 # than silently writing Stage 2A's answer onto a question a prior script's
 # handle numbering happened to shift onto.
-search_out=$(lab search "externally defined task or information-processing objective")
-external_task_matches=$(printf '%s\n' "$search_out" | grep -oE '\(Q_[0-9]+\)' | tr -d '()')
-external_task_count=$(printf '%s\n' "$external_task_matches" | grep -c '^Q_' || true)
+search_out=$(lab search "externally defined task or information-processing objective" --json)
+external_task_count=$(printf '%s\n' "$search_out" | jq '[.[] | select(.label == "Question") | .matches[]] | length')
 if [ "$external_task_count" -ne 1 ]; then
   echo "probe-bonsai-2a.sh: expected exactly one question for the Level-3 wording, found $external_task_count -- refusing to pick" >&2
   exit 1
 fi
-external_task_question="$external_task_matches"
-external_task_enquiry=$(lab pursuits "$external_task_question" | grep -oE 'LOE_[0-9]+')
-external_task_enquiry_count=$(printf '%s\n' "$external_task_enquiry" | grep -c '^LOE_' || true)
+external_task_question=$(printf '%s\n' "$search_out" | jq -er '[.[] | select(.label == "Question") | .matches[]][0].handle')
+pursuits_out=$(lab pursuits "$external_task_question" --json)
+external_task_enquiry_count=$(printf '%s\n' "$pursuits_out" | jq 'length')
 if [ "$external_task_enquiry_count" -ne 1 ]; then
   echo "probe-bonsai-2a.sh: expected exactly one line of enquiry pursuing $external_task_question, found $external_task_enquiry_count" >&2
   exit 1
 fi
+external_task_enquiry=$(printf '%s\n' "$pursuits_out" | jq -er '.[0]')
 ask enquiry "$external_task_enquiry"
 
 say "the feasibility ladder's go/no-go gate -- a quality bar, not a hypothesis"
@@ -160,7 +160,7 @@ STAGE2A_LADDER_GO=2026-08-03T18:06:35.000Z
 
 go_no_go_observations=$(lab --date "$STAGE2A_LADDER_GO" observe "$external_task_enquiry" --name stage2a_go_no_go \
   --finding "0/240,000 (image,topology) evolutions failed; 0 non-finite features in any condition, any topology; 270/270 fold/C fits converged, 6/6 final refits converged" \
-  --hash sha256:9da6b908 | grep '^ART_')
+  --hash sha256:9da6b908 --json | jq -er .observations)
 lab --date "$STAGE2A_LADDER_GO" evaluate "$go_no_go_criterion" --value "0/240,000 solver failures, 0 non-finite features, 270/270 + 6/6 classifier fits converged -- OVERALL: GO" --outcome pass --gate "$go_no_go_gate" --citing "$go_no_go_observations" >/dev/null
 ask gate "$go_no_go_gate"
 
@@ -176,30 +176,30 @@ STAGE2A_CONFIRMATORY=2026-08-03T18:44:23.000Z
 
 classification_confirmatory_observations=$(lab --date "$STAGE2A_CONFIRMATORY" observe "$external_task_enquiry" --name stage2a_confirmatory_test_results \
   --finding "six conditions (raw pixels, encoded pre-evolution, evolved T/lattice/rewired/curr_random), each refit once at its already-selected C on the full 60,000-image official training set, then applied unchanged to the untouched 10,000-image official test set; 20,000 paired class-stratified bootstrap resamples per comparison" \
-  --hash sha256:203e56ff | grep '^ART_')
+  --hash sha256:203e56ff --json | jq -er .observations)
 # #189: --implementing names the feasibility ladder task this run carries
 # out -- missing before this rewrite, which is why `contract` used to read
 # the task as still "planned" after Stage 2A had already finished it.
 classification_confirmatory_analysis=$(lab --date "$STAGE2A_CONFIRMATORY" analyse "$external_task_enquiry" \
   --method "paired class-stratified bootstrap on per-image log-loss difference (evolved minus pre-evolution), 20,000 resamples, two-sided 95% percentile interval; locked success criterion: the entire interval below zero; secondary confirmation via exact McNemar's test on classification disagreement" \
-  --from "$classification_confirmatory_observations" --implementing "$feasibility_ladder_task" \
-  | grep '^COMP_')
+  --from "$classification_confirmatory_observations" --implementing "$feasibility_ladder_task" --json \
+  | jq -er .analysis)
 primary_classification_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
   --proposition "runtime graph evolution on T improves classification over the already dynamically-encoded pre-evolution state" --standing confirmatory \
   --finding "mean d_i=-0.2491, 95% CI [-0.2721,-0.2266], entirely below zero; McNemar p=6.68e-104 (1,234 test images correct only under evolved_T vs 384 only under pre-evolution)" \
-  --bearing supports | grep '^CLM_')
+  --bearing supports --json | jq -er '.claims[0].claim')
 lattice_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
   --proposition "runtime graph evolution on the matched lattice control improves classification over pre-evolution" --standing confirmatory \
   --finding "mean d_i=-0.1743, 95% CI [-0.1930,-0.1557], entirely below zero, McNemar p=1.55e-56" \
-  --bearing supports | grep '^CLM_')
+  --bearing supports --json | jq -er '.claims[0].claim')
 rewired_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
   --proposition "runtime graph evolution on the canonical rewired control improves classification over pre-evolution" --standing confirmatory \
   --finding "mean d_i=-0.2819, 95% CI [-0.3074,-0.2570], entirely below zero, McNemar p=9.76e-133" \
-  --bearing supports | grep '^CLM_')
+  --bearing supports --json | jq -er '.claims[0].claim')
 curr_random_secondary_claim=$(lab --date "$STAGE2A_CONFIRMATORY" conclude "$classification_confirmatory_analysis" \
   --proposition "runtime graph evolution on the canonical current-random control improves classification over pre-evolution" --standing confirmatory \
   --finding "mean d_i=-0.3049, 95% CI [-0.3303,-0.2797], entirely below zero, McNemar p=8.42e-138" \
-  --bearing supports | grep '^CLM_')
+  --bearing supports --json | jq -er '.claims[0].claim')
 
 # Promoted: this is the primary, locked, sole confirmatory comparison
 # (DESIGN.md) and the strongest positive Level 3 result this project has
@@ -223,7 +223,7 @@ four_graphs_headline=$(lab --date "$STAGE2A_CONFIRMATORY" synthesise \
   --resting-on "$primary_classification_claim" \
   --resting-on "$lattice_secondary_claim" \
   --resting-on "$rewired_secondary_claim" \
-  --resting-on "$curr_random_secondary_claim" | grep '^CLM_')
+  --resting-on "$curr_random_secondary_claim" --json | jq -er .claim)
 ask why "$four_graphs_headline"
 
 say "closing the externally-defined-task question, and checking the reopening hesitation a third time"
@@ -253,14 +253,14 @@ STAGE2A_COST_RESULTS=2026-08-04T05:19:56.000Z
 
 compute_cost_observations=$(lab --date "$STAGE2A_COST_RESULTS" observe "$compute_cost_enquiry" --name stage2a_compute_cost_accounting \
   --finding "at N=1: oscillator (evolved_T, GPU evolution) costs 13.7x MLP_H128; at N=1,000,000: 375.6x; at N=100,000,000: 551.8x; every algebraic break-even point (any topology, either baseline) solves to a negative N" \
-  --hash sha256:f9ec47d3 | grep '^ART_')
+  --hash sha256:f9ec47d3 --json | jq -er .observations)
 compute_cost_analysis=$(lab --date "$STAGE2A_COST_RESULTS" analyse "$compute_cost_enquiry" \
   --method "closed-form per-image cost model (Train_readout + N*Infer_readout vs Train_MLP + N*Infer_MLP), solved algebraically for the break-even N at every topology/baseline pair" \
-  --from "$compute_cost_observations" | grep '^COMP_')
+  --from "$compute_cost_observations" --json | jq -er .analysis)
 compute_cost_claim=$(lab --date "$STAGE2A_COST_RESULTS" conclude "$compute_cost_analysis" \
   --proposition "the oscillator readout becomes cheaper than an MLP baseline at some deployment scale" --standing confirmatory \
   --finding "no crossover exists at any plausible deployment scale -- the oscillator is strictly more expensive than either MLP baseline from N=1 to N=100,000,000, and the gap widens with scale rather than narrowing" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 lab --date "$STAGE2A_COST_RESULTS" close enquiry "$compute_cost_enquiry" --answered-by "$compute_cost_claim" >/dev/null
 ask enquiry "$compute_cost_enquiry"
 

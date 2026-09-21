@@ -85,17 +85,17 @@ original_question=$(lab --date "$STAGE1A_ORIGINAL" pose "does learned topology (
 original_enquiry=$(lab --date "$STAGE1A_ORIGINAL" pursue "$original_question" --approach "tangent-linear response vs three matched controls (degree-preserving rewiring, matched-sparsity random, regular lattice) across 10 KMNIST class topologies, joint tangent-matrix integration")
 all_classes_observations=$(lab --date "$STAGE1A_ORIGINAL" observe "$original_enquiry" --name stage1a_all_classes \
   --finding "AUC per (class, construction) for T vs rewired/random/lattice, all 10 KMNIST classes, joint tangent-matrix response, RK45+DOP853 cross-checked, revalidated against finite differences under the actual inference solver" \
-  --hash sha256:d7a89526 | grep '^ART_')
+  --hash sha256:d7a89526 --json | jq -er .observations)
 no_significant_difference_criterion=$(lab --date "$STAGE1A_ORIGINAL" criterion "no T-vs-control comparison reaches significance under paired Wilcoxon, Bonferroni threshold 0.05/3 ~ 0.0167")
 
 original_finding_analysis=$(lab --date "$STAGE1A_ORIGINAL" analyse "$original_enquiry" \
   --method "paired Wilcoxon signed-rank across 10 class-level AUC differences (T minus control), primary; paired t-test on log-AUC, secondary" \
   --from "$all_classes_observations" --held-to "$no_significant_difference_criterion" \
-  | grep '^COMP_')
+  --json | jq -er .analysis)
 original_finding_claim=$(lab --date "$STAGE1A_ORIGINAL" conclude "$original_finding_analysis" \
   --proposition "learned topology (T) produces distinguishable finite-time infinitesimal perturbation dynamics from matched controls" \
   --finding "none of three comparisons reach significance: T-vs-rewired p=0.695, T-vs-random p=0.275, T-vs-lattice p=0.084 (closest, still above uncorrected 0.05)" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 
 lab --date "$STAGE1A_ORIGINAL" evaluate "$no_significant_difference_criterion" --value "T-vs-rewired p=0.695, T-vs-random p=0.275, T-vs-lattice p=0.084; all above 0.0167" --outcome pass --citing "$original_finding_claim" >/dev/null
 lab --date "$STAGE1A_ORIGINAL" is confirmed "$original_finding_claim" --because "high evidence strength: validated simulator, adaptive integration, independent-solver agreement, tangent-linear verification against finite differences, paired comparisons with multiplicity control; a genuine negative finding, not an exploratory null" >/dev/null
@@ -106,7 +106,7 @@ STAGE1A_PILOT=2026-08-01T09:51:27.000Z
 
 class0_pilot_analysis=$(lab --date "$STAGE1A_PILOT" analyse "$original_enquiry" \
   --method "class-0-only pilot, 20-seed sweep of the random construction under both available random-control definitions, fresh initial condition" \
-  --from "$all_classes_observations" | grep '^COMP_')
+  --from "$all_classes_observations" --json | jq -er .analysis)
 lab --date "$STAGE1A_PILOT" conclude "$class0_pilot_analysis" \
   --proposition "the T-vs-random AUC ratio direction is stable across random-construction seeds" \
   --finding "sign of log(T/random) flips in 7/20 seeds (historical control, CV=2.37) and 2/20 seeds (current control, CV=1.08); reinforces rather than contradicts the original null but reveals undocumented within-class seed variance" \
@@ -119,7 +119,7 @@ say "the sharpening: why a re-verification"
 sharpened_question=$(lab --date "$STAGE1A_PILOT" sharpen "$original_question" \
   --into "does the T-vs-stochastic-control comparison hold up under proper seed accounting (multiple seeds per class, explicit within-class aggregation and robustness checks)?" \
   --because "a class-0 pilot found the random control's AUC ratio sign is seed-sensitive (7/20 flips under the historical definition), an undocumented source of within-class variance the original single-seed-per-class design did not account for" \
-  | grep '^Q_')
+  --json | jq -er .question)
 
 say "re-verification v1: raw-scale aggregation, and its own gate"
 
@@ -149,29 +149,29 @@ STAGE1A_V1_RESULTS=2026-08-01T11:34:15.000Z
 
 reverification_observations=$(lab --date "$STAGE1A_V1_RESULTS" observe "$reverification_enquiry" --name stage1a_reverification_results \
   --finding "770 raw AUC values: 10 classes x (T + lattice, 1 each) + 10 classes x 3 stochastic controls x 25 seeds; zero errors, all pre-run assertions passed (T rebuild byte-exact against cached pkl for all 10 classes)" \
-  --hash sha256:4a4bf3d7 | grep '^ART_')
+  --hash sha256:4a4bf3d7 --json | jq -er .observations)
 
 reverification_v1_analysis=$(lab --date "$STAGE1A_V1_RESULTS" analyse "$reverification_enquiry" \
   --method "mean-aggregated paired Wilcoxon signed-rank across 10 class-level differences, 25 seeds per class per stochastic control, Holm-corrected across 4 comparisons (raw AUC scale, as DESIGN.md specifies)" \
   --from "$reverification_observations" --implementing "$reverification_task" \
   --held-to "$robustness_criterion" \
-  | grep '^COMP_')
+  --json | jq -er .analysis)
 historical_random_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
   --proposition "T vs historical half-edge random is distinguishable" --standing confirmatory \
   --finding "nominally Holm-significant (p_holm=0.00781, 0/10 sign+) but median aggregation collapses it to non-significant (p=0.92188, 5/10 sign+); within-class MCSE exceeds |d| in 2/10 classes" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 current_random_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
   --proposition "T vs current edge-count-matched random is distinguishable" --standing confirmatory \
   --finding "not Holm-significant (p_holm=0.05469); median aggregation also disagrees with primary (p=0.492 vs 0.027)" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 rewiring_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
   --proposition "T vs degree-preserving rewiring is distinguishable" --standing confirmatory \
   --finding "nominally Holm-significant (p_holm=0.04102, 1/10 sign+) but median aggregation collapses it (p=0.19336, 3/10 sign+)" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 lattice_claim=$(lab --date "$STAGE1A_V1_RESULTS" conclude "$reverification_v1_analysis" \
   --proposition "T vs lattice is distinguishable" --standing confirmatory \
   --finding "not significant (p_holm=0.13086); the one comparison with no seed axis, so no mean/median/MCSE ambiguity is possible; reproduces the original Stage 1A conclusion cleanly" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 
 lab --date "$STAGE1A_V1_RESULTS" evaluate "$robustness_criterion" --about "$historical_random_claim" --gate "$robustness_gate" --value "primary p=0.00195 vs median p=0.92188; MCSE exceeds |d| in class 6 (93.5 vs 58.9)" --outcome fail --citing "$historical_random_claim" >/dev/null
 lab --date "$STAGE1A_V1_RESULTS" evaluate "$robustness_criterion" --about "$current_random_claim" --gate "$robustness_gate" --value "primary p=0.02734 vs median p=0.49219; MCSE exceeds |d| in 1/10 classes" --outcome fail --citing "$current_random_claim" >/dev/null
@@ -220,19 +220,19 @@ STAGE1A_V2_RESULTS=2026-08-01T11:46:49.000Z
 # current.
 log_scale_replacement=$(lab --date "$STAGE1A_V2_RESULTS" keep "$lattice_claim" --because "$raw_scale_review" \
   --method "log-scale (geometric mean) re-aggregation of the same 770 raw AUC values from ART_4 -- no new simulation, no new seeds, only the aggregation function changes; pre-committed before running, decision rule not revised after seeing results" \
-  | grep '^COMP_')
+  --json | jq -er .replacement)
 historical_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$historical_random_claim" \
   --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322); 95% CI on multiplicative scale x[0.280, 1.541] brackets 1.0" --standing confirmatory \
   --bearing challenges \
-  | grep '^CLM_')
+  --json | jq -er '.claims[0].claim')
 current_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$current_random_claim" \
   --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.320); 95% CI x[0.146, 1.250] brackets 1.0" --standing confirmatory \
   --bearing challenges \
-  | grep '^CLM_')
+  --json | jq -er '.claims[0].claim')
 rewiring_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$rewiring_claim" \
   --finding "NOT resolved: primary (p=0.037) and sign-flip (p=0.041) still say significant, median (p=0.084) still says not -- narrowed from v1 but not closed; per pre-commitment, no further transformation attempted, reported as genuinely inconclusive at n=10/25 seeds. LabKit's bearing is binary (supports/challenges); there is no way to record \" --standing confirmatoryinconclusive\", so the criterion below is left without a fresh evaluation rather than forced to one." \
   --bearing challenges \
-  | grep '^CLM_')
+  --json | jq -er '.claims[0].claim')
 
 # #189: the two comparisons v2 actually resolved get a fresh evaluation
 # citing the new claim -- their v1 evaluation is now `no-standing-verdict`

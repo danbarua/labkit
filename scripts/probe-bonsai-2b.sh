@@ -77,7 +77,7 @@ encoder_gate=$(lab --date "$STAGE2B_DESIGN_LOCK" declare --governed-by "$encoder
 STAGE2B_GATE_FAILED=2026-08-05T21:43:36.000Z
 
 encoder_gate_observations=$(lab --date "$STAGE2B_GATE_FAILED" observe "$denoising_enquiry" --name encoder_gate_s150 \
-  --finding "median final-Delta clean 2.177e-07, noisy 3.698e-05, rho=169.851 against a threshold of 10; zero non-finite values anywhere -- a clean ratio failure, not a numerical blow-up" | grep '^ART_')
+  --finding "median final-Delta clean 2.177e-07, noisy 3.698e-05, rho=169.851 against a threshold of 10; zero non-finite values anywhere -- a clean ratio failure, not a numerical blow-up" --json | jq -er .observations)
 lab --date "$STAGE2B_GATE_FAILED" evaluate "$encoder_gate_criterion" --gate "$encoder_gate" \
   --value "rho=169.851 at ENCODER_STEPS=150, against a threshold of 10" --outcome fail \
   --citing "$encoder_gate_observations" >/dev/null
@@ -90,21 +90,21 @@ ask gate "$encoder_gate"
 STAGE2B_GATE_DIAGNOSIS=2026-08-05T23:02:13.000Z
 
 diagnosis_observations=$(lab --date "$STAGE2B_GATE_DIAGNOSIS" observe "$denoising_enquiry" --name encoder_gate_failure_diagnostic \
-  --finding "convergence curve across five step counts (75, 150, 300, 600, 1200) and per-image state drift from 150 to 600 steps, both pre-committed before either was run; the reconstruction of the failed run's corpus verified bit-for-bit against its own reported identity-baseline MSE, relative diff 0.000e+00" | grep '^ART_')
+  --finding "convergence curve across five step counts (75, 150, 300, 600, 1200) and per-image state drift from 150 to 600 steps, both pre-committed before either was run; the reconstruction of the failed run's corpus verified bit-for-bit against its own reported identity-baseline MSE, relative diff 0.000e+00" --json | jq -er .observations)
 diagnosis_analysis=$(lab --date "$STAGE2B_GATE_DIAGNOSIS" analyse "$denoising_enquiry" \
   --method "two pre-committed measurements: the noisy final-Delta convergence curve across five step counts, and per-image phase drift from 150 to 600 steps measured against the typical between-image circular distance" \
-  --from "$diagnosis_observations" | grep '^COMP_')
+  --from "$diagnosis_observations" --json | jq -er .analysis)
 slow_convergence_claim=$(lab --date "$STAGE2B_GATE_DIAGNOSIS" conclude "$diagnosis_analysis" \
   --proposition "the encoder fails to converge on majority-censored inputs" \
   --finding "noisy final-Delta decays geometrically to exact float64 zero -- median and p95, every one of 1,000 images -- by 1,200 steps, the same fixed point clean reaches; median 150-to-600 drift is 4e-4 of the between-image distance. Genuine, if slow, convergence, not a qualitatively different regime" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 
 # The second defect, found in the same investigation and independent of the
 # first: the gate's own formula, not the encoder.
 unstable_ratio_claim=$(lab --date "$STAGE2B_GATE_DIAGNOSIS" conclude "$diagnosis_analysis" \
   --proposition "the ratio gate is stable wherever the threshold sits" \
   --finding "at 600 steps clean's median was exact 0.0 while noisy's sat at 1.776e-14, nine orders below the smallest meaningful final-Delta measured anywhere -- and max(0.0, 1e-15) silently turned a RATIO gate into an ABSOLUTE test against the floor, reporting FAIL at rho=17.76. The rho trajectory (14.98, 169.9, 1.915e4, 17.76, 0.0) is non-monotone because it tracks which series crossed its float64 floor first" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 
 # "Raise ENCODER_STEPS to 1200 and add an absolute-convergence escape",
 # 2026-08-06T01:41:24+01:00. **`amend`, and this is what it is for**: a
@@ -116,10 +116,10 @@ STAGE2B_GATE_AMENDED=2026-08-06T00:41:24.000Z
 amended_encoder_criterion=$(lab --date "$STAGE2B_GATE_AMENDED" amend "$encoder_gate_criterion" \
   --now-requires "encoder gate: rho at most 10, OR both medians below 1e-12 -- an absolute-convergence escape, because a threshold sitting inside the float64 crossover band is fragile by construction whatever ENCODER_STEPS ends up being" \
   --because "the gate's first real run failed on genuine slow convergence rather than a floor, and the same investigation found the ratio formula unstable near either series' own numerical floor" \
-  --citing "$unstable_ratio_claim" | grep '^CRIT_')
+  --citing "$unstable_ratio_claim" --json | jq -er .nowRequires.criterion)
 
 encoder_gate_pass_observations=$(lab --date "$STAGE2B_GATE_AMENDED" observe "$denoising_enquiry" --name encoder_gate_s1200 \
-  --finding "at ENCODER_STEPS=1200 both medians reach exact float64 zero, clearing the amended gate by the absolute-convergence escape rather than by the ratio" | grep '^ART_')
+  --finding "at ENCODER_STEPS=1200 both medians reach exact float64 zero, clearing the amended gate by the absolute-convergence escape rather than by the ratio" --json | jq -er .observations)
 lab --date "$STAGE2B_GATE_AMENDED" evaluate "$amended_encoder_criterion" --gate "$encoder_gate" \
   --value "both medians exact 0.0 at ENCODER_STEPS=1200 -- the escape clause, not the ratio" --outcome pass \
   --citing "$encoder_gate_pass_observations" >/dev/null
@@ -135,7 +135,7 @@ ask design "$encoder_gate"
 STAGE2B_LADDER=2026-08-07T15:54:13.000Z
 
 feasibility_ladder_observations=$(lab --date "$STAGE2B_LADDER" observe "$denoising_enquiry" --name stage2b_feasibility_ladder \
-  --finding "stages 1 (n=1,000) and 2 (n=5,000) both _OK; Phase A (corrupt+encode, 60,000 images, moved to local CPU, 11.3 min) and Phase B (evolution/ridge/CNN on GPU) both complete; the encoder gate's own first real run FAILED honestly at ENCODER_STEPS=150 (rho=169.851 vs threshold 10), diagnosed as slow convergence not a floor, and re-ran PASS at 1,200 steps -- disclosed as a post-lock amendment, not silently raised" | grep '^ART_')
+  --finding "stages 1 (n=1,000) and 2 (n=5,000) both _OK; Phase A (corrupt+encode, 60,000 images, moved to local CPU, 11.3 min) and Phase B (evolution/ridge/CNN on GPU) both complete; the encoder gate's own first real run FAILED honestly at ENCODER_STEPS=150 (rho=169.851 vs threshold 10), diagnosed as slow convergence not a floor, and re-ran PASS at 1,200 steps -- disclosed as a post-lock amendment, not silently raised" --json | jq -er .observations)
 
 say "the locked stage-4 confirmatory result"
 
@@ -147,7 +147,7 @@ say "the locked stage-4 confirmatory result"
 STAGE2B_STAGE4=2026-08-09T10:16:17.000Z
 
 stage4_confirmatory_observations=$(lab --date "$STAGE2B_STAGE4" observe "$denoising_enquiry" --name stage2b_stage4_official_result \
-  --finding "STAGE4_OK, run_ladder_stage4.py, commit 431d90a, one evaluation on the official 10,000-image KMNIST test corpus, active-support post-clip MSE; primary and denoising-gate tests outside both multiplicity families per the locked design, two Holm families (3-way controls-vs-pre, 6-way pairwise) run separately" | grep '^ART_')
+  --finding "STAGE4_OK, run_ladder_stage4.py, commit 431d90a, one evaluation on the official 10,000-image KMNIST test corpus, active-support post-clip MSE; primary and denoising-gate tests outside both multiplicity families per the locked design, two Holm families (3-way controls-vs-pre, 6-way pairwise) run separately" --json | jq -er .observations)
 # DESIGN.md's second locked check, and its ordering is the point: it is
 # evaluated only because the primary succeeded, and never rescues a failed
 # primary. LabKit records the verdict and the order it was reached in; the
@@ -158,15 +158,15 @@ denoising_gate_criterion=$(lab --date "$STAGE2B_DESIGN_LOCK" criterion "denoisin
 stage4_confirmatory_analysis=$(lab --date "$STAGE2B_STAGE4" analyse "$denoising_enquiry" \
   --method "primary paired class-stratified bootstrap (d_i = MSE_i(T) - MSE_i(pre_evolution), 20,000 resamples, seed=42, two-sided 95% percentile interval); denoising gate (T vs identity) evaluated only because the primary succeeded, never rescuing a failed primary; two Holm-corrected families (3-way controls-vs-pre, 6-way pairwise among the four evolved graphs) with a 100,000-flip sign-flip robustness check on family 2" \
   --from "$stage4_confirmatory_observations" --held-to "$denoising_gate_criterion" \
-  --implementing "$ladder_task" | grep '^COMP_')
+  --implementing "$ladder_task" --json | jq -er .analysis)
 primary_denoising_claim=$(lab --date "$STAGE2B_STAGE4" conclude "$stage4_confirmatory_analysis" \
   --proposition "runtime graph evolution on T improves single-step active-support reconstruction over the already dynamically-encoded pre-evolution state" --standing confirmatory \
   --finding "primary: mean d_i=-0.0044509, 95% CI [-0.0046028,-0.0043002], entirely below zero; denoising gate (T vs identity) also entirely below zero, CI [-0.1335739,-0.1328960] -- the actual-denoising claim is added to the primary reconstruction claim, not just the weaker relative one" \
-  --bearing supports | grep '^CLM_')
+  --bearing supports --json | jq -er '.claims[0].claim')
 unique_winner_claim=$(lab --date "$STAGE2B_STAGE4" conclude "$stage4_confirmatory_analysis" \
   --proposition "T is the unique winner among the four tested evolved graphs on this task" --standing confirmatory \
   --finding "all three controls beat pre_evolution (Family 1, Holm-rejected); T beats each of the other three evolved graphs after Family-2 Holm correction (vs lattice t=-8.74 p=2.73e-18; vs rewired t=-38.10; vs curr_random t=-26.85), all six pairwise Holm-rejected, sign-flip robustness agreeing in direction and significance on all six; not established that T beats the CNN overall -- a separate model class outside both statistics families, mean clipped MSE 0.063069 vs T's 0.065623, reported descriptively per DESIGN.md's own framing" \
-  --bearing supports | grep '^CLM_')
+  --bearing supports --json | jq -er '.claims[0].claim')
 
 lab --date "$STAGE2B_STAGE4" evaluate "$denoising_gate_criterion" --about "$primary_denoising_claim" \
   --value "T vs identity entirely below zero, CI [-0.1335739,-0.1328960] -- reached only because the primary succeeded" \
