@@ -5,10 +5,8 @@
  */
 
 import { runMigrationsOnPostgres } from "@labkit/core-db/migrate";
+import { labkitVersion } from "@labkit/core-db/version";
 import { Client } from "pg";
-import pkg from "../../../package.json" with { type: "json" };
-
-const VERSION = pkg.version;
 
 const url = process.env.LABKIT_DB_URL;
 if (!url) {
@@ -28,4 +26,4 @@ try {
 }
 
 const { host, pathname } = new URL(url);
-console.error(`migrated ${pathname.slice(1)} on ${host} with labkit ${VERSION}`);
+console.error(`migrated ${pathname.slice(1)} on ${host} with labkit ${labkitVersion()}`);
