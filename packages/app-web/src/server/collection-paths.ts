@@ -17,6 +17,10 @@ export const LABEL_BY_SLUG = new Map<string, NodeLabel>(
 // The workspace's record of acts. Not a node type, so it has no label to derive a slug from.
 export const ACT_SLUG = "act";
 
+// The type a recorded act is served as. In the domain it is a command and what came of it; the
+// team calls it an act. Not a node type, so it is not in the graph.
+export const ACT_TYPE = "Act";
+
 // After a record's path: the changes that affected it, `/{handle}/events`.
 export const EVENTS_SEGMENT = "events";
 

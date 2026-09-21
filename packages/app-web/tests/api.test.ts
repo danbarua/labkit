@@ -345,10 +345,11 @@ describe("acts", () => {
     const items = r.body.collection.items;
     expect(items.map((i: any) => dataOf(i).id)).toEqual(["1", "2", "3"]);
     expect(dataOf(items[1])).toMatchObject({
-      type: "Command",
+      type: "Act",
       name: "note NOTE_1",
       operation: "note",
       subject: "NOTE_1",
+      subject_type: "Note",
       changes: 2,
     });
     expect(items[1].href).toBe(`${PUBLIC}/workspace/alpha/act/2`);
@@ -395,7 +396,7 @@ describe("acts", () => {
     });
     expect(events[1]._links.parent).toEqual({
       href: `${PUBLIC}/workspace/alpha/act/2`,
-      type: "Command",
+      type: "Act",
     });
 
     const note = await get("/workspace/alpha/NOTE_1/events");
@@ -425,7 +426,7 @@ describe("acts", () => {
   test("the events document groups its events as links: the acts about the record, and edges in and out", async () => {
     const q1 = (await get("/workspace/alpha/Q_1/events")).body._links;
     expect(q1["acts:about"]).toEqual([
-      { href: `${PUBLIC}/workspace/alpha/act/1`, type: "Command", title: "pose" },
+      { href: `${PUBLIC}/workspace/alpha/act/1`, type: "Act", title: "pose" },
     ]);
     expect(q1["edgeCreated:in"]).toEqual([
       { href: `${PUBLIC}/workspace/alpha/NOTE_1`, type: "Note", dir: "in", title: "CONCERNS" },
@@ -449,7 +450,7 @@ describe("acts", () => {
     expect(r.type).toBe("application/hal+json");
     expect(r.body).toMatchObject({
       id: "2",
-      type: "Command",
+      type: "Act",
       operation: "note",
       command: { on: "Q_1", text: "worth revisiting" },
     });
@@ -469,7 +470,7 @@ describe("acts", () => {
     expect(node.body._links.events.href).toBe(`${PUBLIC}/workspace/alpha/Q_1/events?depth=0`);
     const index = await get("/workspace/alpha");
     const entry = index.body.collection.items.find((i: any) => dataOf(i).slug === "act");
-    expect(dataOf(entry)).toEqual({ slug: "act", type: "Command" });
+    expect(dataOf(entry)).toEqual({ slug: "act", type: "Act" });
   });
 
   test("acts are per workspace, and an unknown act is a 404", async () => {

@@ -1,5 +1,5 @@
 import { NODE_LABELS, SEARCHABLE_TEXT, type NodeLabel } from "@labkit/core-db/domain";
-import { ACT_SLUG, LABEL_BY_SLUG, slugFor } from "./collection-paths";
+import { ACT_SLUG, ACT_TYPE, LABEL_BY_SLUG, slugFor } from "./collection-paths";
 import { nodePath, problem, publicOrigin } from "./graph-handler";
 import type { TenantScope } from "./runtime";
 
@@ -75,7 +75,7 @@ function index(req: Request, root: string, withWorkspaces: boolean): Response {
     ...NODE_LABELS.map((label) => ({ slug: slugFor(label), type: label as string })),
     ...(withWorkspaces
       ? [{ slug: WORKSPACE_SLUG, type: "Workspace" }]
-      : [{ slug: ACT_SLUG, type: "Command" }]),
+      : [{ slug: ACT_SLUG, type: ACT_TYPE }]),
   ];
   return collectionJson(req, {
     href: root,

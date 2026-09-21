@@ -1,6 +1,6 @@
 import { labelForNaturalId } from "@labkit/core-db/domain";
 import { type RecordedEvent, touchedIn } from "@labkit/core-domain/events";
-import { ACT_SLUG, EVENTS_SEGMENT } from "./collection-paths";
+import { ACT_SLUG, ACT_TYPE, EVENTS_SEGMENT } from "./collection-paths";
 import {
   collectionJson,
   DEFAULT_LIMIT,
@@ -20,9 +20,6 @@ const COLUMNS =
 
 // What this handler reads itself. Any other parameter is the client's and rides on every link.
 const HANDLED = new Set(["limit", "offset", "since"]);
-
-// The type a recorded act is served as. An act is the command that was issued and what it did.
-const ACT_TYPE = "Command";
 
 type Row = Omit<RecordedEvent, "seq" | "attribution" | "reconstructedFrom"> & {
   seq: number | string;
@@ -146,6 +143,9 @@ function actItem(origin: string, scope: TenantScope, event: RecordedEvent) {
       { name: "at", value: event.at },
       { name: "operation", value: event.operation },
       { name: "subject", value: event.subject },
+      ...(typeOf(event.subject) === undefined
+        ? []
+        : [{ name: "subject_type", value: typeOf(event.subject) }]),
       { name: "attribution_label", value: by.attribution_label },
       { name: "attribution_how", value: by.attribution_how },
       { name: "changes", value: event.changes.length },

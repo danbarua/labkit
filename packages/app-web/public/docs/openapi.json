@@ -292,7 +292,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A collection of acts (type `Command`).",
+            "description": "A collection of acts (type `Act`).",
             "content": {
               "application/vnd.collection+json": {}
             }

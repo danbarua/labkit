@@ -34,6 +34,7 @@
     --c-review:#eab308;
     --c-note:#fda4af;
     --c-workspace:#a3e635;
+    --c-act:#8592b0;
   }
   @media (prefers-color-scheme: light){
     :root:not([data-theme="dark"]){
@@ -164,7 +165,7 @@
   .badge{
     display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-mono);
     font-size:10.5px; font-weight:600; border-radius:4px; padding:2px 5px; line-height:1.3;
-    color:var(--ink); flex:0 0 auto;
+    color:#0a0f1c; flex:0 0 auto;
   }
   .pill{
     display:inline-flex; align-items:center; gap:5px; font-size:11px; border-radius:20px;
@@ -462,8 +463,10 @@
            a.method || a.logical_name || a.objective || a.consequence || '';
   }
   function truncate(s, n){ s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
-  function badge(type){
-    return '<span class="badge" style="background:var(--' + typeClass(type) + ')">' + esc(TYPE_ABBR[type] || type.slice(0,2)) + '</span>';
+  // The chip for a type, with its abbreviation unless `text` says otherwise.
+  function badge(type, text){
+    var abbr = text !== undefined ? text : (TYPE_ABBR[type] || type.slice(0,2));
+    return '<span class="badge" style="background:var(--' + typeClass(type) + ')">' + esc(abbr) + '</span>';
   }
 
   /* ---------------- state ---------------- */
@@ -633,6 +636,26 @@
 
   // One row per collection item. An item with an `id` is a resource; any other
   // is a link to another collection. A `type`, when present, picks the colour.
+  // How a resource item is drawn, by its `type`. Most are graph entities: the type's chip, the
+  // handle, and its main text. An act is not an entity but a record of something done to one, so it
+  // shows its position in the colour of what it was done to, then what was done and when.
+  var ITEM_VIEWS = {
+    Act: function(it){
+      return {
+        chipType: it.data.subject_type || 'Act', chipText: String(it.id),
+        title: it.data.operation + ' ' + it.data.subject, sub: String(it.data.at || '').slice(0, 10)
+      };
+    }
+  };
+  function itemView(it, r){
+    var custom = ITEM_VIEWS[it.data.type];
+    if (custom) return custom(it);
+    return {
+      chipType: it.data.type || '?', chipText: undefined, title: it.id,
+      sub: truncate(it.data.name || it.data.value || (r ? labelFor(r) : '') || '—', 64)
+    };
+  }
+
   function itemRows(items){
     var term = state.search.trim().toLowerCase();
     var html = '';
@@ -642,10 +665,11 @@
         var r = resources[key];
         var lbl = String(it.data.name || it.data.value || '').toLowerCase();
         if (term && String(it.id).toLowerCase().indexOf(term) === -1 && lbl.indexOf(term) === -1) return;
+        var view = itemView(it, r);
         html += '<button class="res-item' + (key === state.currentId ? ' active' : '') + (r && r.resolved ? '' : ' unresolved') + '" data-nav="' + esc(key) + '">' +
-          badge(it.data.type || '?') +
-          '<span class="rtext"><span class="rid">' + esc(it.id) + '</span><br>' +
-          '<span class="rlabel">' + esc(truncate(it.data.name || it.data.value || (r ? labelFor(r) : '') || '—', 64)) + '</span></span>' +
+          badge(view.chipType, view.chipText) +
+          '<span class="rtext"><span class="rid">' + esc(view.title) + '</span><br>' +
+          '<span class="rlabel">' + esc(view.sub) + '</span></span>' +
         '</button>';
         return;
       }
