@@ -101,17 +101,17 @@ structured_transformation_question=$(lab --date "$STAGE1B2_ORIGINAL" pose "does 
 structured_transformation_enquiry=$(lab --date "$STAGE1B2_ORIGINAL" pursue "$structured_transformation_question" --approach "controlled state-conditioning design: one baseline trajectory (KMNIST class 0, T, seed=3000), 4 perturbation times, 6 fixed nearby-state replicas per time, 3 nodes x 2 signs x 3 amplitudes = 432 trials, Delta_map=B-W permutation test")
 structured_transformation_observations=$(lab --date "$STAGE1B2_ORIGINAL" observe "$structured_transformation_enquiry" --name stage1b2_results \
   --finding "432 trials' event-aligned q/r vectors across finite, tangent-only, nonlinear-residual, and common-support-excluded response representations" \
-  --hash sha256:d5addc8a | grep '^ART_')
+  --hash sha256:d5addc8a --json | jq -er .observations)
 monte_carlo_floor_criterion=$(lab --date "$STAGE1B2_ORIGINAL" criterion "Delta_map hits the Monte Carlo permutation floor (p_MC ~ 0.00010, 10,000 permutations) for every response representation tested")
 
 structured_transformation_analysis=$(lab --date "$STAGE1B2_ORIGINAL" analyse "$structured_transformation_enquiry" \
   --method "one-sided Monte Carlo permutation test, 10,000 permutations, independent per-replica label shuffling, on Delta_map = B - W (balanced-mean vs. same-input-mean output-space distance)" \
   --from "$structured_transformation_observations" --held-to "$monte_carlo_floor_criterion" \
-  | grep '^COMP_')
+  --json | jq -er .analysis)
 structured_transformation_claim=$(lab --date "$STAGE1B2_ORIGINAL" conclude "$structured_transformation_analysis" \
   --proposition "a structured internal transformation exists in response to local perturbations" \
   --finding "finite response Delta_map=0.3505, p_MC~0.00010; survives common-support exclusion of all three candidate source coordinates (Delta_map=0.3418, p_MC~0.00010); tangent-only (0.3248) and nonlinear-residual (0.3896) each separately significant; all three input factors (node, sign, amplitude) separately significant, Holm-corrected" \
-  | grep '^CLM_')
+  --json | jq -er '.claims[0].claim')
 
 lab --date "$STAGE1B2_ORIGINAL" evaluate "$monte_carlo_floor_criterion" --value "all four representations hit p_MC~0.00010; 432/432 trials numerically valid" --outcome pass --citing "$structured_transformation_claim" >/dev/null
 lab --date "$STAGE1B2_ORIGINAL" is confirmed "$structured_transformation_claim" --because "Level 2 (structured internal transformation) established: source-retention objection resolved with an audited common-support mask, both linear and nonlinear structure separately carry the mapping, all three input factors separately significant" >/dev/null
@@ -148,14 +148,14 @@ STAGE1C_RESULTS=2026-08-01T11:01:38.000Z
 generalization_confirmation_enquiry=$(lab --date "$STAGE1C_RESULTS" pursue "$generalization_question" --approach "identical 432-trial design, 9 further independent baseline trajectories (seeds 3010-3090) plus seed=3000 read read-only from Stage 1B2's own committed results, same permutation test")
 trajectory_generalization_observations=$(lab --date "$STAGE1C_RESULTS" observe "$generalization_confirmation_enquiry" --name stage1c_trajectories \
   --finding "10 trajectories' pooled Delta_map: mean 0.3296, range 0.2964-0.3505, SD 0.0172 (CV ~5.2%); every one of 40 per-t_p values positive; 10/10 hit the permutation floor" \
-  --hash sha256:4634d7aa | grep '^ART_')
+  --hash sha256:4634d7aa --json | jq -er .observations)
 trajectory_generalization_analysis=$(lab --date "$STAGE1C_RESULTS" analyse "$generalization_confirmation_enquiry" \
   --method "same design as Stage 1B2 (stage1b2_core.py functions imported directly, not reimplemented), applied to 9 new independent baseline trajectories plus the frozen seed=3000 reference" \
-  --from "$trajectory_generalization_observations" | grep '^COMP_')
+  --from "$trajectory_generalization_observations" --json | jq -er .analysis)
 trajectory_generalization_claim=$(lab --date "$STAGE1C_RESULTS" conclude "$trajectory_generalization_analysis" \
   --proposition "the structured transformation generalizes across independent baseline trajectories" \
   --finding "10 of 10 trajectories hit the Monte Carlo floor; mean Delta_map 0.3296, CV ~5.2% -- tight clustering, not a wide scatter with a few outliers" \
-  | grep '^CLM_')
+  --json | jq -er '.claims[0].claim')
 lab --date "$STAGE1C_RESULTS" close enquiry "$generalization_confirmation_enquiry" --answered-by "$trajectory_generalization_claim" >/dev/null
 lab --date "$STAGE1C_RESULTS" close enquiry "$generalization_enquiry" >/dev/null
 
@@ -173,15 +173,15 @@ STAGE1D_LATTICE_AND_PILOT=2026-08-02T00:40:46.000Z
 lattice_agreement_criterion=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" criterion "T vs lattice: agreement standard -- the primary paired t-test, exact sign-flip, and Wilcoxon signed-rank on the 10 matched d_k=Delta_map(T,k)-Delta_map(lattice,k) values must agree on rejecting or not rejecting the null at the Holm-adjusted bound (individually 0.0125 = 0.05/4, FWER 0.05 across the 4-way fixed-coordinate family), locked before running")
 lattice_trajectories_observations=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" observe "$topology_specificity_enquiry" --name stage1d_lattice_trajectories \
   --finding "lattice's own 10-trajectory run on Stage 1C's matched seeds (3000-3090); T's own values read read-only from Stage 1C, not recomputed" \
-  --hash sha256:2df1d2c3 | grep '^ART_')
+  --hash sha256:2df1d2c3 --json | jq -er .observations)
 lattice_comparison_analysis=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" analyse "$topology_specificity_enquiry" \
   --method "two-sided paired t-test (primary), exact sign-flip and Wilcoxon signed-rank (robustness), on the 10 matched d_k values" \
   --from "$trajectory_generalization_observations" --from "$lattice_trajectories_observations" --held-to "$lattice_agreement_criterion" \
-  | grep '^COMP_')
+  --json | jq -er .analysis)
 lattice_comparison_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$lattice_comparison_analysis" \
   --proposition "T shows a Delta_map advantage over the matched lattice control" --standing confirmatory \
   --finding "mean d_k=-0.0085 (lattice nominally higher), paired t-test p=0.2815, sign-flip p=0.2871, Wilcoxon p=0.4316 -- all three agree, no detectable difference" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 # The criterion is a QUALITY BAR (do the methods agree?), not the
 # hypothesis (does T beat lattice?) -- direction lives in the
 # conclusion's own bearing, above. All three methods agree on
@@ -191,19 +191,19 @@ lab --date "$STAGE1D_LATTICE_AND_PILOT" evaluate "$lattice_agreement_criterion" 
 say "Stage 1D Part 2: the pilot (non-confirmatory), a fresh-input reverify, and the confirmatory run"
 
 pilot_realizations_observations=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" observe "$topology_specificity_enquiry" --name stage1d_pilot_realizations \
-  --finding "3 graph realizations (seeds 0,1,2) x first 3 of Stage 1C's matched trajectory seeds, for each of rewired/hist_random/curr_random -- a runtime and variance-allocation pilot; no confirmatory inference is drawn from it" | grep '^ART_')
+  --finding "3 graph realizations (seeds 0,1,2) x first 3 of Stage 1C's matched trajectory seeds, for each of rewired/hist_random/curr_random -- a runtime and variance-allocation pilot; no confirmatory inference is drawn from it" --json | jq -er .observations)
 pilot_allocation_analysis=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" analyse "$topology_specificity_enquiry" \
   --method "3x3 crossed-variance pilot (mu_g + b_gr + tau_k + epsilon_grk, balanced two-way ANOVA method-of-moments), sizing only -- not confirmatory" \
-  --from "$pilot_realizations_observations" | grep '^COMP_')
+  --from "$pilot_realizations_observations" --json | jq -er .analysis)
 pilot_rewired_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$pilot_allocation_analysis" \
   --proposition "rewired needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05" \
-  --finding "own minimal (15,3), cost 45, power 0.948, reliable" | grep '^CLM_')
+  --finding "own minimal (15,3), cost 45, power 0.948, reliable" --json | jq -er '.claims[0].claim')
 pilot_hist_random_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$pilot_allocation_analysis" \
   --proposition "hist_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05" \
-  --finding "own minimal (15,3) nominally, but sigma^2_b fit on df_r=1 after excluding a fully degenerate realization (seed=2, isolated fixed-coordinate node) -- reported indeterminate, not usable as-is" | grep '^CLM_')
+  --finding "own minimal (15,3) nominally, but sigma^2_b fit on df_r=1 after excluding a fully degenerate realization (seed=2, isolated fixed-coordinate node) -- reported indeterminate, not usable as-is" --json | jq -er '.claims[0].claim')
 pilot_curr_random_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$pilot_allocation_analysis" \
   --proposition "curr_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05" \
-  --finding "own minimal (15,3), cost 45, power 0.883, reliable" | grep '^CLM_')
+  --finding "own minimal (15,3), cost 45, power 0.883, reliable" --json | jq -er '.claims[0].claim')
 # None promoted -- deliberately. The pilot's own claims stay exploratory,
 # and `known` buckets them provisional rather than established, which
 # communicates "don't build on this" without needing a dedicated
@@ -223,13 +223,13 @@ STAGE1D_HIST_REFIT=2026-08-02T04:49:51.000Z
 # exactly one verdict, so there is no list for `conclude` to carry (#173).
 hist_random_followup_observations=$(lab --date "$STAGE1D_HIST_REFIT" observe "$topology_specificity_enquiry" --name stage1d_hist_random_followup \
   --finding "2 further hist_random realizations (seeds 3, 4), same construction recipe, same 3 matched trajectory seeds, full simulation + permutation validation" \
-  --hash sha256:5deaff59 | grep '^ART_')
+  --hash sha256:5deaff59 --json | jq -er .observations)
 hist_random_refit_claim=$(lab --date "$STAGE1D_HIST_REFIT" reverify "$pilot_allocation_analysis" --enquiry "$topology_specificity_enquiry" \
   --method "refit crossed variance decomposition on 4 valid realizations (seeds 0,1,3,4; seed 2 still excluded) -- df_r=3 now clears this project's reliability threshold, both variance components get a proper 95% chi-squared bound" \
   --under "$hist_random_followup_observations" \
   --proposition "hist_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05" \
   --finding "refit: own minimal design is (R=25,K=3), cost 75, power 0.827 -- larger than the currently-locked common (15,3) and larger than rewired's/curr_random's own requirements" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 
 # "Stage 1D: lock common stochastic-control allocation to (R=25, K=3)"
 # and "...add conditional-estimand pre-screening rule for hist_random",
@@ -256,23 +256,23 @@ STAGE1D_CONFIRM_RESULTS=2026-08-02T20:44:21.000Z
 
 confirmatory_observations=$(lab --date "$STAGE1D_CONFIRM_RESULTS" observe "$topology_specificity_enquiry" --name stage1d_confirmatory_gpu \
   --finding "225 trajectories (25 realizations x 3 matched seeds x 3 families), locked (R=25,K=3) allocation, GPU/JAX; hist_random pre-screened, 7 of 32 candidates rejected for fixed-coordinate isolation before 25 evaluable realizations were reached" \
-  --hash sha256:75d8ca29 | grep '^ART_')
+  --hash sha256:75d8ca29 --json | jq -er .observations)
 confirmatory_analysis=$(lab --date "$STAGE1D_CONFIRM_RESULTS" analyse "$topology_specificity_enquiry" \
   --method "two-sided one-sample t-test on realization-level mean differences (primary), studentized bootstrap / Wilcoxon / exact sign-flip (robustness), Holm-corrected across rewired/hist_random/curr_random/lattice" \
   --from "$confirmatory_observations" --held-to "$confirmatory_agreement_criterion" \
-  | grep '^COMP_')
+  --json | jq -er .analysis)
 confirmatory_rewired_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude "$confirmatory_analysis" \
   --proposition "T shows a Delta_map advantage over rewired" --standing confirmatory \
   --finding "mean d_bar_gr=-0.0020, SD=0.0125, t(24)=-0.812, p=0.4246; sign-flip p=0.4215, Wilcoxon p=0.4418, bootstrap CI [-0.0103,0.0061]" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 confirmatory_hist_random_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude "$confirmatory_analysis" \
   --proposition "T shows a Delta_map advantage over historical-random" --standing confirmatory \
   --finding "conditional on evaluability: mean d_bar_gr=-0.0025, SD=0.0154, t(24)=-0.824, p=0.4179; sign-flip p=0.4217, Wilcoxon p=0.2521, bootstrap 95% CI [-0.0109,0.0060]; 21.9% of candidate realizations were unevaluable (95% CI 9.3-40.0%), disclosed separately, not folded into this estimate" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 confirmatory_curr_random_claim=$(lab --date "$STAGE1D_CONFIRM_RESULTS" conclude "$confirmatory_analysis" \
   --proposition "T shows a Delta_map advantage over current-random" --standing confirmatory \
   --finding "mean d_bar_gr=-0.0004, SD=0.0158, t(24)=-0.132, p=0.8958; sign-flip p=0.8950, Wilcoxon p=0.8119, bootstrap 95% CI [-0.0096,0.0084]" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 
 # Same reasoning as lattice_agreement_criterion: these criteria ask whether
 # the four methods agree, not which way the science came out. All four
@@ -302,17 +302,17 @@ STAGE1D_GPU_BUG=2026-08-02T18:44:36.000Z
 # honestly without a hash, the same way pilot_realizations_observations is
 # above.
 gpu_pilot_observations=$(lab --date "$STAGE1D_GPU_BUG" observe "$topology_specificity_enquiry" --name stage1d_gpu_pilot_buggy \
-  --finding "JAX/GPU pilot benchmark on an A100, as-shipped build_432_batch(), Delta_map=0.2842 for T seed=3000 -- no raw output file preserved locally" | grep '^ART_')
+  --finding "JAX/GPU pilot benchmark on an A100, as-shipped build_432_batch(), Delta_map=0.2842 for T seed=3000 -- no raw output file preserved locally" --json | jq -er .observations)
 gpu_pilot_analysis=$(lab --date "$STAGE1D_GPU_BUG" analyse "$topology_specificity_enquiry" \
   --method "JAX/GPU port of the per-trial simulator (run_one_trial_jax_faithful), pilot benchmark on an A100" \
   --from "$trajectory_generalization_observations" --from "$gpu_pilot_observations" \
-  | grep '^COMP_')
+  --json | jq -er .analysis)
 gpu_pilot_claim=$(lab --date "$STAGE1D_GPU_BUG" conclude "$gpu_pilot_analysis" \
   --proposition "the GPU port reproduces Stage 1C's cached Delta_map for T, seed=3000" \
   --finding "GPU reported 0.2842 vs. Stage 1C's cached 0.3505 -- a real, non-trivial discrepancy" \
-  --bearing challenges | grep '^CLM_')
+  --bearing challenges --json | jq -er '.claims[0].claim')
 
-gpu_bug_review=$(lab --date "$STAGE1D_GPU_BUG" review "$gpu_pilot_analysis" --verdict "wrong replica-direction distribution -- uniform(-1,1) instead of normal-then-rotation-projected-then-normalized -- fully reproduces the discrepancy on its own (confirmed by a 4-way factorial: correct/buggy directions x correct/buggy E_min gating); a dropped E_min validity gate was also found but confirmed inert for this specific trajectory" | tail -1)
+gpu_bug_review=$(lab --date "$STAGE1D_GPU_BUG" review "$gpu_pilot_analysis" --verdict "wrong replica-direction distribution -- uniform(-1,1) instead of normal-then-rotation-projected-then-normalized -- fully reproduces the discrepancy on its own (confirmed by a 4-way factorial: correct/buggy directions x correct/buggy E_min gating); a dropped E_min validity gate was also found but confirmed inert for this specific trajectory" --json | jq -er .review)
 
 # "Fix Stage 1D GPU pilot's Delta_map bug, confirmed end-to-end on GPU",
 # 2026-08-02T20:10:59+01:00.
@@ -324,10 +324,10 @@ STAGE1D_GPU_FIX=2026-08-02T19:10:59.000Z
 # smoke-test run survives locally either -- only the later confirmatory
 # run (confirmatory_observations) is on disk.
 gpu_fix_observations=$(lab --date "$STAGE1D_GPU_FIX" observe "$topology_specificity_enquiry" --name stage1d_gpu_fix_smoketest \
-  --finding "corrected build_432_batch() re-run on a fresh A100 session, Delta_map=0.3505 for T seed=3000, verify_on_gpu.py's field-by-field precision check passed -- no raw output file preserved locally beyond the later confirmatory run" | grep '^ART_')
+  --finding "corrected build_432_batch() re-run on a fresh A100 session, Delta_map=0.3505 for T seed=3000, verify_on_gpu.py's field-by-field precision check passed -- no raw output file preserved locally beyond the later confirmatory run" --json | jq -er .observations)
 gpu_fix_replacement=$(lab --date "$STAGE1D_GPU_FIX" replace "$gpu_pilot_analysis" --because "$gpu_bug_review" \
   --method "corrected build_432_batch(), calling the real generate_fixed_replica_directions() instead of a hand-rolled uniform draw; smoke-tested against an independently computed replica state before touching a GPU, then re-verified end-to-end on a fresh A100 session" \
-  --from "$trajectory_generalization_observations" --from "$gpu_fix_observations" | grep '^COMP_')
+  --from "$trajectory_generalization_observations" --from "$gpu_fix_observations" --json | jq -er .replacement)
 # `--bearing supports`, explicitly: a replacing conclusion inherits the
 # replaced claim's bearing, and the replaced claim's was `challenges`.
 # The corrected run's exact match cuts the other way; without this the
@@ -350,7 +350,7 @@ stage1d_headline=$(lab --date "$STAGE1D_CONFIRM_RESULTS" synthesise \
   --resting-on "$lattice_comparison_claim" \
   --resting-on "$confirmatory_rewired_claim" \
   --resting-on "$confirmatory_hist_random_claim" \
-  --resting-on "$confirmatory_curr_random_claim" | grep '^CLM_')
+  --resting-on "$confirmatory_curr_random_claim" --json | jq -er .claim)
 
 lab --date "$STAGE1D_CONFIRM_RESULTS" close enquiry "$topology_specificity_enquiry" --answered-by "$stage1d_headline" >/dev/null
 
