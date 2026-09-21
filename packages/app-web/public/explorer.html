@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Trace Console (live) — labkit-central.framesift.ai</title>
+<title>Trace Console</title>
 <style>
   :root{
     --ink:#0a0f1c;
@@ -184,7 +184,6 @@
   .header-top .badge{ font-size:12px; padding:3px 7px; }
   .header-id{ font-family:var(--font-mono); font-size:20px; font-weight:600; }
   .header-type{ font-size:12.5px; color:var(--text-dim); }
-  .header-label{ font-size:15.5px; color:var(--text); max-width:74ch; margin:0 0 10px; }
   .header-pills{ display:flex; gap:8px; flex-wrap:wrap; }
 
   .toolbar{ display:flex; gap:8px; margin-top:14px; }
@@ -291,6 +290,17 @@
   .relations-col .panel-body{ padding:4px 0; }
   .scrim{ display:none; position:fixed; inset:52px 0 0 0; background:rgba(0,0,0,.4); z-index:19; }
   .scrim.open{ display:block; }
+  .card-head{ display:flex; align-items:center; gap:8px; width:100%; padding:10px 14px; background:none; border:none; border-bottom:1px solid var(--line); text-align:left; }
+  .card-head:hover{ background:var(--panel-2); }
+  .card-head .cid{ font-family:var(--font-mono); font-size:12px; flex:0 0 auto; }
+  .card-head .clabel{ font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rel-heading{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); margin:22px 0 8px; }
+  .mention{ font-family:var(--font-mono); font-size:.92em; padding:0 4px; border-radius:4px; border:1px solid var(--mention, var(--line)); background:none; color:var(--text); }
+  button.mention{ cursor:pointer; }
+  button.mention:hover{ background:var(--panel-2); }
+  .mention.unknown{ color:var(--text-dim); border-style:dashed; }
+  .panel-head a{ color:var(--accent); font-family:var(--font-mono); text-decoration:none; }
+  .panel-head a:hover{ text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -300,9 +310,10 @@
     <div class="brand">
       <span class="brand-dot" aria-hidden="true"></span>
       <span class="brand-name">Trace Console</span>
-      <span class="brand-sub">live · labkit-central.framesift.ai</span>
+      <span class="brand-sub" id="brand-sub"></span>
     </div>
     <div class="nav-controls">
+      <button class="nav-btn" id="btn-home" aria-label="Entry point" title="Back to the workspaces">⌂</button>
       <button class="nav-btn" id="btn-back" aria-label="Back">‹</button>
       <button class="nav-btn" id="btn-fwd" aria-label="Forward">›</button>
     </div>
@@ -320,10 +331,12 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-section">
         <div class="section-label">Collections<span class="count" id="type-total-count"></span></div>
+        <div class="faint mono" id="index-path" style="font-size:11px;margin:-4px 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
         <div class="type-list" id="type-list"></div>
       </div>
       <div class="sidebar-section grow">
         <div class="section-label">Items<span class="count" id="index-count"></span></div>
+        <div class="faint mono" id="items-path" style="font-size:11px;margin:-4px 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
         <div class="res-list" id="res-list"></div>
       </div>
     </aside>
@@ -333,10 +346,6 @@
     </main>
 
     <aside class="relations-col" id="relations-col">
-      <div class="sidebar-section">
-        <div class="section-label">Outgoing relations<span class="count" id="out-count"></span></div>
-        <div class="panel-body" id="out-rel-body"></div>
-      </div>
       <div class="sidebar-section grow">
         <div class="section-label">Incoming relations<span class="count" id="in-count"></span></div>
         <div class="panel-body" id="in-rel-body"></div>
@@ -350,33 +359,15 @@
 (function(){
   "use strict";
 
-  var GRAPH_BASE = 'https://labkit-central.framesift.ai/graph/';
-  var COLLECTIONS_BASE = 'https://labkit-central.framesift.ai/collections';
-
   /* ---------------- graph store (shared logic with the static console) ---------------- */
   var resources = Object.create(null);
-  var edges = [];
-  var edgeKeys = Object.create(null);
   var SKIP_ATTR = { id:1, type:1, dir:1, depth:1, _links:1, _embedded:1 };
 
-  function idFromHref(href){
-    if (!href) return null;
-    var m = href.match(/\/graph\/([A-Za-z0-9_]+)/);
-    return m ? m[1] : null;
-  }
-  function relVerb(key, entryType){
-    var i = key.indexOf(':');
-    if (i === -1) return key;
-    var a = key.slice(0, i), b = key.slice(i + 1);
-    var t = String(entryType || '').toLowerCase();
-    if (b.toLowerCase() === t) return a;
-    if (a.toLowerCase() === t) return b;
-    return key;
-  }
-  function ensureResource(id, type){
-    if (!resources[id]) resources[id] = { id: id, type: type, attrs: {}, resolved: false };
-    if (type && !resources[id].type) resources[id].type = type;
-    return resources[id];
+  function stripQuery(href){ return String(href).split('?')[0]; }
+  function ensureResource(key, type){
+    if (!resources[key]) resources[key] = { id: key.split('/').pop(), type: type, attrs: {}, resolved: false };
+    if (type && !resources[key].type) resources[key].type = type;
+    return resources[key];
   }
   function mergeAttrs(res, node){
     for (var k in node){
@@ -389,15 +380,29 @@
       }
     }
   }
-  function addEdge(parentId, otherId, rel, dir){
-    var from, to;
-    if (dir === 'out'){ from = parentId; to = otherId; }
-    else if (dir === 'in'){ from = otherId; to = parentId; }
-    else return;
-    var key = from + '|' + rel + '|' + to;
-    if (edgeKeys[key]) return;
-    edgeKeys[key] = true;
-    edges.push({ from: from, to: to, rel: rel });
+  // The relations a resource states about itself: its `_links` entries and its direct
+  // `_embedded` children, each with the `dir` the API gives it.
+  function collectRels(node){
+    var rels = [], seen = Object.create(null);
+    function add(rawRel, href, type, dir){
+      var key = href && dir && stripQuery(href);
+      if (!key || seen[rawRel + '|' + key]) return;
+      seen[rawRel + '|' + key] = true;
+      rels.push({ rel: rawRel, key: key, dir: dir });
+      ensureResource(key, type);
+    }
+    var links = node._links || {};
+    Object.keys(links).forEach(function(rawRel){
+      if (rawRel === 'self' || rawRel === 'start') return;
+      [].concat(links[rawRel]).forEach(function(entry){ if (!entry.templated) add(rawRel, entry.href, entry.type, entry.dir); });
+    });
+    var embedded = node._embedded || {};
+    Object.keys(embedded).forEach(function(rawRel){
+      [].concat(embedded[rawRel]).forEach(function(child){
+        add(rawRel, child._links && child._links.self && child._links.self.href, child.type, child.dir);
+      });
+    });
+    return rels;
   }
   function walk(node){
     if (!node) return;
@@ -406,35 +411,14 @@
     var isResource = node.type && node._links;
     if (isResource){
       var selfHref = node._links.self && node._links.self.href;
-      var id = node.id || idFromHref(selfHref);
+      var id = selfHref && stripQuery(selfHref);
       if (id){
         var res = ensureResource(id, node.type);
         res.resolved = true;
         mergeAttrs(res, node);
-        for (var rawRel in node._links){
-          if (rawRel === 'self' || rawRel === 'start') continue;
-          var val = node._links[rawRel];
-          var arr = Array.isArray(val) ? val : [val];
-          for (var j=0;j<arr.length;j++){
-            var entry = arr[j];
-            var targetId = idFromHref(entry.href);
-            if (targetId){
-              addEdge(id, targetId, relVerb(rawRel, entry.type), entry.dir);
-              ensureResource(targetId, entry.type);
-            }
-          }
-        }
-        if (node._embedded){
-          for (var rawErel in node._embedded){
-            var evArr = node._embedded[rawErel];
-            if (!Array.isArray(evArr)) evArr = [evArr];
-            for (var k2=0;k2<evArr.length;k2++){
-              var child = evArr[k2];
-              var childId = child.id || idFromHref(child._links && child._links.self && child._links.self.href);
-              if (childId) addEdge(id, childId, relVerb(rawErel, child.type), child.dir);
-              walk(child);
-            }
-          }
+        res.rels = collectRels(node);
+        for (var rawErel in node._embedded || {}){
+          [].concat(node._embedded[rawErel]).forEach(walk);
         }
         return;
       }
@@ -446,14 +430,6 @@
     }
   }
 
-  var outgoing = Object.create(null), incoming = Object.create(null);
-  function reindexEdges(){
-    outgoing = Object.create(null); incoming = Object.create(null);
-    edges.forEach(function(e){
-      (outgoing[e.from] = outgoing[e.from] || []).push(e);
-      (incoming[e.to] = incoming[e.to] || []).push(e);
-    });
-  }
 
   var TYPE_ORDER = ['Question','LineOfEnquiry','Decision','Evidence','EvidenceUnit','Computation','Artefact','Claim','Criterion','CriterionEvaluation','Gate','Task','Review','Note','Workspace'];
   var TYPE_ABBR = { Question:'Q', LineOfEnquiry:'LoE', Decision:'D', Evidence:'Ev', EvidenceUnit:'EU', Claim:'Cl', Computation:'Cp', Artefact:'Ar', Criterion:'Cr', CriterionEvaluation:'CE', Gate:'Ga', Task:'Tk', Review:'Rv', Note:'No', Workspace:'Ws' };
@@ -474,7 +450,7 @@
   function isDateKey(k){ return /_at$/.test(k); }
   function labelFor(res){
     var a = res.attrs;
-    return a.name || a.statement || a.reason || a.verdict || a.value || a.proposition ||
+    return res.summary || a.name || a.statement || a.text || a.reason || a.verdict || a.value || a.proposition ||
            a.method || a.logical_name || a.objective || a.consequence || '';
   }
   function truncate(s, n){ s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
@@ -483,140 +459,154 @@
   }
 
   /* ---------------- state ---------------- */
-  var state = { history: [], pointer: -1, currentId: null, activeType: null, search: '', rawOpen: false, loading: false, error: null };
-  var fetchToken = 0;
+  var ENTRY = '/collections/workspace';
+  var ACCEPT = 'application/vnd.collection+json, application/hal+json, application/json';
+  var state = { history: [], pointer: -1, currentId: null, search: '', rawOpen: false, loading: false, error: null, errorHref: null };
+  var fetchToken = 0, listToken = 0;
   // Fixed, not user-adjustable: depth=1 (the graph API's own default when the
   // param is omitted) only ever returns link stubs for this domain — the
   // relationships that actually matter don't resolve until depth=2, even
   // though the UI here only ever renders one hop of _embedded at a time.
   var GRAPH_DEPTH = 2;
 
-  // catalog: the full list of collections the server exposes, independent of
-  // anything we've fetched into the graph — this is what makes the sidebar a
-  // directory into the whole dataset rather than a reflection of local history.
-  var catalog = [];          // [{ type, slug, href }]
-  var catalogError = null;
-  var collectionView = null; // { type, items:[{id,dataMap}], nextHref, loading, error }
+  // Column 1 holds two collections. A collection with an `index` link is the
+  // lower one and the collection that link names is the upper one; a
+  // collection without one is the upper one alone. Columns 2 and 3 show the
+  // last resource returned. Resources are keyed by their href, so the same
+  // handle in two workspaces stays two resources.
+  var upper = null, lower = null;   // { href, links, items, nextHref }
+  var colStatus = { loading: false, error: null };
 
-  function fetchCatalog(){
-    fetch(COLLECTIONS_BASE, { headers: { 'Accept': 'application/vnd.collection+json, application/json' } })
-      .then(function(resp){
-        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
-        return resp.json();
-      })
-      .then(function(json){
-        var items = (json.collection && json.collection.items) || [];
-        catalog = items.map(function(it){
-          var d = {};
-          (it.data || []).forEach(function(kv){ d[kv.name] = kv.value; });
-          return { type: d.type, slug: d.slug, href: it.href };
-        }).filter(function(c){ return c.type; });
-        catalogError = null;
-        renderTypeList();
-      })
-      .catch(function(err){
-        catalogError = String(err && err.message || err);
-        renderTypeList();
-      });
-  }
+  function withDepth(href){ var u = new URL(href, location.href); u.searchParams.set('depth', GRAPH_DEPTH); return u.href; }
+  function pathOf(href){ var u = new URL(href, location.href); return u.pathname + u.search; }
+  function pathnameOf(href){ return new URL(href, location.href).pathname; }
+  function shortId(key){ return String(key).split('/').pop(); }
+  function errMsg(err){ return String(err && err.message || err); }
 
-  function itemsFromCollectionJson(json){
-    var col = json.collection || {};
-    var items = (col.items || []).map(function(it){
+  function parseCollection(json){
+    var c = json.collection || {};
+    var links = {};
+    (c.links || []).forEach(function(l){ links[l.rel] = l.href; });
+    var items = (c.items || []).map(function(it){
       var d = {};
       (it.data || []).forEach(function(kv){ d[kv.name] = kv.value; });
-      var id = d.id || idFromHref(it.href);
-      return { id: id, dataMap: d, peekLinks: it.links || [] };
+      return { href: it.href, data: d, id: d.id || null };
     });
-    var next = null;
-    (col.links || []).forEach(function(l){ if (l.rel === 'next') next = l.href; });
-    return { items: items, nextHref: next };
+    items.forEach(function(it){
+      if (!it.id) return;
+      var r = ensureResource(stripQuery(it.href), it.data.type);
+      r.summary = it.data.name || it.data.value || r.summary;
+    });
+    return { href: c.href, links: links, items: items, nextHref: links.next || null };
   }
 
-  function mergeCollectionAttrs(res, dataMap){
-    Object.keys(dataMap).forEach(function(k){
-      if (k === 'id' || k === 'type') return;
-      var v = dataMap[k];
-      var cur = res.attrs[k];
-      if (cur === undefined || (typeof v === 'string' && typeof cur === 'string' && v.length > cur.length)){
-        res.attrs[k] = v;
-      }
-    });
-  }
 
-  function loadCollection(type, href, append){
-    collectionView = collectionView && append ? collectionView : { type: type, items: [], nextHref: null, loading: true, error: null };
-    collectionView.type = type;
-    collectionView.loading = true;
-    collectionView.error = null;
-    renderResList();
-    fetch(href, { headers: { 'Accept': 'application/vnd.collection+json, application/json' } })
-      .then(function(resp){
-        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
-        return resp.json();
-      })
-      .then(function(json){
-        var parsed = itemsFromCollectionJson(json);
-        parsed.items.forEach(function(it){
-          if (!it.id) return;
-          var res = ensureResource(it.id, it.dataMap.type || type);
-          mergeCollectionAttrs(res, it.dataMap);
+  // Fetches href and reports which media type came back. What happens next is
+  // decided by that type, never by the shape of the URL.
+  function request(href){
+    return fetch(href, { headers: { 'Accept': ACCEPT } }).then(function(resp){
+      if (!resp.ok){
+        return resp.json().catch(function(){ return null; }).then(function(p){
+          throw new Error('HTTP ' + resp.status + ' ' + ((p && p.detail) || resp.statusText));
         });
-        collectionView.items = append ? collectionView.items.concat(parsed.items) : parsed.items;
-        collectionView.nextHref = parsed.nextHref;
-        collectionView.loading = false;
-        renderTypeList();
-        renderResList();
-      })
-      .catch(function(err){
-        collectionView.loading = false;
-        collectionView.error = String(err && err.message || err);
-        renderResList();
-      });
+      }
+      var ct = resp.headers.get('content-type') || '';
+      var kind = /collection\+json/.test(ct) ? 'collection' : /hal\+json/.test(ct) ? 'resource' : null;
+      if (!kind) throw new Error('Unhandled content-type: ' + ct);
+      return resp.json().then(function(json){ return { kind: kind, json: json, href: resp.url }; });
+    });
   }
 
-  function fetchResource(id){
-    var url = GRAPH_BASE + id + '?depth=' + GRAPH_DEPTH;
-    var myToken = ++fetchToken;
-    state.loading = true; state.error = null;
+  function receive(r, opts){
+    if (r.kind === 'resource') showResource(r.json, r.href);
+    else showCollection(r.json, opts);
+  }
+
+  function showResource(json, href){
+    var self = json._links && json._links.self && json._links.self.href;
+    var key = stripQuery(self || href);
+    if (resources[key]) resources[key].full = false;
+    walk(json);
+    if (resources[key]){ resources[key].full = true; resources[key].selfHref = self || href; }
+    if (state.history[state.pointer] !== key) pushHistory(key);
+    state.currentId = key;
+    state.loading = false; state.error = null;
+    colStatus.loading = false;
     render();
-    fetch(url, { headers: { 'Accept': 'application/hal+json, application/json' } })
-      .then(function(resp){
-        if (myToken !== fetchToken) return null;
-        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
-        return resp.json();
-      })
-      .then(function(json){
-        if (myToken !== fetchToken || json === null) return;
-        walk(json);
-        reindexEdges();
+  }
+
+  function showCollection(json, opts){
+    var next = parseCollection(json);
+    var up = next.links.index;
+    colStatus.loading = false; colStatus.error = null;
+    if (opts.append && lower){
+      next.items = lower.items.concat(next.items);
+      lower = next;
+    } else if (opts.root || !up){
+      upper = next; lower = null;
+    } else if (upper && stripQuery(up) === stripQuery(upper.href)){
+      lower = next;
+    } else {
+      lower = next;
+      request(up).then(function(r){
+        if (r.kind === 'collection'){ upper = parseCollection(r.json); render(); }
+      }).catch(function(err){ colStatus.error = errMsg(err); render(); });
+    }
+    render();
+  }
+
+  // opts.node: the link is a graph resource, so the depth is requested and the
+  // detail column shows the wait. Otherwise column 1 does.
+  // opts.root: a starting point, shown as the upper collection whatever it links to.
+  // opts.append: a next page, added to the lower collection.
+  function follow(href, opts){
+    opts = opts || {};
+    if (opts.node){
+      var url = withDepth(href);
+      var token = ++fetchToken;
+      state.loading = true; state.error = null; state.errorHref = url;
+      render();
+      request(url).then(function(r){
+        if (token !== fetchToken) return;
         state.loading = false;
-        state.currentId = id;
-        render();
-      })
-      .catch(function(err){
-        if (myToken !== fetchToken) return;
-        state.loading = false;
-        state.error = String(err && err.message || err);
+        receive(r, opts);
+      }).catch(function(err){
+        if (token !== fetchToken) return;
+        state.loading = false; state.error = errMsg(err);
         render();
       });
+      return;
+    }
+    var ltoken = ++listToken;
+    colStatus.loading = true; colStatus.error = null;
+    renderTypeList(); renderResList();
+    request(href).then(function(r){
+      if (ltoken !== listToken) return;
+      receive(r, opts);
+    }).catch(function(err){
+      if (ltoken !== listToken) return;
+      colStatus.loading = false; colStatus.error = errMsg(err);
+      renderTypeList(); renderResList();
+    });
+  }
+
+  function pushHistory(id){
+    state.history = state.history.slice(0, state.pointer + 1);
+    state.history.push(id);
+    state.pointer = state.history.length - 1;
   }
 
   function navigate(id, push){
-    if (push !== false){
-      state.history = state.history.slice(0, state.pointer + 1);
-      state.history.push(id);
-      state.pointer = state.history.length - 1;
-    }
+    if (push !== false) pushHistory(id);
     state.currentId = id;
     state.rawOpen = false;
     var res = resources[id];
-    if (res && res.resolved){
+    if (res && res.full){
       state.loading = false; state.error = null;
       render();
       return;
     }
-    fetchResource(id);
+    follow(id, { node: true });
   }
   function goBack(){ if (state.pointer > 0){ state.pointer--; navigate(state.history[state.pointer], false); } }
   function goFwd(){ if (state.pointer < state.history.length - 1){ state.pointer++; navigate(state.history[state.pointer], false); } }
@@ -624,75 +614,64 @@
   /* ---------------- sidebar ---------------- */
   var typeListEl = document.getElementById('type-list');
   var typeTotalEl = document.getElementById('type-total-count');
+  var indexPathEl = document.getElementById('index-path');
+  var itemsPathEl = document.getElementById('items-path');
   var resListEl = document.getElementById('res-list');
   var indexCountEl = document.getElementById('index-count');
 
-  function renderTypeList(){
-    typeTotalEl.textContent = catalog.length ? catalog.length : '';
-
-    if (catalogError){
-      typeListEl.innerHTML = '<div class="empty-note">Couldn\'t load /collections: ' + esc(catalogError) + '</div>';
-      return;
-    }
-    if (!catalog.length){
-      typeListEl.innerHTML = '<div class="empty-note">Loading collections…</div>';
-      return;
-    }
-    var term = state.activeType ? '' : state.search.trim().toLowerCase();
-    var html = '';
-    catalog.forEach(function(c){
-      var t = c.type;
-      if (term && t.toLowerCase().indexOf(term) === -1 && c.slug.toLowerCase().indexOf(term) === -1) return;
-      var active = state.activeType === t ? ' active' : '';
-      html += '<button class="type-row' + active + '" data-type="' + esc(t) + '" data-href="' + esc(c.href) + '" title="' + esc(c.href) + '">' +
-        '<span class="type-swatch" style="background:var(--' + typeClass(t) + ')"></span>' +
-        '<span class="tname">' + esc(t) + '</span>' +
-      '</button>';
-    });
-    typeListEl.innerHTML = html || '<div class="empty-note">No matching collection.</div>';
-  }
-
-  function renderResList(){
+  // One row per collection item. An item with an `id` is a resource; any other
+  // is a link to another collection. A `type`, when present, picks the colour.
+  function itemRows(items){
     var term = state.search.trim().toLowerCase();
-
-    if (!state.activeType || !collectionView){
-      indexCountEl.textContent = '';
-      resListEl.innerHTML = '<div class="empty-note">Pick a type above to browse its items from /collections.</div>';
-      return;
-    }
-
-    var items = collectionView.items.filter(function(it){
-      if (!term) return true;
-      var lbl = (it.dataMap.name || it.dataMap.value || '').toLowerCase();
-      return (it.id||'').toLowerCase().indexOf(term) !== -1 || lbl.indexOf(term) !== -1;
-    });
-    indexCountEl.textContent = items.length + (collectionView.nextHref ? '+' : '');
     var html = '';
-    if (collectionView.error){
-      html += '<div class="empty-note">Fetch failed: ' + esc(collectionView.error) + '</div>';
-    }
-    if (!items.length && !collectionView.loading && !collectionView.error){
-      html += '<div class="empty-note">No ' + esc(state.activeType) + ' items on the server.</div>';
-    }
     items.forEach(function(it){
-      var id = it.id;
-      var r = resources[id];
-      var active = id === state.currentId ? ' active' : '';
-      var resolvedCls = (r && r.resolved) ? '' : ' unresolved';
-      var lbl = truncate(it.dataMap.name || it.dataMap.value || (r ? labelFor(r) : '') || '—', 64);
-      html += '<button class="res-item' + active + resolvedCls + '" data-nav="' + esc(id) + '">' +
-        badge(state.activeType) +
-        '<span class="rtext"><span class="rid">' + esc(id) + '</span><br>' +
-        '<span class="rlabel">' + esc(lbl) + '</span></span>' +
+      if (it.id){
+        var key = stripQuery(it.href);
+        var r = resources[key];
+        var lbl = String(it.data.name || it.data.value || '').toLowerCase();
+        if (term && String(it.id).toLowerCase().indexOf(term) === -1 && lbl.indexOf(term) === -1) return;
+        html += '<button class="res-item' + (key === state.currentId ? ' active' : '') + (r && r.resolved ? '' : ' unresolved') + '" data-nav="' + esc(key) + '">' +
+          badge(it.data.type || '?') +
+          '<span class="rtext"><span class="rid">' + esc(it.id) + '</span><br>' +
+          '<span class="rlabel">' + esc(truncate(it.data.name || it.data.value || (r ? labelFor(r) : '') || '—', 64)) + '</span></span>' +
+        '</button>';
+        return;
+      }
+      var label = it.data.type || it.data.name || it.data.slug || it.href;
+      if (term && (label + ' ' + (it.data.slug || '')).toLowerCase().indexOf(term) === -1) return;
+      var open = lower && stripQuery(lower.href) === stripQuery(it.href);
+      var swatch = it.data.type ? 'var(--' + typeClass(it.data.type) + ')' : 'var(--text-faint)';
+      html += '<button class="type-row' + (open ? ' active' : '') + '" data-list-href="' + esc(it.href) + '" title="' + esc(it.href) + '">' +
+        '<span class="type-swatch" style="background:' + swatch + '"></span>' +
+        '<span class="tname">' + esc(label) + '</span>' +
       '</button>';
     });
-    if (collectionView.loading){
-      html += '<div class="fetchbar"><span class="spinner" aria-hidden="true"></span>loading ' + esc(state.activeType) + '…</div>';
-    } else if (collectionView.nextHref){
-      html += '<button class="tbtn" id="load-more-btn" style="margin-top:6px;width:100%;">Load more</button>';
-    }
-    resListEl.innerHTML = html;
+    return html;
   }
+
+  function status(pane){
+    if (colStatus.error && pane === (upper ? 'lower' : 'upper')) return '<div class="empty-note">Fetch failed: ' + esc(colStatus.error) + '</div>';
+    if (colStatus.loading && pane === (upper ? 'lower' : 'upper')) return '<div class="fetchbar"><span class="spinner" aria-hidden="true"></span>loading…</div>';
+    return '';
+  }
+
+  function renderPane(el, countEl, pathEl, c, pane){
+    countEl.textContent = c && c.items.length ? c.items.length + (c.nextHref ? '+' : '') : '';
+    pathEl.textContent = c ? pathnameOf(c.href) : '';
+    if (!c){
+      el.innerHTML = status(pane) || '<div class="empty-note">' + (pane === 'upper' ? 'Loading ' + esc(ENTRY) + '…' : 'Pick a collection above to list its items.') + '</div>';
+      return;
+    }
+    var html = itemRows(c.items);
+    if (!html && !c.items.length) html = '<div class="empty-note">Nothing in this collection.</div>';
+    else if (!html) html = '<div class="empty-note">No matching item.</div>';
+    html += status(pane);
+    if (pane === 'lower' && c.nextHref && !colStatus.loading) html += '<button class="tbtn" id="load-more-btn" style="margin-top:6px;width:100%;">Load more</button>';
+    el.innerHTML = html;
+  }
+
+  function renderTypeList(){ renderPane(typeListEl, typeTotalEl, indexPathEl, upper, 'upper'); }
+  function renderResList(){ renderPane(resListEl, indexCountEl, itemsPathEl, lower, 'lower'); }
 
   /* ---------------- breadcrumb ---------------- */
   var breadcrumbEl = document.getElementById('breadcrumb');
@@ -701,7 +680,7 @@
     state.history.forEach(function(id, i){
       if (i > 0) html += '<span class="crumb-sep">›</span>';
       var cur = i === state.pointer ? ' current' : '';
-      html += '<button class="crumb' + cur + '" data-hist="' + i + '">' + esc(id) + '</button>';
+      html += '<button class="crumb' + cur + '" data-hist="' + i + '">' + esc(shortId(id)) + '</button>';
     });
     breadcrumbEl.innerHTML = html;
     breadcrumbEl.scrollLeft = breadcrumbEl.scrollWidth;
@@ -712,27 +691,59 @@
   /* ---------------- detail ---------------- */
   var detailEl = document.getElementById('detail');
 
-  function renderRelGroup(list, arrowLeft){
-    if (!list || !list.length) return '<div class="empty-panel">None recorded.</div>';
+  // Handles written in prose (Q_1, CLM_23) become chips. A candidate counts only if its
+  // prefix starts the id of some resource this page holds, which leaves K_1 or A_2 in
+  // mathematical prose alone. One that names a resource held in the same directory as
+  // the open resource loads it when clicked; any other is a dashed chip.
+  function mentionHtml(text){
+    var base = state.currentId ? state.currentId.slice(0, state.currentId.lastIndexOf('/') + 1) : '';
+    var prefixes = Object.create(null);
+    Object.keys(resources).forEach(function(k){ prefixes[shortId(k).split('_')[0]] = true; });
+    var re = /\b[A-Z]{1,6}_\d+\b/g, out = '', last = 0, m;
+    while ((m = re.exec(text))){
+      out += esc(text.slice(last, m.index));
+      last = m.index + m[0].length;
+      if (!prefixes[m[0].split('_')[0]]){ out += esc(m[0]); continue; }
+      var r = resources[base + m[0]];
+      out += r
+        ? '<button class="mention" data-nav="' + esc(base + m[0]) + '" style="--mention:' + (r.type ? 'var(--' + typeClass(r.type) + ')' : 'var(--line)') + '" title="' + esc(r.type || '') + '">' + m[0] + '</button>'
+        : '<span class="mention unknown">' + m[0] + '</span>';
+    }
+    return out + esc(text.slice(last));
+  }
+  function propRows(a){
+    var keys = Object.keys(a).sort();
+    if (!keys.length) return '<div class="empty-panel">No additional properties.</div>';
+    return keys.map(function(k){
+      var isMono = /^(logical_name|content_hash|method)$/.test(k);
+      var display = isDateKey(k) ? fmtDate(a[k]) : a[k];
+      var body = typeof display === 'string' ? mentionHtml(display) : esc(display);
+      return '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v' + (isMono ? ' mono' : '') + '">' + body + '</div></div>';
+    }).join('');
+  }
+
+  function relChip(key){
+    var r = resources[key];
+    var resolved = r && r.resolved;
+    var tail = resolved ? esc(truncate(labelFor(r) || r.type, 70)) : 'not yet fetched — GET ' + esc(pathOf(withDepth(key)));
+    return '<button class="rel-chip' + (resolved ? '' : ' unresolved') + '" data-nav="' + esc(key) + '">' + badge(r ? r.type : '?') +
+      '<span class="cid mono">' + esc(shortId(key)) + '</span><span class="clabel">' + tail + '</span></button>';
+  }
+
+  // A related resource with its properties. The head loads it.
+  function relCard(key){
+    var r = resources[key];
+    if (!r || !r.resolved) return relChip(key);
+    return '<div class="panel"><button class="card-head" data-nav="' + esc(key) + '">' + badge(r.type) +
+      '<span class="cid mono">' + esc(shortId(key)) + '</span><span class="clabel">' + esc(r.type) + '</span></button>' +
+      '<div class="panel-body">' + propRows(r.attrs) + '</div></div>';
+  }
+
+  // The relations of `res` in one direction, grouped by the rel name the API gave them.
+  function relGroups(res, dir){
     var byRel = {};
-    list.forEach(function(e){ (byRel[e.rel] = byRel[e.rel] || []).push(e); });
-    var html = '';
-    Object.keys(byRel).sort().forEach(function(rel){
-      html += '<div class="rel-group"><div class="rel-key"><span class="rel-arrow">' + (arrowLeft ? '←' : '→') + '</span>' + esc(humanRel(rel)) + '</div><div class="rel-chips">';
-      byRel[rel].forEach(function(e){
-        var otherId = arrowLeft ? e.from : e.to;
-        var r = resources[otherId];
-        var cls = (r && r.resolved) ? '' : ' unresolved';
-        var tail = (r && r.resolved)
-          ? esc(truncate(labelFor(r) || r.type, 70))
-          : 'not yet fetched — GET /graph/' + esc(otherId) + '?depth=' + GRAPH_DEPTH;
-        html += '<button class="rel-chip' + cls + '" data-nav="' + esc(otherId) + '">' + badge(r ? r.type : '?') +
-          '<span class="cid mono">' + esc(otherId) + '</span>' +
-          '<span class="clabel">' + tail + '</span></button>';
-      });
-      html += '</div></div>';
-    });
-    return html;
+    (res.rels || []).forEach(function(e){ if (e.dir === dir) (byRel[e.rel] = byRel[e.rel] || []).push(e.key); });
+    return Object.keys(byRel).sort().map(function(rel){ return { rel: rel, keys: byRel[rel] }; });
   }
 
   function jsonHighlight(obj){
@@ -755,7 +766,7 @@
       detailEl.innerHTML =
         '<div class="fetch-error"><div class="title">Fetch failed</div>' +
         '<div>' + esc(state.error) + '</div>' +
-        '<div style="margin-top:8px;">Requested <span class="mono">' + esc(GRAPH_BASE + id + '?depth=' + GRAPH_DEPTH) + '</span>. ' +
+        '<div style="margin-top:8px;">Requested <span class="mono">' + esc(state.errorHref || shortId(id)) + '</span>. ' +
         'A generic "Failed to fetch" here is almost always CORS — check that the response for this origin includes an <span class="mono">Access-Control-Allow-Origin</span> header covering wherever this file is being served from (including <span class="mono">null</span> if opened as a local file). Open devtools\u2019 Network tab for the actual reason; browsers don\u2019t expose it to script.</div></div>';
       return;
     }
@@ -765,8 +776,8 @@
 
     if (!res.resolved){
       if (state.loading){
-        detailEl.innerHTML = '<div class="detail-header"><div class="header-top">' + badge(res.type || 'Question') + '<span class="header-id">' + esc(id) + '</span></div></div>' +
-          '<div class="panel"><div class="panel-head">GET /graph/' + esc(id) + '?depth=' + GRAPH_DEPTH + '</div><div class="panel-body"><div class="fetchbar"><span class="spinner" aria-hidden="true"></span>fetching ' + esc(id) + '…</div></div></div>';
+        detailEl.innerHTML = '<div class="detail-header"><div class="header-top">' + badge(res.type || 'Question') + '<span class="header-id">' + esc(shortId(id)) + '</span></div></div>' +
+          '<div class="panel"><div class="panel-head">GET ' + esc(pathOf(withDepth(id))) + '</div><div class="panel-body"><div class="fetchbar"><span class="spinner" aria-hidden="true"></span>fetching ' + esc(shortId(id)) + '…</div></div></div>';
       } else {
         detailEl.innerHTML = '<div class="empty-panel">Not fetched.</div>';
       }
@@ -774,7 +785,6 @@
     }
 
     var a = res.attrs;
-    var label = labelFor(res);
     var pills = '';
     if (a.kind) pills += '<span class="pill kind-' + esc(a.kind) + '">' + esc(a.kind) + '</span>';
     if (a.outcome) pills += '<span class="pill outcome-' + esc(a.outcome) + '">' + esc(a.outcome) + '</span>';
@@ -782,87 +792,71 @@
     if (a.status) pills += '<span class="pill">' + esc(a.status) + '</span>';
     if (a.role) pills += '<span class="pill">' + esc(a.role) + '</span>';
 
-    var propRows = '';
     var propKeys = Object.keys(a).sort();
-    propKeys.forEach(function(k){
-      var v = a[k];
-      var isMono = /^(logical_name|content_hash|method)$/.test(k);
-      var display = isDateKey(k) ? fmtDate(v) : v;
-      propRows += '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v' + (isMono ? ' mono' : '') + '">' + esc(display) + '</div></div>';
-    });
-    if (!propKeys.length) propRows = '<div class="empty-panel">No additional properties.</div>';
 
     var html = '';
     html += '<div class="detail-header">';
-    html += '  <div class="header-top">' + badge(res.type) + '<span class="header-id">' + esc(id) + '</span><span class="header-type">' + esc(res.type) + '</span></div>';
-    if (label) html += '  <p class="header-label">' + esc(label) + '</p>';
+    html += '  <div class="header-top">' + badge(res.type) + '<span class="header-id">' + esc(shortId(id)) + '</span><span class="header-type">' + esc(res.type) + '</span></div>';
     if (pills) html += '  <div class="header-pills">' + pills + '</div>';
     html += '  <div class="toolbar">';
     html += '    <button class="tbtn' + (!state.rawOpen ? ' on' : '') + '" id="tab-overview">Overview</button>';
-    html += '    <button class="tbtn' + (state.rawOpen ? ' on' : '') + '" id="tab-raw">Raw resource</button>';
-    html += '    <button class="tbtn" id="refetch-btn">Re-fetch</button>';
+    html += '    <button class="tbtn' + (state.rawOpen ? ' on' : '') + '" id="tab-raw">Debug</button>';
+    html += '    <button class="tbtn" id="refetch-btn" title="Reload from the API" aria-label="Reload from the API">↻</button>';
     html += '  </div>';
     html += '</div>';
 
     if (state.rawOpen){
-      html += '<div class="panel"><div class="panel-head">normalized resource · ' + esc(id) + '</div><pre class="jsonview">' + jsonHighlight({ id: res.id, type: res.type, attrs: res.attrs }) + '</pre></div>';
+      var selfLink = res.selfHref ? '<a href="' + esc(res.selfHref) + '" target="_blank" rel="noopener" title="Open in a new tab">' + esc(pathOf(res.selfHref)) + '</a>' : '';
+      html += '<div class="panel"><div class="panel-head">' + selfLink + '<span>normalized resource</span></div><pre class="jsonview">' + jsonHighlight({ id: res.id, type: res.type, attrs: res.attrs }) + '</pre></div>';
     } else {
-      html += '<div class="panel"><div class="panel-head">Properties<span>' + propKeys.length + '</span></div><div class="panel-body">' + propRows + '</div></div>';
+      html += '<div class="panel"><div class="panel-head">Properties<span>' + propKeys.length + '</span></div><div class="panel-body">' + propRows(a) + '</div></div>';
+    }
+    if (!state.rawOpen){
+      relGroups(res, 'out').forEach(function(g){
+        html += '<div class="rel-heading">→ ' + esc(humanRel(g.rel)) + ' <span class="faint">' + g.keys.length + '</span></div>' + g.keys.map(relCard).join('');
+      });
     }
     detailEl.innerHTML = html;
   }
 
-  var outRelEl = document.getElementById('out-rel-body');
   var inRelEl = document.getElementById('in-rel-body');
-  var outCountEl = document.getElementById('out-count');
   var inCountEl = document.getElementById('in-count');
 
   function renderRelations(){
     var id = state.currentId;
     var res = id && resources[id];
 
-    if (!id){
-      outRelEl.innerHTML = inRelEl.innerHTML = '<div class="empty-note">Nothing open yet.</div>';
-      outCountEl.textContent = inCountEl.textContent = '';
-      return;
-    }
     if (!res || !res.resolved){
-      var msg = state.loading ? '<div class="empty-note">Waiting on ' + esc(id) + '…</div>' : '<div class="empty-note">' + esc(id) + ' hasn\'t loaded.</div>';
-      outRelEl.innerHTML = inRelEl.innerHTML = msg;
-      outCountEl.textContent = inCountEl.textContent = '';
+      inRelEl.innerHTML = '<div class="empty-note">' + (!id ? 'Nothing open yet.' : state.loading ? 'Waiting on ' + esc(shortId(id)) + '…' : esc(shortId(id)) + ' hasn\'t loaded.') + '</div>';
+      inCountEl.textContent = '';
       return;
     }
-    var out = outgoing[id] || [], inc = incoming[id] || [];
-    outCountEl.textContent = out.length;
-    inCountEl.textContent = inc.length;
-    outRelEl.innerHTML = renderRelGroup(out, false);
-    inRelEl.innerHTML = renderRelGroup(inc, true);
+    var groups = relGroups(res, 'in');
+    inCountEl.textContent = groups.reduce(function(n, g){ return n + g.keys.length; }, 0);
+    inRelEl.innerHTML = groups.map(function(g){
+      return '<div class="rel-group"><div class="rel-key"><span class="rel-arrow">←</span>' + esc(humanRel(g.rel)) + '</div><div class="rel-chips">' + g.keys.map(relChip).join('') + '</div></div>';
+    }).join('') || '<div class="empty-panel">None recorded.</div>';
   }
 
-  function render(){ renderTypeList(); renderResList(); renderBreadcrumb(); renderDetail(); renderRelations(); }
+  // The open resource's path is kept in the URL hash, so a reload or a pasted link opens it.
+  function syncHash(){
+    if (!state.currentId) return;
+    var want = '#' + pathnameOf(state.currentId);
+    if (location.hash !== want) history.replaceState(null, '', location.pathname + location.search + want);
+  }
+
+  function render(){ renderTypeList(); renderResList(); renderBreadcrumb(); renderDetail(); renderRelations(); syncHash(); }
 
   /* ---------------- events ---------------- */
   document.body.addEventListener('click', function(e){
     var navBtn = e.target.closest('[data-nav]');
     if (navBtn){ navigate(navBtn.getAttribute('data-nav')); return; }
 
-    var typeBtn = e.target.closest('[data-type]');
-    if (typeBtn){
-      var t = typeBtn.getAttribute('data-type');
-      var href = typeBtn.getAttribute('data-href');
-      if (state.activeType === t){
-        state.activeType = null;
-        collectionView = null;
-      } else {
-        state.activeType = t;
-        loadCollection(t, href, false);
-      }
-      renderTypeList(); renderResList();
-      return;
-    }
+    var listBtn = e.target.closest('[data-list-href]');
+    if (listBtn){ follow(listBtn.getAttribute('data-list-href')); return; }
 
     if (e.target.id === 'load-more-btn'){
-      if (collectionView && collectionView.nextHref) loadCollection(collectionView.type, collectionView.nextHref, true);
+      if (lower && lower.nextHref) follow(lower.nextHref, { append: true });
       return;
     }
 
@@ -876,9 +870,17 @@
 
     if (e.target.id === 'tab-overview'){ state.rawOpen = false; renderDetail(); return; }
     if (e.target.id === 'tab-raw'){ state.rawOpen = true; renderDetail(); return; }
-    if (e.target.id === 'refetch-btn'){ if (state.currentId) fetchResource(state.currentId); return; }
+    if (e.target.id === 'refetch-btn'){ if (state.currentId) follow(state.currentId, { node: true }); return; }
   });
 
+  document.getElementById('btn-home').addEventListener('click', function(){
+    fetchToken++;
+    state.history = []; state.pointer = -1; state.currentId = null;
+    state.loading = false; state.error = null; state.rawOpen = false;
+    history.replaceState(null, '', location.pathname + location.search);
+    render();
+    follow(ENTRY, { root: true });
+  });
   document.getElementById('btn-back').addEventListener('click', goBack);
   document.getElementById('btn-fwd').addEventListener('click', goFwd);
   document.getElementById('search').addEventListener('input', function(e){ state.search = e.target.value; renderTypeList(); renderResList(); });
@@ -912,8 +914,19 @@
      so that's the only thing fetched on load. Center and right columns stay
      empty until an item is picked from the left column (or a relation chip
      is followed from whatever's already open). */
-  fetchCatalog();
+  document.getElementById('brand-sub').textContent = 'live · ' + location.host;
+  // A path in the hash opens that resource; it is loaded as a link would be.
+  function openHash(){
+    var path = location.hash.slice(1);
+    if (path.charAt(0) === '/' && (!state.currentId || pathnameOf(state.currentId) !== path)){
+      follow(location.origin + path, { node: true });
+    }
+  }
+  window.addEventListener('hashchange', openHash);
+
   render();
+  follow(ENTRY, { root: true });
+  openHash();
 })();
 </script>
 </body>

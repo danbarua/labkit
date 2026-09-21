@@ -11,13 +11,13 @@ Everything below is scoped to a workspace, one research project's graph. Bare `/
 ```
 GET /workspace/{slug}                a workspace's collections, one per node type
 GET /workspace/{slug}/{type}         one collection
-GET /workspace/{slug}/graph/{id}     one entity
+GET /workspace/{slug}/{id}           one entity
 ```
 
-- A workspace is a collection. `/collections/workspace` lists them, and each item's address is the workspace itself, with a link to its `graph`. That collection is offered from the default workspace only, since workspaces are not nested.
+- A workspace is a collection. `/collections/workspace` lists them, and each item's address is the workspace itself. That collection is offered from the default workspace only, since workspaces are not nested.
 - A slug that does not exist is a 404. A workspace never falls back to another one's data.
-- Links in a response keep you in the workspace you arrived by. `/workspace/{slug}/graph/{id}` links to `/workspace/{slug}/graph/…`, and the bare form links to the bare form.
-- `graph` is not a collection name, so it cannot clash with a node type.
+- Links in a response keep you in the workspace you arrived by. `/workspace/{slug}/{id}` links to `/workspace/{slug}/…`, and the bare `/graph/{id}` links to the bare form.
+- Inside a workspace a collection and an entity share a path level. A collection name is lower case and a handle is not, so a name is never both.
 - `/sitemap.xml` and `/.well-known/api-catalog` describe the default workspace only.
 
 ## Entities: `/graph/{id}`
@@ -36,7 +36,7 @@ GET /graph/{id}?depth=1
   - Each neighbour also has `dir` (`in` or `out`) and `depth`.
 - At the deepest level an entity is not expanded. Its `_links` lists what lies beyond, so nothing is hidden, only not fetched.
 - Every link repeats the `depth` that was applied. Following one gives the same view of the linked entity.
-- `_links.expand` is a URI template, `/graph/{id}{?depth}`, for asking for a different depth.
+- `_links.expand` is a URI template, the entity's own address followed by `{?depth}`, for asking for a different depth.
 
 ## Collections: `/collections`
 
@@ -51,7 +51,7 @@ GET /collections/{type}     the live nodes of that type
 
 - `next`, `prev` and `index` links do the paging and navigation.
 - Retracted nodes are not listed.
-- Each item's `href` is its `/graph/{id}` address. A collection lists things and does not define them.
+- Each item's `href` is that entity's address. A collection lists things and does not define them.
 
 ### What an item carries
 

@@ -10,6 +10,7 @@
     "ingest": "bash scripts/with-ports.sh bun scripts/ingest-overlap-bench.ts",
     "db:up": "bash scripts/compose.sh up -d db",
     "db:down": "bash scripts/compose.sh stop db",
+    "db:migrate": "bun scripts/migrate.ts",
     "build": "vite build",
     "test": "bun test --timeout 60000",
     "e2e": "playwright test",

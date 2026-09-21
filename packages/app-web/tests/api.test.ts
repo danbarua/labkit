@@ -130,8 +130,8 @@ describe("entities", () => {
 
 describe("workspaces", () => {
   test("the same handle is a different entity in each workspace", async () => {
-    const alpha = await get("/workspace/alpha/graph/Q_1");
-    const beta = await get("/workspace/beta/graph/Q_1");
+    const alpha = await get("/workspace/alpha/Q_1");
+    const beta = await get("/workspace/beta/Q_1");
     expect(alpha.body.name).toBe("alpha question");
     expect(beta.body.name).toBe("beta question");
   });
@@ -141,23 +141,22 @@ describe("workspaces", () => {
   });
 
   test("a handle that only exists in another workspace is a 404, not a fallback", async () => {
-    expect((await get("/workspace/beta/graph/LOE_1")).status).toBe(404);
+    expect((await get("/workspace/beta/LOE_1")).status).toBe(404);
     expect((await get("/workspace/beta/enquiry")).body.collection.items).toEqual([]);
   });
 
   test("an unknown workspace is a 404", async () => {
-    const r = await get("/workspace/nope/graph/Q_1");
+    const r = await get("/workspace/nope/Q_1");
     expect(r.status).toBe(404);
     expect(r.type).toBe("application/problem+json");
   });
 
   test("every link in a workspace response stays in that workspace", async () => {
-    const r = await get("/workspace/alpha/graph/LOE_1?depth=2");
+    const r = await get("/workspace/alpha/LOE_1?depth=2");
     const links = hrefs(r.body);
     expect(links.length).toBeGreaterThan(0);
-    for (const href of links)
-      expect(href.startsWith(`${PUBLIC}/workspace/alpha/graph/`)).toBe(true);
-    expect(r.body._links.expand.href).toBe(`${PUBLIC}/workspace/alpha/graph/LOE_1{?depth}`);
+    for (const href of links) expect(href.startsWith(`${PUBLIC}/workspace/alpha/`)).toBe(true);
+    expect(r.body._links.expand.href).toBe(`${PUBLIC}/workspace/alpha/LOE_1{?depth}`);
   });
 
   test("bare links do not mention workspaces", async () => {
@@ -165,29 +164,21 @@ describe("workspaces", () => {
     for (const href of hrefs(r.body)) expect(href).not.toContain("/workspace/");
   });
 
-  test("a bare /graph inside a workspace redirects inside it", async () => {
-    const r = await get("/workspace/beta/graph");
-    expect(r.res.headers.get("location")).toBe(`${PUBLIC}/workspace/beta/graph/Q_1`);
-  });
-
-  test("inside a workspace, only graph and the collections are routes", async () => {
+  test("inside a workspace, only its nodes and its collections are routes", async () => {
     expect((await get("/workspace/alpha/sitemap.xml")).status).toBe(404);
     expect((await get("/workspace/alpha/docs/")).status).toBe(404);
     expect((await get("/workspace/alpha/collections")).status).toBe(404);
     expect((await get("/workspace/alpha/question/extra")).status).toBe(404);
   });
 
-  test("no node type is called graph, which would clash with the graph path", async () => {
-    const index = await get("/collections");
-    const slugs = index.body.collection.items.map((i: any) => dataOf(i).slug);
-    expect(slugs).not.toContain("graph");
+  test("a workspace has no /graph segment: neither the old node form nor the entrance resolves", async () => {
+    expect((await get("/workspace/alpha/graph/Q_1")).status).toBe(404);
+    expect((await get("/workspace/alpha/graph")).status).toBe(404);
   });
 
   testOnPostgres("interleaved requests to different workspaces never cross", async () => {
     const results = await Promise.all(
-      Array.from({ length: 60 }, (_, i) =>
-        get(`/workspace/${i % 2 === 0 ? "alpha" : "beta"}/graph/Q_1`),
-      ),
+      Array.from({ length: 60 }, (_, i) => get(`/workspace/${i % 2 === 0 ? "alpha" : "beta"}/Q_1`)),
     );
     for (const [i, r] of results.entries()) {
       expect(r.body.name).toBe(i % 2 === 0 ? "alpha question" : "beta question");
@@ -197,7 +188,7 @@ describe("workspaces", () => {
   testOnPostgres("more concurrent requests than pool connections all complete", async () => {
     const paths = [
       "/collections/workspace",
-      "/workspace/alpha/graph/LOE_1?depth=2",
+      "/workspace/alpha/LOE_1?depth=2",
       "/collections/question",
     ];
     const results = await Promise.all(
@@ -207,7 +198,7 @@ describe("workspaces", () => {
   });
 
   test("no request leaves tenant state on the connection it used", async () => {
-    await get("/workspace/beta/graph/Q_1");
+    await get("/workspace/beta/Q_1");
     const session = await runtime.connections.connect();
     try {
       const { rows } = await session.query<{ role: string; tenant: string | null }>(
@@ -305,12 +296,12 @@ describe("collections", () => {
     expect(r.type).toBe("application/problem+json");
   });
 
-  test("workspace lists every workspace, each addressed by its own index, with a link to its graph", async () => {
+  test("workspace lists every workspace, each addressed by its own index", async () => {
     const r = await get("/collections/workspace");
     const items = r.body.collection.items;
     expect(items.map((i: any) => dataOf(i).slug)).toEqual(["alpha", "beta"]);
     expect(items[1].href).toBe(`${PUBLIC}/workspace/beta`);
-    expect(items[1].links).toEqual([{ rel: "graph", href: `${PUBLIC}/workspace/beta/graph` }]);
+    expect(items[1].links).toBeUndefined();
   });
 
   test("collection links stay in the workspace", async () => {
