@@ -33,7 +33,7 @@ export function globalOptions(program: Command): Command {
       .option("--json", "emit the report as JSON instead of prose")
       .option(
         "--depth <n>",
-        "with --json, how many hops of neighbours an act embeds in what it minted",
+        "with `get`, how many hops of neighbours to embed around the handle",
         (raw) => Number.parseInt(raw, 10),
       )
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only
