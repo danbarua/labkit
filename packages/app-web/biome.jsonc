@@ -21,7 +21,16 @@
   },
 
   "files": {
-    "includes": ["src/**", "scripts/**", "tests/**", "e2e/**", "*.ts", "*.json", "!src/routeTree.gen.ts"],
+    "includes": [
+      "src/**",
+      "scripts/**",
+      "tests/**",
+      "e2e/**",
+      "public/explorer*.js",
+      "*.ts",
+      "*.json",
+      "!src/routeTree.gen.ts"
+    ],
     "ignoreUnknown": true
   },
 
