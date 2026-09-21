@@ -1,7 +1,17 @@
 import { withTenant, type Runtime, type TenantScope } from "./runtime";
-import { rootCollectionsHandler, workspaceCollectionsHandler } from "./collections-handler";
+import {
+  isCollectionSlug,
+  rootCollectionsHandler,
+  workspaceCollectionsHandler,
+} from "./collections-handler";
 import { docsHandler } from "./docs-handler";
-import { apiCatalogHandler, graphHandler, sitemapHandler } from "./graph-handler";
+import {
+  apiCatalogHandler,
+  graphHandler,
+  nodePath,
+  publicOrigin,
+  sitemapHandler,
+} from "./graph-handler";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -57,9 +67,9 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
   return withCors(req, await route(req, runtime));
 }
 
-// `/workspace/{slug}` is a workspace's collections, `/workspace/{slug}/graph…` its graph, and
-// `/workspace/{slug}/{type}` one collection. The bare `/graph` and `/collections…` are the default
-// workspace.
+// `/workspace/{slug}` is a workspace's collections, `/workspace/{slug}/{type}` one collection and
+// `/workspace/{slug}/{handle}` one node. The bare `/graph/{handle}` and `/collections…` are the
+// default workspace.
 const WORKSPACE_PATH = /^\/workspace\/([^/]+)(\/.*)?$/;
 
 async function inWorkspace(
@@ -83,8 +93,10 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
     const slug = decodeURIComponent(workspace[1]!);
     const rest = workspace[2] ?? "";
     console.debug("request: workspace", slug, rest);
-    if (rest === "/graph" || rest.startsWith("/graph/")) {
-      return inWorkspace(runtime, slug, (scope) => graphHandler(req, scope, rest));
+    const name = /^\/([^/]+)$/.exec(rest)?.[1];
+    if (name !== undefined && !isCollectionSlug(name)) {
+      const id = decodeURIComponent(name);
+      return inWorkspace(runtime, slug, (scope) => graphHandler(req, scope, id));
     }
     return inWorkspace(runtime, slug, (scope) => workspaceCollectionsHandler(req, scope, rest));
   }
@@ -114,10 +126,16 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
     return inWorkspace(runtime, undefined, (scope) => sitemapHandler(req, scope));
   }
 
-  // new API
-  if (path.startsWith("/graph")) {
+  if (/^\/graph\/?$/.test(path)) {
+    console.debug("request: graph without a handle, redirecting to the first question", path);
+    return Response.redirect(new URL(nodePath("", "Q_1"), publicOrigin(req)), 302);
+  }
+
+  const node = /^\/graph\/([^/]+)$/.exec(path)?.[1];
+  if (node !== undefined) {
     console.debug("request: graph", path);
-    return inWorkspace(runtime, undefined, (scope) => graphHandler(req, scope, path));
+    const id = decodeURIComponent(node);
+    return inWorkspace(runtime, undefined, (scope) => graphHandler(req, scope, id));
   }
 
   if (path === "/") {

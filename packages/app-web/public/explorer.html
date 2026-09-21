@@ -184,7 +184,6 @@
   .header-top .badge{ font-size:12px; padding:3px 7px; }
   .header-id{ font-family:var(--font-mono); font-size:20px; font-weight:600; }
   .header-type{ font-size:12.5px; color:var(--text-dim); }
-  .header-label{ font-size:15.5px; color:var(--text); max-width:74ch; margin:0 0 10px; }
   .header-pills{ display:flex; gap:8px; flex-wrap:wrap; }
 
   .toolbar{ display:flex; gap:8px; margin-top:14px; }
@@ -291,6 +290,17 @@
   .relations-col .panel-body{ padding:4px 0; }
   .scrim{ display:none; position:fixed; inset:52px 0 0 0; background:rgba(0,0,0,.4); z-index:19; }
   .scrim.open{ display:block; }
+  .card-head{ display:flex; align-items:center; gap:8px; width:100%; padding:10px 14px; background:none; border:none; border-bottom:1px solid var(--line); text-align:left; }
+  .card-head:hover{ background:var(--panel-2); }
+  .card-head .cid{ font-family:var(--font-mono); font-size:12px; flex:0 0 auto; }
+  .card-head .clabel{ font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rel-heading{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim); margin:22px 0 8px; }
+  .mention{ font-family:var(--font-mono); font-size:.92em; padding:0 4px; border-radius:4px; border:1px solid var(--mention, var(--line)); background:none; color:var(--text); }
+  button.mention{ cursor:pointer; }
+  button.mention:hover{ background:var(--panel-2); }
+  .mention.unknown{ color:var(--text-dim); border-style:dashed; }
+  .panel-head a{ color:var(--accent); font-family:var(--font-mono); text-decoration:none; }
+  .panel-head a:hover{ text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -336,10 +346,6 @@
     </main>
 
     <aside class="relations-col" id="relations-col">
-      <div class="sidebar-section">
-        <div class="section-label">Outgoing relations<span class="count" id="out-count"></span></div>
-        <div class="panel-body" id="out-rel-body"></div>
-      </div>
       <div class="sidebar-section grow">
         <div class="section-label">Incoming relations<span class="count" id="in-count"></span></div>
         <div class="panel-body" id="in-rel-body"></div>
@@ -355,19 +361,8 @@
 
   /* ---------------- graph store (shared logic with the static console) ---------------- */
   var resources = Object.create(null);
-  var edges = [];
-  var edgeKeys = Object.create(null);
   var SKIP_ATTR = { id:1, type:1, dir:1, depth:1, _links:1, _embedded:1 };
 
-  function relVerb(key, entryType){
-    var i = key.indexOf(':');
-    if (i === -1) return key;
-    var a = key.slice(0, i), b = key.slice(i + 1);
-    var t = String(entryType || '').toLowerCase();
-    if (b.toLowerCase() === t) return a;
-    if (a.toLowerCase() === t) return b;
-    return key;
-  }
   function stripQuery(href){ return String(href).split('?')[0]; }
   function ensureResource(key, type){
     if (!resources[key]) resources[key] = { id: key.split('/').pop(), type: type, attrs: {}, resolved: false };
@@ -385,15 +380,29 @@
       }
     }
   }
-  function addEdge(parentId, otherId, rel, dir){
-    var from, to;
-    if (dir === 'out'){ from = parentId; to = otherId; }
-    else if (dir === 'in'){ from = otherId; to = parentId; }
-    else return;
-    var key = from + '|' + rel + '|' + to;
-    if (edgeKeys[key]) return;
-    edgeKeys[key] = true;
-    edges.push({ from: from, to: to, rel: rel });
+  // The relations a resource states about itself: its `_links` entries and its direct
+  // `_embedded` children, each with the `dir` the API gives it.
+  function collectRels(node){
+    var rels = [], seen = Object.create(null);
+    function add(rawRel, href, type, dir){
+      var key = href && dir && stripQuery(href);
+      if (!key || seen[rawRel + '|' + key]) return;
+      seen[rawRel + '|' + key] = true;
+      rels.push({ rel: rawRel, key: key, dir: dir });
+      ensureResource(key, type);
+    }
+    var links = node._links || {};
+    Object.keys(links).forEach(function(rawRel){
+      if (rawRel === 'self' || rawRel === 'start') return;
+      [].concat(links[rawRel]).forEach(function(entry){ if (!entry.templated) add(rawRel, entry.href, entry.type, entry.dir); });
+    });
+    var embedded = node._embedded || {};
+    Object.keys(embedded).forEach(function(rawRel){
+      [].concat(embedded[rawRel]).forEach(function(child){
+        add(rawRel, child._links && child._links.self && child._links.self.href, child.type, child.dir);
+      });
+    });
+    return rels;
   }
   function walk(node){
     if (!node) return;
@@ -407,32 +416,9 @@
         var res = ensureResource(id, node.type);
         res.resolved = true;
         mergeAttrs(res, node);
-        for (var rawRel in node._links){
-          if (rawRel === 'self' || rawRel === 'start') continue;
-          var val = node._links[rawRel];
-          var arr = Array.isArray(val) ? val : [val];
-          for (var j=0;j<arr.length;j++){
-            var entry = arr[j];
-            if (entry.templated) continue;
-            var targetId = entry.href && entry.dir && stripQuery(entry.href);
-            if (targetId){
-              addEdge(id, targetId, relVerb(rawRel, entry.type), entry.dir);
-              ensureResource(targetId, entry.type);
-            }
-          }
-        }
-        if (node._embedded){
-          for (var rawErel in node._embedded){
-            var evArr = node._embedded[rawErel];
-            if (!Array.isArray(evArr)) evArr = [evArr];
-            for (var k2=0;k2<evArr.length;k2++){
-              var child = evArr[k2];
-              var childHref = child._links && child._links.self && child._links.self.href;
-              var childId = childHref && stripQuery(childHref);
-              if (childId) addEdge(id, childId, relVerb(rawErel, child.type), child.dir);
-              walk(child);
-            }
-          }
+        res.rels = collectRels(node);
+        for (var rawErel in node._embedded || {}){
+          [].concat(node._embedded[rawErel]).forEach(walk);
         }
         return;
       }
@@ -444,14 +430,6 @@
     }
   }
 
-  var outgoing = Object.create(null), incoming = Object.create(null);
-  function reindexEdges(){
-    outgoing = Object.create(null); incoming = Object.create(null);
-    edges.forEach(function(e){
-      (outgoing[e.from] = outgoing[e.from] || []).push(e);
-      (incoming[e.to] = incoming[e.to] || []).push(e);
-    });
-  }
 
   var TYPE_ORDER = ['Question','LineOfEnquiry','Decision','Evidence','EvidenceUnit','Computation','Artefact','Claim','Criterion','CriterionEvaluation','Gate','Task','Review','Note','Workspace'];
   var TYPE_ABBR = { Question:'Q', LineOfEnquiry:'LoE', Decision:'D', Evidence:'Ev', EvidenceUnit:'EU', Claim:'Cl', Computation:'Cp', Artefact:'Ar', Criterion:'Cr', CriterionEvaluation:'CE', Gate:'Ga', Task:'Tk', Review:'Rv', Note:'No', Workspace:'Ws' };
@@ -472,7 +450,7 @@
   function isDateKey(k){ return /_at$/.test(k); }
   function labelFor(res){
     var a = res.attrs;
-    return a.name || a.statement || a.reason || a.verdict || a.value || a.proposition ||
+    return res.summary || a.name || a.statement || a.text || a.reason || a.verdict || a.value || a.proposition ||
            a.method || a.logical_name || a.objective || a.consequence || '';
   }
   function truncate(s, n){ s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
@@ -515,21 +493,13 @@
       return { href: it.href, data: d, id: d.id || null };
     });
     items.forEach(function(it){
-      if (it.id) mergeCollectionAttrs(ensureResource(stripQuery(it.href), it.data.type), it.data);
+      if (!it.id) return;
+      var r = ensureResource(stripQuery(it.href), it.data.type);
+      r.summary = it.data.name || it.data.value || r.summary;
     });
     return { href: c.href, links: links, items: items, nextHref: links.next || null };
   }
 
-  function mergeCollectionAttrs(res, dataMap){
-    Object.keys(dataMap).forEach(function(k){
-      if (k === 'id' || k === 'type') return;
-      var v = dataMap[k];
-      var cur = res.attrs[k];
-      if (cur === undefined || (typeof v === 'string' && typeof cur === 'string' && v.length > cur.length)){
-        res.attrs[k] = v;
-      }
-    });
-  }
 
   // Fetches href and reports which media type came back. What happens next is
   // decided by that type, never by the shape of the URL.
@@ -553,10 +523,11 @@
   }
 
   function showResource(json, href){
-    walk(json);
-    reindexEdges();
     var self = json._links && json._links.self && json._links.self.href;
     var key = stripQuery(self || href);
+    if (resources[key]) resources[key].full = false;
+    walk(json);
+    if (resources[key]){ resources[key].full = true; resources[key].selfHref = self || href; }
     if (state.history[state.pointer] !== key) pushHistory(key);
     state.currentId = key;
     state.loading = false; state.error = null;
@@ -630,7 +601,7 @@
     state.currentId = id;
     state.rawOpen = false;
     var res = resources[id];
-    if (res && res.resolved){
+    if (res && res.full){
       state.loading = false; state.error = null;
       render();
       return;
@@ -720,27 +691,59 @@
   /* ---------------- detail ---------------- */
   var detailEl = document.getElementById('detail');
 
-  function renderRelGroup(list, arrowLeft){
-    if (!list || !list.length) return '<div class="empty-panel">None recorded.</div>';
+  // Handles written in prose (Q_1, CLM_23) become chips. A candidate counts only if its
+  // prefix starts the id of some resource this page holds, which leaves K_1 or A_2 in
+  // mathematical prose alone. One that names a resource held in the same directory as
+  // the open resource loads it when clicked; any other is a dashed chip.
+  function mentionHtml(text){
+    var base = state.currentId ? state.currentId.slice(0, state.currentId.lastIndexOf('/') + 1) : '';
+    var prefixes = Object.create(null);
+    Object.keys(resources).forEach(function(k){ prefixes[shortId(k).split('_')[0]] = true; });
+    var re = /\b[A-Z]{1,6}_\d+\b/g, out = '', last = 0, m;
+    while ((m = re.exec(text))){
+      out += esc(text.slice(last, m.index));
+      last = m.index + m[0].length;
+      if (!prefixes[m[0].split('_')[0]]){ out += esc(m[0]); continue; }
+      var r = resources[base + m[0]];
+      out += r
+        ? '<button class="mention" data-nav="' + esc(base + m[0]) + '" style="--mention:' + (r.type ? 'var(--' + typeClass(r.type) + ')' : 'var(--line)') + '" title="' + esc(r.type || '') + '">' + m[0] + '</button>'
+        : '<span class="mention unknown">' + m[0] + '</span>';
+    }
+    return out + esc(text.slice(last));
+  }
+  function propRows(a){
+    var keys = Object.keys(a).sort();
+    if (!keys.length) return '<div class="empty-panel">No additional properties.</div>';
+    return keys.map(function(k){
+      var isMono = /^(logical_name|content_hash|method)$/.test(k);
+      var display = isDateKey(k) ? fmtDate(a[k]) : a[k];
+      var body = typeof display === 'string' ? mentionHtml(display) : esc(display);
+      return '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v' + (isMono ? ' mono' : '') + '">' + body + '</div></div>';
+    }).join('');
+  }
+
+  function relChip(key){
+    var r = resources[key];
+    var resolved = r && r.resolved;
+    var tail = resolved ? esc(truncate(labelFor(r) || r.type, 70)) : 'not yet fetched — GET ' + esc(pathOf(withDepth(key)));
+    return '<button class="rel-chip' + (resolved ? '' : ' unresolved') + '" data-nav="' + esc(key) + '">' + badge(r ? r.type : '?') +
+      '<span class="cid mono">' + esc(shortId(key)) + '</span><span class="clabel">' + tail + '</span></button>';
+  }
+
+  // A related resource with its properties. The head loads it.
+  function relCard(key){
+    var r = resources[key];
+    if (!r || !r.resolved) return relChip(key);
+    return '<div class="panel"><button class="card-head" data-nav="' + esc(key) + '">' + badge(r.type) +
+      '<span class="cid mono">' + esc(shortId(key)) + '</span><span class="clabel">' + esc(r.type) + '</span></button>' +
+      '<div class="panel-body">' + propRows(r.attrs) + '</div></div>';
+  }
+
+  // The relations of `res` in one direction, grouped by the rel name the API gave them.
+  function relGroups(res, dir){
     var byRel = {};
-    list.forEach(function(e){ (byRel[e.rel] = byRel[e.rel] || []).push(e); });
-    var html = '';
-    Object.keys(byRel).sort().forEach(function(rel){
-      html += '<div class="rel-group"><div class="rel-key"><span class="rel-arrow">' + (arrowLeft ? '←' : '→') + '</span>' + esc(humanRel(rel)) + '</div><div class="rel-chips">';
-      byRel[rel].forEach(function(e){
-        var otherId = arrowLeft ? e.from : e.to;
-        var r = resources[otherId];
-        var cls = (r && r.resolved) ? '' : ' unresolved';
-        var tail = (r && r.resolved)
-          ? esc(truncate(labelFor(r) || r.type, 70))
-          : 'not yet fetched — GET ' + escpathOf(withDepth(otherId));
-        html += '<button class="rel-chip' + cls + '" data-nav="' + esc(otherId) + '">' + badge(r ? r.type : '?') +
-          '<span class="cid mono">' + esc(shortId(otherId)) + '</span>' +
-          '<span class="clabel">' + tail + '</span></button>';
-      });
-      html += '</div></div>';
-    });
-    return html;
+    (res.rels || []).forEach(function(e){ if (e.dir === dir) (byRel[e.rel] = byRel[e.rel] || []).push(e.key); });
+    return Object.keys(byRel).sort().map(function(rel){ return { rel: rel, keys: byRel[rel] }; });
   }
 
   function jsonHighlight(obj){
@@ -782,7 +785,6 @@
     }
 
     var a = res.attrs;
-    var label = labelFor(res);
     var pills = '';
     if (a.kind) pills += '<span class="pill kind-' + esc(a.kind) + '">' + esc(a.kind) + '</span>';
     if (a.outcome) pills += '<span class="pill outcome-' + esc(a.outcome) + '">' + esc(a.outcome) + '</span>';
@@ -790,64 +792,60 @@
     if (a.status) pills += '<span class="pill">' + esc(a.status) + '</span>';
     if (a.role) pills += '<span class="pill">' + esc(a.role) + '</span>';
 
-    var propRows = '';
     var propKeys = Object.keys(a).sort();
-    propKeys.forEach(function(k){
-      var v = a[k];
-      var isMono = /^(logical_name|content_hash|method)$/.test(k);
-      var display = isDateKey(k) ? fmtDate(v) : v;
-      propRows += '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v' + (isMono ? ' mono' : '') + '">' + esc(display) + '</div></div>';
-    });
-    if (!propKeys.length) propRows = '<div class="empty-panel">No additional properties.</div>';
 
     var html = '';
     html += '<div class="detail-header">';
     html += '  <div class="header-top">' + badge(res.type) + '<span class="header-id">' + esc(shortId(id)) + '</span><span class="header-type">' + esc(res.type) + '</span></div>';
-    if (label) html += '  <p class="header-label">' + esc(label) + '</p>';
     if (pills) html += '  <div class="header-pills">' + pills + '</div>';
     html += '  <div class="toolbar">';
     html += '    <button class="tbtn' + (!state.rawOpen ? ' on' : '') + '" id="tab-overview">Overview</button>';
-    html += '    <button class="tbtn' + (state.rawOpen ? ' on' : '') + '" id="tab-raw">Raw resource</button>';
-    html += '    <button class="tbtn" id="refetch-btn">Re-fetch</button>';
+    html += '    <button class="tbtn' + (state.rawOpen ? ' on' : '') + '" id="tab-raw">Debug</button>';
+    html += '    <button class="tbtn" id="refetch-btn" title="Reload from the API" aria-label="Reload from the API">↻</button>';
     html += '  </div>';
     html += '</div>';
 
     if (state.rawOpen){
-      html += '<div class="panel"><div class="panel-head">normalized resource · ' + esc(shortId(id)) + '</div><pre class="jsonview">' + jsonHighlight({ id: res.id, type: res.type, attrs: res.attrs }) + '</pre></div>';
+      var selfLink = res.selfHref ? '<a href="' + esc(res.selfHref) + '" target="_blank" rel="noopener" title="Open in a new tab">' + esc(pathOf(res.selfHref)) + '</a>' : '';
+      html += '<div class="panel"><div class="panel-head">' + selfLink + '<span>normalized resource</span></div><pre class="jsonview">' + jsonHighlight({ id: res.id, type: res.type, attrs: res.attrs }) + '</pre></div>';
     } else {
-      html += '<div class="panel"><div class="panel-head">Properties<span>' + propKeys.length + '</span></div><div class="panel-body">' + propRows + '</div></div>';
+      html += '<div class="panel"><div class="panel-head">Properties<span>' + propKeys.length + '</span></div><div class="panel-body">' + propRows(a) + '</div></div>';
+    }
+    if (!state.rawOpen){
+      relGroups(res, 'out').forEach(function(g){
+        html += '<div class="rel-heading">→ ' + esc(humanRel(g.rel)) + ' <span class="faint">' + g.keys.length + '</span></div>' + g.keys.map(relCard).join('');
+      });
     }
     detailEl.innerHTML = html;
   }
 
-  var outRelEl = document.getElementById('out-rel-body');
   var inRelEl = document.getElementById('in-rel-body');
-  var outCountEl = document.getElementById('out-count');
   var inCountEl = document.getElementById('in-count');
 
   function renderRelations(){
     var id = state.currentId;
     var res = id && resources[id];
 
-    if (!id){
-      outRelEl.innerHTML = inRelEl.innerHTML = '<div class="empty-note">Nothing open yet.</div>';
-      outCountEl.textContent = inCountEl.textContent = '';
-      return;
-    }
     if (!res || !res.resolved){
-      var msg = state.loading ? '<div class="empty-note">Waiting on ' + esc(shortId(id)) + '…</div>' : '<div class="empty-note">' + esc(shortId(id)) + ' hasn\'t loaded.</div>';
-      outRelEl.innerHTML = inRelEl.innerHTML = msg;
-      outCountEl.textContent = inCountEl.textContent = '';
+      inRelEl.innerHTML = '<div class="empty-note">' + (!id ? 'Nothing open yet.' : state.loading ? 'Waiting on ' + esc(shortId(id)) + '…' : esc(shortId(id)) + ' hasn\'t loaded.') + '</div>';
+      inCountEl.textContent = '';
       return;
     }
-    var out = outgoing[id] || [], inc = incoming[id] || [];
-    outCountEl.textContent = out.length;
-    inCountEl.textContent = inc.length;
-    outRelEl.innerHTML = renderRelGroup(out, false);
-    inRelEl.innerHTML = renderRelGroup(inc, true);
+    var groups = relGroups(res, 'in');
+    inCountEl.textContent = groups.reduce(function(n, g){ return n + g.keys.length; }, 0);
+    inRelEl.innerHTML = groups.map(function(g){
+      return '<div class="rel-group"><div class="rel-key"><span class="rel-arrow">←</span>' + esc(humanRel(g.rel)) + '</div><div class="rel-chips">' + g.keys.map(relChip).join('') + '</div></div>';
+    }).join('') || '<div class="empty-panel">None recorded.</div>';
   }
 
-  function render(){ renderTypeList(); renderResList(); renderBreadcrumb(); renderDetail(); renderRelations(); }
+  // The open resource's path is kept in the URL hash, so a reload or a pasted link opens it.
+  function syncHash(){
+    if (!state.currentId) return;
+    var want = '#' + pathnameOf(state.currentId);
+    if (location.hash !== want) history.replaceState(null, '', location.pathname + location.search + want);
+  }
+
+  function render(){ renderTypeList(); renderResList(); renderBreadcrumb(); renderDetail(); renderRelations(); syncHash(); }
 
   /* ---------------- events ---------------- */
   document.body.addEventListener('click', function(e){
@@ -875,7 +873,14 @@
     if (e.target.id === 'refetch-btn'){ if (state.currentId) follow(state.currentId, { node: true }); return; }
   });
 
-  document.getElementById('btn-home').addEventListener('click', function(){ follow(ENTRY, { root: true }); });
+  document.getElementById('btn-home').addEventListener('click', function(){
+    fetchToken++;
+    state.history = []; state.pointer = -1; state.currentId = null;
+    state.loading = false; state.error = null; state.rawOpen = false;
+    history.replaceState(null, '', location.pathname + location.search);
+    render();
+    follow(ENTRY, { root: true });
+  });
   document.getElementById('btn-back').addEventListener('click', goBack);
   document.getElementById('btn-fwd').addEventListener('click', goFwd);
   document.getElementById('search').addEventListener('input', function(e){ state.search = e.target.value; renderTypeList(); renderResList(); });
@@ -910,8 +915,18 @@
      empty until an item is picked from the left column (or a relation chip
      is followed from whatever's already open). */
   document.getElementById('brand-sub').textContent = 'live · ' + location.host;
+  // A path in the hash opens that resource; it is loaded as a link would be.
+  function openHash(){
+    var path = location.hash.slice(1);
+    if (path.charAt(0) === '/' && (!state.currentId || pathnameOf(state.currentId) !== path)){
+      follow(location.origin + path, { node: true });
+    }
+  }
+  window.addEventListener('hashchange', openHash);
+
   render();
   follow(ENTRY, { root: true });
+  openHash();
 })();
 </script>
 </body>

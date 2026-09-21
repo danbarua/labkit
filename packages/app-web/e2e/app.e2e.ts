@@ -216,7 +216,7 @@ test.describe("when something is not there", () => {
 
 test.describe("the API keeps its own paths", () => {
   test("a browser going to an API path gets the API's answer, not the app", async ({ page }) => {
-    const response = await page.goto("/workspace/alpha/graph/Q_1");
+    const response = await page.goto("/workspace/alpha/Q_1");
     expect(response?.headers()["content-type"]).toContain("application/hal+json");
     expect(JSON.parse(await page.locator("body").innerText())).toMatchObject({ id: "Q_1" });
   });

@@ -58,7 +58,7 @@ export function workspacePath(workspace: string): string {
 }
 
 export function graphPath(workspace: string, id: string): string {
-  return `${workspacePath(workspace)}/graph/${encodeURIComponent(id)}`;
+  return `${workspacePath(workspace)}/${encodeURIComponent(id)}`;
 }
 
 /** GETs JSON, and says what went wrong in words a person can act on. */

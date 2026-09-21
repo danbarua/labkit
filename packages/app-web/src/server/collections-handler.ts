@@ -1,5 +1,5 @@
 import { NODE_LABELS, SEARCHABLE_TEXT, type NodeLabel } from "@labkit/core-db/domain";
-import { problem, publicOrigin } from "./graph-handler";
+import { nodePath, problem, publicOrigin } from "./graph-handler";
 import type { TenantScope } from "./runtime";
 
 const COLLECTION_JSON = "application/vnd.collection+json";
@@ -21,8 +21,11 @@ const LABEL_BY_SLUG = new Map<string, NodeLabel>(
 // Not a node type: workspaces are the tenants, and only the default workspace can see them all.
 const WORKSPACE_SLUG = "workspace";
 
-// Inside a workspace a collection sits at the same path level as `graph`.
-if (LABEL_BY_SLUG.has("graph")) throw new Error("a node type cannot have the slug `graph`");
+// Inside a workspace a collection and a node sit at the same path level. A handle such as `Q_1`
+// is upper case, and a slug is lower case, so a name is never both.
+export function isCollectionSlug(name: string): boolean {
+  return LABEL_BY_SLUG.has(name);
+}
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -83,7 +86,7 @@ async function outboundLinks(
   scope: TenantScope,
   label: NodeLabel,
   ids: string[],
-  base: string,
+  origin: string,
 ): Promise<Map<string, Link[]>> {
   const links = new Map<string, Link[]>();
   const safe = ids.filter((id) => HANDLE.test(id));
@@ -100,7 +103,8 @@ async function outboundLinks(
   );
   for (const row of result.rows) {
     const bucket = links.get(row.src) ?? [];
-    bucket.push({ rel: row.rel.toLowerCase(), href: `${base}/graph/${row.dst}`, name: row.dst });
+    const href = `${origin}${nodePath(scope.prefix, row.dst)}`;
+    bucket.push({ rel: row.rel.toLowerCase(), href, name: row.dst });
     links.set(row.src, bucket);
   }
   return links;
@@ -117,7 +121,6 @@ async function listing(
 ): Promise<Response> {
   const url = new URL(req.url);
   const origin = publicOrigin(req).origin;
-  const base = origin + scope.prefix;
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
   const nameProp = SEARCHABLE_TEXT[label]?.[0];
@@ -143,7 +146,7 @@ async function listing(
     scope,
     label,
     page.map((row) => row.id),
-    base,
+    origin,
   );
 
   const self = `${root}/${slugFor(label)}`;
@@ -166,7 +169,11 @@ async function listing(
           }
         }
       }
-      return { href: `${base}/graph/${row.id}`, data, links: links.get(row.id) ?? [] };
+      return {
+        href: `${origin}${nodePath(scope.prefix, row.id)}`,
+        data,
+        links: links.get(row.id) ?? [],
+      };
     }),
   });
 }
@@ -185,14 +192,12 @@ async function workspaceListing(req: Request, scope: TenantScope, root: string):
     href: `${self}?limit=${limit}&offset=${offset}`,
     links: pagingLinks(root, self, limit, offset, rows.length > limit),
     items: rows.slice(0, limit).map((workspace) => {
-      const address = `${origin}/workspace/${encodeURIComponent(workspace.slug)}`;
       return {
-        href: address,
+        href: `${origin}/workspace/${encodeURIComponent(workspace.slug)}`,
         data: [
           { name: "slug", value: workspace.slug },
           { name: "name", value: workspace.displayName },
         ],
-        links: [{ rel: "graph", href: `${address}/graph` }],
       };
     }),
   });

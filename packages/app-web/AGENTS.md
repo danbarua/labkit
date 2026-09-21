@@ -16,6 +16,8 @@ The paths Vite proxies are listed in `vite.config.ts`. A new top-level API route
 
 The browser app lives under `/app` and nowhere else. `/` sends a browser there, and every other path that neither the API nor Vite claims is a 404, never `index.html`. Routes are files in `src/routes`; the Vite plugin writes `src/routeTree.gen.ts` from them, and it is committed so typecheck works without running Vite.
 
+`LABKIT_DB_URL=… bun run db:migrate` applies core's migrations to an empty or existing Postgres database. The API never migrates, so run it before starting the API against a new database.
+
 A second process on the same port exiting 1 is a duplicate bind. Probe `/healthz` on the live port. Do not debug the duplicate if the live endpoint answers.
 
 ## Hypermedia

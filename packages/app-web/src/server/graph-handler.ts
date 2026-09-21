@@ -3,8 +3,14 @@ import type { TenantScope } from "./runtime";
 const DEFAULT_DEPTH = 1;
 const MAX_DEPTH = 6;
 
-// matches /graph/Q_1
-const MATCHER = new URLPattern({ pathname: "/graph/:id" });
+// Where a node lives: the default workspace keeps it under `/graph`, any other workspace addresses
+// it directly under its own path.
+export function nodePath(prefix: string, id: string): string {
+  return prefix === "" ? `/graph/${id}` : `${prefix}/${id}`;
+}
+
+// The address the graph query gives a node, before it is made absolute.
+const QUERY_HREF = /^\/graph\/([^/]+)$/;
 
 export function problem(status: number, title: string, detail?: string): Response {
   return new Response(
@@ -18,7 +24,6 @@ export function problem(status: number, title: string, detail?: string): Respons
   );
 }
 
-// `path` is the request path with any workspace prefix already taken off.
 // `RAISE EXCEPTION` in the database. Both drivers put the SQLSTATE in `code`, and only that is read,
 // because they do not share an error class.
 function isRaisedException(err: unknown): err is Error {
@@ -28,17 +33,10 @@ function isRaisedException(err: unknown): err is Error {
 export async function graphHandler(
   req: Request,
   scope: TenantScope,
-  path: string,
+  id: string,
 ): Promise<Response> {
   if (!URL.canParse(req.url)) {
     throw Error("Invalid URL");
-  }
-
-  const m = MATCHER.exec({ pathname: path });
-  const id = m?.pathname.groups.id;
-  if (!id) {
-    console.error("request: /graph without id, redirecting to /graph/Q_1", req.url);
-    return Response.redirect(new URL(`${scope.prefix}/graph/Q_1`, publicOrigin(req)), 302);
   }
 
   const url = new URL(req.url);
@@ -69,7 +67,7 @@ export async function graphHandler(
       prefix: scope.prefix,
     });
     (resource._links as Record<string, unknown>).expand = {
-      href: `${publicOrigin(req).origin}${scope.prefix}/graph/${id}{?depth}`,
+      href: `${publicOrigin(req).origin}${nodePath(scope.prefix, id)}{?depth}`,
       templated: true,
       title: `depth: hops of neighbours to embed, 0 to ${MAX_DEPTH}`,
     };
@@ -121,7 +119,7 @@ export async function sitemapHandler(req: Request, scope: TenantScope): Promise<
     "/docs/",
     "/docs/api.md",
     "/collections",
-    ...result.rows.map((row) => `${scope.prefix}/graph/${row.id}`),
+    ...result.rows.map((row) => nodePath(scope.prefix, row.id)),
   ];
   const urls = paths.map((p) => `  <url><loc>${xmlEscape(origin + p)}</loc></url>`).join("\n");
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
@@ -177,7 +175,9 @@ function absolute(link: unknown, ctx: LinkContext): unknown {
   if (link === null || typeof link !== "object") return link;
   const { href } = link as { href?: unknown };
   if (typeof href !== "string" || href === "") return link;
-  const absoluteUrl = new URL(ctx.prefix + href, ctx.origin);
+  const node = QUERY_HREF.exec(href);
+  const path = node ? nodePath(ctx.prefix, node[1]!) : ctx.prefix + href;
+  const absoluteUrl = new URL(path, ctx.origin);
   absoluteUrl.search = ctx.search;
   return { ...link, href: absoluteUrl.toString() };
 }

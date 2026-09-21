@@ -3,7 +3,7 @@
   "info": {
     "title": "LabKit graph API",
     "version": "1.0.0",
-    "description": "Read-only HAL+JSON view of the LabKit research graph. Each resource embeds its neighbours under `_embedded`, keyed `relation:type` for outbound links and `type:relation` for inbound ones. `/collections` lists entities by type as Collection+JSON. Everything is scoped to a workspace: bare `/graph` and `/collections` are the default one, and `/workspace/{slug}` in front selects another."
+    "description": "Read-only HAL+JSON view of the LabKit research graph. Each resource embeds its neighbours under `_embedded`, keyed `relation:type` for outbound links and `type:relation` for inbound ones. `/collections` lists entities by type as Collection+JSON. Everything is scoped to a workspace: bare `/graph` and `/collections` are the default one, and `/workspace/{slug}` selects another, where an entity is addressed as `/workspace/{slug}/{handle}`."
   },
   "paths": {
     "/graph/{id}": {
@@ -158,9 +158,10 @@
         }
       }
     },
-    "/workspace/{slug}/graph/{id}": {
+    "/workspace/{slug}/{name}": {
       "get": {
-        "summary": "One graph entity and its neighbours (in a workspace)",
+        "summary": "One collection or one entity, in a workspace",
+        "description": "`limit` and `offset` apply to a collection, `depth` to an entity.",
         "parameters": [
           {
             "name": "slug",
@@ -172,13 +173,33 @@
             }
           },
           {
-            "name": "id",
+            "name": "name",
             "in": "path",
             "required": true,
-            "description": "Entity handle, e.g. Q_1, LOE_1, CLM_27.",
+            "description": "Either a collection slug (lower case, e.g. `question`), which returns that collection, or an entity handle (e.g. `Q_1`), which returns that entity. A handle is upper case, so the two never clash.",
             "schema": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9]+_[A-Za-z0-9]+$"
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
             }
           },
           {
@@ -196,8 +217,13 @@
         ],
         "responses": {
           "200": {
-            "description": "The entity, with its properties beside id and type.",
+            "description": "A collection for a slug, an entity with its neighbours for a handle.",
             "content": {
+              "application/vnd.collection+json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
               "application/hal+json": {
                 "schema": {
                   "type": "object"
@@ -244,74 +270,6 @@
             }
           }
         ]
-      }
-    },
-    "/workspace/{slug}/{type}": {
-      "get": {
-        "summary": "The live nodes of one type, in a workspace",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "description": "A workspace slug from /collections/workspace.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "type",
-            "in": "path",
-            "required": true,
-            "description": "A slug from the workspace index, e.g. question, claim, evidence-unit.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A Collection+JSON document.",
-            "content": {
-              "application/vnd.collection+json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Unknown type.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        }
       }
     }
   }
