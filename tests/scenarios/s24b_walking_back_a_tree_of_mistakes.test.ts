@@ -7,11 +7,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** Named apart from the per-act `events` a write verb returns. */
+let eventLog: EventSink;
 
 const clock: Clock = { now: () => "2026-09-17T09:00:00.000Z" };
 
@@ -22,7 +25,12 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  eventLog = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events: eventLog,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -103,6 +111,16 @@ describe("S-24b — walking back a tree of mistakes", () => {
     expect(taken.flat()).toContain(built.posed.question);
     expect(taken.flat()).toContain(built.pursued.enquiry);
     expect(taken.flat()).toContain(built.observed.observations);
+
+    await captureConversation(
+      {
+        id: "S-24b",
+        title: "walking back a tree of mistakes",
+        about:
+          "A whole line of work built on a mistaken question is taken back one act at a time, newest first, and the promotion goes with it.",
+      },
+      eventLog,
+    );
   });
 
   test("the promotion can be taken back on its own, leaving the claim standing", async () => {

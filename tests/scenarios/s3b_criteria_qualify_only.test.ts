@@ -8,6 +8,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf, whyOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -25,7 +26,7 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -112,6 +113,17 @@ describe("S-3b: the same design with nothing downstream", () => {
     expect(why.withdrawn).toBe(false);
     expect(why.challenged).toBe(false);
     expect(why.restingOn.map((a) => a.name)).toEqual(["per-image results"]);
+
+    await captureConversation(
+      {
+        id: "S-3b",
+        title: "The same design with nothing downstream",
+        about:
+          "A finding is held to three checks agreed before the run. One passes, one disagrees and one was never run, so the finding does not stand even though its numbers are untouched.",
+      },
+      events,
+      why,
+    );
   });
 
   /**

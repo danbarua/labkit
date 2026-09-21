@@ -4,12 +4,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 const NOW = "2026-08-27T09:00:00.000Z";
 const clock: Clock = { now: () => NOW };
@@ -25,7 +27,12 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -72,6 +79,16 @@ describe("S-19: promoted, closed, and the agreed check never run", () => {
     // And it says so about a claim that genuinely is promoted -- the two facts
     // coexist, which is the whole difficulty.
     expect(why.standing).toBe("confirmatory");
+
+    await captureConversation(
+      {
+        id: "S-19",
+        title: "promoted, closed, and the agreed check never run",
+        about:
+          "An answer is promoted and its question closed, but the check agreed in advance was never run, so the record still reports that check as unmet.",
+      },
+      events,
+    );
   });
 
   /**

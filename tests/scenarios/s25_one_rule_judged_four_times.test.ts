@@ -3,13 +3,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -24,7 +26,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -88,6 +95,16 @@ describe("S-25: one rule judged four times", () => {
     // control failed.
     const about = standing.evaluations.map((e) => e.about);
     expect(about.sort()).toEqual(judged.map((j) => j.claim).sort());
+
+    await captureConversation(
+      {
+        id: "S-25",
+        title: "one rule judged four times",
+        about:
+          "One decision rule is stated once and held against four comparisons, giving four verdicts that each name the comparison they judged.",
+      },
+      events,
+    );
   });
 
   test("the rule is stated once, not once per comparison", async () => {

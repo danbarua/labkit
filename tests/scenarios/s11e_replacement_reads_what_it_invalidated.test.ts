@@ -4,13 +4,17 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** The same graph, spoken to by the person who reviews rather than the one who ran it. */
+let reviewer: ResearchSession;
+let events: EventSink;
 
 const clock: Clock = { now: () => "2026-08-24T10:00:00.000Z" };
 
@@ -21,10 +25,10 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), {
-    clock,
-    events: inMemoryEventLog(),
-  });
+  const graph = await scenario.begin();
+  events = inMemoryEventLog();
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+  reviewer = new ResearchSession(graph, { clock, events, attribution: as("Reviewer") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -51,7 +55,7 @@ async function aDefectiveAnalysis() {
     from: [observations],
     concludes: [{ proposition: PROP, finding: "three days shorter" }],
   });
-  const { review } = await session.writes.recordReview({
+  const { review } = await reviewer.writes.recordReview({
     of: analysis,
     verdict: "unadjusted for baseline severity",
   });
@@ -140,5 +144,16 @@ describe("S-11e — a replacement that consumes the output it invalidated", () =
     const retracted = why.restingOn.find((r) => r.invalidated)!;
     const affected = await later.reads.whatDependsOn({ subject: retracted.part });
     expect(affected.claims.map((c) => c.claim)).toContain(report.claims[0]!.claim);
+
+    await captureConversation(
+      {
+        id: "S-11e",
+        title: "A replacement that consumes the output it invalidated",
+        about:
+          "A replacement analysis is built on the very analysis a review found defective. Its conclusion still reads as supported, and the record names the retracted input rather than hiding it.",
+      },
+      events,
+      why,
+    );
   });
 });

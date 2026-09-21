@@ -3,12 +3,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = { now: () => new Date(Date.UTC(2026, 8, 11, 12, tick++)).toISOString() };
@@ -21,7 +23,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -60,6 +67,17 @@ describe("why <task> names the state work already computes", () => {
     expect(explained.because.map((c) => c.handle)).toContain(gate);
     expect(explained.because[0]!.wording).toContain("failed");
     expect(explained.because.map((c) => c.handle)).toContain(enquiry);
+
+    await captureConversation(
+      {
+        id: "S-363",
+        title: "why <task> names the state work already computes",
+        about:
+          "Asking why of a planned task says it is blocked, and names the failing check and the question the task was planned to address.",
+      },
+      events,
+      explained,
+    );
   });
 
   test("waiting work names the unevaluated gate", async () => {

@@ -4,13 +4,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
 beforeAll(async () => {
@@ -20,9 +22,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -71,6 +75,16 @@ describe("S-9e: reproducing nothing", () => {
     // Afterward, from a second reader over the same graph.
     const again = await (await afterwards()).reads.reproducibilityOf({ analysis, rebuilt: [] });
     expect(again.reproducible).toBe(false);
+
+    await captureConversation(
+      {
+        id: "S-9e",
+        title: "reproducing nothing",
+        about:
+          "A pure simulation read none of the programme's own data. Asked whether it reproduces, the answer is no: nothing was rebuilt because there was nothing to rebuild.",
+      },
+      events,
+    );
   });
 
   /**

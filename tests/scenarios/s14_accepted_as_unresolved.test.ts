@@ -7,6 +7,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -27,7 +28,7 @@ beforeEach(async () => {
   tick = 0;
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -88,6 +89,16 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(status.closure).toBeNull();
     // Not answered. Accepting a question is not deciding it.
     expect(status.answer).toBeNull();
+
+    await captureConversation(
+      {
+        id: "S-14",
+        title: "Deliberately leaving something unresolved",
+        about:
+          "A comparison comes out marginal and there is no data left to settle it, so the question is left open on purpose, with the reason and the condition that would reopen it.",
+      },
+      events,
+    );
   });
 
   /**

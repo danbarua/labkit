@@ -3,13 +3,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
 beforeAll(async () => {
@@ -19,9 +21,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -86,6 +90,16 @@ describe("S-10b: the same inputs, in a different order", () => {
     });
     expect(report.exact.map((p) => p.name).sort()).toEqual(["series A", "series B"]);
     expect(report.reproducible).toBe(true);
+
+    await captureConversation(
+      {
+        id: "S-10b",
+        title: "The same inputs, in a different order",
+        about:
+          "An alignment subtracts one series from the other, so which input came first is part of what the run was. The record keeps both series either way, and nothing in it tells the two orders apart.",
+      },
+      events,
+    );
   });
 
   /**

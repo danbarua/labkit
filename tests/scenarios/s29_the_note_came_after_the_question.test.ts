@@ -3,11 +3,13 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -22,7 +24,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -44,6 +51,16 @@ describe("S-29: the note came after the question", () => {
     expect(origin?.kind).toBe("noted");
     expect(origin?.from).toBe(note);
     expect(origin?.said).toBe(PROBE);
+
+    await captureConversation(
+      {
+        id: "S-29",
+        title: "The note came after the question",
+        about:
+          "The throwaway run that prompted a question is only written down after the question was asked, and it can still be recorded as the reason the question exists.",
+      },
+      events,
+    );
   });
 
   /**

@@ -3,12 +3,14 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 const clock: Clock = { now: () => "2026-08-21T09:00:00.000Z" };
 
 beforeAll(async () => {
@@ -18,9 +20,11 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
+  events = inMemoryEventLog();
   session = new ResearchSession(await scenario.begin(), {
     clock,
-    events: inMemoryEventLog(),
+    events,
+    attribution: as("Researcher"),
   });
 });
 afterEach(async () => {
@@ -86,6 +90,16 @@ describe("S-9c: two parts, one name", () => {
     // reference, and the name is what a person reads.
     expect(report.exact[0]?.name).toEqual(report.differing[0]?.name);
     expect(report.exact[0]?.part).not.toEqual(report.differing[0]?.part);
+
+    await captureConversation(
+      {
+        id: "S-9c",
+        title: "two parts, one name",
+        about:
+          "One analysis reads two control series recorded under the same name. On a rebuild one matches and one differs, and the report keeps them apart because it identifies parts by reference rather than by name.",
+      },
+      events,
+    );
   });
 
   /** The same for the two absences, which S-9 fought to keep apart. */

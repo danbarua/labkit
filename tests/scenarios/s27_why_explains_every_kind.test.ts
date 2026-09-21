@@ -3,13 +3,15 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { LABEL_BY_KIND, kindOf, type AnyRef, type Kind } from "@labkit/core-domain/report";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = { now: () => new Date(Date.UTC(2026, 8, 7, 9, tick++)).toISOString() };
@@ -22,7 +24,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -105,6 +112,16 @@ describe("S-27: why explains every kind", () => {
       // it holds no prose of its own.
       expect(explained.is.length).toBeGreaterThan(0);
     }
+
+    await captureConversation(
+      {
+        id: "S-27",
+        title: "Why explains every kind",
+        about:
+          "One ordinary arc of work — a question, observations, an analysis, a check, a gate, a note, a review and a decision — and asking why of each of them gets an answer rather than a refusal.",
+      },
+      events,
+    );
   });
 
   test("Afterward: a decision says what it settled — the kind with the most edges, once refused", async () => {

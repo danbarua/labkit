@@ -3,11 +3,13 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+let events: EventSink;
 
 let tick = 0;
 const clock: Clock = {
@@ -22,7 +24,12 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   tick = 0;
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  events = inMemoryEventLog();
+  session = new ResearchSession(await scenario.begin(), {
+    clock,
+    events,
+    attribution: as("Researcher"),
+  });
 });
 afterEach(async () => {
   await scenario.end();
@@ -71,6 +78,16 @@ describe("S-30: fixed before the first run", () => {
       c.amendments.map((a) => a.replaced.requires),
     );
     expect(wordings).toContain(VAGUE);
+
+    await captureConversation(
+      {
+        id: "S-30",
+        title: "Fixed before the first run",
+        about:
+          "A condition agreed in advance is worded too loosely, and is made precise before any number exists — so the amendment is prespecification rather than a change made in light of a result.",
+      },
+      events,
+    );
   });
 
   test("Afterward 2: once a number exists, the diagnosis is required again", async () => {

@@ -8,6 +8,7 @@ import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
@@ -25,7 +26,7 @@ afterAll(async () => {
 beforeEach(async () => {
   const graph = await scenario.begin();
   events = inMemoryEventLog();
-  session = new ResearchSession(graph, { clock, events });
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -124,6 +125,16 @@ describe("S-5 — contradiction or dissociation?", () => {
     expect(verdict.conflict).toBe(false);
     expect(verdict.relation).toBe("dissociation");
     expect(verdict.differsBy).toBe("scope");
+
+    await captureConversation(
+      {
+        id: "S-5",
+        title: "contradiction or dissociation?",
+        about:
+          "Two stages of one programme assert the same sentence with opposite evidence. They turn out to be answering different questions, so this is a dissociation rather than a contradiction.",
+      },
+      events,
+    );
   });
 
   /**

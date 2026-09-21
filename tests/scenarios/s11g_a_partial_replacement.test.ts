@@ -3,13 +3,17 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
+import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
 let session: ResearchSession;
+/** The same graph, spoken to by the person who reviews rather than the one who ran it. */
+let reviewer: ResearchSession;
+let events: EventSink;
 
 const clock: Clock = { now: () => "2026-09-01T09:00:00.000Z" };
 
@@ -20,7 +24,10 @@ afterAll(async () => {
   await scenario.close();
 });
 beforeEach(async () => {
-  session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+  const graph = await scenario.begin();
+  events = inMemoryEventLog();
+  session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+  reviewer = new ResearchSession(graph, { clock, events, attribution: as("Reviewer") });
 });
 afterEach(async () => {
   await scenario.end();
@@ -73,7 +80,7 @@ async function aRunPartlyReAnalysed(holdTo = false) {
 
 /** The re-analysis, naming the one finding that survives it and no other. */
 async function theLogScaleReAnalysis(w: Awaited<ReturnType<typeof aRunPartlyReAnalysed>>) {
-  const { review } = await session.writes.recordReview({
+  const { review } = await reviewer.writes.recordReview({
     of: w.v1,
     verdict: "raw-scale aggregation is untrustworthy for the stochastic-control comparisons",
   });
@@ -118,6 +125,16 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     // empty would be half a fix and read as a whole one.
     expect(why.restingOn.map((r) => r.name)).toEqual(["per-image results"]);
     expect(why.restingOn[0]!.invalidated).toBeUndefined();
+
+    await captureConversation(
+      {
+        id: "S-11g",
+        title: "A replacement that addresses only some of a run's conclusions",
+        about:
+          "One run drew two comparisons and the re-analysis revisits only one of them; the comparison it kept still stands on its original measurements.",
+      },
+      events,
+    );
   });
 
   /**
@@ -153,7 +170,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
         { proposition: REVISITED, finding: "p = 0.04 raw, batch two" },
       ],
     });
-    const { review } = await session.writes.recordReview({ of: v1, verdict: "wrong scale" });
+    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
 
     // Nothing kept — both fall — and one successor finding asserting the same
     // sentence as each of them.
@@ -249,7 +266,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       ],
     });
     const batchTwo = v1Claims[1]!.claim;
-    const { review } = await session.writes.recordReview({ of: v1, verdict: "wrong scale" });
+    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
     const report = await session.writes.replaceAnalysis({
       supersedes: v1,
       because: review,
@@ -304,7 +321,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       because: "the lattice set was not matched for density",
     });
 
-    const { review } = await session.writes.recordReview({ of: v1, verdict: "wrong scale" });
+    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
     const report = await session.writes.keep({
       keeping: [narrowed],
       because: review,
@@ -356,7 +373,10 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     // it.
     expect(await state("revisited")).toBe("no-standing-verdict");
     await scenario.end();
-    session = new ResearchSession(await scenario.begin(), { clock, events: inMemoryEventLog() });
+    const graph = await scenario.begin();
+    events = inMemoryEventLog();
+    session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+    reviewer = new ResearchSession(graph, { clock, events, attribution: as("Reviewer") });
 
     // The verdict reached against the finding this act never mentioned does
     // not.
@@ -379,7 +399,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
       from: [observations],
       concludes: [{ proposition: REVISITED, finding: "p = 0.03 raw" }],
     });
-    const { review } = await session.writes.recordReview({ of: v1, verdict: "wrong scale" });
+    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
     const report = await session.writes.replaceAnalysis({
       supersedes: v1,
       because: review,
@@ -405,7 +425,9 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
    */
   test("a conclusion is never paired to a finding the revision kept", async () => {
     const events = inMemoryEventLog();
-    session = new ResearchSession(await scenario.current(), { clock, events });
+    const graph = await scenario.current();
+    session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
+    reviewer = new ResearchSession(graph, { clock, events, attribution: as("Reviewer") });
     const { enquiry } = await session.writes.openEnquiry("does T differ from its controls?");
     const { observations } = await session.writes.recordObservations({
       enquiry,
@@ -421,7 +443,7 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
         { proposition: SURVIVES, finding: "the lattice comparison, unaffected by scale" },
       ],
     });
-    const { review } = await session.writes.recordReview({ of: v1, verdict: "wrong scale" });
+    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
     const report = await session.writes.keep({
       keeping: [claimOf(v1Claims, SURVIVES)],
       because: review,

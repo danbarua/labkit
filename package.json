@@ -48,7 +48,9 @@
 		"bonsai:record": "bash scripts/build-bonsai-record.sh",
 		"check:quick": "bun scripts/check-quick.ts",
 		"check:web-types": "bun scripts/check-web-types.ts",
-		"check:changed": "bun scripts/check-changed.ts"
+		"check:changed": "bun scripts/check-changed.ts",
+		"docs:scenarios": "bun scripts/build-scenario-docs.ts",
+		"check:scenario-docs": "bun scripts/check-scenario-docs.ts"
 	},
 	"private": true,
 	"devDependencies": {
