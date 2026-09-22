@@ -18,8 +18,10 @@ import { APP_ROLE } from "./schema";
  * `_ag_label_edge` (`id`, `start_id`, `end_id`), so those are the leading columns of each row.
  */
 function restorable(dump: string): string {
+  // `pg_dump` brackets its output in `\restrict` / `\unrestrict`, which only psql reads.
+  const sql = dump.replace(/^\\(?:un)?restrict\b.*\r?\n?/gm, "");
   const arity = new Map<string, number>();
-  for (const m of dump.matchAll(
+  for (const m of sql.matchAll(
     /^CREATE TABLE (\S+) \([\s\S]*?\)\nINHERITS \(\S+\._ag_label_(vertex|edge)\);/gm,
   ))
     arity.set(m[1]!, m[2] === "vertex" ? 1 : 3);
@@ -27,7 +29,7 @@ function restorable(dump: string): string {
     const n = BigInt(literal);
     return `ag_catalog._graphid(${n >> 48n}, ${n & 0xffffffffffffn})`;
   };
-  const rows = dump.replace(
+  const rows = sql.replace(
     /^INSERT INTO (\S+) VALUES \(((?:'\d+', ){0,2}'\d+')/gm,
     (line, table, ids) => {
       const count = arity.get(table);

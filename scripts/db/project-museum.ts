@@ -1,17 +1,26 @@
 #!/usr/bin/env bun
 /**
- * Rebuilds a graph from the museum's events, into a tenant of its own.
+ * Rebuilds a tenant from the museum's acts: the events first, then the graph off the events.
  *
  *   LABKIT_DB_URL=… bun scripts/db/project-museum.ts <tenant> [--simplify]
  *
- * `--simplify` rewrites each EdgeCreated as it goes: the labels that are one relation
- * spelled several ways collapse to one, and what differed becomes an edge property.
- * The graph it builds is deliberately not one this application can read.
+ * Each act is recorded through the same sink every write verb uses, so the database numbers
+ * it and the graph is a projection of what was stored, not of the file. `--simplify` rewrites
+ * each EdgeCreated before it is recorded: the labels that are one relation spelled several
+ * ways collapse to one, and what differed becomes an edge property. A simplified graph holds
+ * labels the application does not know, so those edges bypass its edge validation.
  */
 
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
-import { type OpenOptions, openRecord } from "@labkit/core-domain";
+import { connectDb } from "@labkit/core-db/connect";
+import { EDGE_SCHEMA, type GraphChange } from "@labkit/core-db/domain";
+import { TenantGraph } from "@labkit/core-db/graph";
+import { scopeToTenant } from "@labkit/core-db/scoped";
+import { resolveTenantContext } from "@labkit/core-db/tenant";
+import { pgEventLog } from "@labkit/core-domain/event-store";
+import type { DomainEvent } from "@labkit/core-domain/events";
+import { applyDelta } from "@labkit/core-domain/projection";
 
 const [tenant, ...rest] = process.argv.slice(2);
 if (!tenant) {
@@ -19,20 +28,16 @@ if (!tenant) {
   process.exit(2);
 }
 const simplify = rest.includes("--simplify");
-
-interface Change {
-  change: string;
-  id?: string;
-  label?: string;
-  props?: Record<string, unknown>;
-  from?: string;
-  to?: string;
-  after?: Record<string, unknown>;
+const url = process.env.LABKIT_DB_URL;
+if (!url) {
+  console.error("LABKIT_DB_URL names the database this writes to");
+  process.exit(2);
 }
 
+type Act = Omit<DomainEvent, "changes"> & { changes: GraphChange[] };
 const acts = JSON.parse(
   readFileSync(`${process.env.HOME}/labkit-museum-events.json`, "utf8"),
-) as Array<{ seq: number; changes: Change[] }>;
+) as Act[];
 
 /** What each collapsed label becomes: one edge, and the word that used to be the label. */
 const COLLAPSE: Record<string, { label: string; prop: string; value: string }> = {
@@ -52,99 +57,119 @@ const COLLAPSE: Record<string, { label: string; prop: string; value: string }> =
   NARROWS: { label: "RESOLVES", prop: "kind", value: "narrowed" },
   DEFERS: { label: "RESOLVES", prop: "kind", value: "deferred" },
   // The three that all mean "rests on".
-  IN_LIGHT_OF_CLAIM: { label: "BASED_ON", prop: "kind", value: "in-light-of" },
   RESTS_ON: { label: "BASED_ON", prop: "kind", value: "drawn-from" },
 };
 
-const record = await openRecord({ tenant } as unknown as OpenOptions);
+const COLLAPSED = new Set(Object.values(COLLAPSE).map((r) => r.label));
 
-// Edges go in through Cypher, not `createEdge`, because `createEdge` validates against
-// EDGE_SCHEMA and the collapsed labels are deliberately not in it. That refusal is the
-// application working; this script is asking what the graph would look like without it.
-const raw = new Client({ connectionString: process.env.LABKIT_DB_URL });
-await raw.connect();
-await raw.query("SET search_path = ag_catalog, public");
-const ws = (await raw.query("SELECT graph_name FROM public.tenants WHERE slug = $1", [tenant]))
-  .rows[0].graph_name as string;
+let collapsed = 0;
+const simplified = (change: GraphChange): GraphChange => {
+  if (change.change !== "EdgeCreated") return change;
+  const rule = COLLAPSE[change.label];
+  if (!rule) return change;
+  collapsed++;
+  return {
+    ...change,
+    label: rule.label as typeof change.label,
+    props: { ...(change.props ?? {}), [rule.prop]: rule.value },
+  };
+};
+
+// The tenant is rebuilt from nothing: its graph, its workspace row and its tenant row go.
+const admin = new Client({ connectionString: url });
+await admin.connect();
+await admin.query("SET search_path = ag_catalog, public");
+const existing = await admin.query<{ id: number; graph_name: string }>(
+  "SELECT id, graph_name FROM public.tenants WHERE slug = $1",
+  [tenant],
+);
+for (const t of existing.rows) {
+  await admin.query("SELECT * FROM ag_catalog.drop_graph($1, true)", [t.graph_name]);
+  await admin.query("DELETE FROM public.__workspace WHERE tenant_id = $1", [t.id]);
+  await admin.query("DELETE FROM public.tenants WHERE id = $1", [t.id]);
+  console.log(`dropped tenant ${tenant} (${t.graph_name})`);
+}
+
+const connection = await connectDb();
+const ctx = await resolveTenantContext(connection.db, connection.tx, tenant);
+await scopeToTenant(connection.db, ctx);
+const events = pgEventLog(connection.db, ctx);
+const graph = new TenantGraph(ctx, connection.db, connection.tx);
+
+// Edges the application's schema does not know go in through Cypher on the admin
+// connection. That refusal is the application working; this asks what the graph would
+// look like without it.
 const ensured = new Set<string>();
-const cypherEdge = async (
+const foreignEdge = async (
   from: string,
   label: string,
   to: string,
-  props?: Record<string, string>,
+  props: Record<string, unknown>,
 ) => {
   if (!ensured.has(label)) {
     try {
-      await raw.query("SELECT ag_catalog.create_elabel($1, $2)", [ws, label]);
+      await admin.query("SELECT ag_catalog.create_elabel($1, $2)", [ctx.graphName, label]);
     } catch {}
     ensured.add(label);
   }
-  const setProps = props
-    ? `{${Object.entries(props)
-        .map(([k, v]) => `${k}: '${v}'`)
-        .join(", ")}}`
-    : "";
-  await raw.query(
-    `SELECT *
-         FROM ag_catalog.cypher('${ws}', $$
-             MATCH (a {natural_id: '${from}'}), (b {natural_id: '${to}'})
-                                    CREATE (a)-[:${label} ${setProps}]->(b)
-                                    $$) AS (v ag_catalog.agtype)`,
+  const setProps = Object.entries(props)
+    .map(([k, v]) => `${k}: '${String(v).replace(/'/g, "''")}'`)
+    .join(", ");
+  await admin.query(
+    `SELECT * FROM ag_catalog.cypher('${ctx.graphName}', $$
+       MATCH (a {natural_id: '${from}'}), (b {natural_id: '${to}'})
+       CREATE (a)-[:${label} {${setProps}}]->(b)
+     $$) AS (v ag_catalog.agtype)`,
   );
 };
-const graph = record.graph as unknown as {
-  createNode(label: string, props: Record<string, unknown>, id?: string): Promise<unknown>;
-  createEdge(
-    from: string,
-    label: string,
-    to: string,
-    props?: Record<string, string | number | boolean | number[]>,
-    skip?: boolean,
-  ): Promise<unknown>;
-  setNodeProperty(id: string, key: string, value: unknown): Promise<void>;
-  setEdgeProperty(id_from: string, id_to: string, key: string, value: unknown): Promise<void>;
-};
-
-let nodes = 0;
-let edges = 0;
-let sets = 0;
-let collapsed = 0;
-const labelsSeen = new Set<string>();
 
 try {
+  // 1. The events, numbered by the database.
+  let recorded = 0;
   for (const act of acts) {
-    for (const c of act.changes) {
-      if (c.change === "NodeCreated") {
-        await graph.createNode(c.label!, c.props ?? {}, c.id);
-        nodes++;
-      } else if (c.change === "EdgeCreated") {
-        const rule = simplify ? COLLAPSE[c.label!] : undefined;
-        const label = rule?.label ?? c.label!;
-        const props = rule ? { [rule.prop]: rule.value } : undefined;
-        if (rule) collapsed++;
-        labelsSeen.add(label);
-        await cypherEdge(c.from!, label, c.to!, props as Record<string, string> | undefined);
-        edges++;
-      } else if (c.change === "NodePropsChanged" || c.change === "PropsChanged") {
-        for (const [k, v] of Object.entries(c.after ?? {})) {
-          await graph.setNodeProperty(c.id!, k, v);
-          sets++;
-        }
-      } else if (c.change === "EdgePropsChanged") {
-        for (const [k, v] of Object.entries(c.after ?? {})) {
-          await graph.setEdgeProperty(c.from!, c.to!, k, v);
-          sets++;
-        }
+    const changes = simplify ? act.changes.map(simplified) : act.changes;
+    await events.record({
+      at: act.at,
+      attribution: act.attribution,
+      operation: act.operation,
+      subject: act.subject,
+      changes,
+      command: act.command,
+      reconstructedFrom: act.reconstructedFrom,
+    });
+    recorded++;
+  }
+  console.log(`${tenant}: recorded ${recorded} acts (${collapsed} edges collapsed)`);
+
+  // 2. The graph, off what was stored.
+  const stored = await events.all();
+  let nodes = 0;
+  let edges = 0;
+  let sets = 0;
+  const labels = new Set<string>();
+  for (const event of stored) {
+    for (const change of event.changes) {
+      // A collapsed label is either unknown to the schema or joins a pair it does not list.
+      if (
+        change.change === "EdgeCreated" &&
+        (!(change.label in EDGE_SCHEMA) || (simplify && COLLAPSED.has(change.label)))
+      ) {
+        await foreignEdge(change.from, change.label, change.to, change.props ?? {});
+      } else {
+        await applyDelta(graph, { ...event, changes: [change] });
       }
+      if (change.change === "NodeCreated") nodes++;
+      else if (change.change === "EdgeCreated") {
+        edges++;
+        labels.add(change.label);
+      } else sets++;
     }
   }
+  console.log(
+    `${tenant}: projected ${stored.length} events -> ${nodes} nodes, ${edges} edges, ${sets} property sets`,
+  );
+  console.log(`edge labels: ${labels.size}: ${[...labels].sort().join(" ")}`);
 } finally {
-  await record.close();
-  await raw.end();
+  await connection.close();
+  await admin.end();
 }
-
-console.log(
-  `${tenant}: ${acts.length} acts -> ${nodes} nodes, ${edges} edges (${collapsed} collapsed), ${sets} property sets`,
-);
-console.log(`edge labels in the graph: ${labelsSeen.size}`);
-console.log([...labelsSeen].sort().join(" "));
