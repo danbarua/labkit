@@ -28,7 +28,8 @@ export async function seed(db: LabKitDB, tx: Transactor): Promise<void> {
   );
   for (const edge of [
     "(a:Question {natural_id: 'Q_1'}), (b:LineOfEnquiry {natural_id: 'LOE_1'}) CREATE (a)-[:MOTIVATES]->(b)",
-    "(a:EvidenceUnit {natural_id: 'EU_1'}), (b:LineOfEnquiry {natural_id: 'LOE_1'}) CREATE (a)-[:ADDRESSES]->(b)",
+    // Carries a property, so a resource on either end can assert `_links` shows it.
+    "(a:EvidenceUnit {natural_id: 'EU_1'}), (b:LineOfEnquiry {natural_id: 'LOE_1'}) CREATE (a)-[:ADDRESSES {weight: 1}]->(b)",
     "(a:EvidenceUnit {natural_id: 'EU_1'}), (b:Evidence {natural_id: 'EV_1'}) CREATE (a)-[:PRODUCES]->(b)",
   ]) {
     await cypher(alpha.graphName, `MATCH ${edge}`);
