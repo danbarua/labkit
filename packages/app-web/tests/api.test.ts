@@ -99,6 +99,53 @@ describe("entities", () => {
     }
   });
 
+  test("every relation is in _links, embedded or not, with props when the edge has any", async () => {
+    const r = await get("/graph/EU_1?depth=1");
+    expect(Object.keys(r.body._embedded).sort()).toEqual([
+      "addresses:lineofenquiry",
+      "produces:evidence",
+    ]);
+    // addresses:lineofenquiry is embedded (LOE_1 is within depth) and carries an edge property.
+    expect(r.body._links["addresses:lineofenquiry"]).toEqual([
+      {
+        href: `${PUBLIC}/graph/LOE_1?depth=1`,
+        dir: "out",
+        type: "LineOfEnquiry",
+        props: { weight: 1 },
+      },
+    ]);
+    // produces:evidence is embedded too, with a plain edge, so no props key.
+    expect(r.body._links["produces:evidence"]).toEqual([
+      { href: `${PUBLIC}/graph/EV_1?depth=1`, dir: "out", type: "Evidence" },
+    ]);
+  });
+
+  test("a mid-tree resource, not only the boundary layer, gets links for its own relations", async () => {
+    const r = await get("/graph/Q_1?depth=2");
+    const loe1 = r.body._embedded["motivates:lineofenquiry"][0];
+    expect(loe1.depth).toBe(1);
+    expect(loe1._links["evidenceunit:addresses"]).toEqual([
+      {
+        href: `${PUBLIC}/graph/EU_1?depth=2`,
+        dir: "in",
+        type: "EvidenceUnit",
+        props: { weight: 1 },
+      },
+    ]);
+  });
+
+  test("the edge property survives from the other end of the same relation", async () => {
+    const r = await get("/graph/LOE_1?depth=0");
+    expect(r.body._links["evidenceunit:addresses"]).toEqual([
+      {
+        href: `${PUBLIC}/graph/EU_1?depth=0`,
+        dir: "in",
+        type: "EvidenceUnit",
+        props: { weight: 1 },
+      },
+    ]);
+  });
+
   test("index links to the collection the entity is listed in, with the same parameters", async () => {
     const bare = await get("/graph/Q_1");
     expect(bare.body._links.index.href).toBe(`${PUBLIC}/collections/question?depth=1`);

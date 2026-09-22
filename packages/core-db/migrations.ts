@@ -25,6 +25,7 @@ import m0014 from "../../drizzle/0014_events_leave_public.sql" with { type: "tex
 import m0015 from "../../drizzle/0015_next_workspace_id_exists.sql" with { type: "text" };
 import m0016 from "../../drizzle/0016_migration_provenance.sql" with { type: "text" };
 import m0017 from "../../drizzle/0017_get_entity_as_hal.sql" with { type: "text" };
+import m0018 from "../../drizzle/0018_entity_as_hal_links_every_relation.sql" with { type: "text" };
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -48,6 +49,7 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0015_next_workspace_id_exists": m0015,
   "0016_migration_provenance": m0016,
   "0017_get_entity_as_hal": m0017,
+  "0018_entity_as_hal_links_every_relation": m0018,
 };
 
 /**

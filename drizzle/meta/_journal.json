@@ -127,6 +127,13 @@
       "when": 1789826367308,
       "tag": "0017_get_entity_as_hal",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790081164005,
+      "tag": "0018_entity_as_hal_links_every_relation",
+      "breakpoints": true
     }
   ]
 }
