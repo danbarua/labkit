@@ -53,10 +53,10 @@ export function answeringClaimBearing(
     clause: `OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
            OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(loe)
            OPTIONAL MATCH (closing)-[:ANSWERS]->(answering:Claim)
-           OPTIONAL MATCH (answering)-[:RESTS_ON]->(part:Claim)
+           OPTIONAL MATCH (answering)-[:BASED_ON]->(part:Claim)
            OPTIONAL MATCH (closing)-[:BASED_ON]->(cited:Evidence)
            OPTIONAL MATCH (cited)-[:${bearing}]->(borne:Claim)
-           OPTIONAL MATCH (answering)<-[:PROMOTES]-(vouching:Decision)`,
+           OPTIONAL MATCH (answering)<-[:CONFIRMED]-(vouching:Decision)`,
     yields: {
       loe: optional(vertexProps<Node & { name: string }>()),
       closing: optional(
@@ -481,10 +481,10 @@ export function standingAsOf(
     clause: `OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
            OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(loe)
            OPTIONAL MATCH (resolving)-[:ANSWERS]->(answering:Claim)
-           OPTIONAL MATCH (answering)-[:RESTS_ON]->(part:Claim)
+           OPTIONAL MATCH (answering)-[:BASED_ON]->(part:Claim)
            OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
            OPTIONAL MATCH (cited)-[:${bearing}]->(borne:Claim)
-           OPTIONAL MATCH (vouching:Decision)-[:PROMOTES]->(answering)`,
+           OPTIONAL MATCH (vouching:Decision)-[:CONFIRMED]->(answering)`,
     yields: {
       loe: optional(vertexProps<Node & { started_at?: string }>()),
       resolving: optional(vertexProps<{ decided_at: string; resolution_kind?: string }>()),

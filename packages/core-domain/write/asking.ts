@@ -141,7 +141,7 @@ export class Asking extends SessionCore {
     for (const pattern of [
       `MATCH (n:Note)-[:MOTIVATES]->(:Question {natural_id: $id}) RETURN n AS found`,
       `MATCH (d:Decision)-[:MOTIVATES]->(:Question {natural_id: $id})
-       MATCH (d)-[:NARROWS]->(:Question) RETURN d AS found`,
+       MATCH (d)-[:SHARPENS]->(:Question) RETURN d AS found`,
     ]) {
       const rows = await this.graph.query(
         pattern,
@@ -225,7 +225,7 @@ export class Asking extends SessionCore {
         reason: input.because,
         invalidation_check: "evidence that the sharper question was the wrong one to ask",
       });
-      unitOfWork.edge(decision, "NARROWS", input.from);
+      unitOfWork.edge(decision, "SHARPENS", input.from);
       for (const finding of standing) unitOfWork.edge(decision, "BASED_ON", finding);
 
       const sharper = await this.posed(input.into, unitOfWork);

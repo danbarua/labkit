@@ -212,7 +212,7 @@ describe("S-21: a finding drawn across findings", () => {
     ]);
     expect(
       edges
-        .filter((edge) => edge.label === "RESTS_ON")
+        .filter((edge) => edge.label === "BASED_ON")
         .map((edge) => edge.to)
         .sort(),
     ).toEqual(expectedParts);

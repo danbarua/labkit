@@ -89,20 +89,26 @@ read_side() {
 acts_normalised() { jq -S '.acts | map(del(.attribution.git_hash, .at))'; }
 graph_normalised() { jq -S .; }
 
-# `happened` proves the act stream matches; `known` reads the graph itself, so both "what a
-# script did" and "what the record now says" are covered.
+# `happened` proves the act stream matches; the list reads read the graph itself, so both
+# "what a script did" and "what the record now says" are covered.
+graph_reads=(gates claims enquiries work)
+read_graph() {
+  local lk=$1 r out
+  for r in $graph_reads; do
+    out="$(read_side "$lk" $r --json)" || exit $?
+    printf '%s' "$out" | graph_normalised \
+      || { print -u2 "ERROR: \`$r --json\` against '$lk' is not the JSON expected; nothing was compared."; exit 2 }
+  done
+}
+
 live_happened="$(read_side "$live_lk" happened --limit 100000 --json)" || exit $?
 live_happened=$(printf '%s' "$live_happened" | acts_normalised) \
   || { print -u2 "ERROR: the live event stream is not the JSON expected; nothing was compared."; exit 2 }
 fresh_happened="$(read_side "$fresh_lk" happened --limit 100000 --json)" || exit $?
 fresh_happened=$(printf '%s' "$fresh_happened" | acts_normalised) \
   || { print -u2 "ERROR: the fresh event stream is not the JSON expected; nothing was compared."; exit 2 }
-live_known="$(read_side "$live_lk" known --json)" || exit $?
-live_known=$(printf '%s' "$live_known" | graph_normalised) \
-  || { print -u2 "ERROR: the live graph state is not the JSON expected; nothing was compared."; exit 2 }
-fresh_known="$(read_side "$fresh_lk" known --json)" || exit $?
-fresh_known=$(printf '%s' "$fresh_known" | graph_normalised) \
-  || { print -u2 "ERROR: the fresh graph state is not the JSON expected; nothing was compared."; exit 2 }
+live_known="$(read_graph "$live_lk")" || exit $?
+fresh_known="$(read_graph "$fresh_lk")" || exit $?
 
 happened_diff=$(diff <(printf '%s\n' "$live_happened") <(printf '%s\n' "$fresh_happened")) && happened_ok=1 || happened_ok=0
 known_diff=$(diff <(printf '%s\n' "$live_known") <(printf '%s\n' "$fresh_known")) && known_ok=1 || known_ok=0
@@ -114,7 +120,7 @@ fi
 
 print -u2 "FAILED: the live record has drifted from what the scripts produce."
 (( happened_ok )) || { print -r -- "-- event stream (happened) --"; print -r -- "$happened_diff"; }
-(( known_ok )) || { print -r -- "-- graph state (known) --"; print -r -- "$known_diff"; }
+(( known_ok )) || { print -r -- "-- graph state ($graph_reads) --"; print -r -- "$known_diff"; }
 print -u2
 print -u2 "A handle name above is the usual cause: the later scripts find their"
 print -u2 "inherited handles with \`labkit search\`, so a wording change in an earlier"

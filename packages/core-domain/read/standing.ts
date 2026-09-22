@@ -27,7 +27,7 @@ export class StandingGroup extends SessionCore {
       const { cypher, decoders } = compose(
         `MATCH (q:Question)
        WHERE q.posed_at <= $at
-       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)`,
+       OPTIONAL MATCH (accepting:Decision)-[:ACCEPTS]->(q)`,
         standing,
         {
           q: vertexProps<{ natural_id: string; name: string }>(),
@@ -75,7 +75,7 @@ export class StandingGroup extends SessionCore {
   /** What the programme knows, folded over each question's pursuits. */
   async whatIsKnown(): Promise<KnowledgeSurvey> {
     const anchor = `MATCH (q:Question)
-       OPTIONAL MATCH (accepting:Decision)-[:DEFERS]->(q)
+       OPTIONAL MATCH (accepting:Decision)-[:ACCEPTS]->(q)
        OPTIONAL MATCH (q)-[:MOTIVATES]->(:LineOfEnquiry)<-[:ADDRESSES]-(work:EvidenceUnit)`;
     type Closing = {
       natural_id: string;

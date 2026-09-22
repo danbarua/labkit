@@ -32,7 +32,7 @@
 # is closed separately, as abandoned, once its named reopening condition has
 # been taken up by the replacement pursuit.
 #
-# `accept` remains question-level: it writes Decision -DEFERS-> Question with
+# `accept` remains question-level: it writes Decision -ACCEPTS-> Question with
 # the reason and reopening condition. That deferral remains readable beside
 # the later answer; it is not a closure and does not get retargeted to either
 # line of enquiry. The same enquiry carries Stage 1D's topology work, so its

@@ -508,7 +508,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
   expect(accepted.closure).toBeNull();
   expect(accepted.open).toBe(true);
 
-  // Evidence arrives. This must be allowed -- DEFERS is not RESOLVES.
+  // Evidence arrives. This must be allowed -- ACCEPTS is not RESOLVES.
   await s.writes.closeEnquiry({
     enquiry,
     answeredBy: claimOf(analysisClaims, "depth moves convergence"),

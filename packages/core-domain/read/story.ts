@@ -79,7 +79,7 @@ export class StoryGroup extends SessionCore {
       `MATCH (q:Question)-[:MOTIVATES]->(loe:LineOfEnquiry {natural_id: $id})
        OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(loe)
        OPTIONAL MATCH (resolving)-[:ANSWERS]->(answered:Claim)
-       OPTIONAL MATCH (deferring:Decision)-[:DEFERS]->(q)
+       OPTIONAL MATCH (deferring:Decision)-[:ACCEPTS]->(q)
        RETURN q, resolving, answered, deferring`,
       {
         q: vertexProps<{ name: string; natural_id: string }>(),
@@ -717,7 +717,7 @@ export class StoryGroup extends SessionCore {
     // promotion taken later is visible here at all. By handle, and with no traversal at all.
     const promotion = await this.graph.query(
       `MATCH (c:Claim {natural_id: $claim})
-       OPTIONAL MATCH (d:Decision)-[:PROMOTES]->(c)
+       OPTIONAL MATCH (d:Decision)-[:CONFIRMED]->(c)
        RETURN c, d`,
       {
         c: vertexProps<{ kind?: string }>(),
@@ -733,13 +733,13 @@ export class StoryGroup extends SessionCore {
     const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
 
     // What a synthesis was drawn across. By handle, from the claim itself:
-    // `synthesise` writes `RESTS_ON` at the moment the act names the findings,
+    // `synthesise` writes `BASED_ON` at the moment the act names the findings,
     // so this is a read of what the caller said rather than a match on wording.
     const drawnAcross = (
       await this.graph.query(
         // `part`, not `on`: a RETURN name that is a SQL reserved word breaks
         // the AS clause AGE builds, and `on` is one.
-        `MATCH (:Claim {natural_id: $claim})-[:RESTS_ON]->(part:Claim) RETURN part`,
+        `MATCH (:Claim {natural_id: $claim})-[:BASED_ON]->(part:Claim) RETURN part`,
         { part: vertexProps<ClaimProps & { natural_id: string }>() },
         { claim },
       )

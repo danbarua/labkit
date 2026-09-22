@@ -20,7 +20,7 @@ export class InventoryGroup extends SessionCore {
       `MATCH (c:Claim) WHERE c.retracted IS NULL
        OPTIONAL MATCH (sup:Evidence)-[:SUPPORTS]->(c)
        OPTIONAL MATCH (ch:Evidence)-[:CHALLENGES]->(c)
-       OPTIONAL MATCH (promoted:Decision)-[:PROMOTES]->(c)
+       OPTIONAL MATCH (promoted:Decision)-[:CONFIRMED]->(c)
        RETURN c, sup, ch, promoted`,
       {
         c: vertexProps<{ natural_id: string; name: string }>(),

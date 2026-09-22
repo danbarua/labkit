@@ -2,19 +2,18 @@
 /**
  * Rebuilds a tenant from the museum's acts: the events first, then the graph off the events.
  *
- *   LABKIT_DB_URL=… bun scripts/db/project-museum.ts <tenant> [--simplify]
+ *   LABKIT_DB_URL=… bun scripts/db/project-museum.ts <tenant>
  *
  * Each act is recorded through the same sink every write verb uses, so the database numbers
- * it and the graph is a projection of what was stored, not of the file. `--simplify` rewrites
- * each EdgeCreated before it is recorded: the labels that are one relation spelled several
- * ways collapse to one, and what differed becomes an edge property. A simplified graph holds
- * labels the application does not know, so those edges bypass its edge validation.
+ * it and the graph is a projection of what was stored, not of the file. The acts file was
+ * recorded when four edge labels were not the verb's word; those are rewritten before they
+ * are recorded, so the stored events speak the schema's labels.
  */
 
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
 import { connectDb } from "@labkit/core-db/connect";
-import { EDGE_SCHEMA, type GraphChange } from "@labkit/core-db/domain";
+import type { GraphChange } from "@labkit/core-db/domain";
 import { TenantGraph } from "@labkit/core-db/graph";
 import { scopeToTenant } from "@labkit/core-db/scoped";
 import { resolveTenantContext } from "@labkit/core-db/tenant";
@@ -22,13 +21,11 @@ import { pgEventLog } from "@labkit/core-domain/event-store";
 import type { DomainEvent } from "@labkit/core-domain/events";
 import { applyDelta } from "@labkit/core-domain/projection";
 
-const [tenant, ...rest] = process.argv.slice(2);
+const [tenant] = process.argv.slice(2);
 if (!tenant) {
-  console.error("usage: project-museum.ts <tenant> [--simplify | --verbs]");
+  console.error("usage: project-museum.ts <tenant>");
   process.exit(2);
 }
-const simplify = rest.includes("--simplify");
-const verbs = rest.includes("--verbs");
 const url = process.env.LABKIT_DB_URL;
 if (!url) {
   console.error("LABKIT_DB_URL names the database this writes to");
@@ -43,56 +40,17 @@ const acts = JSON.parse(
   ),
 ) as Act[];
 
-/**
- * `--verbs`: an edge label is the word of the verb that wrote it. Four labels in the corpus
- * are not; every other label already is. No properties.
- */
+/** The labels the acts file carries that the schema no longer spells that way. */
 const VERB_WORD: Record<string, string> = {
   PROMOTES: "CONFIRMED", // is confirmed
   DEFERS: "ACCEPTS", // accept
   NARROWS: "SHARPENS", // sharpen
-  RESTS_ON: "BASED_ON", // synthesise, the existing word for resting on
+  RESTS_ON: "BASED_ON", // synthesise
 };
 const verbWord = (change: GraphChange): GraphChange =>
   change.change === "EdgeCreated" && VERB_WORD[change.label]
     ? { ...change, label: VERB_WORD[change.label] as typeof change.label }
     : change;
-
-/** What each collapsed label becomes: one edge, and the word that used to be the label. */
-const COLLAPSE: Record<string, { label: string; prop: string; value: string }> = {
-  // Decision -> Claim, eight labels for one relation.
-  PROMOTES: { label: "DECIDED", prop: "kind", value: "promoted" },
-  GRADES: { label: "DECIDED", prop: "kind", value: "graded" },
-  KEEPS: { label: "DECIDED", prop: "kind", value: "kept" },
-  ANSWERS: { label: "DECIDED", prop: "kind", value: "answered" },
-  IN_LIGHT_OF: { label: "DECIDED", prop: "kind", value: "in-light-of" },
-  // Evidence -> Claim: a bearing, not two relations.
-  SUPPORTS: { label: "BEARS_ON", prop: "bearing", value: "for" },
-  CHALLENGES: { label: "BEARS_ON", prop: "bearing", value: "against" },
-  // Note -> anything: how the link was found, not what it means.
-  CONCERNS: { label: "NOTES", prop: "how", value: "stated" },
-  MENTIONS: { label: "NOTES", prop: "how", value: "found-in-prose" },
-  // Decision -> Question.
-  NARROWS: { label: "RESOLVES", prop: "kind", value: "narrowed" },
-  DEFERS: { label: "RESOLVES", prop: "kind", value: "deferred" },
-  // The three that all mean "rests on".
-  RESTS_ON: { label: "BASED_ON", prop: "kind", value: "drawn-from" },
-};
-
-const COLLAPSED = new Set(Object.values(COLLAPSE).map((r) => r.label));
-
-let collapsed = 0;
-const simplified = (change: GraphChange): GraphChange => {
-  if (change.change !== "EdgeCreated") return change;
-  const rule = COLLAPSE[change.label];
-  if (!rule) return change;
-  collapsed++;
-  return {
-    ...change,
-    label: rule.label as typeof change.label,
-    props: { ...(change.props ?? {}), [rule.prop]: rule.value },
-  };
-};
 
 // The tenant is rebuilt from nothing: its graph, its workspace row and its tenant row go.
 const admin = new Client({ connectionString: url });
@@ -115,42 +73,11 @@ await scopeToTenant(connection.db, ctx);
 const events = pgEventLog(connection.db, ctx);
 const graph = new TenantGraph(ctx, connection.db, connection.tx);
 
-// Edges the application's schema does not know go in through Cypher on the admin
-// connection. That refusal is the application working; this asks what the graph would
-// look like without it.
-const ensured = new Set<string>();
-const foreignEdge = async (
-  from: string,
-  label: string,
-  to: string,
-  props: Record<string, unknown>,
-) => {
-  if (!ensured.has(label)) {
-    try {
-      await admin.query("SELECT ag_catalog.create_elabel($1, $2)", [ctx.graphName, label]);
-    } catch {}
-    ensured.add(label);
-  }
-  const setProps = Object.entries(props)
-    .map(([k, v]) => `${k}: '${String(v).replace(/'/g, "''")}'`)
-    .join(", ");
-  await admin.query(
-    `SELECT * FROM ag_catalog.cypher('${ctx.graphName}', $$
-       MATCH (a {natural_id: '${from}'}), (b {natural_id: '${to}'})
-       CREATE (a)-[:${label} {${setProps}}]->(b)
-     $$) AS (v ag_catalog.agtype)`,
-  );
-};
-
 try {
   // 1. The events, numbered by the database.
   let recorded = 0;
   for (const act of acts) {
-    const changes = simplify
-      ? act.changes.map(simplified)
-      : verbs
-        ? act.changes.map(verbWord)
-        : act.changes;
+    const changes = act.changes.map(verbWord);
     await events.record({
       at: act.at,
       attribution: act.attribution,
@@ -162,7 +89,7 @@ try {
     });
     recorded++;
   }
-  console.log(`${tenant}: recorded ${recorded} acts (${collapsed} edges collapsed)`);
+  console.log(`${tenant}: recorded ${recorded} acts`);
 
   // 2. The graph, off what was stored.
   const stored = await events.all();
@@ -172,17 +99,7 @@ try {
   const labels = new Set<string>();
   for (const event of stored) {
     for (const change of event.changes) {
-      // A collapsed label is either unknown to the schema or joins a pair it does not list.
-      if (
-        change.change === "EdgeCreated" &&
-        (!(change.label in EDGE_SCHEMA) ||
-          (simplify && COLLAPSED.has(change.label)) ||
-          (verbs && Object.values(VERB_WORD).includes(change.label)))
-      ) {
-        await foreignEdge(change.from, change.label, change.to, change.props ?? {});
-      } else {
-        await applyDelta(graph, { ...event, changes: [change] });
-      }
+      await applyDelta(graph, { ...event, changes: [change] });
       if (change.change === "NodeCreated") nodes++;
       else if (change.change === "EdgeCreated") {
         edges++;

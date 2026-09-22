@@ -80,7 +80,7 @@ export class Stopping extends SessionCore {
           for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
             parts.push(
               ...(await this.graph.query(
-                `MATCH (c:Claim {natural_id: $claim})-[:RESTS_ON]->(:Claim)<-[:${bearing}]-(e:Evidence)
+                `MATCH (c:Claim {natural_id: $claim})-[:BASED_ON]->(:Claim)<-[:${bearing}]-(e:Evidence)
                  RETURN c, e`,
                 {
                   c: vertexProps<{ name: string }>(),
@@ -178,7 +178,7 @@ export class Stopping extends SessionCore {
           invalidation_check: input.until,
         }),
       );
-      unitOfWork.edge(decision, "DEFERS", question);
+      unitOfWork.edge(decision, "ACCEPTS", question);
       unitOfWork.edge(decision, "IN_LIGHT_OF", input.inLightOf);
       // What was known when the call was made, which is what makes
       // `evidence` answerable afterwards rather than only now.

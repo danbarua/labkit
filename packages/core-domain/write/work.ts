@@ -115,7 +115,7 @@ export class Work extends Shared {
         "claim",
         unitOfWork.node("Claim", { name: input.proposition, kind: "exploratory" }),
       );
-      for (const on of new Set(input.restingOn)) unitOfWork.edge(claim, "RESTS_ON", on);
+      for (const on of new Set(input.restingOn)) unitOfWork.edge(claim, "BASED_ON", on);
 
       return { subject: claim, result: { claim } };
     });

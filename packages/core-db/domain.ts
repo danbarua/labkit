@@ -75,7 +75,7 @@ export const EDGE_LABELS = [
   "SUPPORTS", // Evidence -> Claim
   "CHALLENGES", // Evidence -> Claim
   "REVERIFIES", // Evidence -> Evidence
-  "PROMOTES", // Decision -> Claim
+  "CONFIRMED", // Decision -> Claim (the researcher said `is confirmed`)
   "GRADES", // Decision -> Claim
   "ABOUT", // CriterionEvaluation -> Claim (which finding this verdict judged)
   "KEEPS", // Decision -> Claim (a conclusion a revision carried forward)
@@ -93,13 +93,12 @@ export const EDGE_LABELS = [
   "IN_LIGHT_OF", // Decision -> Claim it was accepted in light of
   "RESOLVES", // Decision -> Question | LineOfEnquiry | Task | Gate
   "ANSWERS", // Decision -> Claim named as an enquiry's answer
-  "NARROWS", // Decision -> Question
-  "DEFERS", // Decision -> Question
+  "SHARPENS", // Decision -> Question (`sharpen`)
+  "ACCEPTS", // Decision -> Question (`accept`, left unresolved on purpose)
   "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
   "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
   "INVALIDATED_BY", // Artefact -> Review (the artefact is invalidated; this review found it so)
   "IMPLEMENTS", // Task -> EvidenceUnit
-  "RESTS_ON", // Claim -> Claim (a synthesis over findings it does not re-run)
   "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
   "MENTIONS", // Note -> any entity mentioned in the note text (by natural_id regex)
 ] as const;
@@ -230,7 +229,7 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   /**
    * The act that confers confirmatory standing on a finding.
    */
-  PROMOTES: [["Decision", "Claim"]],
+  CONFIRMED: [["Decision", "Claim"]],
   /**
    * **A decision put a claim into a state its evidence does not carry.**
    */
@@ -255,6 +254,8 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * finding: the thing the decision rests on.
    */
   BASED_ON: [
+    // A synthesis rests on the findings it is drawn across and computes nothing new.
+    ["Claim", "Claim"],
     ["Decision", "Evidence"],
     ["Decision", "Review"],
     ["CriterionEvaluation", "Evidence"],
@@ -271,8 +272,8 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Gate"],
   ],
   ANSWERS: [["Decision", "Claim"]],
-  NARROWS: [["Decision", "Question"]],
-  DEFERS: [["Decision", "Question"]],
+  SHARPENS: [["Decision", "Question"]],
+  ACCEPTS: [["Decision", "Question"]],
   /**
    * **A later record stands instead of an earlier one.**
    */
@@ -302,10 +303,6 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    */
   INVALIDATED_BY: [["Artefact", "Review"]],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
-  /**
-   * A claim that synthesises others and computes nothing new.
-   */
-  RESTS_ON: [["Claim", "Claim"]],
   /**
    * Every other pair in this table names two specific labels because the relationship means
    * something specific about both.
