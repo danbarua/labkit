@@ -48,7 +48,7 @@ export class FindingGroup extends SessionCore {
 
     const rows = await this.graph.query(
       `MATCH (d:Decision)-[:MOTIVATES]->(:Question {natural_id: $id})
-       MATCH (d)-[:NARROWS]->(from:Question)
+       MATCH (d)-[:SHARPENS]->(from:Question)
        RETURN d, from AS origin`,
       {
         d: vertexProps<{ natural_id: string; reason: string }>(),

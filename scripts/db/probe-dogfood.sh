@@ -92,18 +92,14 @@ printf '\n-- 1. what should I investigate next?\n'
 ask work
 
 printf '\n-- 2. why does that work exist?\n'
-printf '   THE GAP. A Task hangs off nothing but a gate: `plan` takes no question\n'
-printf '   and TaskContract carries none, so no report can name one (#55).\n'
-printf '   Note that it DECLINES rather than guessing, which is why no edge is\n'
-printf '   earned yet -- PJ-011 §5 wants a confidently wrong answer, not an absent one.\n'
-ask contract "$unstarted"
+ask why "$unstarted"
 
 printf '\n-- 3. what is the chain under a conclusion?\n'
 ask why "$claim"
 
 printf '\n-- 4. what is deliberately not being done, and what would reopen it?\n'
-ask known
-ask enquiry "$de"
+ask enquiries
+
 
 say "the events the run generated"
 ask happened

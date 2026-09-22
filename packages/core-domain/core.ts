@@ -107,7 +107,7 @@ export class SessionCore {
   /** Distinguishes a concluded claim from a synthesis by the edges the claim itself carries. */
   protected async claimOrigin(claim: ClaimRef): Promise<ClaimOrigin | undefined> {
     const parts = await this.graph.query(
-      `MATCH (c:Claim {natural_id: $claim})-[:RESTS_ON]->(part:Claim) RETURN c, part`,
+      `MATCH (c:Claim {natural_id: $claim})-[:BASED_ON]->(part:Claim) RETURN c, part`,
       {
         c: vertexProps<{ name: string }>(),
         part: vertexProps<{ natural_id: string }>(),
@@ -119,7 +119,7 @@ export class SessionCore {
       const evidence = new Set<EvidenceRef>();
       for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
         const rows = await this.graph.query(
-          `MATCH (:Claim {natural_id: $claim})-[:RESTS_ON]->(part:Claim)
+          `MATCH (:Claim {natural_id: $claim})-[:BASED_ON]->(part:Claim)
            MATCH (e:Evidence)-[:${bearing}]->(part)
            RETURN e`,
           { e: vertexProps<{ natural_id: string }>() },

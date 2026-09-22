@@ -160,8 +160,8 @@ export class Revising extends Shared {
       invalidation_check: INVALIDATION_CHECK.confirmed,
       kind: STORED_KIND.confirmed,
       connect: (unitOfWork, decision) => {
-        // Same PROMOTES edge the retired `promote` verb wrote.
-        unitOfWork.edge(decision, "PROMOTES", input.claim);
+        // Same CONFIRMED edge the retired `promote` verb wrote.
+        unitOfWork.edge(decision, "CONFIRMED", input.claim);
       },
     });
   }
@@ -476,7 +476,7 @@ export class Revising extends Shared {
         unitOfWork.edge(decision, "MOTIVATES", narrower);
         unitOfWork.edge(review, "EVALUATES", input.of);
         unitOfWork.edge(decision, "CHANGES", input.of);
-        for (const part of origin.parts) unitOfWork.edge(narrower, "RESTS_ON", part);
+        for (const part of origin.parts) unitOfWork.edge(narrower, "BASED_ON", part);
 
         return {
           subject: narrower,
