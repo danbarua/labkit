@@ -7,6 +7,7 @@
       "dependencies": {
         "@electric-sql/pglite": "^0.5.7",
         "@electric-sql/pglite-age": "^0.0.8",
+        "@electric-sql/pglite-tools": "^0.4.8",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "commander": "^15.0.0",
         "drizzle-orm": "^0.45.2",
@@ -83,6 +84,7 @@
       "dependencies": {
         "@electric-sql/pglite": "^0.5.7",
         "@electric-sql/pglite-age": "^0.0.8",
+        "@electric-sql/pglite-tools": "^0.4.8",
         "drizzle-orm": "^0.45.2",
         "pg": "^8.23.0",
       },
@@ -159,6 +161,8 @@
     "@electric-sql/pglite": ["@electric-sql/pglite@0.5.8", "", {}, "sha512-n9tsbUOhwx2epK1V0ZG9Ar4SHWUju04dhmzZXiSBXwBoleOvIfals33NAaWgagQVAL4Rbvx/Ptsu3P+pA09f6Q=="],
 
     "@electric-sql/pglite-age": ["@electric-sql/pglite-age@0.0.8", "", { "peerDependencies": { "@electric-sql/pglite": "0.5.7" } }, "sha512-w9lZ5UClBKLlmx5aIxOF+w6FHdL2CnUQ315r9xiFJROg0RB+3ocnmjXMYf2LX8gLxhNJ2MHWkmdqDb2jzs97mg=="],
+
+    "@electric-sql/pglite-tools": ["@electric-sql/pglite-tools@0.4.8", "", { "peerDependencies": { "@electric-sql/pglite": "0.5.8" } }, "sha512-WjgS8US6xfuE0wLYn5m9WrZ/+8dQWoQuQSRkpe7eYcxxx1UjZjvq30rpYSHfGrGtTke/zNiCd9ijVGeRUD8ukg=="],
 
     "@esbuild-kit/core-utils": ["@esbuild-kit/core-utils@3.3.2", "", { "dependencies": { "esbuild": "~0.18.20", "source-map-support": "^0.5.21" } }, "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ=="],
 

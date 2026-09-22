@@ -27,7 +27,7 @@ Every variable the code reads, what it does, and its default.
 
 ## Ports
 
-`scripts/worktree-ports.sh --export` sets all five from a hash of the worktree path, so two
+`scripts/dev/worktree-ports.sh --export` sets all five from a hash of the worktree path, so two
 checkouts do not collide. **It overwrites what you set**; to choose a port yourself, pass a
 full `LABKIT_DB_URL` instead.
 

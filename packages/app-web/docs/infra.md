@@ -14,13 +14,13 @@ From `web/`:
 bun run db:up
 ```
 
-That runs `scripts/compose.sh` with `--project-name labkit-web` and host port **5432**. Every checkout shares this database. `bun run db:down` stops that shared `db` service. It does not delete the volume.
+That runs `scripts/dev/compose.sh` with `--project-name labkit-web` and host port **5432**. Every checkout shares this database. `bun run db:down` stops that shared `db` service. It does not delete the volume.
 
 Ingest refuses destination databases named `labkit_tests` or `postgres`.
 
 ## Ports
 
-`scripts/worktree-ports.sh` hashes the worktree path for **HTTP**. Daily Postgres is pg0 on **5433**. Docker, when used, is **5432**.
+`scripts/dev/worktree-ports.sh` hashes the worktree path for **HTTP**. Daily Postgres is pg0 on **5433**. Docker, when used, is **5432**.
 
 | Env | Main | Use |
 |-----|------|-----|

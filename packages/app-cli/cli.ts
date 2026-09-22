@@ -6,29 +6,8 @@
 import { buildProgram } from "./program";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
 import { DomainRefusal } from "@labkit/core-domain";
-import { writeSync } from "node:fs";
 import { runner } from "./session";
-
-/**
- * Writes one report to stdout, whatever its size.
- */
-function writeOut(line: string): void {
-  const out = Buffer.from(`${line}\n`, "utf8");
-  let written = 0;
-  while (written < out.length) {
-    try {
-      written += writeSync(1, out, written, out.length - written);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "EAGAIN") throw err;
-      // The pipe is full and the reader has not caught up -- `labkit happened
-      // | less` sitting at the first page, waiting on a person. Retrying
-      // straight away spins a core for as long as they read; a millisecond
-      // costs nothing on a reader that is actually draining, since it is only
-      // reached when a write was refused.
-      Bun.sleepSync(1);
-    }
-  }
-}
+import { writeOut } from "./stdout";
 
 /**
  * The innermost message, and the SQLSTATE if there is one.
@@ -52,7 +31,12 @@ function reasonOf(error: Error): string {
  */
 
 export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> {
-  const program = buildProgram(runner(() => program.opts(), writeOut));
+  const program = buildProgram(
+    runner(
+      () => program.opts(),
+      (line) => writeOut(`${line}\n`),
+    ),
+  );
   program.exitOverride();
   try {
     await program.parseAsync(argv, { from: "user" });

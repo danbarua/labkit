@@ -9,7 +9,7 @@
 
 import pkg from "../../package.json" with { type: "json" };
 
-// Replaced at compile time by `scripts/build-binary.sh`, so a binary carries the provenance
+// Replaced at compile time by `scripts/build/build-binary.sh`, so a binary carries the provenance
 // of the checkout it was built from rather than looking for a git it does not have.
 declare const LABKIT_BUILD_VERSION: string;
 const PLACEHOLDER = "@LABKIT_BUILD_VERSION@";

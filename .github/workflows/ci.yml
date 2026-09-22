@@ -85,7 +85,7 @@ jobs:
 
       - name: test
         run: |
-          bun run test -- $(bun scripts/shard.ts --of 5 --index ${{ matrix.shard }}) \
+          bun run test -- $(bun scripts/lib/shard.ts --of 5 --index ${{ matrix.shard }}) \
             --reporter=junit --reporter-outfile=junit-${{ matrix.shard }}.xml
 
       - name: junit
@@ -167,7 +167,7 @@ jobs:
 
       - name: test against postgres
         run: |
-          bun run test -- $(bun scripts/shard.ts --of 4 --index ${{ matrix.shard }}) \
+          bun run test -- $(bun scripts/lib/shard.ts --of 4 --index ${{ matrix.shard }}) \
             --timeout 60000 \
             --reporter=junit --reporter-outfile=junit-pg-${{ matrix.shard }}.xml
 
@@ -228,7 +228,7 @@ jobs:
 
       - name: summarise the tests
         if: always()
-        run: bun scripts/junit-summary.ts junit >> "$GITHUB_STEP_SUMMARY"
+        run: bun scripts/lib/junit-summary.ts junit >> "$GITHUB_STEP_SUMMARY"
 
       - name: fail if anything under this did
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

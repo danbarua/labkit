@@ -2,7 +2,7 @@
  * Every asset PGlite needs, embedded rather than looked up.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import fs, { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -21,11 +21,27 @@ import pgliteWasmPath from "../../node_modules/@electric-sql/pglite/dist/pglite.
 import agePath from "../../node_modules/@electric-sql/pglite-age/dist/age.tar.gz" with {
   type: "file",
 };
+import pgDumpWasmPath from "../../node_modules/@electric-sql/pglite-tools/dist/pg_dump.wasm" with {
+  type: "file",
+};
 
 /**
  * Bun's virtual filesystem, where an embedded file lives in a compiled binary.
  */
 const BUNFS = "/$bunfs/";
+
+// pg_dump's loader reads `<its own module's directory>/pg_dump.wasm` through
+// `fs.readFileSync` and offers no `locateFile`. In a compiled binary that directory
+// is `/$bunfs/root/` and the embedded copy carries a hash in its name, so that one
+// read is pointed at the embedded copy. Nothing else reads a file by that name.
+if (pgDumpWasmPath.startsWith(BUNFS)) {
+  const real = fs.readFileSync;
+  fs.readFileSync = ((path: Parameters<typeof real>[0], ...rest: unknown[]) =>
+    (real as (...a: unknown[]) => ReturnType<typeof real>)(
+      String(path).endsWith("/pg_dump.wasm") ? pgDumpWasmPath : path,
+      ...rest,
+    )) as typeof real;
+}
 
 /**
  * A path PGlite can *stream* from, materialising the file if it cannot.

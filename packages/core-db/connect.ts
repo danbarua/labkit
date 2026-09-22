@@ -125,7 +125,7 @@ export async function connectDb(projectRoot?: string): Promise<LabKitDBConnectio
 /**
  * The PGlite cluster to open, from whatever the caller pointed at: nothing, a
  * project root holding `.labkit/`, a `.labkit/`, or a cluster directory —
- * which is what unpacking a `backup` leaves, under whatever name.
+ * which is what `restore` builds, under whatever name.
  */
 export function dataDirFor(pointedAt?: string): string {
   if (pointedAt === undefined) return join(resolveProjectRoot(), ".labkit", "pglite");
@@ -168,7 +168,7 @@ function announceNewRecord(dataDir: string, pointedAt: string | undefined): void
     throw new Error(
       `${pointedAt} holds no record, and is not empty\n` +
         `  --db takes a project directory, a .labkit/, or an unpacked pglite cluster.\n` +
-        `  \`labkit restore --path <backup>\` unpacks a backup into the right shape.`,
+        `  \`labkit restore <dump.sql> --into <dir>\` builds a record from a dump.`,
     );
   process.stderr.write(`labkit: creating a new record at ${dataDir}\n`);
 }
