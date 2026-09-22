@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 # Transcribes Bonsai's real Stage 1A -> re-verification v1 -> v2 -> closure
 # chain into LabKit, by hand, through the CLI. #125.
 #
@@ -6,8 +6,8 @@
 # gap (#133), not a red/green signal. This script REPRODUCES it on every run
 # rather than working around it -- that is what a probe is for.
 #
-#   LABKIT_HOME=~/Code/pycharm/bonsai-2026 bash scripts/db/probe-bonsai-1a.sh
-#   bash scripts/db/probe-bonsai-1a.sh <db-dir>
+#   LK='bun packages/app-cli/cli.ts --db ~/Code/pycharm/bonsai-2026' scripts/db/probe-bonsai-1a.sh
+#   LABKIT_DB_URL=... LK='bun packages/app-cli/cli.ts --tenant <slug>' scripts/db/probe-bonsai-1a.sh
 #
 # No default and no throwaway db: unlike probe-dogfood.sh this writes into a
 # REAL research record meant to persist and be rendered by the Explorer
@@ -57,19 +57,17 @@
 # proposed.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-. "$root/scripts/lib/throwaway-db.sh"
-refuse_db_url "scripts/db/probe-bonsai-1a.sh"
-db="${1:-${LABKIT_HOME:-}}"
+root=${0:A:h:h:h}
+[[ -n ${LK:-} ]] || { print -u2 "usage: LK='bun packages/app-cli/cli.ts --db <dir>' $0   (or LABKIT_DB_URL=... LK='bun packages/app-cli/cli.ts --tenant <slug>')"; exit 2 }
+source "$root/scripts/lib/labkit-macros.zsh"
+LK="$LK --author probe-bonsai-1a.sh"
 # Nothing here was watched happening: every act below is transcribed from a
 # source, so every event it writes says which one. One export covers the file;
 # `labkit happened` shows it on each act, which is what makes a stale one
 # visible rather than silent.
 export LABKIT_RECONSTRUCTED_FROM="bonsai-2026 git history"
 
-[ -n "$db" ] || { echo "usage: LABKIT_HOME=<dir> $0, or $0 <db-dir>" >&2; exit 2; }
-
-lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author probe-bonsai-1a.sh "$@"; }
+lab() { ${=LK} "$@"; }
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 

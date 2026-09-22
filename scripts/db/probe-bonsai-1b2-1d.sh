@@ -1,12 +1,12 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 # Transcribes Bonsai's real Stage 1B.2 -> 1C -> 1D chain into LabKit, by
 # hand, through the CLI. Continuation of #135's #125 (scripts/probe-
 # bonsai-1a.sh) -- same real record, same rules: no verb pre-picked, every
 # invented fact / hesitation / wrong answer is checked against #132/#133/
 # #134/#139 before being filed as new.
 #
-#   LABKIT_HOME=~/Code/pycharm/bonsai-2026 bash scripts/db/probe-bonsai-1b2-1d.sh
-#   bash scripts/db/probe-bonsai-1b2-1d.sh <db-dir>
+#   LK='bun packages/app-cli/cli.ts --db ~/Code/pycharm/bonsai-2026' scripts/db/probe-bonsai-1b2-1d.sh
+#   LABKIT_DB_URL=... LK='bun packages/app-cli/cli.ts --tenant <slug>' scripts/db/probe-bonsai-1b2-1d.sh
 #
 # **Every write below carries `--date`, mined from bonsai-2026's own git
 # history and verified against it (#166), not invented.** Each is the commit
@@ -75,17 +75,17 @@
 # (probe-bonsai-1a.sh), which #173 fixed directly.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-db="${1:-${LABKIT_HOME:-}}"
+root=${0:A:h:h:h}
+[[ -n ${LK:-} ]] || { print -u2 "usage: LK='bun packages/app-cli/cli.ts --db <dir>' $0   (or LABKIT_DB_URL=... LK='bun packages/app-cli/cli.ts --tenant <slug>')"; exit 2 }
+source "$root/scripts/lib/labkit-macros.zsh"
+LK="$LK --author probe-bonsai-1b2-1d.sh"
 # Nothing here was watched happening: every act below is transcribed from a
 # source, so every event it writes says which one. One export covers the file;
 # `labkit happened` shows it on each act, which is what makes a stale one
 # visible rather than silent.
 export LABKIT_RECONSTRUCTED_FROM="bonsai-2026 git history"
 
-[ -n "$db" ] || { echo "usage: LABKIT_HOME=<dir> $0, or $0 <db-dir>" >&2; exit 2; }
-
-lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author probe-bonsai-1b2-1d.sh "$@"; }
+lab() { ${=LK} "$@"; }
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 

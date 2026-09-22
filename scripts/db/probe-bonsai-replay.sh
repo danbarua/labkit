@@ -1,124 +1,83 @@
-#!/usr/bin/env bash
-# Proves the real Bonsai record is script-derived: replays the
-# probe-bonsai-*.sh scripts into a fresh database and diffs the result
-# against the live one. Zero lines out is the point.
+#!/usr/bin/env zsh
+# Proves the live Bonsai record is script-derived: replays the probe-bonsai-*.sh scripts
+# into a fresh database and diffs the result against the live one. Zero lines out is the point.
 #
-#   LABKIT_HOME=~/Code/pycharm/bonsai-2026 bash scripts/db/probe-bonsai-replay.sh
-#   bash scripts/db/probe-bonsai-replay.sh <live-db-dir>
+#   LK='<labkit cmd with the live target>' zsh scripts/db/probe-bonsai-replay.sh [<bonsai-source-dir>]
 #
-# NOT registered in package.json and NOT in `bun run check`'s sweep, for
-# the same two reasons `test:pg` sits outside it (CLAUDE.md): it needs a
-# resource the repository cannot assume exists -- a specific external
-# checkout, LABKIT_HOME, that is not part of this repo or CI -- and it
-# takes on the order of three minutes, not the sweep's ~90s budget. Unlike
-# `probe:dogfood`, this is NOT a "no exit code expresses the outcome"
-# probe -- it can and does properly pass or fail, and its exit code is
-# the thing to trust. It keeps the `probe-bonsai-` prefix rather than
-# `check-` because it is Bonsai-transcription tooling, sibling to the
-# scripts it replays, not a general LabKit repo check -- CLAUDE.md's own
-# lesson about `check-all.ts`'s first exclusion list applies in reverse
-# here: a script's name should say what it is, and this one is not what
-# `check:` means even though it can go red.
+# LK is the labkit command including its record target (`--db <dir>`, or `--tenant <name>`
+# with LABKIT_DB_URL exported). <bonsai-source-dir> is the checkout holding
+# experiments/stage2b_denoising/gates.toml; it defaults to $BONSAI_SOURCE, then
+# ~/Code/pycharm/bonsai-2026.
 #
-# The live record is opened READ-ONLY -- only `happened` is ever run
-# against it. Everything the scripts write goes into a fresh, disposable
-# directory.
+# Not registered in package.json and not in `bun run check`'s sweep: it needs a Bonsai
+# checkout the repository cannot assume exists, and it takes minutes. Unlike probe-dogfood.sh
+# its exit code is the outcome.
 #
-# What gets stripped before the diff, and why each survives or doesn't:
-#   - `@<git-hash>` in each event's attribution line: differs whenever the
-#     scripts themselves have been committed since the live record was
-#     built -- not a reproducibility defect, just which commit was HEAD.
-#   - Attribution NAME and claimed/observed are kept, not stripped. They
-#     must reproduce identically -- including the one Reviewer-attributed
-#     evaluate in probe-bonsai-2b.sh -- and a stripped diff that could not
-#     catch a broken --author override would not be proving what this
-#     script exists to prove.
+# The live record is only read -- `happened` and `known`. Everything the scripts write goes
+# into a fresh, disposable directory.
 #
-# **ISO timestamps used to be stripped here too, and no longer are (#166).**
-# They differed because every write ran against `date -u` at the moment the
-# script executed, so a replay run today could never match a live record
-# built on an earlier day. Once the scripts backfill real, verified
-# dates via `--date` instead, `at` is deterministic content like any other
-# field -- checked directly, 2026-08-31: a replay with the stripping simply
-# deleted matched the live record byte for byte, with nothing left for the
-# regex to remove. Leaving it stripped would have hidden the one thing this
-# check exists to catch if a future edit ever made a script's `--date`
-# non-deterministic again.
+# Both sides are compared as JSON. Two fields are dropped from every act before the diff:
+#   - `attribution.git_hash`: which commit was HEAD when the act was recorded, so it differs
+#     whenever the scripts have been committed since the live record was built.
+#   - `at`: the clock at the moment of recording.
+# Attribution name and observed/claimed are kept. They must reproduce identically -- including
+# the one Reviewer-attributed evaluate in probe-bonsai-2b.sh -- or the diff could not catch a
+# broken --author override.
 #
 # Two distinct failure shapes, not conflated into one exit code:
-#   ERROR   the checker itself could not run -- a replay script died, or a
-#           `labkit` read errored. Nothing about the record was compared,
-#           so nothing about it is asserted either way.
-#   FAILED  both sides read cleanly and disagree. This is the real defect
-#           this script exists to catch.
-# Without the distinction, a replay that dies partway through (a guard
-# firing, say) leaves a short fresh record, and every later live event
-# reads as "drift" -- the right exit code for the wrong reason, which is
-# worse than no check at all because it points the reader at a handle
-# that never actually moved.
+#   ERROR (2)  the checker itself could not run -- a replay script died, or a read errored.
+#              Nothing about the record was compared, so nothing about it is asserted.
+#   FAILED (1) both sides read cleanly and disagree. This is the defect this script catches.
+# Without the distinction, a replay that dies partway through leaves a short fresh record and
+# every later live act reads as drift -- the right exit code for the wrong reason.
 set -uo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-. "$root/scripts/lib/throwaway-db.sh"
-refuse_db_url "scripts/db/probe-bonsai-replay.sh"
-live="${1:-${LABKIT_HOME:-}}"
-[ -n "$live" ] || { echo "usage: LABKIT_HOME=<live-db-dir> $0, or $0 <live-db-dir> [<gates-source-dir>]" >&2; exit 2; }
-[ -d "$live/.labkit" ] || { echo "no .labkit record at $live" >&2; exit 2; }
+root=${0:A:h:h:h}
 
-# Where `gates.toml` is read from, which used to be the record's own directory
-# and is not any more. The record is built into this repository now
-# (`scripts/db/build-bonsai-record.sh`) and the Bonsai checkout is read-only source
-# data, so the two are different paths and the second argument says so.
-# Defaulted to the record's directory for the case this script was written
-# against -- a record sitting inside the Bonsai checkout still replays with one
-# argument, exactly as before.
-gates_source="${2:-${BONSAI_SOURCE:-$live}}"
-gates_rel="experiments/stage2b_denoising/gates.toml"
-if [ ! -f "$gates_source/$gates_rel" ]; then
-  echo "ERROR: no $gates_rel under $gates_source; nothing was compared." >&2
-  echo "  pass the Bonsai checkout as the second argument, or set BONSAI_SOURCE." >&2
+[[ -n ${LK:-} ]] || { print -u2 "usage: LK='<labkit cmd with the live target>' $0 [<bonsai-source-dir>]"; exit 2 }
+live_lk=$LK
+
+gates_source=${1:-${BONSAI_SOURCE:-$HOME/Code/pycharm/bonsai-2026}}
+gates_rel=experiments/stage2b_denoising/gates.toml
+if [[ ! -f $gates_source/$gates_rel ]]; then
+  print -u2 "ERROR: no $gates_rel under $gates_source; nothing was compared."
+  print -u2 "  pass the Bonsai checkout as the argument, or set BONSAI_SOURCE."
   exit 2
 fi
 
-fresh="$(mktemp -d)"
+fresh=$(mktemp -d)
 trap 'rm -rf "$fresh"' EXIT
+fresh_lk="bun $root/packages/app-cli/cli.ts --db $fresh"
 
-echo "replaying the scripts into $fresh" >&2
-for script in probe-bonsai-1a.sh probe-bonsai-1b2-1d.sh probe-bonsai-2a.sh probe-bonsai-2b.sh probe-bonsai-3-gates.sh; do
-  echo "  $script" >&2
-  # probe-bonsai-3-gates.sh reads gates.toml from a real Bonsai checkout,
-  # which $fresh (a disposable temp dir) doesn't have. Every other script
-  # ignores the second argument.
-  if ! bash "$root/scripts/$script" "$fresh" "$gates_source" >/dev/null; then
-    echo "ERROR: $script failed replaying; the record was not compared." >&2
+print -u2 "replaying the scripts into $fresh"
+for stage in 1a 1b2-1d 2a 2b 3-gates; do
+  script=probe-bonsai-$stage.sh
+  print -u2 "  $script"
+  args=()
+  [[ $stage == 3-gates ]] && args=("$gates_source")
+  if ! LK=$fresh_lk zsh "$root/scripts/db/$script" "${args[@]}" >/dev/null; then
+    print -u2 "ERROR: $script failed replaying; the record was not compared."
     exit 2
   fi
 done
 
-normalize() {
-  # Drop the @<hash> token from an attribution line, wherever it sits.
-  # No longer strips ISO timestamps -- see the header comment (#166).
-  sed -E -e 's/ @[0-9a-f]+,/,/'
-}
-
-# stdout and stderr kept apart deliberately: a CLI error on stderr must
-# not be silently absorbed into the diff as if it were event text.
+# stdout and stderr kept apart deliberately: a CLI error on stderr must not be silently
+# absorbed into the diff as if it were record content.
 #
-# `read_side`'s own `exit 2` only ends the subshell it runs in --
-# `$(read_side ...)` is one too, the same trap a pipeline sets, one level
-# up. Without checking `$?` at every call site, that `exit` is swallowed:
-# the assignment "succeeds" with an empty string and the script carries
-# on to print ERROR and then a bogus FAILED diff on top of it. Every
-# caller below is `x="$(read_side ...)" || exit $?` for exactly that
-# reason -- do not move the check back inside this function.
+# `read_side`'s own `exit 2` only ends the subshell it runs in -- `$(read_side ...)` is one
+# too, the same trap a pipeline sets, one level up. Without checking `$?` at every call site,
+# that `exit` is swallowed: the assignment "succeeds" with an empty string and the script
+# carries on to print ERROR and then a bogus FAILED diff on top of it. Every caller below is
+# `x="$(read_side ...)" || exit $?` for exactly that reason -- do not move the check back
+# inside this function.
 read_side() {
-  local db="$1"; shift
+  local lk=$1; shift
   local err out rc
-  err="$(mktemp)"
-  out="$(bun "$root/packages/app-cli/cli.ts" --db "$db" "$@" 2>"$err")"
+  err=$(mktemp)
+  out=$(${=lk} "$@" 2>"$err")
   rc=$?
-  if [ "$rc" -ne 0 ]; then
-    echo "ERROR: labkit $* against $db failed:" >&2
+  if (( rc != 0 )); then
+    print -u2 "ERROR: labkit $* against '$lk' failed:"
     cat "$err" >&2
     rm -f "$err"
     exit 2
@@ -127,29 +86,37 @@ read_side() {
   printf '%s' "$out"
 }
 
-# `happened` proves the event STREAM matches; `known` reads the graph
-# itself and is cheap to add, so both sides of "what a script did" and
-# "what the record now says" are covered, not just the former.
-live_happened="$(read_side "$live" happened --limit 1000)" || exit $?
-live_happened="$(printf '%s' "$live_happened" | normalize)"
-fresh_happened="$(read_side "$fresh" happened --limit 1000)" || exit $?
-fresh_happened="$(printf '%s' "$fresh_happened" | normalize)"
-live_known="$(read_side "$live" known)" || exit $?
-fresh_known="$(read_side "$fresh" known)" || exit $?
+acts_normalised() { jq -S '.acts | map(del(.attribution.git_hash, .at))'; }
+graph_normalised() { jq -S .; }
+
+# `happened` proves the act stream matches; `known` reads the graph itself, so both "what a
+# script did" and "what the record now says" are covered.
+live_happened="$(read_side "$live_lk" happened --limit 100000 --json)" || exit $?
+live_happened=$(printf '%s' "$live_happened" | acts_normalised) \
+  || { print -u2 "ERROR: the live event stream is not the JSON expected; nothing was compared."; exit 2 }
+fresh_happened="$(read_side "$fresh_lk" happened --limit 100000 --json)" || exit $?
+fresh_happened=$(printf '%s' "$fresh_happened" | acts_normalised) \
+  || { print -u2 "ERROR: the fresh event stream is not the JSON expected; nothing was compared."; exit 2 }
+live_known="$(read_side "$live_lk" known --json)" || exit $?
+live_known=$(printf '%s' "$live_known" | graph_normalised) \
+  || { print -u2 "ERROR: the live graph state is not the JSON expected; nothing was compared."; exit 2 }
+fresh_known="$(read_side "$fresh_lk" known --json)" || exit $?
+fresh_known=$(printf '%s' "$fresh_known" | graph_normalised) \
+  || { print -u2 "ERROR: the fresh graph state is not the JSON expected; nothing was compared."; exit 2 }
 
 happened_diff=$(diff <(printf '%s\n' "$live_happened") <(printf '%s\n' "$fresh_happened")) && happened_ok=1 || happened_ok=0
 known_diff=$(diff <(printf '%s\n' "$live_known") <(printf '%s\n' "$fresh_known")) && known_ok=1 || known_ok=0
 
-if [ "$happened_ok" = 1 ] && [ "$known_ok" = 1 ]; then
-  echo "OK: the live event stream and graph state are exactly what the scripts produce, commit hashes aside."
+if (( happened_ok && known_ok )); then
+  print -r -- "OK: the live event stream and graph state are exactly what the scripts produce, commit hashes and clocks aside."
   exit 0
 fi
 
-echo "FAILED: the live record has drifted from what the scripts produce." >&2
-[ "$happened_ok" = 0 ] && { echo "-- event stream (happened) --"; echo "$happened_diff"; }
-[ "$known_ok" = 0 ] && { echo "-- graph state (known) --"; echo "$known_diff"; }
-echo >&2
-echo "A handle name below is the usual cause: the later scripts find their" >&2
-echo "inherited handles with \`labkit search\`, so a wording change in an earlier" >&2
-echo "script moves what a later one resolves to." >&2
+print -u2 "FAILED: the live record has drifted from what the scripts produce."
+(( happened_ok )) || { print -r -- "-- event stream (happened) --"; print -r -- "$happened_diff"; }
+(( known_ok )) || { print -r -- "-- graph state (known) --"; print -r -- "$known_diff"; }
+print -u2
+print -u2 "A handle name above is the usual cause: the later scripts find their"
+print -u2 "inherited handles with \`labkit search\`, so a wording change in an earlier"
+print -u2 "script moves what a later one resolves to."
 exit 1

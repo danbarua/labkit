@@ -60,32 +60,38 @@
 
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-const [, , dbArg, sourceArg] = process.argv;
-const dbOrNone = dbArg ?? process.env.LABKIT_HOME;
-if (!dbOrNone) {
+// LK is the labkit command including its record target, e.g.
+// `bun packages/app-cli/cli.ts --db /tmp/x`; it is word-split by zsh below.
+const LK = process.env.LK;
+if (!LK) {
   console.error(
-    "usage: LABKIT_HOME=<dir> bun scripts/db/import-bonsai-gates.ts, or bun scripts/db/import-bonsai-gates.ts <db-dir> [<bonsai-source-dir>]",
+    "usage: LK='bun packages/app-cli/cli.ts --db <dir>' bun scripts/db/import-bonsai-gates.ts [<bonsai-source-dir>]",
   );
   process.exit(2);
 }
-const db: string = dbOrNone;
-const sourceDir = sourceArg ?? db;
+const [, , sourceArg] = process.argv;
+const sourceDir =
+  sourceArg ?? process.env.BONSAI_SOURCE ?? join(homedir(), "Code/pycharm/bonsai-2026");
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const cliPath = join(root, "packages/app-cli/cli.ts");
 const relPath = "experiments/stage2b_denoising/gates.toml";
 const gatesPath = join(sourceDir, relPath);
 
 const DEFAULT_AUTHOR = "probe-bonsai-3-gates.sh";
 
-function lab(args: string[], opts: { date?: string; author?: string } = {}): string {
-  const full = ["--db", db, "--author", opts.author ?? DEFAULT_AUTHOR];
-  if (opts.date) full.push("--date", opts.date);
-  full.push(...args);
-  const result = spawnSync("bun", [cliPath, ...full], { encoding: "utf8" });
+interface LabOpts {
+  date?: string;
+  author?: string;
+}
+
+/** Runs LK with `args` appended, word-splitting LK the way zsh does. */
+function run(args: string[]): string {
+  const result = spawnSync("zsh", ["-c", '${=LK} "$@"', "_", ...args], {
+    encoding: "utf8",
+    env: process.env,
+  });
   if (result.status !== 0) {
     console.error(`labkit ${args.join(" ")} failed:\n${result.stderr}`);
     process.exit(result.status ?? 1);
@@ -93,30 +99,47 @@ function lab(args: string[], opts: { date?: string; author?: string } = {}): str
   return result.stdout.trim();
 }
 
-/**
- * The one handle of a kind, from a verb that mints several.
- *
- * `observe` writes an artefact and the finding that cites it, so its stdout
- * is two handles and `lab()`'s whole-stdout answer is not one of them.
- */
-function pick(stdout: string, prefix: string): string {
-  const found = stdout.split("\n").filter((line) => line.startsWith(prefix));
-  if (found.length !== 1) {
-    console.error(`expected one ${prefix}… handle, got ${found.length}:\n${stdout}`);
+/** A write verb, stamped with its author and date. */
+function lab(args: string[], opts: LabOpts = {}): string {
+  const full = ["--author", opts.author ?? DEFAULT_AUTHOR];
+  if (opts.date) full.push("--date", opts.date);
+  full.push(...args);
+  return run(full);
+}
+
+function parseJson(stdout: string, what: string): unknown {
+  try {
+    return JSON.parse(stdout);
+  } catch {
+    console.error(`labkit --json ${what} did not print JSON:\n${stdout}`);
     process.exit(1);
   }
-  return found[0]!.trim();
+}
+
+function labJson(args: string[], opts: LabOpts = {}): unknown {
+  return parseJson(lab(["--json", ...args], opts), args[0] ?? "");
+}
+
+/** One string field of a verb's --json answer; the handle it minted. */
+function handle(args: string[], field: string, opts: LabOpts = {}): string {
+  const answer = labJson(args, opts);
+  const value = (answer as Record<string, unknown> | null)?.[field];
+  if (typeof value !== "string" || value === "") {
+    console.error(
+      `labkit --json ${args[0]} answered without a string .${field}:\n${JSON.stringify(answer)}`,
+    );
+    process.exit(1);
+  }
+  return value;
 }
 
 function labSearchJson(text: string): unknown[] {
-  const result = spawnSync("bun", [cliPath, "--db", db, "--json", "search", text], {
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    console.error(result.stderr);
-    process.exit(result.status ?? 1);
+  const answer = parseJson(run(["--json", "search", text]), "search");
+  if (!Array.isArray(answer)) {
+    console.error(`labkit --json search did not answer with an array:\n${JSON.stringify(answer)}`);
+    process.exit(1);
   }
-  return JSON.parse(result.stdout) as unknown[];
+  return answer;
 }
 
 // ---- idempotency ----
@@ -376,14 +399,14 @@ const latestCreated = createdDates.at(-1)!;
 
 // The reviewer's requirement, as the question it is. The Task is planned
 // against it (#98) and every observation below is recorded in it.
-const question = pick(lab(["pose", ENQUIRY_QUESTION], { date: earliestCreated }), "Q_");
-const enquiry = pick(
-  lab(["pursue", question, "--approach", ENQUIRY_APPROACH], { date: earliestCreated }),
-  "LOE_",
-);
+const question = handle(["pose", ENQUIRY_QUESTION], "question", { date: earliestCreated });
+const enquiry = handle(["pursue", question, "--approach", ENQUIRY_APPROACH], "enquiry", {
+  date: earliestCreated,
+});
 
-const task = lab(
+const task = handle(
   ["plan", "--objective", TASK_OBJECTIVE, "--acceptance", TASK_ACCEPTANCE, "--enquiry", enquiry],
+  "work",
   { date: earliestCreated },
 );
 
@@ -392,8 +415,9 @@ const task = lab(
 const criteriaHandles: string[] = [];
 rows.forEach((row, i) => {
   const { proposition } = dispositionOf(row);
-  const handle = lab(["criterion", proposition], { date: orderedDates[i]!.createdAt });
-  criteriaHandles.push(handle);
+  criteriaHandles.push(
+    handle(["criterion", proposition], "criterion", { date: orderedDates[i]!.createdAt }),
+  );
   if ((i + 1) % 20 === 0) console.error(`  ${i + 1}/${rows.length} criteria recorded`);
 });
 console.error(`${rows.length}/${rows.length} criteria recorded`);
@@ -403,7 +427,7 @@ console.error(`${rows.length}/${rows.length} criteria recorded`);
 const declareArgs = ["declare"];
 for (const h of criteriaHandles) declareArgs.push("--governed-by", h);
 declareArgs.push("--consequence", GATE_CONSEQUENCE, "--protecting", task);
-const gate = lab(declareArgs, { date: latestCreated });
+const gate = handle(declareArgs, "gate", { date: latestCreated });
 
 // ---- evaluations ----
 
@@ -430,11 +454,10 @@ rows.forEach((row, i) => {
   ];
   const measurement = measurementOf(row);
   if (measurement) {
-    const observations = pick(
-      lab(["observe", enquiry, "--name", measurement.name, "--finding", measurement.finding], {
-        date: dates.lastEditedAt,
-      }),
-      "ART_",
+    const observations = handle(
+      ["observe", enquiry, "--name", measurement.name, "--finding", measurement.finding],
+      "observations",
+      { date: dates.lastEditedAt },
     );
     args.push("--citing", observations);
     cited++;

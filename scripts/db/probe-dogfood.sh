@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 # Asks LabKit what to investigate next, using only LabKit. Prints; asserts nothing.
 #
 # **`probe:`, not `check:`, and the prefix is the whole point.** `check:` means
@@ -20,60 +20,55 @@
 # journal, but the things that generate follow-on work. It is one real slice —
 # the attribution grade that shipped as #109 — loaded as it actually happened.
 #
-#   bash scripts/db/probe-dogfood.sh [dir]
+#   zsh scripts/db/probe-dogfood.sh [dir]
 #
 # With no argument it builds a throwaway record and removes it. Pass a directory
 # to keep the record and poke at it afterwards with `labkit --db <dir>`.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-. "$root/scripts/lib/throwaway-db.sh"
-refuse_db_url "scripts/db/probe-dogfood.sh"
+root=${0:A:h:h:h}
 keep=${1:-}
 db=${keep:-$(mktemp -d)}
-[ -n "$keep" ] || trap 'rm -rf "$db"' EXIT
+[[ -n $keep ]] || trap 'rm -rf "$db"' EXIT
+export LK="bun $root/packages/app-cli/cli.ts --db $db"
+source "$root/scripts/lib/labkit-macros.zsh"
+LK="$LK --author probe-dogfood.sh"
 
-lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author probe-dogfood.sh "$@"; }
+lab() { ${=LK} "$@"; }
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 
 say "loading one slice of this repository's own recursive work"
 
 # The open question, and the line of enquiry under it.
-q=$(lab pose 'what may the record honestly say about who did something?')
-e=$(lab pursue "$q" --approach 'grade the attribution at the provider')
+q=$(lab pose 'what may the record honestly say about who did something?' --json | jq -er .question)
+e=$(lab pursue "$q" --approach 'grade the attribution at the provider' --json | jq -er .enquiry)
 
 # The review finding that started the work -- a real measurement, kept verbatim.
-# The ART_ line specifically. `observe` mints three things and prints a handle
-# for each (#161), and this captured all three into one variable -- so `--from`
-# was handed a three-line string, which parses as a handle and then matches no
-# record. Found running this script, which is what "nothing runs it, so it can
-# rot" in CLAUDE.md predicted for it.
 obs=$(lab observe "$e" \
   --name 'author-vs-os-attribution' \
   --finding 'labkit pose and labkit --author dan pose wrote byte-identical attribution' \
-  --hash 'sha256:427fa7f' | grep '^ART_')
+  --hash 'sha256:427fa7f' --json | jq -er .observations)
 
 # The work that finding created, the condition it was held to, the gate.
 w=$(lab plan \
   --objective 'record how LabKit came by the actor name' \
   --acceptance 'observed and claimed are distinguishable in the event log' \
-  --may-read 'author-vs-os-attribution')
-c=$(lab criterion 'every declared grade has a producer')
+  --may-read 'author-vs-os-attribution' --json | jq -er .work)
+c=$(lab criterion 'every declared grade has a producer' --json | jq -er .criterion)
 g=$(lab declare --governed-by "$c" \
   --consequence 'a value nothing writes is one whose absence a reader cannot interpret' \
-  --protecting "$w")
+  --protecting "$w" --json | jq -er .gate)
 
-out=$(lab analyse "$e" \
+analysis=$(lab analyse "$e" \
   --method 'grade on the provider, three values' \
-  --from "$obs" --implementing "$w" --held-to "$c")
-analysis=$(printf '%s' "$out" | head -1)
+  --from "$obs" --implementing "$w" --held-to "$c" --json | jq -er .analysis)
 claim=$(lab conclude "$analysis" \
   --proposition 'the grade belongs to the provider, not the field' \
   --finding 'how() is a method because personContext is observed or claimed by construction' \
-  | tail -1)
+  --json | jq -er '.claims[0].claim')
 lab evaluate "$c" --gate "$g" --value 'observed, claimed, unattributed all written' \
-  --outcome pass --citing "$claim" >/dev/null
+  --outcome pass --citing "$claim" --json | jq -er .evaluation >/dev/null
 
 # The two danglers: named, not built, each with what would reopen it.
 for pair in \
@@ -81,15 +76,15 @@ for pair in \
   'should trace_id go on CommandContext?|look for a producer|no producer: CLI has none, stdio MCP has none, and one session id covers 153 merged commits|a harness emits a turn delimiter, or a bus message carries an id into a write'
 do
   IFS='|' read -r question approach because until <<<"$pair"
-  dq=$(lab pose "$question")
-  de=$(lab pursue "$dq" --approach "$approach")
+  dq=$(lab pose "$question" --json | jq -er .question)
+  de=$(lab pursue "$dq" --approach "$approach" --json | jq -er .enquiry)
   lab accept "$de" --because "$because" --until "$until" --in-light-of "$claim" >/dev/null
 done
 
 # Work nobody has started, and which nothing explains the existence of. That
 # absence is the finding, not an oversight in this script.
-lab plan --objective 'decide whether a Task should name the question it serves' \
-  --acceptance 'a report gets a confidently wrong answer without the edge' >/dev/null
+unstarted=$(lab plan --objective 'decide whether a Task should name the question it serves' \
+  --acceptance 'a report gets a confidently wrong answer without the edge' --json | jq -er .work)
 
 say "#56's criterion, asked cold"
 
@@ -101,18 +96,18 @@ printf '   THE GAP. A Task hangs off nothing but a gate: `plan` takes no questio
 printf '   and TaskContract carries none, so no report can name one (#55).\n'
 printf '   Note that it DECLINES rather than guessing, which is why no edge is\n'
 printf '   earned yet -- PJ-011 §5 wants a confidently wrong answer, not an absent one.\n'
-ask contract TASK_2
+ask contract "$unstarted"
 
 printf '\n-- 3. what is the chain under a conclusion?\n'
 ask why "$claim"
 
 printf '\n-- 4. what is deliberately not being done, and what would reopen it?\n'
 ask known
-ask enquiry LOE_3
+ask enquiry "$de"
 
 say "the events the run generated"
 ask happened
 
 say "read the four answers above. This script asserts nothing on purpose."
-[ -n "$keep" ] && printf '\nrecord kept at %s\n' "$db"
+[[ -n $keep ]] && printf '\nrecord kept at %s\n' "$db"
 exit 0

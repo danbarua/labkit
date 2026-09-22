@@ -1,12 +1,12 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 # Transcribes Bonsai's real Stage 2A into LabKit, by hand, through the CLI.
 # Continuation of #135/#125 -> #144/#147 (Stage 1B.2/1C/1D) -- same real
 # record, same rules: no verb pre-picked, every invented fact / hesitation /
 # wrong answer checked against #132/#133/#134/#137/#139/#143/#146 before
 # being filed as new.
 #
-#   LABKIT_HOME=~/Code/pycharm/bonsai-2026 bash scripts/db/probe-bonsai-2a.sh
-#   bash scripts/db/probe-bonsai-2a.sh <db-dir>
+#   LK='bun packages/app-cli/cli.ts --db <dir>' scripts/db/probe-bonsai-2a.sh
+#   LABKIT_DB_URL=... LK='bun packages/app-cli/cli.ts --tenant <slug>' scripts/db/probe-bonsai-2a.sh
 #
 # **Every write below carries `--date`, mined from bonsai-2026's own git
 # history and verified against it (#166), not invented.** Each is the commit
@@ -102,17 +102,18 @@
 # else in this project.
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-db="${1:-${LABKIT_HOME:-}}"
+root=${0:A:h:h:h}
 # Nothing here was watched happening: every act below is transcribed from a
 # source, so every event it writes says which one. One export covers the file;
 # `labkit happened` shows it on each act, which is what makes a stale one
 # visible rather than silent.
 export LABKIT_RECONSTRUCTED_FROM="bonsai-2026 git history"
 
-[ -n "$db" ] || { echo "usage: LABKIT_HOME=<dir> $0, or $0 <db-dir>" >&2; exit 2; }
+[[ -n ${LK:-} ]] || { print -u2 "usage: LK='bun packages/app-cli/cli.ts --db <dir>' $0   (or LABKIT_DB_URL=... LK='bun packages/app-cli/cli.ts --tenant <slug>')"; exit 2 }
+source "$root/scripts/lib/labkit-macros.zsh"
+LK="$LK --author probe-bonsai-2a.sh"
 
-lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author probe-bonsai-2a.sh "$@"; }
+lab() { ${=LK} "$@"; }
 ask() { printf '\n\033[1m$ labkit %s\033[0m\n' "$*"; lab "$@"; }
 say() { printf '\n\n=== %s\n' "$1"; }
 
@@ -122,13 +123,7 @@ say "found via search, not hardcoded: the Level-3 question the prior script acce
 # the guard now: it fails loudly (empty, or more than one match) rather
 # than silently writing Stage 2A's answer onto a question a prior script's
 # handle numbering happened to shift onto.
-search_out=$(lab search "externally defined task or information-processing objective" --json)
-external_task_count=$(printf '%s\n' "$search_out" | jq '[.[] | select(.label == "Question") | .matches[]] | length')
-if [ "$external_task_count" -ne 1 ]; then
-  echo "probe-bonsai-2a.sh: expected exactly one question for the Level-3 wording, found $external_task_count -- refusing to pick" >&2
-  exit 1
-fi
-external_task_question=$(printf '%s\n' "$search_out" | jq -er '[.[] | select(.label == "Question") | .matches[]][0].handle')
+external_task_question=$(lk_one Q "externally defined task or information-processing objective")
 pursuits_out=$(lab pursuits "$external_task_question" --json)
 external_task_enquiry_count=$(printf '%s\n' "$pursuits_out" | jq 'length')
 if [ "$external_task_enquiry_count" -ne 1 ]; then
