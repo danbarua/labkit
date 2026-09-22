@@ -7,7 +7,6 @@
     "dev:api": "bash scripts/with-ports.sh bun --watch --no-clear-screen src/server/main.ts",
     "dev:ui": "bash scripts/with-ports.sh bun node_modules/vite/bin/vite.js --host 127.0.0.1",
     "server": "bash scripts/with-ports.sh bun src/server/main.ts",
-    "ingest": "bash scripts/with-ports.sh bun scripts/ingest-overlap-bench.ts",
     "db:up": "bash scripts/compose.sh up -d db",
     "db:down": "bash scripts/compose.sh stop db",
     "db:migrate": "bun scripts/migrate.ts",
