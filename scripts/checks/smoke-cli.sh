@@ -170,7 +170,7 @@ echo "  gate $gate governing $criterion"
 # Declared and never evaluated: a gate has a state before anybody checks it, and
 # it is not "passed".
 expect "a gate nobody has evaluated is never-evaluated" \
-  "$(lab why "$gate")" "is never evaluated"
+  "$(lab why "$gate")" "never evaluated"
 
 echo "== measuring, then analysing =="
 
@@ -202,7 +202,7 @@ echo "== checking, promoting, closing =="
 
 lab evaluate "$criterion" --gate "$gate" --value 'n=24 at every depth' --outcome pass >/dev/null
 expect "the gate is satisfied once its condition passes" \
-  "$(lab why "$gate")" "is satisfied"
+  "$(lab why "$gate")" "satisfied"
 
 # **Deliberately left exploratory above**, so this line is load-bearing rather
 # than ceremonial. `whatIsKnown` reads `Claim.kind`, and a conclusion recorded
