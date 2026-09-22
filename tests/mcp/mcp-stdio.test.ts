@@ -76,7 +76,7 @@ test(
   async () => {
     const { tools } = await client.listTools();
     expect(tools.length).toBeGreaterThan(0);
-    expect(tools.map((t) => t.name)).toContain("open_enquiry");
+    expect(tools.map((t) => t.name)).toContain("work_list");
   },
   COLD_START,
 );
@@ -88,8 +88,8 @@ test(
     // `buildServer` in-process over `InMemoryTransport`; here the server was spawned, and the
     // registry it consults is the one `main()` built.
     const refused = await client.callTool({
-      name: "pose",
-      arguments: { question: "who is asking?" },
+      name: "note",
+      arguments: { text: "who is asking?" },
     });
     expect(refused.isError).toBe(true);
     expect(JSON.stringify(refused.content)).toContain("register_session");
@@ -108,20 +108,25 @@ test(
     });
     expect(registered.isError ?? false).toBe(false);
 
-    const opened = await client.callTool({
-      name: "open_enquiry",
-      arguments: { question: "does the launched server write?" },
+    const noted = await client.callTool({
+      name: "note",
+      arguments: { text: "does the launched server write?" },
     });
-    expect(opened.isError ?? false).toBe(false);
-    const enquiry = opened.structuredContent as { kind: string; id: string };
-    expect(id(enquiry)).toMatch(/^LOE_/);
-    expect(id(enquiry).startsWith("LOE_")).toBe(true);
+    expect(noted.isError ?? false).toBe(false);
+    expect(id(noted.structuredContent)).toMatch(/^NOTE_/);
 
     // Read back through a different tool, so the answer comes from the graph
     // rather than from the value the write returned.
-    const known = await client.callTool({ name: "known", arguments: {} });
-    const untested = (known.structuredContent as { untested: Array<{ asks: string }> }).untested;
-    expect(untested.map((q) => q.asks)).toContain("does the launched server write?");
+    const found = await client.callTool({
+      name: "search",
+      arguments: { text: "does the launched server write?" },
+    });
+    const groups = (
+      found.structuredContent as { groups: Array<{ matches: Array<{ handle: string }> }> }
+    ).groups;
+    expect(groups.flatMap((g) => g.matches.map((m) => m.handle))).toContain(
+      id(noted.structuredContent),
+    );
   },
   COLD_START,
 );
@@ -133,7 +138,7 @@ test(
       uri: "labkit://docs/tools",
     });
     const text = (contents[0] as { text: string }).text;
-    expect(text).toContain("open_enquiry");
+    expect(text).toContain("work_list");
     expect(text.length).toBeGreaterThan(1000);
   },
   COLD_START,
@@ -196,18 +201,20 @@ test(
       name: "register_session",
       arguments: { id: "stdio-test-0", label: "mcp-stdio test", reconstructed_from: source },
     });
-    const posed = await client.callTool({
-      name: "pose",
-      arguments: { question: "was this act read off something?" },
+    const noted = await client.callTool({
+      name: "note",
+      arguments: { text: "was this act read off something?" },
     });
-    expect(posed.isError ?? false).toBe(false);
-    const subject = id(posed.structuredContent);
+    expect(noted.isError ?? false).toBe(false);
 
-    const seen = await client.callTool({ name: "what_happened", arguments: { touching: subject } });
-    const acts = (seen.structuredContent as { events: { reconstructed_from: string | null }[] })
-      .events;
-    expect(acts.length).toBeGreaterThan(0);
-    expect(acts.map((e) => e.reconstructed_from)).toEqual(acts.map(() => source));
+    // Off the write's own reply: every write returns the events it recorded,
+    // and the stamp rides on the event.
+    const stamps = (r: typeof noted) =>
+      (r.structuredContent as { events: { reconstructedFrom: string | null }[] }).events.map(
+        (e) => e.reconstructedFrom,
+      );
+    expect(stamps(noted).length).toBeGreaterThan(0);
+    expect(stamps(noted)).toEqual(stamps(noted).map(() => source));
 
     // Registering again is a fresh statement of who is on the line, so the
     // source does not carry over onto work nobody said was reconstructed.
@@ -216,18 +223,10 @@ test(
       arguments: { id: "stdio-test-0", label: "mcp-stdio test" },
     });
     const live = await client.callTool({
-      name: "pose",
-      arguments: { question: "and this one, asked with no source?" },
+      name: "note",
+      arguments: { text: "and this one, written with no source?" },
     });
-    const after = await client.callTool({
-      name: "what_happened",
-      arguments: { touching: id(live.structuredContent) },
-    });
-    expect(
-      (after.structuredContent as { events: { reconstructed_from: string | null }[] }).events.map(
-        (e) => e.reconstructed_from,
-      ),
-    ).toEqual([null]);
+    expect(stamps(live)).toEqual([null]);
   },
   COLD_START,
 );

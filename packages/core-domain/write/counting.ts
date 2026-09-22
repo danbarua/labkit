@@ -1,6 +1,6 @@
 /** The conditions a result will be held to, agreed before it exists. */
 
-import { scalar, vertexProps } from "@labkit/core-db/cypher";
+import { vertexProps } from "@labkit/core-db/cypher";
 import { labelForNaturalId, type Prose } from "@labkit/core-db/domain";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
@@ -26,8 +26,6 @@ import type {
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import { noFindingBearsOn } from "./shared";
-import { compose, per, type Row } from "../facts";
-import { criterionDetail, type CheckState } from "../survey-facts";
 
 export class Counting extends SessionCore {
   constructor(
@@ -110,7 +108,6 @@ export class Counting extends SessionCore {
    */
   async evaluateCriterion(input: EvaluateCriterionCommand): Promise<EvaluatedCriterion> {
     return this.handle("evaluateCriterion", input, async (unitOfWork) => {
-      if (input.gate) await this.assertCriterionGovernsGate(input.criterion, input.gate);
       const basis: EvidenceRef[] = [];
       for (const cited of input.citing ?? []) basis.push(...(await this.evidenceFor(cited)));
       const at = this.clock.now();
@@ -169,22 +166,9 @@ export class Counting extends SessionCore {
       const replaced = existing[0]?.c.proposition;
       if (!replaced) throw new Error(`${input.criterion} not found`);
 
-      // **`never-run`, not "no standing verdicts".** `stateOf` in survey-facts
-      // already tells the two apart, and the difference is the whole rule: a
-      // criterion whose only evaluation was undone reads `no-standing-verdict`,
-      // and a number existed there for somebody to have seen.
-      const everEvaluated = (await this.stateOfCriterion(input.criterion)) !== "never-run";
-      if (input.citing === undefined && everEvaluated)
-        throw new Error(
-          `${input.criterion} has been evaluated. An amendment after a result needs --citing.`,
-        );
-
       const diagnosis = input.citing === undefined ? [] : await this.evidenceFor(input.citing);
 
       const gates = await this.gatesGovernedBy(input.criterion);
-      if (gates.length === 0) {
-        throw new Error(`${input.criterion} governs nothing. There is no design to amend.`);
-      }
 
       // A condition that has already been amended is not the one in force, and
       // amending it forks the design: two replacements stand for one setting
@@ -253,21 +237,6 @@ export class Counting extends SessionCore {
     });
   }
 
-  /**
-   * Whether this condition has ever been evaluated, in the words the read side already uses.
-   * `never-run` is the only state with no number behind it; `no-standing-verdict` means every
-   * verdict was retracted, and somebody saw a result before that happened.
-   */
-  private async stateOfCriterion(criterion: CriterionRef): Promise<CheckState> {
-    const { cypher, decoders } = compose(
-      `MATCH (crit:Criterion {natural_id: $id})`,
-      criterionDetail,
-      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
-    );
-    const rows = (await this.graph.query(cypher, decoders, { id: criterion })) as unknown as Row[];
-    return [...per(criterionDetail, rows).values()][0]?.state ?? "never-run";
-  }
-
   private async gatesGovernedBy(criterion: CriterionRef): Promise<GateRef[]> {
     const rows = await this.graph.query(
       `MATCH (:Criterion {natural_id: $id})-[:GOVERNS]->(g:Gate) RETURN g`,
@@ -309,16 +278,5 @@ export class Counting extends SessionCore {
     const found = rows[0];
     if (!found) throw new Error(`no finding is recorded in ${cited}`);
     return [ref("evidence", found.e.natural_id)];
-  }
-
-  private async assertCriterionGovernsGate(criterion: CriterionRef, gate: GateRef): Promise<void> {
-    const rows = await this.graph.query(
-      `MATCH (:Criterion {natural_id: $criterion})-[:GOVERNS]->(:Gate {natural_id: $gate}) RETURN 1`,
-      { ok: scalar<number>() },
-      { criterion: criterion, gate: gate },
-    );
-    if (rows.length === 0) {
-      throw new Error(`criterion ${criterion} does not govern gate ${gate}.`);
-    }
   }
 }

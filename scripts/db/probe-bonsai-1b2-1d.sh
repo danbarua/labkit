@@ -15,9 +15,7 @@
 # carries recorded order (this script's own order, chained after
 # probe-bonsai-1a.sh); `--date` carries when the research itself happened.
 #
-# **Rewritten for #173** (`conclude` is the primitive; `analyse`/`replace`
-# no longer take `--concludes` JSON; `reverify` takes its single conclusion
-# as flat flags). Variables are named for what the handle IS.
+# Variables are named for what the handle IS.
 #
 # Chosen for what Stage 1A did NOT exercise: Stage 1B.2 established
 # something LOCALLY (one trajectory) and named three open items; Stage 1C
@@ -32,9 +30,7 @@
 # enquiry for the independent-trajectory run. Answering that new line does not
 # claim that Stage 1B.2's untested line produced the result. The original line
 # is closed separately, as abandoned, once its named reopening condition has
-# been taken up by the replacement pursuit. `known` keeps the shared question
-# unresolved while either pursuit remains open, then reads the answer from the
-# pursuit that actually produced it.
+# been taken up by the replacement pursuit.
 #
 # `accept` remains question-level: it writes Decision -DEFERS-> Question with
 # the reason and reopening condition. That deferral remains readable beside
@@ -63,12 +59,11 @@
 # `why` on 1B.2's "Level 2 established, locally" claim after Stage 1D
 # closes topology specificity negatively shows no tension -- "a structured
 # mapping exists" and "T's mapping isn't stronger than matched controls'"
-# are orthogonal claims, and the record treats them that way without any
-# `reinterpret`.
+# are orthogonal claims, and the record treats them that way.
 #
 # **A clean, total-supersession control case for #132.** The GPU pilot
 # benchmark had a real bug (wrong replica-direction distribution); found,
-# reviewed, and `replace`d with a single `conclude --replacing`, matching
+# reviewed, and superseded with a single `conclude --replacing`, matching
 # the analysis's own single conclusion exactly -- no partial-supersession
 # ambiguity, because there was nothing partial about it. Worth keeping in
 # mind as a control alongside Bonsai's own v1/v2 partial case
@@ -160,8 +155,8 @@ lab --date "$STAGE1C_RESULTS" close enquiry "$generalization_confirmation_enquir
 lab --date "$STAGE1C_RESULTS" close enquiry "$generalization_enquiry" >/dev/null
 
 say "checking the reopening hesitation with real data, not assumed"
-ask enquiry "$generalization_enquiry"
-ask known
+ask why "$generalization_enquiry"
+ask now
 
 say "Stage 1D Part 1: T vs. lattice"
 
@@ -188,7 +183,7 @@ lattice_comparison_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$la
 # non-rejection at 0.0125, so the criterion is satisfied: pass.
 lab --date "$STAGE1D_LATTICE_AND_PILOT" evaluate "$lattice_agreement_criterion" --value "paired t p=0.2815, sign-flip p=0.2871, Wilcoxon p=0.4316 -- all three agree: no rejection at 0.0125" --outcome pass --citing "$lattice_comparison_claim" >/dev/null
 
-say "Stage 1D Part 2: the pilot (non-confirmatory), a fresh-input reverify, and the confirmatory run"
+say "Stage 1D Part 2: the pilot (non-confirmatory), a fresh-input refit, and the confirmatory run"
 
 pilot_realizations_observations=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" observe "$topology_specificity_enquiry" --name stage1d_pilot_realizations \
   --finding "3 graph realizations (seeds 0,1,2) x first 3 of Stage 1C's matched trajectory seeds, for each of rewired/hist_random/curr_random -- a runtime and variance-allocation pilot; no confirmatory inference is drawn from it" --json | jq -er .observations)
@@ -204,29 +199,20 @@ pilot_hist_random_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$pil
 pilot_curr_random_claim=$(lab --date "$STAGE1D_LATTICE_AND_PILOT" conclude "$pilot_allocation_analysis" \
   --proposition "curr_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05" \
   --finding "own minimal (15,3), cost 45, power 0.883, reliable" --json | jq -er '.claims[0].claim')
-# None promoted -- deliberately. The pilot's own claims stay exploratory,
-# and `known` buckets them provisional rather than established, which
-# communicates "don't build on this" without needing a dedicated
-# pilot/confirmatory flag on the write API.
+# None promoted -- deliberately. The pilot's own claims stay exploratory.
 
 # "Refit hist_random's pilot variance from 2 more realizations (seeds
 # 3,4)", 2026-08-02T05:49:51+01:00 -- genuinely fresh inputs, unlike
 # probe-bonsai-1a.sh's v1->v2.
 STAGE1D_HIST_REFIT=2026-08-02T04:49:51.000Z
 
-# reverify, not amend or replace: hist_random's variance estimate is
-# re-checked under genuinely FRESH inputs -- two NEW graph realizations
-# (seeds 3, 4), not a re-read of the same pilot data. This is the clean
-# case reverify's own doc describes ("under fresh inputs"), unlike
-# probe-bonsai-1a.sh's v1->v2 (same pkl, no fresh inputs at all).
-# `reverify` keeps its single conclusion inline -- a re-check reaches
-# exactly one verdict, so there is no list for `conclude` to carry (#173).
 hist_random_followup_observations=$(lab --date "$STAGE1D_HIST_REFIT" observe "$topology_specificity_enquiry" --name stage1d_hist_random_followup \
   --finding "2 further hist_random realizations (seeds 3, 4), same construction recipe, same 3 matched trajectory seeds, full simulation + permutation validation" \
   --hash sha256:5deaff59 --json | jq -er .observations)
-hist_random_refit_claim=$(lab --date "$STAGE1D_HIST_REFIT" reverify "$pilot_allocation_analysis" --enquiry "$topology_specificity_enquiry" \
+hist_random_refit_analysis=$(lab --date "$STAGE1D_HIST_REFIT" analyse "$topology_specificity_enquiry" \
   --method "refit crossed variance decomposition on 4 valid realizations (seeds 0,1,3,4; seed 2 still excluded) -- df_r=3 now clears this project's reliability threshold, both variance components get a proper 95% chi-squared bound" \
-  --under "$hist_random_followup_observations" \
+  --from "$hist_random_followup_observations" --json | jq -er .analysis)
+hist_random_refit_claim=$(lab --date "$STAGE1D_HIST_REFIT" conclude "$hist_random_refit_analysis" \
   --proposition "hist_random needs the common (R=15,K=3) confirmatory allocation to hit 80% power at delta_min=0.05" \
   --finding "refit: own minimal design is (R=25,K=3), cost 75, power 0.827 -- larger than the currently-locked common (15,3) and larger than rewired's/curr_random's own requirements" \
   --bearing challenges --json | jq -er '.claims[0].claim')
@@ -288,7 +274,7 @@ lab --date "$STAGE1D_CONFIRM_RESULTS" evaluate "$confirmatory_agreement_criterio
 # two share is the Holm bound and the family, which is the finding text's
 # business rather than the criterion's.
 
-say "the GPU bug: a clean, total-supersession replace"
+say "the GPU bug: a clean, total supersession"
 
 # "Diagnose and confirm root cause of Stage 1D GPU pilot's Delta_map
 # mismatch", 2026-08-02T19:44:36+01:00 -- the earliest evidence in git of
@@ -312,7 +298,7 @@ gpu_pilot_claim=$(lab --date "$STAGE1D_GPU_BUG" conclude "$gpu_pilot_analysis" \
   --finding "GPU reported 0.2842 vs. Stage 1C's cached 0.3505 -- a real, non-trivial discrepancy" \
   --bearing challenges --json | jq -er '.claims[0].claim')
 
-gpu_bug_review=$(lab --date "$STAGE1D_GPU_BUG" review "$gpu_pilot_analysis" --verdict "wrong replica-direction distribution -- uniform(-1,1) instead of normal-then-rotation-projected-then-normalized -- fully reproduces the discrepancy on its own (confirmed by a 4-way factorial: correct/buggy directions x correct/buggy E_min gating); a dropped E_min validity gate was also found but confirmed inert for this specific trajectory" --json | jq -er .review)
+gpu_bug_review=$(lab --date "$STAGE1D_GPU_BUG" conclude "$gpu_pilot_analysis" --proposition "the GPU pilot's Delta_map computation is correct" --finding "wrong replica-direction distribution -- uniform(-1,1) instead of normal-then-rotation-projected-then-normalized -- fully reproduces the discrepancy on its own (confirmed by a 4-way factorial: correct/buggy directions x correct/buggy E_min gating); a dropped E_min validity gate was also found but confirmed inert for this specific trajectory" --bearing challenges --json | jq -er '.claims[0].claim')
 
 # "Fix Stage 1D GPU pilot's Delta_map bug, confirmed end-to-end on GPU",
 # 2026-08-02T20:10:59+01:00.
@@ -325,9 +311,9 @@ STAGE1D_GPU_FIX=2026-08-02T19:10:59.000Z
 # run (confirmatory_observations) is on disk.
 gpu_fix_observations=$(lab --date "$STAGE1D_GPU_FIX" observe "$topology_specificity_enquiry" --name stage1d_gpu_fix_smoketest \
   --finding "corrected build_432_batch() re-run on a fresh A100 session, Delta_map=0.3505 for T seed=3000, verify_on_gpu.py's field-by-field precision check passed -- no raw output file preserved locally beyond the later confirmatory run" --json | jq -er .observations)
-gpu_fix_replacement=$(lab --date "$STAGE1D_GPU_FIX" replace "$gpu_pilot_analysis" --because "$gpu_bug_review" \
+gpu_fix_replacement=$(lab --date "$STAGE1D_GPU_FIX" analyse "$topology_specificity_enquiry" \
   --method "corrected build_432_batch(), calling the real generate_fixed_replica_directions() instead of a hand-rolled uniform draw; smoke-tested against an independently computed replica state before touching a GPU, then re-verified end-to-end on a fresh A100 session" \
-  --from "$trajectory_generalization_observations" --from "$gpu_fix_observations" --json | jq -er .replacement)
+  --from "$trajectory_generalization_observations" --from "$gpu_fix_observations" --json | jq -er .analysis)
 # `--bearing supports`, explicitly: a replacing conclusion inherits the
 # replaced claim's bearing, and the replaced claim's was `challenges`.
 # The corrected run's exact match cuts the other way; without this the
@@ -355,10 +341,10 @@ stage1d_headline=$(lab --date "$STAGE1D_CONFIRM_RESULTS" synthesise \
 lab --date "$STAGE1D_CONFIRM_RESULTS" close enquiry "$topology_specificity_enquiry" --answered-by "$stage1d_headline" >/dev/null
 
 say "checking the reopening hesitation a second time, same method"
-ask enquiry "$topology_specificity_enquiry"
+ask why "$topology_specificity_enquiry"
 
-printf '\n-- what was known the moment this stage actually closed (#166)?\n'
-ask known --at "$STAGE1D_CONFIRM_RESULTS"
+printf '\n-- what stands now that this stage has closed?\n'
+ask now
 
 say "checked, not assumed: does 1B2's promoted claim show any tension with 1D's negative finding?"
 ask why "$structured_transformation_claim"

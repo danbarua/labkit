@@ -52,14 +52,12 @@ enquiry="$(lab open 'does the packaged binary work?')"
 # A second process against the same directory. If the ledger were not written,
 # or the hashes disagreed with a disk-read run, this re-applies migration 0000
 # and fails on an existing table.
-known="$(lab known)"
-[[ "$known" == *"does the packaged binary work?"* ]] || fail "the question is not on the record" "$known"
+found="$(lab search 'does the packaged binary work?')"
+[[ "$found" == *"does the packaged binary work?"* ]] || fail "the question is not on the record" "$found"
 
-# The graph extension actually loaded: the question came back through AGE under
-# a bucket heading, not merely that Postgres started. Buckets holding nothing
-# do not print, so this names the one the question is actually in.
-[[ "$known" == *"Untested"* || "$known" == *"Unresolved"* ]] ||
-  fail "the survey has no buckets" "$known"
+# The graph extension actually loaded: the question came back through AGE with
+# its handle, not merely that Postgres started.
+[[ "$found" == *Q_* ]] || fail "search found the wording but no handle" "$found"
 
 # The durable event log, on the same connection as the graph.
 happened="$(lab happened)"
@@ -75,7 +73,7 @@ happened="$(lab happened)"
 copy="$(mktemp -d "${TMPDIR:-/tmp}/labkit-binary-copy.XXXXXX")"
 trap 'rm -rf "$db" "$copy"' EXIT
 lab dump | "$root/bin/labkit" restore - --into "$copy" 2>/dev/null
-copied="$("$root/bin/labkit" --db "$copy" known)"
+copied="$("$root/bin/labkit" --db "$copy" search 'does the packaged binary work?')"
 [[ "$copied" == *"does the packaged binary work?"* ]] ||
   fail "the restored record does not hold the question" "$copied"
 

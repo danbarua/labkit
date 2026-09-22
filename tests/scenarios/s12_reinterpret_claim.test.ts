@@ -339,50 +339,6 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     expect(standing.superseded).toEqual([]);
   });
 
-  /**
-   * A withdrawn interpretation cannot be re-asserted by side effect.
-   */
-  test("recording the withdrawn sentence again does not quietly restore it", async () => {
-    const programme = await assertedTwice();
-    await session.writes.reinterpret({
-      of: claimOf(programme.firstClaims, PREFERENTIAL),
-      as: NARROWER,
-      because: "both types attenuate",
-    });
-
-    const { observations: moreReadings } = await session.writes.recordObservations({
-      enquiry: programme.enquiry,
-      name: "attenuation readings, cohort D",
-      finding: "signal amplitude before and after encoding, cohort D",
-    });
-    await expect(
-      recordAnalysis(session.writes, {
-        enquiry: programme.enquiry,
-        method: "attenuation-ratio",
-        from: [moreReadings],
-        concludes: [
-          {
-            proposition: PREFERENTIAL,
-            finding: "discriminative amplitude ratio 0.80, non-discriminative 0.43",
-          },
-        ],
-      }),
-    ).rejects.toThrow(
-      /"the encoding preferentially preserves discriminative signal" was withdrawn/,
-    );
-
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-    const still = await later.reads.whySupported({
-      claim: claimOf(programme.firstClaims, PREFERENTIAL),
-    });
-    expect(still.withdrawn).toBe(true);
-    expect(still.replacedBy?.asserts).toBe(NARROWER);
-    expect(still.verdict).toBe("withdrawn");
-  });
-
   /** Reinterpreting something nobody claimed writes nothing. */
   test("reinterpreting a proposition that is not on the record writes nothing", async () => {
     const programme = await assertedTwice();

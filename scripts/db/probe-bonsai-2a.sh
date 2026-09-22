@@ -25,7 +25,7 @@
 # `accept` call is real (the wording is theirs, not this script's own), but
 # the handle numbering is not this script's to assume. `search` finds the
 # question by its distinctive wording, refuses to pick if more than one
-# match comes back, and `pursuits` finds the one line of enquiry pursuing
+# match comes back, and `get` finds the one line of enquiry pursuing
 # it -- both fail loudly rather than silently writing Stage 2A's answer onto
 # a question a prior script's handle numbering happened to shift onto.
 #
@@ -45,8 +45,7 @@
 # nothing connecting it to the question, exactly as #98's own
 # `TaskContract = {work, objective, acceptance, mayRead, enforced}` said.
 # Commented on #98 with this concrete instance rather than filing a
-# duplicate; `plan` now takes `--enquiry`, written below, and `contract`
-# reports `addressing`/`pursuing` back.
+# duplicate; `plan` now takes `--enquiry`, written below.
 #
 # **#189: the ladder's own confirmatory analyse never named the task it
 # carried out.** `--implementing` was missing from the run below, so
@@ -124,14 +123,10 @@ say "found via search, not hardcoded: the Level-3 question the prior script acce
 # than silently writing Stage 2A's answer onto a question a prior script's
 # handle numbering happened to shift onto.
 external_task_question=$(lk_one Q "externally defined task or information-processing objective")
-pursuits_out=$(lab pursuits "$external_task_question" --json)
-external_task_enquiry_count=$(printf '%s\n' "$pursuits_out" | jq 'length')
-if [ "$external_task_enquiry_count" -ne 1 ]; then
-  echo "probe-bonsai-2a.sh: expected exactly one line of enquiry pursuing $external_task_question, found $external_task_enquiry_count" >&2
-  exit 1
-fi
-external_task_enquiry=$(printf '%s\n' "$pursuits_out" | jq -er '.[0]')
-ask enquiry "$external_task_enquiry"
+external_task_enquiry=$(lab get "$external_task_question" --json \
+  | jq -er '._links["motivates:lineofenquiry"] | if length == 1 then .[0].href | sub(".*/"; "") else error("expected one line of enquiry, found \(length)") end') \
+  || { echo "probe-bonsai-2a.sh: $external_task_question is not pursued by exactly one line of enquiry" >&2; exit 1; }
+ask why "$external_task_enquiry"
 
 say "the feasibility ladder's go/no-go gate -- a quality bar, not a hypothesis"
 
@@ -157,10 +152,10 @@ go_no_go_observations=$(lab --date "$STAGE2A_LADDER_GO" observe "$external_task_
   --finding "0/240,000 (image,topology) evolutions failed; 0 non-finite features in any condition, any topology; 270/270 fold/C fits converged, 6/6 final refits converged" \
   --hash sha256:9da6b908 --json | jq -er .observations)
 lab --date "$STAGE2A_LADDER_GO" evaluate "$go_no_go_criterion" --value "0/240,000 solver failures, 0 non-finite features, 270/270 + 6/6 classifier fits converged -- OVERALL: GO" --outcome pass --gate "$go_no_go_gate" --citing "$go_no_go_observations" >/dev/null
-ask gate "$go_no_go_gate"
+ask why "$go_no_go_gate"
 
 say "#98, checked directly: does the ladder's own task know why it exists?"
-ask contract "$feasibility_ladder_task"
+ask why "$feasibility_ladder_task"
 
 say "the locked confirmatory result: T-evolved vs. encoded-pre-evolution, and three secondary graphs"
 
@@ -227,11 +222,8 @@ say "closing the externally-defined-task question, and checking the reopening he
 # what answers it. The synthesis is the wider statement about the controls
 # as well, which is context rather than the answer.
 lab --date "$STAGE2A_CONFIRMATORY" close enquiry "$external_task_enquiry" --answered-by "$primary_classification_claim" >/dev/null
-ask enquiry "$external_task_enquiry"
-ask known
-
-printf '\n-- what was known the moment this stage actually closed (#166)?\n'
-ask known --at "$STAGE2A_CONFIRMATORY"
+ask why "$external_task_enquiry"
+ask now
 
 say "a genuinely separate research question: does the oscillator ever become cheaper at scale?"
 
@@ -257,10 +249,8 @@ compute_cost_claim=$(lab --date "$STAGE2A_COST_RESULTS" conclude "$compute_cost_
   --finding "no crossover exists at any plausible deployment scale -- the oscillator is strictly more expensive than either MLP baseline from N=1 to N=100,000,000, and the gap widens with scale rather than narrowing" \
   --bearing challenges --json | jq -er '.claims[0].claim')
 lab --date "$STAGE2A_COST_RESULTS" close enquiry "$compute_cost_enquiry" --answered-by "$compute_cost_claim" >/dev/null
-ask enquiry "$compute_cost_enquiry"
-
-printf '\n-- what was known the moment this stage actually closed (#166)?\n'
-ask known --at "$STAGE2A_COST_RESULTS"
+ask why "$compute_cost_enquiry"
+ask now
 
 say "the events this script generated"
 ask happened

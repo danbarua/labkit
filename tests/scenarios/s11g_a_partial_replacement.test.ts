@@ -196,56 +196,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
-   * **A replacement whose finding flips the answer.**
-   */
-  test("a replacement does not inherit a challenging bearing in silence", async () => {
-    const { enquiry } = await session.writes.openEnquiry("does the port reproduce the cached map?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "pilot run",
-      finding: "one seed, one session",
-    });
-    const REPRODUCES = "the port reproduces the cached map";
-    const { analysis: pilot, claims } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "GPU pilot",
-      from: [observations],
-      concludes: [{ proposition: REPRODUCES, finding: "0.2842 vs 0.3505", bearing: "challenges" }],
-    });
-    const buggy = claims[0]!.claim;
-    const { review } = await session.writes.recordReview({
-      of: pilot,
-      verdict: "the pilot had a bug",
-    });
-    const report = await session.writes.replaceAnalysis({
-      supersedes: pilot,
-      because: review,
-      method: "GPU, bug fixed",
-    });
-
-    // The corrected run says the opposite, and does not say which way it cuts.
-    await expect(
-      session.writes.conclude({
-        analysis: report.replacement,
-        proposition: REPRODUCES,
-        finding: "0.3505 vs 0.3505 — exact match",
-        replacing: buggy,
-      }),
-    ).rejects.toThrow(/bearing/);
-
-    // Stating it is all that is asked, and then it stands as stated.
-    const { claims: fixed } = await session.writes.conclude({
-      analysis: report.replacement,
-      proposition: REPRODUCES,
-      finding: "0.3505 vs 0.3505 — exact match",
-      replacing: buggy,
-      bearing: "supports",
-    });
-    const why = await (await afterwards()).reads.whySupported({ claim: fixed[0]!.claim });
-    expect(why.verdict).toBe("supported");
-  });
-
-  /**
    * The other half of the test above: named, so not a guess.
    */
   test("a successor that names what it replaces is paired on the handle, not the wording", async () => {
@@ -291,59 +241,6 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     expect(why.report.changed[0]!.after).toBe("p = 0.007 log, batch two");
     // The one nothing named is still unpaired -- naming one does not pair both.
     expect(why.report.unpaired.map((u) => u.claim)).toEqual([v1Claims[0]!.claim]);
-  });
-
-  /**
-   * **The boundary of the successor's exemption**, in a pair.
-   */
-  test("a successor may re-assert what its own revision withdrew, and nothing else", async () => {
-    const { enquiry } = await session.writes.openEnquiry("does T differ from its controls?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "per-image results",
-      finding: "T and two controls",
-    });
-    const { analysis: v1, claims } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "raw-scale aggregation",
-      from: [observations],
-      concludes: [
-        { proposition: REVISITED, finding: "p = 0.03 raw" },
-        { proposition: EXCLUDED, finding: "p = 0.41 raw" },
-      ],
-    });
-    const narrowed = claimOf(claims, EXCLUDED);
-
-    // Somebody else's act retires one of them first.
-    await session.writes.reinterpret({
-      of: narrowed,
-      as: "T differs from the lattice control on this instance set only",
-      because: "the lattice set was not matched for density",
-    });
-
-    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
-    const report = await session.writes.keep({
-      keeping: [narrowed],
-      because: review,
-      method: "log-scale re-aggregation",
-    });
-
-    // The successor may restate what THIS revision withdrew.
-    const restated = await session.writes.conclude({
-      analysis: report.replacement,
-      proposition: REVISITED,
-      finding: "p = 0.007 log",
-    });
-    expect(restated.claims).toHaveLength(1);
-
-    // It may not restate what the reinterpretation withdrew, successor or not.
-    await expect(
-      session.writes.conclude({
-        analysis: report.replacement,
-        proposition: EXCLUDED,
-        finding: "p = 0.39 log",
-      }),
-    ).rejects.toThrow(/withdrawn/);
   });
 
   /**

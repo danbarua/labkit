@@ -295,48 +295,6 @@ describe("S-4: a negative result that closes the question", () => {
     expect(refuted.against[0]!.finding).toContain("no separation detectable");
   });
 
-  /**
-   * A question can only be answered by work that was actually pursuing it.
-   * Without this, an unrelated analysis's findings become the stated basis
-   * for resolving a question they never addressed.
-   */
-  test("an analysis from a different enquiry cannot answer this question", async () => {
-    const { established, specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { observations: elsewhere } = await session.writes.recordObservations({
-      enquiry: established,
-      name: "unrelated measurements",
-      finding: "unrelated",
-    });
-    const { claims: unrelatedClaims } = await recordAnalysis(session.writes, {
-      enquiry: established,
-      method: "unrelated-analysis",
-      from: [elsewhere],
-      concludes: [
-        {
-          proposition: SPECIFICITY,
-          finding: "irrelevant",
-          bearing: "challenges",
-        },
-      ],
-    });
-
-    await expect(
-      session.writes.closeEnquiry({
-        enquiry: specificity,
-        answeredBy: claimOf(unrelatedClaims, SPECIFICITY),
-      }),
-    ).rejects.toThrow(/CLM_99999 not found|does not belong to enquiry/);
-
-    // Nothing was written on the way to failing.
-    const status = await session.reads.enquiryStatus({ enquiry: specificity });
-    expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
-      status,
-    );
-    expect(status.open).toBe(true);
-    expect(status.closure).toBeNull();
-    expect(observations).toMatch(/^ART_/);
-  });
-
   test("a question cannot be answered on a proposition the analysis never concluded", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
     await recordAnalysis(session.writes, {

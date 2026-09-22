@@ -9,34 +9,25 @@ import { buildProgram } from "@labkit/app-cli/program";
 import type { Answer } from "@labkit/app-cli/output";
 import type { Run, Surfaces } from "@labkit/app-cli/session";
 import {
+  analysisList,
   claimsAsserting,
-  conflictVerdict,
-  criteriaGoverning,
-  dependencyReport,
-  designHistory,
-  enquiryStatus,
-  gateStatus,
-  interpretationHistory,
-  knowledgeSurvey,
-  historicalSurvey,
-  how,
-  originOf,
-  pursuits,
-  reproducibilityReport,
-  reproductionReport,
-  explanation,
-  taskContract,
-  openedEnquiry,
-  recordedObservations,
-  plannedWork,
-  statedCriterion,
-  declaredGate,
-  recordedAnalysis,
-  recordedReview,
-  verificationReport,
-  evaluatedCriterion,
-  restated,
   closedEnquiry,
+  criterionList,
+  declaredGate,
+  enquiryList,
+  evaluatedCriterion,
+  explanation,
+  gateList,
+  notes,
+  openedEnquiry,
+  plannedWork,
+  recordedAnalysis,
+  recordedObservations,
+  restated,
+  search,
+  standing,
+  statedCriterion,
+  workList,
 } from "@labkit/core-domain/reports";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
@@ -45,9 +36,13 @@ import { openScenario, type Scenario } from "../helpers/scenario";
  */
 const ENVELOPES: Readonly<Record<string, string>> = {
   claims: "claims",
-  pursuits: "enquiries",
-  origin: "origin",
-  criteria: "criteria",
+  search: "groups",
+  enquiries: "enquiries",
+  analyses: "analyses",
+  conditions: "criteria",
+  gates: "gates",
+  work: "work",
+  notes: "notes",
 };
 
 /**
@@ -75,8 +70,6 @@ let seeded: {
   criterion: string;
   heldTo: string[];
   work: string;
-  question: string;
-  review: string;
 };
 
 /**
@@ -166,36 +159,17 @@ beforeAll(async () => {
 
   await out(["evaluate", criterion, "--gate", gate, "--value", "n=24", "--outcome", "pass"]);
   await out(["is", "confirmed", claim, "--because", "the prespecified check passed"]);
-  const review = id(await out(["review", analysis, "--verdict", "sound"]), "review");
-  const verified = await out([
-    "reverify",
-    analysis,
-    "--enquiry",
-    enquiry,
-    "--method",
-    "replication at n=24",
-    "--under",
-    observations,
-    "--proposition",
-    "the schedule moves convergence",
-    "--finding",
-    "holds at n=24",
-  ]);
-  const question = (await surfaces.read.enquiryStatus({ enquiry: enquiry as never })).question!
-    .question;
   await out(["close", "enquiry", enquiry, "--answered-by", claim]);
 
   seeded = {
     enquiry,
     claim,
     observations,
-    analysis: verified.verification as string,
+    analysis,
     gate,
     criterion,
     heldTo: [criterion, secondCriterion],
     work,
-    question,
-    review,
   };
 });
 
@@ -231,26 +205,19 @@ function serialised(answer: Answer, command: string): unknown {
 
 test("every read command's --json parses against the MCP schema for the same verb", async () => {
   const cases: Array<[command: string, argv: string[], schema: z.ZodType]> = [
-    ["known", ["known"], knowledgeSurvey],
-    ["known", ["known", "--at", new Date().toISOString()], historicalSurvey],
+    ["now", ["now"], standing],
     ["why", ["why", seeded.claim], explanation],
     ["why", ["why", seeded.work], explanation],
     ["why", ["why", seeded.enquiry], explanation],
     ["why", ["why", seeded.gate], explanation],
-    ["how", ["how", seeded.question], how],
     ["claims", ["claims", "the schedule moves convergence"], claimsAsserting],
-    ["conflict", ["conflict", seeded.claim, seeded.claim], conflictVerdict],
-    ["pursuits", ["pursuits", seeded.question], pursuits],
-    ["origin", ["origin", seeded.question], originOf],
-    ["enquiry", ["enquiry", seeded.enquiry], enquiryStatus],
-    ["gate", ["gate", seeded.gate], gateStatus],
-    ["criteria", ["criteria", seeded.gate], criteriaGoverning],
-    ["design", ["design", seeded.gate], designHistory],
-    ["contract", ["contract", seeded.work], taskContract],
-    ["interpretation", ["interpretation", seeded.claim], interpretationHistory],
-    ["reproduction", ["reproduction", seeded.analysis], reproductionReport],
-    ["reproducibility", ["reproducibility", seeded.analysis], reproducibilityReport],
-    ["affects", ["affects", "depth-sweep-raw"], dependencyReport],
+    ["search", ["search", "convergence"], search],
+    ["enquiries", ["enquiries"], enquiryList],
+    ["analyses", ["analyses"], analysisList],
+    ["conditions", ["conditions"], criterionList],
+    ["gates", ["gates"], gateList],
+    ["work", ["work"], workList],
+    ["notes", ["notes"], notes],
   ];
 
   // Guards the table itself: a case list that silently emptied would make this
@@ -296,8 +263,6 @@ test("every write command's --json parses against the MCP schema for the same ve
     ["criterion", statedCriterion],
     ["declare", declaredGate],
     ["analyse", recordedAnalysis],
-    ["review", recordedReview],
-    ["reverify", verificationReport],
     ["evaluate", evaluatedCriterion],
     ["is", restated],
     ["close", closedEnquiry],

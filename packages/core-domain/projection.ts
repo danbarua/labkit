@@ -3,7 +3,6 @@
  * than the privileged one.
  */
 
-import { NODE_TYPES } from "@labkit/core-db/domain";
 import type {
   EdgeLabel,
   EdgeProps,

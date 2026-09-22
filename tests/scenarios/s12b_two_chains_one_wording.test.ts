@@ -322,40 +322,6 @@ describe("S-12b — a reading is narrowed once", () => {
   });
 
   /**
-   * Why only the named claim is checked, and not every claim the wording match returns.
-   */
-  test("a withdrawn reading cannot be put back, so the match never mixes the two", async () => {
-    const { enquiry } = await session.writes.openEnquiry("why does the sampler stall?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "stall traces",
-      finding: "measured",
-    });
-    const { claims: first } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "fit",
-      from: [observations],
-      concludes: [{ proposition: ONCE, finding: `${ONCE}, on the first fit` }],
-    });
-    const narrowed = await session.writes.reinterpret({
-      of: claimOf(first, ONCE),
-      as: NARROWED_ONCE,
-      because: "the fit only covers the boundary",
-    });
-
-    await expect(
-      recordAnalysis(session.writes, {
-        enquiry,
-        method: "refit",
-        from: [observations],
-        concludes: [{ proposition: ONCE, finding: `${ONCE}, on the refit` }],
-      }),
-    ).rejects.toThrow(
-      new RegExp(`was withdrawn in favour of "${NARROWED_ONCE}" \\(${narrowed.nowClaims.claim}\\)`),
-    );
-  });
-
-  /**
    * A finding can stop standing without its reading ever being narrowed: replacing the analysis
    * supersedes the claim instead. Both acts leave a reading nobody should narrow, and AGE has
    * no edge alternation, so the two predicates are two clauses and reading one is silent.

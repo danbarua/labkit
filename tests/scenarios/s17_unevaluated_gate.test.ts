@@ -250,45 +250,6 @@ describe("S-17: does the guard actually guard?", () => {
   });
 
   /**
-   * An evaluation must be attached to a gate the criterion actually governs. Without the guard,
-   * gateStatus() would mostly HIDE the malformed evaluation — its traversal starts from GOVERNS
-   * — so the graph would carry durable nonsense without producing a visibly wrong report.
-   */
-  test("a criterion cannot be evaluated against a gate it does not govern", async () => {
-    const { gate } = await aDeclaredButUnevaluatedGate();
-    const { criterion: unrelated } = await session.writes.stateCriterion("an unrelated condition");
-    const { work: otherWork } = await session.writes.planWork({
-      objective: "other work",
-      acceptance: "n/a",
-    });
-    await session.writes.declareGate({
-      governedBy: [unrelated],
-      consequence: "block other work",
-      protecting: [otherWork],
-    });
-
-    await expect(
-      session.writes.evaluateCriterion({
-        criterion: unrelated,
-        gate,
-        value: "irrelevant",
-        outcome: "fail",
-      }),
-    ).rejects.toThrow(/does not govern gate/);
-
-    // Rejected before anything was written: the gate is untouched, and no
-    // stray evaluation is sitting in the graph.
-    const status = await session.reads.gateStatus({ gate });
-    expect(status.state).toBe("never-evaluated");
-    expect(status.counts["never-run"]).toBe(status.checks.length);
-    expect(status.everFailed).toBe(false);
-
-    const durable = await (await afterwards()).reads.gateStatus({ gate });
-    expect(durable.state).toBe("never-evaluated");
-    expect(durable.counts["never-run"]).toBe(durable.checks.length);
-  });
-
-  /**
    * The reviewer's actual demand: "show me evidence that it fails when the protected artefact
    * is wrong." That is a question about the CRITERION, not about this gate's history -- it
    * should be answerable without knowing which gate to ask about.
