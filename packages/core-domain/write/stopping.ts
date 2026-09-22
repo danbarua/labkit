@@ -1,6 +1,6 @@
 /** Closing a pursuit or planned work, or deliberately leaving a question open. */
 
-import { optional, scalar, vertexProps } from "@labkit/core-db/cypher";
+import { optional, vertexProps } from "@labkit/core-db/cypher";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   AcceptedAsUnresolved,
@@ -21,7 +21,6 @@ import type {
 } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
-import { noFindingBearsOn } from "./shared";
 
 export class Stopping extends SessionCore {
   constructor(
@@ -70,44 +69,6 @@ export class Stopping extends SessionCore {
       // fallback at each use for a state no path reaches.
       let answer: { bearing: EvidenceRef[]; asserts: string } | undefined;
       if (input.answeredBy) {
-        // The claim identifies itself; what still has to be checked is that it belongs to THIS
-        // enquiry. One hop from the claim rather than a search for a proposition. BOTH
-        // bearings. A question answered "no" is answered on a finding that CHALLENGES its
-        // proposition, so checking only SUPPORTS rejects exactly that closure.
-        const addresses: unknown[] = [];
-        for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-          addresses.push(
-            ...(await this.graph.query(
-              `MATCH (:Claim {natural_id: $claim})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
-               RETURN 1`,
-              { ok: scalar<number>() },
-              { claim: input.answeredBy, enquiry: input.enquiry },
-            )),
-          );
-        }
-        // A synthesis belongs to the enquiry its parts belong to. It has no
-        // evidence of its own -- that is what makes it a synthesis -- so the
-        // walk above finds nothing, and one hop through `RESTS_ON` is what the
-        // caller already said when they named the findings.
-        if (addresses.length === 0) {
-          for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-            addresses.push(
-              ...(await this.graph.query(
-                `MATCH (:Claim {natural_id: $claim})-[:RESTS_ON]->(:Claim)<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(:EvidenceUnit)-[:ADDRESSES]->(:LineOfEnquiry {natural_id: $enquiry})
-                 RETURN 1`,
-                { ok: scalar<number>() },
-                { claim: input.answeredBy, enquiry: input.enquiry },
-              )),
-            );
-          }
-        }
-        if (addresses.length === 0) {
-          throw new DomainRefusal({
-            kind: "invariant",
-            message: `${input.answeredBy} does not belong to enquiry ${input.enquiry}.`,
-            subject: input.answeredBy,
-          });
-        }
         const found = await this.findingOn(input.answeredBy);
         if (found) {
           answer = { bearing: [found.evidence], asserts: found.asserts };
@@ -129,15 +90,21 @@ export class Stopping extends SessionCore {
               )),
             );
           }
-          if (parts.length === 0)
+          // A claim nothing has concluded yet still answers; the closure then rests on nothing.
+          const [bare] = await this.graph.query(
+            `MATCH (c:Claim {natural_id: $claim}) RETURN c`,
+            { c: vertexProps<{ name: string }>() },
+            { claim: input.answeredBy },
+          );
+          if (!bare)
             throw new DomainRefusal({
               kind: "not-found",
-              message: noFindingBearsOn(input.answeredBy),
+              message: `${input.answeredBy} not found`,
               subject: input.answeredBy,
             });
           answer = {
             bearing: [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))],
-            asserts: parts[0]!.c.name,
+            asserts: parts[0]?.c.name ?? bare.c.name,
           };
         }
       }
@@ -200,13 +167,8 @@ export class Stopping extends SessionCore {
         });
 
       const origin = await this.claimOrigin(input.inLightOf);
-      if (!origin)
-        throw new DomainRefusal({
-          kind: "not-found",
-          message: noFindingBearsOn(input.inLightOf),
-          subject: input.inLightOf,
-        });
-      const basis = origin.kind === "direct" ? [origin.evidence] : origin.evidence;
+      const basis =
+        origin === undefined ? [] : origin.kind === "direct" ? [origin.evidence] : origin.evidence;
 
       const decision = stagedRef(
         "decision",

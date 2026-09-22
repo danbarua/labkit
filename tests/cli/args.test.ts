@@ -52,11 +52,11 @@ test("a global flag may precede or follow the command", () => {
   // `labkit why --tenant acme "the schedule…"` asked why `acme` was supported. Order-
   // sensitivity in an argument parser is the kind of defect that looks like the user's mistake.
   const before = buildProgram(async () => {});
-  before.parseOptions(["--tenant", "acme", "known"]);
+  before.parseOptions(["--tenant", "acme", "now"]);
   expect(before.opts().tenant).toBe("acme");
 
   const after = buildProgram(async () => {});
-  after.parseOptions(["known", "--tenant", "acme"]);
+  after.parseOptions(["now", "--tenant", "acme"]);
   expect(after.opts().tenant).toBe("acme");
 });
 
@@ -65,7 +65,7 @@ test("an unknown flag is refused, not ignored", async () => {
   // hold for a read, where the worst case is an answer to a slightly different question. A
   // mistyped `--becuase` on a write puts a record on the permanent register with a field the
   // caller believes they set.
-  expect(await refusal(["known", "--becuase", "it holds"])).toContain("--becuase");
+  expect(await refusal(["now", "--becuase", "it holds"])).toContain("--becuase");
 });
 
 test("a repeated option keeps every value, in order", async () => {
@@ -87,12 +87,6 @@ test("a non-numeric --since or --limit is refused, not coerced", async () => {
   expect(await refusal(["happened", "--since", "1.5"])).toContain("--since");
 });
 
-test("a handle of the wrong kind is refused at the boundary", async () => {
-  // The query schema brands the handle. A claim where a gate belongs is refused
-  // before `run` opens a database, the same way a write command is.
-  expect(await refusal(["gate", "CLM_1"])).toContain('gate handle expected a Gate id, got "CLM_1"');
-});
-
 test("happened touching a non-handle is refused at the boundary", async () => {
   expect(await refusal(["happened", "not-a-handle"])).toContain("not a handle");
 });
@@ -106,7 +100,7 @@ test("a write handle of the wrong kind is refused at the boundary", async () => 
 test("a command with no bad arguments reaches its action", async () => {
   // The control. Without it every assertion above could pass because the
   // program refuses everything.
-  const { ran } = await parse(["known"]);
+  const { ran } = await parse(["now"]);
   expect(ran).toBe(true);
 });
 
@@ -115,12 +109,6 @@ test("a bad --state names the values it would have accepted", async () => {
   expect(await refusal(["gates", "--state", "blockd"])).toContain("sidestepped");
   expect(await refusal(["gates", "--state", "blockd"])).toContain("retired");
   expect(await refusal(["work", "--state", "carriedout"])).toContain("carried-out");
-});
-
-test("a bad gate closure names the schema values", async () => {
-  const message = await refusal(["close", "gate", "GATE_1", "--as", "passed", "--because", "x"]);
-  expect(message).toContain("sidestepped");
-  expect(message).toContain("retired");
 });
 
 test("a non-ISO --date is refused, not stamped into the record", async () => {

@@ -6,20 +6,17 @@ import { createdIn } from "@labkit/core-domain";
 import type { DomainEvent, WriteSurface } from "@labkit/core-domain";
 import type { Command } from "commander";
 import type { z } from "zod";
-import { collect, parseCommand, whole } from "../args";
+import { collect, parseCommand } from "../args";
 import { answer, asHandles } from "../output";
 import type { Run } from "../session";
 import {
   acceptAsUnresolvedCommand,
   amendDesignCommand,
   claimIsConfirmedCommand,
-  claimIsUndecidedCommand,
   closeEnquiryCommand,
-  closeGateCommand,
   concludeCommand,
   declareGateCommand,
   evaluateCriterionCommand,
-  keepCommand,
   noteCommand,
   noteSupersedesCommand,
   openEnquiryCommand,
@@ -28,15 +25,9 @@ import {
   pursueCommand,
   recordAnalysisCommand,
   recordObservationsCommand,
-  recordReviewCommand,
-  reinterpretCommand,
-  replaceAnalysisCommand,
-  reverifyCommand,
-  sharpenCommand,
   stateCriterionCommand,
   stopWorkCommand,
   synthesiseCommand,
-  undoCommand,
 } from "@labkit/core-domain/commands";
 
 /**
@@ -112,21 +103,6 @@ export function registerWrites(program: Command, run: Run): void {
     .requiredOption("--approach <text>", "how this line of enquiry will go about it")
     .action(async (question, { approach }: { approach: string }) =>
       parsed(pursueCommand, { question, approach }, (write, input) => write.pursue(input)),
-    );
-  program
-    .command("sharpen")
-    .helpGroup("Asking")
-    .summary("narrow a question into a more precise one, recording why")
-    .description(
-      "The new question records what was known at the moment it was asked, frozen rather than " +
-        "recomputed — so a later reader sees the evidence the sharpening was taken in light of, " +
-        "not everything that has arrived since.",
-    )
-    .argument("<question-id>", "the question being narrowed")
-    .requiredOption("--into <question>", "the sharper question")
-    .requiredOption("--because <text>", "what prompted the narrowing")
-    .action(async (from, { into, because }: { into: string; because: string }) =>
-      parsed(sharpenCommand, { from, into, because }, (write, input) => write.sharpen(input)),
     );
   program
     .command("note")
@@ -279,16 +255,6 @@ export function registerWrites(program: Command, run: Run): void {
       ),
     );
   program
-    .command("review")
-    .helpGroup("Doing the work")
-    .summary("record a verdict on an analysis")
-    .description("A later retraction can rest on this, which is why it is a record of its own.")
-    .argument("<analysis-id>", "the analysis being reviewed")
-    .requiredOption("--verdict <text>", "what the review found")
-    .action(async (of, { verdict }: { verdict: string }) =>
-      parsed(recordReviewCommand, { of, verdict }, (write, input) => write.recordReview(input)),
-    );
-  program
     .command("plan")
     .helpGroup("Saying in advance what counts")
     .summary("state an objective and what would count as meeting it")
@@ -430,23 +396,12 @@ export function registerWrites(program: Command, run: Run): void {
         (write, input) => write.amendDesign(input),
       ),
     );
+  program;
   const is = program
     .command("is")
     .helpGroup("Revising")
     .description(
-      "**The claim's standing changed; its wording did not.** `undecided` settles the " +
-        "proposition neither way. `confirmed` is one others may build on.\n\n" +
-        "`reinterpret` changes what a claim is read to mean.",
-    );
-  is.command("undecided")
-    .helpGroup("Revising")
-    .summary("record that a finding settles the proposition neither way")
-    .argument("<claim-id>", "the claim")
-    .requiredOption("--because <evidence-id>", "the finding that left it open")
-    .action(async (claim, { because }: { because: string }) =>
-      parsed(claimIsUndecidedCommand, { claim, because }, (write, input) =>
-        write.isUndecided(input),
-      ),
+      "**The claim's standing changed; its wording did not.** `confirmed` is one others may build on.",
     );
   is.command("confirmed")
     .helpGroup("Revising")
@@ -458,157 +413,10 @@ export function registerWrites(program: Command, run: Run): void {
         write.isConfirmed(input),
       ),
     );
-  program
-    .command("undo")
-    .helpGroup("Revising")
-    .summary("take back a mistaken act")
-    .description(
-      "**The act itself was wrong.** Hides every handle it minted, and what it connected. " +
-        "Nothing is deleted. Refused if something else already rests on it.\n\n" +
-        "`reinterpret` is for when the act was right and only the reading changed; `keep` and " +
-        "`replace` for when a whole analysis was wrong.",
-    )
-    .argument("<event>", "the act's seq, from 'labkit happened'", whole)
-    .requiredOption("--because <text>", "why this is being taken back")
-    .action(async (event: number, opts: { because: string }) => {
-      const input = parseCommand(undoCommand, { event, because: opts.because });
-      return run(async ({ write }) =>
-        answer(await write.undo(input), (r, p) => asHandles(r.retracted, p)),
-      );
-    });
-  program
-    .command("keep")
-    .helpGroup("Revising")
-    .summary("revise an analysis, naming the conclusions that survive")
-    .description(
-      "**The analysis was wrong; some of its conclusions survive.** Names those; the rest " +
-        "fall. A kept claim still rests on the run that produced its number.\n\n" +
-        "`replace` when none survive. `undo` when the act itself was wrong.\n\n" +
-        "Add the successor's own findings with `conclude`. It reads what its predecessor read; " +
-        "`--from` adds to that. `--replacing <claim-id>` says which fallen finding a new one " +
-        "stands in place of, when two answer the same proposition.",
-    )
-    .argument("<claim-id...>", "the conclusions that survive", (v, prev: string[] = []) => [
-      ...prev,
-      v,
-    ])
-    .requiredOption("--because <review-id>", "the review that found it wanting")
-    .requiredOption("--method <text>", "what the revision did differently")
-    .option("--from <id>", "an input the successor read as well (repeatable)", collect(String))
-    .action(async (keeping, opts) => {
-      const input = parseCommand(keepCommand, {
-        keeping,
-        because: opts.because,
-        method: opts.method,
-        ...(opts.from === undefined ? {} : { from: opts.from }),
-      });
-      return run(async ({ write }) => {
-        const report = await write.keep(input);
-        // **What was superseded is the complement of what the caller typed**,
-        // over a set they may not have had in front of them, so the act says
-        // out loud what it did. stderr, because stdout is the handles.
-        const total = report.superseded.length + report.kept.length;
-        process.stderr.write(
-          `labkit: superseding ${report.supersedes} — ${report.superseded.length} of ${total} ` +
-            `conclusions; keeping ${report.kept.join(", ")}\n`,
-        );
-        return answer(report, mintedView());
-      });
-    });
-  program
-    .command("replace")
-    .helpGroup("Revising")
-    .summary("supersede a defective analysis with a corrected one")
-    .description(
-      "**The analysis was wrong and none of its conclusions survive.** All of them fall.\n\n" +
-        "`keep` carries some forward. `undo` when the act itself was wrong.\n\n" +
-        "Add the successor's own findings with `conclude`; each stands in place of the fallen " +
-        "finding it re-answers. It reads what its predecessor read; `--from` adds to that. " +
-        "`--replacing <claim-id>` when two fallen findings answer the same proposition.",
-    )
-    .argument("<analysis-id>", "the analysis being superseded")
-    .requiredOption("--because <review-id>", "the review that found it defective")
-    .requiredOption("--method <text>", "what the replacement did")
-    .option("--from <id>", "an input the successor read as well (repeatable)", collect(String))
-    .action(async (supersedes, opts) =>
-      parsed(
-        replaceAnalysisCommand,
-        {
-          supersedes,
-          because: opts.because,
-          method: opts.method,
-          ...(opts.from === undefined ? {} : { from: opts.from }),
-        },
-        (write, input) => write.replaceAnalysis(input),
-      ),
-    );
-  program
-    .command("reverify")
-    .helpGroup("Revising")
-    .summary("re-check an earlier analysis under fresh inputs")
-    .description(
-      "**Nothing was wrong.** Re-checks the same analysis under fresh inputs, reaching one " +
-        "verdict — not a list. It does not claim reproduction; `reproduction` reports on that.",
-    )
-    .argument("<analysis-id>", "the analysis being re-checked")
-    .option("--enquiry <id>", "the line of enquiry this belongs to (default: the analysis's own)")
-    .requiredOption("--method <text>", "what the re-check did")
-    .requiredOption("--under <id>", "an input the re-check read (repeatable)", collect(String))
-    .requiredOption("--proposition <text>", "what the re-check reached a verdict about")
-    .requiredOption("--finding <text>", "what it found this time")
-    .option("--bearing <supports|challenges>", "which way it cuts (default supports)")
-    .option("--standing <exploratory|confirmatory>", "confirmatory standing")
-    .action(async (historical, opts) =>
-      parsed(
-        reverifyCommand,
-        {
-          historical,
-          ...(opts.enquiry === undefined ? {} : { enquiry: opts.enquiry }),
-          method: opts.method,
-          under: opts.under,
-          // Flat flags rather than JSON, and this one stays on the verb: a
-          // re-check reaches exactly one verdict about the thing it
-          // re-checked, so there is no list to serialise.
-          concludes: {
-            proposition: opts.proposition,
-            finding: opts.finding,
-            ...(opts.bearing === undefined ? {} : { bearing: opts.bearing }),
-            ...(opts.standing === undefined ? {} : { standing: opts.standing }),
-          },
-        },
-        (write, input) => write.reverify(input),
-      ),
-    );
-  program
-    .command("reinterpret")
-    .helpGroup("Revising")
-    .summary("narrow what a claim is read to mean")
-    .description(
-      "**The reading was wrong; the evidence stands.** Withdraws the old reading and records " +
-        "the new one. One step can withdraw several claims, so the report names records rather " +
-        "than a sentence.\n\n" +
-        "`undo` is for when the act itself was wrong and nothing needs reinterpreting.",
-    )
-    .argument("<claim-id>", "the claim being narrowed")
-    .requiredOption("--as <text>", "the narrower reading")
-    .requiredOption("--because <text>", "what prompted the narrowing")
-    .action(async (of, opts: { as: string; because: string }) =>
-      parsed(
-        reinterpretCommand,
-        {
-          of,
-          as: opts.as,
-          because: opts.because,
-        },
-        (write, input) => write.reinterpret(input),
-      ),
-    );
   const close = program
     .command("close")
     .helpGroup("Stopping")
-    .description(
-      "Close a line of enquiry, a gate, or a piece of planned work. Subcommand names the kind.",
-    );
+    .description("Close a line of enquiry or a piece of planned work. Subcommand names the kind.");
   close
     .command("enquiry")
     .helpGroup("Stopping")
@@ -623,18 +431,6 @@ export function registerWrites(program: Command, run: Run): void {
           ...(answeredBy === undefined ? {} : { answeredBy }),
         },
         (write, input) => write.closeEnquiry(input),
-      ),
-    );
-  close
-    .command("gate")
-    .helpGroup("Stopping")
-    .summary("close a gate without passing it")
-    .argument("<gate-id>", "the gate")
-    .requiredOption("--as <closure>", "sidestepped | retired")
-    .requiredOption("--because <text>", "why the gate no longer governs work")
-    .action(async (gate, { as, because }: { as: string; because: string }) =>
-      parsed(closeGateCommand, { gate, closure: as, because }, (write, input) =>
-        write.closeGate(input),
       ),
     );
   close

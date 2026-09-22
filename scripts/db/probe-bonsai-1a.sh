@@ -21,12 +21,10 @@
 # that introduced or completed the real work the line transcribes -- see the
 # comment above each block for the commit it came from. `seq` still carries
 # recorded order (this script's own order); `--date` carries when the
-# research itself happened, which is what makes `known --at` at the end of
-# this file answerable.
+# research itself happened.
 #
-# **Rewritten for #173** (`conclude` is the primitive; `analyse`/`replace`/
-# `reverify` no longer take `--concludes` JSON). Variables are named for what
-# the handle IS, not the short/positional form the pre-#173 script used.
+# Variables are named for what the handle IS, not the short/positional form
+# the pre-#173 script used.
 #
 # ## What transcribing this by hand found
 #
@@ -52,9 +50,8 @@
 #
 # A third thing worth knowing, filed on its own even though it is an
 # absence and PJ-011 §5 says an absence earns nothing alone: there is no
-# verb that corrects a mis-entered claim. `review` + `replace` is the
-# nearest. Named so nobody rediscovers it as a gap (labkit#134), no verb
-# proposed.
+# verb that corrects a mis-entered claim. Named so nobody rediscovers it as a
+# gap (labkit#134), no verb proposed.
 set -euo pipefail
 
 root=${0:A:h:h:h}
@@ -112,12 +109,9 @@ lab --date "$STAGE1A_PILOT" conclude "$class0_pilot_analysis" \
 
 lab --date "$STAGE1A_ORIGINAL" close enquiry "$original_enquiry" --answered-by "$original_finding_claim" >/dev/null
 
-say "the sharpening: why a re-verification"
+say "the sharpened question"
 
-sharpened_question=$(lab --date "$STAGE1A_PILOT" sharpen "$original_question" \
-  --into "does the T-vs-stochastic-control comparison hold up under proper seed accounting (multiple seeds per class, explicit within-class aggregation and robustness checks)?" \
-  --because "a class-0 pilot found the random control's AUC ratio sign is seed-sensitive (7/20 flips under the historical definition), an undocumented source of within-class variance the original single-seed-per-class design did not account for" \
-  --json | jq -er .question)
+sharpened_question=$(lab --date "$STAGE1A_PILOT" pose "does the T-vs-stochastic-control comparison hold up under proper seed accounting (multiple seeds per class, explicit within-class aggregation and robustness checks)?" --json | jq -er .question)
 
 say "re-verification v1: raw-scale aggregation, and its own gate"
 
@@ -182,43 +176,20 @@ say "re-verification v2: log-scale re-analysis of the SAME data"
 # header: "committed and locked before running any log-scale analysis."
 STAGE1A_V2_LOCK=2026-08-01T11:41:10.000Z
 
-raw_scale_review=$(lab --date "$STAGE1A_V2_LOCK" review "$reverification_v1_analysis" --verdict "the nominally Holm-significant p-values (historical random, rewiring) are artifacts of aggregating a heavy-right-tailed AUC distribution by arithmetic mean across only 25 seeds; raw-scale aggregation is not sufficient to get a stable read on the stochastic-control comparisons")
+raw_scale_review=$(lab --date "$STAGE1A_V2_LOCK" conclude "$reverification_v1_analysis" --proposition "raw-scale mean aggregation across 25 seeds gives a stable read on the stochastic-control comparisons" --finding "the nominally Holm-significant p-values (historical random, rewiring) are artifacts of aggregating a heavy-right-tailed AUC distribution by arithmetic mean across only 25 seeds; raw-scale aggregation is not sufficient to get a stable read on the stochastic-control comparisons" --bearing challenges --json | jq -er '.claims[0].claim')
 
-# The moment v2 was locked, in Bonsai's own sense -- DESIGN_v2_log_scale.md's
-# own header: "committed and locked before running any log-scale analysis."
-# That is here: after the review that motivated it, before the replacement
-# that runs it. `known --at` answers what #125 first called unanswerable --
-# it wasn't; `sharpen`'s freeze isn't the only way to ask "what was known
-# then", `known --at <instant>` reads durable state as of any moment.
 v2_lock_instant="$STAGE1A_V2_LOCK"
 
 # "Stage 1A re-verification v2: log-scale re-analysis resolves 2 of 3
 # mean-vs-median disagreements...", 2026-08-01T12:46:49+01:00.
 STAGE1A_V2_RESULTS=2026-08-01T11:46:49.000Z
 
-# `replace`, not `amend` or `reverify` -- the verb choice #125 asks for.
-# `reverify` means "under fresh inputs"; v2 reuses v1's SAME 770 raw values
-# by design (DESIGN_v2_log_scale.md: "no new simulation ... only the
-# aggregation function ... changes"), so it is not that. `amend` means a
-# locked CRITERION is revised; the decision rule's logic is unchanged
-# between v1 and v2 ("same gate, applied in log space") -- what changes is
-# the analysis method, not the standard being held to. `replace` fits best
-# of the three: a review found the prior analysis's significant results
-# untrustworthy, and a corrected analysis supersedes it.
-#
-# `keep` names what SURVIVES: the lattice comparison, which v2 does not
-# revisit. Everything else v1 concluded is superseded at this moment, and the
-# lattice claim keeps its original evidence -- asking why it holds still
-# answers with the v1 run that produced the number. `conclude --replacing`
-# below then names which superseded finding each new one stands in place of.
-#
-# Naming the survivor rather than each casualty is the safer direction: a
-# forgotten entry here supersedes something still true, which the answer
-# shows; forgetting to supersede would leave something stale reading as
-# current.
-log_scale_replacement=$(lab --date "$STAGE1A_V2_RESULTS" keep "$lattice_claim" --because "$raw_scale_review" \
+# v2 is a second analysis over v1's observations; its conclusions replace v1's.
+log_scale_replacement=$(lab --date "$STAGE1A_V2_RESULTS" analyse "$reverification_enquiry" \
   --method "log-scale (geometric mean) re-aggregation of the same 770 raw AUC values from ART_4 -- no new simulation, no new seeds, only the aggregation function changes; pre-committed before running, decision rule not revised after seeing results" \
-  --json | jq -er .replacement)
+  --from "$reverification_observations" --implementing "$reverification_task" \
+  --held-to "$robustness_criterion" \
+  --json | jq -er .analysis)
 historical_random_resolved_claim=$(lab --date "$STAGE1A_V2_RESULTS" conclude "$log_scale_replacement" --replacing "$historical_random_claim" \
   --finding "log-scale resolves the disagreement: primary/median/sign-flip/mixed-model all agree non-significant (p_holm=0.322); 95% CI on multiplicative scale x[0.280, 1.541] brackets 1.0" --standing confirmatory \
   --bearing challenges \
@@ -250,26 +221,23 @@ ask why "$lattice_claim"
 say "closure, and the five questions PROJECT_MEMORY.md answers in prose"
 
 printf '\n-- why was Stage 1A re-verified?\n'
-ask origin "$sharpened_question"
+ask why "$sharpened_question"
 
 printf '\n-- what was known when v2 was locked?\n'
-ask known --at "$v2_lock_instant"
+ask now
 
 printf '\n-- what was known the moment the stage actually closed (#166)?\n'
-ask known --at "$STAGE1A_V2_RESULTS"
+ask now
 
 printf '\n-- what closed the stage, and how?\n'
-ask enquiry "$reverification_enquiry"
-
-printf '\n-- which claims rest on results/stage1a_reverification_results.pkl?\n'
-ask affects stage1a_reverification_results
+ask why "$reverification_enquiry"
 
 printf '\n-- what work exists and why?\n'
 ask work
-ask contract "$reverification_task"
+ask why "$reverification_task"
 
 say "the gate, with the honest inconclusive left visible"
-ask gate "$robustness_gate"
+ask why "$robustness_gate"
 
 say "the events this script generated"
 ask happened

@@ -66,7 +66,7 @@ async function overTheWire() {
   ).connect(serverSide);
   const client = new Client({ name: "subject-identity", version: "0" });
   await client.connect(clientSide);
-  return client;
+  return { client, write: new WriteSurface(graph, { clock, events }) };
 }
 
 const call = async (c: Client, name: string, args: Record<string, unknown>) => {
@@ -480,83 +480,32 @@ describe("3. a consumer can now repair a two-stage pipeline with its own handles
    * take observations alone — while all three write the same `CONSUMES` edge, which does not
    * allow `Computation -> Computation`.
    */
-  test("the repair takes the handle the consumer holds, with no detour", async () => {
-    // Section 2 showed the two routes equivalent -- measured inside the process,
-    // holding an artefact id the domain handed back. A consumer over the wire
-    // holds what the tools returned, which for an analysis is a computation id.
-    const client = await overTheWire();
+  test("a computation id is accepted where an input is named, with no detour", async () => {
+    // A consumer over the wire holds what the tools returned, which for an
+    // analysis is a computation id.
+    const { client, write } = await overTheWire();
     try {
-      const enquiry = (await call(client, "open_enquiry", { question: "two stage?" })).body;
+      const { enquiry } = await write.openEnquiry("two stage?");
       const raw = (
-        await call(client, "record_observations", {
-          enquiry: id(enquiry),
-          name: "raw",
-          finding: "f",
-        })
+        await call(client, "record_observations", { enquiry, name: "raw", finding: "f" })
       ).body;
       const stageOne = (
         await call(client, "record_analysis", {
-          enquiry: id(enquiry),
+          enquiry,
           method: "stage one",
           from: [id(raw)],
         })
       ).body.analysis as string;
-      await call(client, "conclude", {
-        analysis: stageOne,
-        proposition: "p1",
-        finding: "f1",
-      });
-      const stageTwoResult = (
-        await call(client, "record_analysis", {
-          enquiry: id(enquiry),
-          method: "stage two",
-          from: [stageOne],
-        })
-      ).body;
-      const stageTwo = stageTwoResult.analysis as string;
-      const concludedTwo = (
-        await call(client, "conclude", {
-          analysis: stageTwo,
-          proposition: "p2",
-          finding: "f2",
-        })
-      ).body;
-      const p2 = (concludedTwo.claims as Array<{ claim: string; asserts: string }>).find(
-        (c) => c.asserts === "p2",
-      )!.claim;
-      const review = (
-        await call(client, "record_review", {
-          of: stageTwo,
-          verdict: "stage two mis-specified",
-        })
-      ).body;
-
-      // Recording stage two on stage one was accepted all along.
+      await call(client, "conclude", { analysis: stageOne, proposition: "p1", finding: "f1" });
       expect(String(stageOne).startsWith("COMP_")).toBe(true);
 
-      // Repairing it is now accepted too, and needs no `from` at all: the
-      // successor inherits what its predecessor read, which here is stage one
-      // by its COMP_ id.
-      const repair = await call(client, "replace_analysis", {
-        supersedes: stageTwo,
-        because: id(review),
-        method: "stage two, corrected",
+      const stageTwo = await call(client, "record_analysis", {
+        enquiry,
+        method: "stage two",
+        from: [stageOne],
       });
-      expect(repair.failed).toBe(false);
-      expect(repair.body.supersedes).toEqual(stageTwo);
-      const corrected = await call(client, "conclude", {
-        analysis: repair.body.replacement as string,
-        replacing: p2,
-        finding: "f2 corrected",
-      });
-      expect(corrected.failed).toBe(false);
-
-      // The detour still works and is no longer the only route. It is what a
-      // consumer had to do: ask why a claim was supported in order to learn
-      // what a computation read.
-      const why = (await call(client, "why_supported", { claim: p2 })).body;
-      const restingOn = why.restingOn as Array<{ part: string; name: string }>;
-      expect(restingOn.some((p) => p.part.startsWith("ART_"))).toBe(true);
+      expect(stageTwo.failed).toBe(false);
+      expect(String(stageTwo.body.analysis).startsWith("COMP_")).toBe(true);
       await client.close();
     } finally {
       await scenario.end();

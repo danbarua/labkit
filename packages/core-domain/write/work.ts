@@ -8,7 +8,7 @@ import type {
   RecordedReview,
   Synthesised,
 } from "../report";
-import { ref, stagedRef } from "../report";
+import { stagedRef } from "../report";
 import type {
   ConcludeCommand,
   SynthesiseCommand,

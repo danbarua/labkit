@@ -4,9 +4,9 @@
  */
 
 import { z } from "zod";
-import type { EdgeLabel, NodeLabel } from "@labkit/core-db/domain";
+import type { EdgeLabel } from "@labkit/core-db/domain";
 import type { Command } from "./commands";
-import type { DomainEvent, GraphChange } from "./events";
+import type { GraphChange } from "./events";
 import type { AnyRef, Kind, Ref } from "./ref";
 import { GATE_STATES, WORK_STATES } from "./vocab";
 /**

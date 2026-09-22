@@ -143,6 +143,43 @@ export class Shared extends SessionCore {
     return (await this.conclusionsOf(revision.old)).find((c) => c.claim === answering[0]);
   }
 
+  /**
+   * One recorded conclusion, by its claim or its finding.
+   */
+  private async conclusionBehind(
+    handle: ClaimRef | EvidenceRef,
+  ): Promise<RecordedConclusion | undefined> {
+    const byClaim = labelForNaturalId(handle) === "Claim";
+    const rows = await this.graph.query(
+      byClaim
+        ? `MATCH (c:Claim {natural_id: $id})
+           OPTIONAL MATCH (s:Evidence)-[:SUPPORTS]->(c)
+           OPTIONAL MATCH (ch:Evidence)-[:CHALLENGES]->(c)
+           RETURN c, s, ch`
+        : `MATCH (e:Evidence {natural_id: $id})
+           OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
+           OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
+           RETURN coalesce(sc, cc) AS c, CASE WHEN sc IS NULL THEN null ELSE e END AS s, CASE WHEN cc IS NULL THEN null ELSE e END AS ch`,
+      {
+        c: optional(vertexProps<ClaimProps & { natural_id: string }>()),
+        s: optional(vertexProps<{ natural_id: string; statement: string }>()),
+        ch: optional(vertexProps<{ natural_id: string; statement: string }>()),
+      },
+      { id: handle },
+    );
+    const row = rows[0];
+    if (!row?.c) return undefined;
+    const evidence = row.s ?? row.ch;
+    if (!evidence) return undefined;
+    return {
+      claim: ref("claim", row.c.natural_id),
+      proposition: row.c.name,
+      finding: evidence.statement,
+      evidence: ref("evidence", evidence.natural_id),
+      bearing: row.ch && !row.s ? "challenges" : "supports",
+    };
+  }
+
   protected async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
     const rows = await this.graph.query(
       // Either bearing: an analysis whose findings all CHALLENGE returned no
@@ -300,62 +337,14 @@ export class Shared extends SessionCore {
         const unit = staging?.unit ?? (await this.unitOf(input.analysis));
         const output = staging?.output ?? (await this.outputArtefactOf(input.analysis));
 
-        // Superseded analyses take no new conclusions. Adding one would put a fresh finding on
-        // a record the caller has already declared spent, and nothing downstream distinguishes
-        // it from a live one.
-        const [spent] = await this.graph.query(
-          `MATCH (:Computation {natural_id: $id})<-[:SUPERSEDES]-(d:Decision)
-           OPTIONAL MATCH (d)-[:MOTIVATES]->(instead:Computation)
-           RETURN d, instead`,
-          {
-            d: vertexProps<{ natural_id: string }>(),
-            instead: optional(vertexProps<{ natural_id: string }>()),
-          },
-          { id: input.analysis },
-        );
-        if (spent)
-          throw new Error(
-            `${input.analysis} has been superseded. Record this on ${spent.instead ? spent.instead.natural_id : "the analysis that replaced it"}.`,
-          );
-
-        // What is being superseded, if anything — matched on whichever handle
-        // the caller held; both come back from the act that recorded it.
+        // The finding this one stands in place of, by whichever handle the caller held.
         let superseded: RecordedConclusion | undefined;
         let revision:
           | { old: AnalysisRef; decision: Ref<"decision">; because?: ReviewRef }
           | undefined;
         if (input.replacing !== undefined) {
-          // **Scoped to the analysis this one revises, not to this one.** A
-          // replacement supersedes findings of the analysis it replaced, so the
-          // handle the caller holds belongs to the OLD analysis. The lineage
-          // decision is what makes that reachable:
-          // `new <-MOTIVATES- Decision -CHANGES-> old`.
-          revision = await this.revisedBy(input.analysis);
-          const revised = revision?.old;
-          if (revised === undefined)
-            throw new Error(
-              `${input.analysis} replaces nothing, so ${input.replacing} is not its to supersede.`,
-            );
-          const already = await this.conclusionsOf(revised);
-          superseded = already.find(
-            (c) => c.claim === input.replacing || c.evidence === input.replacing,
-          );
-          if (!superseded) {
-            const named = already.length
-              ? already.map((c) => `${c.claim} "${c.proposition}"`).join(", ")
-              : "nothing at all";
-            throw new Error(
-              `${revised} did not conclude ${input.replacing}. It concluded: ${named}`,
-            );
-          }
-
-          // **A finding falls once, and it fell when the revision was recorded.** So
-          // `replacing` here is not the act of superseding; it names which superseded finding
-          // this one stands in place of, for a reader that would otherwise match on wording.
-          // What is refused is naming a finding that some OTHER act withdrew.
-          const gone = await this.supersessionOf(superseded.claim);
-          if (gone !== undefined && gone !== revision?.decision)
-            throw new Error(`${superseded.claim} was superseded by a different act`);
+          superseded = await this.conclusionBehind(input.replacing);
+          if (superseded === undefined) throw new Error(`${input.replacing} not found`);
         }
 
         // Inherited from what is being superseded, overridden when given. A
@@ -366,30 +355,7 @@ export class Shared extends SessionCore {
           throw new Error(
             `conclude needs --proposition, or a claim or finding to inherit it from.`,
           );
-        // **A challenging bearing is never inherited in silence.** Inheriting `supports` is
-        // indistinguishable from the default, so nothing is being assumed on the caller's
-        // behalf.
-        if (input.bearing === undefined && superseded?.bearing === "challenges")
-          throw new Error(
-            `${superseded.claim} challenges its proposition. Pass --bearing supports or --bearing challenges.`,
-          );
         const bearing = input.bearing ?? superseded?.bearing ?? "supports";
-
-        // A withdrawn proposition cannot be re-asserted as a side effect of recording some
-        // other analysis.
-        if (superseded === undefined) {
-          if (revision === undefined) revision = await this.revisedBy(input.analysis);
-          const enquiry = staging?.enquiry ?? (await this.enquiryOf(input.analysis));
-          const { withdrawn, by, replacedBy } = await this.withdrawalOf({
-            proposition,
-            ...(enquiry === undefined ? {} : { enquiry }),
-          });
-          if (withdrawn && by !== revision?.decision)
-            throw new Error(
-              `"${proposition}" was withdrawn${replacedBy ? ` in favour of "${replacedBy.asserts}" (${replacedBy.claim})` : ""}; ` +
-                `it cannot be re-asserted by recording another analysis`,
-            );
-        }
 
         const evidence = unitOfWork.node("Evidence", { statement: input.finding });
         const claim = unitOfWork.node("Claim", {

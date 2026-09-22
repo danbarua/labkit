@@ -61,7 +61,7 @@ lab() { bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.s
 # alone: a wrong message, a crash that printed to stdout, and a run that never
 # reached the announcement at all. The last one reported an empty `stderr was:`
 # and said nothing about why.
-first_out="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>/tmp/labkit-first-err.$$)" || first_status=$?
+first_out="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh now 2>/tmp/labkit-first-err.$$)" || first_status=$?
 first_status="${first_status:-0}"
 first_err="$(cat /tmp/labkit-first-err.$$)"; rm -f /tmp/labkit-first-err.$$
 case "$first_err" in
@@ -74,7 +74,7 @@ case "$first_err" in
     exit 1 ;;
 esac
 
-second_err="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh known 2>&1 >/dev/null)"
+second_err="$(bun "$root/packages/app-cli/cli.ts" --db "$db" --author full-lifecycle.sh now 2>&1 >/dev/null)"
 case "$second_err" in
   *"creating a new record"*) printf '\nFAILED: it announced a new record twice\n' >&2; exit 1 ;;
   *) printf '  ok  %s\n' "the second says nothing" ;;
@@ -170,7 +170,7 @@ echo "  gate $gate governing $criterion"
 # Declared and never evaluated: a gate has a state before anybody checks it, and
 # it is not "passed".
 expect "a gate nobody has evaluated is never-evaluated" \
-  "$(lab gate "$gate")" "never-evaluated"
+  "$(lab why "$gate")" "is never evaluated"
 
 echo "== measuring, then analysing =="
 
@@ -202,7 +202,7 @@ echo "== checking, promoting, closing =="
 
 lab evaluate "$criterion" --gate "$gate" --value 'n=24 at every depth' --outcome pass >/dev/null
 expect "the gate is satisfied once its condition passes" \
-  "$(lab gate "$gate")" "satisfied"
+  "$(lab why "$gate")" "is satisfied"
 
 # **Deliberately left exploratory above**, so this line is load-bearing rather
 # than ceremonial. `whatIsKnown` reads `Claim.kind`, and a conclusion recorded
@@ -215,24 +215,14 @@ lab close enquiry "$enquiry" --answered-by "$claim" >/dev/null
 
 echo "== reading it back =="
 
-known=$(lab known --json)
-established=$(printf '%s' "$known" | pluck established)
-provisional=$(printf '%s' "$known" | pluck provisional)
-expect "the answered question is established" "$established" "does the pruning schedule move convergence?"
-refute "and not merely provisional -- the claim was promoted" \
-  "$provisional" "does the pruning schedule move convergence?"
 
 why=$(lab why "$claim")
 expect "the claim is supported" "$why" "supported"
 expect "the finding under it is named" "$why" "converges ~3 steps earlier"
 expect "the prespecified standard is shown" "$why" "the effect holds at n>=20"
+expect "the claim was promoted" "$why" "confirmatory"
 
-expect "the enquiry reports itself closed" "$(lab enquiry "$enquiry")" "closed"
-
-# The dependency walk is a lower bound and says so; what matters here is that
-# the claim is reached from the artefact the analysis read.
-expect "the claim is reachable from what it rests on" \
-  "$(lab affects depth-sweep-raw)" "$claim"
+expect "the enquiry reports itself closed" "$(lab enquiries --json | jq -c --arg e "$enquiry" '.[] | select(.enquiry == $e)')" "\"closed\":true"
 
 # The one read that answers from the event log rather than the graph. Nothing
 # else can say who did this.
@@ -267,7 +257,7 @@ expect "an act is findable by what it minted" "$(lab happened "$claim")" "conclu
 # above reads piped output, where the palette is off. A value rewritten for
 # display and then computed on came back `NaN days ago` in a terminal and
 # correct through a pipe, so the suite and CI both passed it (#429, #431).
-for view in now known gates work claims conditions enquiries analyses "happened --limit 20"; do
+for view in now gates work claims conditions enquiries analyses "happened --limit 20"; do
   # shellcheck disable=SC2086
   painted=$(FORCE_COLOR=1 lab $view 2>&1)
   for rubbish in NaN undefined "Invalid Date" "[object Object]" "\${"; do
@@ -278,7 +268,7 @@ for view in now known gates work claims conditions enquiries analyses "happened 
   done
   step=$((step + 1))
 done
-printf '  ok  nine views render with colour on and print nothing broken\n'
+printf '  ok  eight views render with colour on and print nothing broken\n'
 
 echo
 echo "OK: $step assertions over a real database, all passed."

@@ -82,7 +82,7 @@ encoder_gate_observations=$(lab --date "$STAGE2B_GATE_FAILED" observe "$denoisin
 lab --date "$STAGE2B_GATE_FAILED" evaluate "$encoder_gate_criterion" --gate "$encoder_gate" \
   --value "rho=169.851 at ENCODER_STEPS=150, against a threshold of 10" --outcome fail \
   --citing "$encoder_gate_observations" >/dev/null
-ask gate "$encoder_gate"
+ask why "$encoder_gate"
 
 # "Diagnose why Stage 2B's encoder gate failed at ladder stage 1",
 # 2026-08-06T00:02:13+01:00. Diagnostic-only: no locked pipeline code was
@@ -125,9 +125,8 @@ lab --date "$STAGE2B_GATE_AMENDED" evaluate "$amended_encoder_criterion" --gate 
   --value "both medians exact 0.0 at ENCODER_STEPS=1200 -- the escape clause, not the ratio" --outcome pass \
   --citing "$encoder_gate_pass_observations" >/dev/null
 
-ask gate "$encoder_gate"
 printf '\n-- how the locked condition was amended, and on what\n'
-ask design "$encoder_gate"
+ask why "$encoder_gate"
 
 # "Build the Phase B driver, and clear two blockers found before
 # provisioning", 2026-08-07T16:54:13+01:00 -- the last of the ladder
@@ -177,26 +176,10 @@ lab --date "$STAGE2B_STAGE4" is confirmed "$primary_denoising_claim" --because "
 
 say "closing Stage 2B's own line of enquiry"
 lab --date "$STAGE2B_STAGE4" close enquiry "$denoising_enquiry" --answered-by "$primary_denoising_claim" >/dev/null
-ask enquiry "$denoising_enquiry"
+ask why "$denoising_enquiry"
 
-printf '\n-- what was known the moment this stage actually closed (#166)?\n'
-ask known --at "$STAGE2B_STAGE4"
-
-say "standing point-in-time queries (#166), run against the full chain"
-
-# The reviewer's ruling instant -- gates.toml's own header, "ruling of
-# 2026-08-08, §5". #166 predicted this would show 1A closed negative, 1B.2
-# established locally, 1C confirmed, 2A/2B absent -- checked against the
-# real mined dates rather than assumed, and it is NOT what the record
-# shows: Stage 2A ran and closed entirely on 2026-08-02 through 2026-08-04
-# (STAGE2A_COST_RESULTS in probe-bonsai-2a.sh), four to six days before this
-# ruling, so its cost-accounting question is already `provisional` here,
-# not absent. Only Stage 2B (posed and pursued 2026-08-05 under
-# STAGE2B_DESIGN_LOCK, but not analysed until STAGE2B_STAGE4 on
-# 2026-08-09) is genuinely `open` -- pursued, nothing concluded yet. The
-# prediction was reasonable before the archaeology; the record, once
-# dated for real, is the more precise answer.
-ask known --at 2026-08-08T00:00:00.000Z
+say "what stands, run against the full chain"
+ask now
 
 say "the events this script generated"
 ask happened

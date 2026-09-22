@@ -457,38 +457,4 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
    * **Researcher:** I superseded that analysis. Then I noticed one more thing in its output and
    * went to record it against it.
    */
-  test("a superseded analysis takes no further conclusions", async () => {
-    const { enquiry, analysis, observations } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict: "the bootstrap does not implement the intended null",
-    });
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
-
-    // Refused, and the message names where the finding belongs instead —
-    // a three-part refusal, not a bare no.
-    await expect(
-      session.writes.conclude({
-        analysis,
-        proposition: "one more thing the old run showed",
-        finding: "noticed afterwards",
-      }),
-    ).rejects.toThrow(new RegExp(`has been superseded. Record this on ${report.replacement}`));
-
-    // The replacement still takes them, which is what makes the refusal about
-    // supersession rather than about analyses in general.
-    const { claims } = await session.writes.conclude({
-      analysis: report.replacement,
-      proposition: "one more thing the new run showed",
-      finding: "noticed afterwards",
-    });
-    expect(claims).toHaveLength(1);
-  });
 });

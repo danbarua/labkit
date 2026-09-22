@@ -24,10 +24,11 @@ import { applyDelta } from "@labkit/core-domain/projection";
 
 const [tenant, ...rest] = process.argv.slice(2);
 if (!tenant) {
-  console.error("usage: project-museum.ts <tenant> [--simplify]");
+  console.error("usage: project-museum.ts <tenant> [--simplify | --verbs]");
   process.exit(2);
 }
 const simplify = rest.includes("--simplify");
+const verbs = rest.includes("--verbs");
 const url = process.env.LABKIT_DB_URL;
 if (!url) {
   console.error("LABKIT_DB_URL names the database this writes to");
@@ -36,8 +37,26 @@ if (!url) {
 
 type Act = Omit<DomainEvent, "changes"> & { changes: GraphChange[] };
 const acts = JSON.parse(
-  readFileSync(`${process.env.HOME}/labkit-museum-events.json`, "utf8"),
+  readFileSync(
+    process.env.LABKIT_MUSEUM_EVENTS ?? `${process.env.HOME}/labkit-museum-events.json`,
+    "utf8",
+  ),
 ) as Act[];
+
+/**
+ * `--verbs`: an edge label is the word of the verb that wrote it. Four labels in the corpus
+ * are not; every other label already is. No properties.
+ */
+const VERB_WORD: Record<string, string> = {
+  PROMOTES: "CONFIRMED", // is confirmed
+  DEFERS: "ACCEPTS", // accept
+  NARROWS: "SHARPENS", // sharpen
+  RESTS_ON: "BASED_ON", // synthesise, the existing word for resting on
+};
+const verbWord = (change: GraphChange): GraphChange =>
+  change.change === "EdgeCreated" && VERB_WORD[change.label]
+    ? { ...change, label: VERB_WORD[change.label] as typeof change.label }
+    : change;
 
 /** What each collapsed label becomes: one edge, and the word that used to be the label. */
 const COLLAPSE: Record<string, { label: string; prop: string; value: string }> = {
@@ -127,7 +146,11 @@ try {
   // 1. The events, numbered by the database.
   let recorded = 0;
   for (const act of acts) {
-    const changes = simplify ? act.changes.map(simplified) : act.changes;
+    const changes = simplify
+      ? act.changes.map(simplified)
+      : verbs
+        ? act.changes.map(verbWord)
+        : act.changes;
     await events.record({
       at: act.at,
       attribution: act.attribution,
@@ -152,7 +175,9 @@ try {
       // A collapsed label is either unknown to the schema or joins a pair it does not list.
       if (
         change.change === "EdgeCreated" &&
-        (!(change.label in EDGE_SCHEMA) || (simplify && COLLAPSED.has(change.label)))
+        (!(change.label in EDGE_SCHEMA) ||
+          (simplify && COLLAPSED.has(change.label)) ||
+          (verbs && Object.values(VERB_WORD).includes(change.label)))
       ) {
         await foreignEdge(change.from, change.label, change.to, change.props ?? {});
       } else {
