@@ -65,7 +65,10 @@ export interface DbBackend {
   connect(): Promise<LabKitDBConnection>;
 }
 
-async function openPglite(dataDir: string): Promise<PGlite> {
+/**
+ * A PGlite cluster at `dataDir`, opened with LabKit's extensions and nothing run against it.
+ */
+export async function openPglite(dataDir: string): Promise<PGlite> {
   // Assets handed in rather than located -- see `./extensions.ts`. Doing it
   // unconditionally keeps one code path: an interpreted run reads the same
   // files from `node_modules/`, a compiled one from inside the bundle.

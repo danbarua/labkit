@@ -36,7 +36,8 @@ Upstream: PGlite #414 and Bun #15032 are the same `ENOENT /$bunfs/root/pglite.da
 | behaviour | consequence |
 |---|---|
 | a `dataDir` missing its final path segment silently initialises a fresh empty cluster | no error. You back up or query the wrong thing with no signal. Always open through the connection helper, which holds the lock and checks the path |
-| there is no `pg_dump` | the equivalents are `dumpDataDir()` / `loadDataDir()`. The dump is a tarball that gzips about six times |
+| `pg_dump` is not in `@electric-sql/pglite` | it is `pgDump()` in `@electric-sql/pglite-tools` (https://pglite.dev/docs/pglite-tools#pgDump), which runs against a PGlite instance and returns SQL that restores into real Postgres. `dumpDataDir()` / `loadDataDir()` are the raw-cluster alternative; that tarball is a 32-bit WASM cluster image and restores only into another PGlite |
+| `pgDump()` in a compiled binary reads `<its module's directory>/pg_dump.wasm` with `fs.readFileSync` and offers no `locateFile` | in `$bunfs` that directory is `/$bunfs/root/` and an embedded file carries a hash (`pg_dump-k93pqapb.wasm`), so the read fails with `Aborted(ENOENT)`. Embed the wasm with `type: "file"` and redirect that one path in `fs.readFileSync` before importing `pglite-tools`. Measured on bun 1.4.2, pglite 0.5.8, pglite-tools 0.4.8: the dump restores into pg0 |
 | PGlite is single-writer and single-process | the mutex is a PID lockfile opened `wx` — atomic exclusive-create, the same mechanism as `postmaster.pid` |
 | a cold open (initdb plus first migration) takes about 1067ms against 80-96ms warm | any lock deadline must clear the cold case |
 | `count(*)` and `bigserial` come back as a string from `pg` and a number from raw PGlite | decode both |
