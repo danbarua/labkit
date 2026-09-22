@@ -35,7 +35,7 @@ afterEach(async () => {
 const REWIRING = "T differs from the rewiring control";
 
 /**
- * The transcriber's own sentence, from `scripts/probe-bonsai-1a.sh`, kept
+ * The transcriber's own sentence, from `scripts/db/probe-bonsai-1a.sh`, kept
  * verbatim: it is the record of what the researcher said, and paraphrasing it
  * would make this scenario about wording this repo chose.
  */
