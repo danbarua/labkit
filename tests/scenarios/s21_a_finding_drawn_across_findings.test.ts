@@ -277,20 +277,19 @@ describe("S-21: a finding drawn across findings", () => {
       .map((finding) => finding.evidence)
       .sort();
 
-    expect(edges.filter((edge) => edge.label === "IN_LIGHT_OF").map((edge) => edge.to)).toEqual([
-      synthesis,
-    ]);
+    // One edge, BASED_ON, from the acceptance to the synthesis it was read in light of and
+    // to every finding that synthesis is drawn across.
     expect(
       edges
         .filter((edge) => edge.label === "BASED_ON")
         .map((edge) => edge.to)
         .sort(),
-    ).toEqual(expectedEvidence);
+    ).toEqual([synthesis, ...expectedEvidence].sort());
     const explained = await (await afterwards()).reads.why({ subject: accepted.decision });
     expect(explained.because).toContainEqual(
       expect.objectContaining({
         handle: synthesis,
-        wording: expect.stringContaining("in light of"),
+        wording: expect.stringContaining("rests on"),
       }),
     );
   });
