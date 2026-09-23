@@ -1,11 +1,11 @@
 import { optional, vertexProps } from "@labkit/core-db/cypher";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import { SessionCore } from "../core";
-import { compose, per, type Row } from "../facts";
 import { byHandle, ref } from "../report";
 import type {
   AmendmentRecord,
   BlockedWork,
+  CheckStatus,
   CitedFinding,
   Condition,
   ConditionHistory,
@@ -30,11 +30,12 @@ import type {
   WorkListQuery,
 } from "../queries";
 import {
-  checkStatusForGate,
-  gateConditionsAnchor as anchorInForce,
-  inForce,
   type CheckState,
-} from "../survey-facts";
+  checkStatusOf,
+  criteriaChecks,
+  gateConditionColumns,
+  gateConditionsAnchor,
+} from "./checks";
 import type { Identified } from "./shared";
 /**
  * What each of these criteria is holding up.
@@ -287,24 +288,21 @@ export class BlockedGroup extends SessionCore {
     const found = declared[0];
     if (!found) throw new Error(`${gate} not found`);
 
-    // Every governing criterion with the evaluations that pertain to THIS gate. Two scopes are
-    // deliberately kept apart:  gate-scoped  (here) -- has this condition been checked FOR this
-    // gate? criterion-scoped    -- has this check ever been shown able to fail?
-    const { cypher, decoders } = compose(anchorInForce("one"), checkStatusForGate, {
-      crit: vertexProps<{ natural_id: string; proposition: string }>(),
-      amended: optional(vertexProps<{ natural_id: string }>()),
-    });
-    // Conditions an `amend` retired still `GOVERNS` this gate — that is what
-    // keeps the original readable — and they are not live conditions. Counting
-    // one made Bonsai's Stage 2B ladder read `blocked` after its amended gate
-    // passed and the stage ran to completion.
-    const rows = inForce(
-      (await this.graph.query(cypher, decoders, { id: gate })) as unknown as Row[],
+    // Every governing criterion with the evaluations that pertain to this gate: has this
+    // condition been checked for this gate? A condition an amendment superseded still GOVERNS
+    // the gate, which keeps the original readable, and is not in force.
+    const governing = await criteriaChecks(
+      this.graph,
+      gateConditionsAnchor("one"),
+      { id: gate },
+      {
+        extra: gateConditionColumns,
+        gate: "g",
+      },
     );
-    // Flattened: a criterion yields one check per finding it was judged
-    // about, so a rule held against four controls is four conditions on this
-    // gate rather than one line folding them together (#293).
-    const checks = [...per(checkStatusForGate, rows).values()].flat();
+    const checks = [...governing.values()]
+      .filter((c) => c.extra.amended === null)
+      .flatMap(checkStatusOf);
     // Every state present, zero included -- see `GateStatus.counts`.
     const counts: GateStatus["counts"] = {
       passed: 0,
@@ -381,24 +379,24 @@ export class BlockedGroup extends SessionCore {
    * Every gate, with the state a reader is filtering on.
    */
   async gateList({ state }: GateListQuery): Promise<ListedGate[]> {
-    const { cypher, decoders } = compose(anchorInForce("every"), checkStatusForGate, {
-      crit: vertexProps<{ natural_id: string; proposition: string }>(),
-      g: vertexProps<{ natural_id: string; consequence: string }>(),
-      amended: optional(vertexProps<{ natural_id: string }>()),
-    });
-    // Same exclusion `gateStatus` makes, from the same named clause.
-    const rows = inForce((await this.graph.query(cypher, decoders, {})) as unknown as Row[]);
-
-    // Bucketed on the gate the row was reached through, never on the criterion.
-    const byGate = new Map<string, { consequence: string; rows: Row[] }>();
-    for (const row of rows) {
-      const gate = row.g as { natural_id: string; consequence: string } | undefined;
-      if (!gate?.natural_id) continue;
-      const bucket = byGate.get(gate.natural_id) ?? {
-        consequence: gate.consequence,
-        rows: [],
-      };
-      bucket.rows.push(row);
+    // One entry per (gate, criterion): a criterion governing two gates is read for each, since
+    // which evaluations bear on it differs by gate. Bucketed on the gate.
+    const governing = await criteriaChecks(
+      this.graph,
+      gateConditionsAnchor("every"),
+      {},
+      {
+        extra: gateConditionColumns,
+        gate: "g",
+        key: (row) => `${row.g.natural_id}|${row.crit.natural_id}`,
+      },
+    );
+    const byGate = new Map<string, { consequence: string; checks: CheckStatus[] }>();
+    for (const found of governing.values()) {
+      if (found.extra.amended !== null) continue;
+      const gate = found.extra.g;
+      const bucket = byGate.get(gate.natural_id) ?? { consequence: gate.consequence, checks: [] };
+      bucket.checks.push(...checkStatusOf(found));
       byGate.set(gate.natural_id, bucket);
     }
 
@@ -434,8 +432,7 @@ export class BlockedGroup extends SessionCore {
     const closed = new Set(closedRows.map((row) => row.g.natural_id));
 
     const listed = [...byGate.entries()]
-      .map(([id, { consequence, rows: forGate }]) => {
-        const checks = [...per(checkStatusForGate, forGate).values()].flat();
+      .map(([id, { consequence, checks }]) => {
         // The most recent decision across every condition — a gate with no
         // decided condition (never evaluated) has none to report.
         const decidedAt = checks

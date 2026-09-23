@@ -31,7 +31,6 @@
 		"check:comment-length": "bun scripts/checks/check-comment-length.ts",
 		"check:help-groups": "bun scripts/checks/check-help-groups.ts",
 		"check:empty-population": "bun scripts/checks/check-empty-population.ts",
-		"check:facts": "bun scripts/checks/check-facts.ts",
 		"check:no-stringly-typed": "bun scripts/checks/check-no-stringly-typed.ts",
 		"check:prop-classes": "bun scripts/checks/check-prop-classes.ts",
 		"check:stdout": "bash scripts/checks/check-stdout.sh",

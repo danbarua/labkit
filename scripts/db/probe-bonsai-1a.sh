@@ -29,7 +29,7 @@
 # ## What transcribing this by hand found
 #
 # **One still-open design gap.** `why <claim>`'s "Held to" line is
-# criterion-scoped by design (`checkStatusOver`, packages/core-domain/survey-facts.ts)
+# criterion-scoped by design (`checkStatusOf`, packages/core-domain/read/checks.ts)
 # -- every standing evaluation of a criterion counts, and one failure fails it
 # for every claim held to it. Bonsai's re-verification decision rule is ONE
 # rule instantiated PER COMPARISON (4 of them), which LabKit has no way to
