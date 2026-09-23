@@ -77,7 +77,7 @@ export class StoryGroup extends SessionCore {
 
     const rows = await this.graph.query(
       `MATCH (q:Question)-[:MOTIVATES]->(loe:LineOfEnquiry {natural_id: $id})
-       OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(loe)
+       OPTIONAL MATCH (resolving:Decision)-[:CLOSES]->(loe)
        OPTIONAL MATCH (resolving)-[:ANSWERS]->(answered:Claim)
        OPTIONAL MATCH (deferring:Decision)-[:ACCEPTS]->(q)
        RETURN q, resolving, answered, deferring`,
@@ -395,7 +395,7 @@ export class StoryGroup extends SessionCore {
     claim,
   }: InterpretationHistoryQuery): Promise<InterpretationHistory> {
     // **Walked by id.** `reinterpret` writes `Decision -MOTIVATES-> narrower` and `Decision
-    // -CHANGES-> each withdrawn claim`, both carrying natural ids, so every step is reachable
+    // -SUPERSEDES-> each withdrawn claim`, both carrying natural ids, so every step is reachable
     // by identity.
     const proposition = await this.assertedBy(claim);
     if (proposition === undefined) throw new Error(`${claim} not found`);
@@ -415,7 +415,7 @@ export class StoryGroup extends SessionCore {
         // camelCase one decodes as null. See `buildAsClause`.
         `MATCH (d:Decision)-[:MOTIVATES]->(nxt:Claim)
          WHERE nxt.natural_id IN $ids
-         MATCH (d)-[:CHANGES]->(was:Claim)
+         MATCH (d)-[:SUPERSEDES]->(was:Claim)
          RETURN d, was, nxt`,
         {
           d: vertexProps<{ natural_id: string; reason: string }>(),
@@ -942,7 +942,7 @@ export class StoryGroup extends SessionCore {
        //
        // Two clauses, because AGE has no edge alternation; filtered in
        // TypeScript, because it has no NOT (pattern) predicate in WHERE.
-       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (narrowed:Decision)-[:SUPERSEDES]->(c)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
        RETURN a, e, narrowed, replaced`,
         {
@@ -998,7 +998,7 @@ export class StoryGroup extends SessionCore {
   private async supersededClaim(claim: ClaimRef): Promise<boolean> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id})
-       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (narrowed:Decision)-[:SUPERSEDES]->(c)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
        RETURN narrowed, replaced`,
       {
@@ -1087,9 +1087,9 @@ export class StoryGroup extends SessionCore {
     return ref("observations", rows[0]!.a.natural_id);
   }
   /**
-   * Walks SUPERSEDES both ways (Note and Decision), CHANGES, and paired MOTIVATES.
+   * Walks SUPERSEDES both ways (Note and Decision), SUPERSEDES, and paired MOTIVATES.
    * Works for any handle kind. Steps that were superseded are marked false starts;
-   * successor is named when SUPERSEDES/CHANGES record one (via the MOTIVATES target).
+   * successor is named when SUPERSEDES/SUPERSEDES record one (via the MOTIVATES target).
    * Orders by event seq when available, else by id numeric. --since filters steps.
    */
   async how({ subject, since }: HowQuery): Promise<How> {
@@ -1117,9 +1117,9 @@ export class StoryGroup extends SessionCore {
       }
 
       const ch = await this.graph.query(
-        `MATCH (a {natural_id: $id})-[r:CHANGES]->(b) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other
+        `MATCH (a {natural_id: $id})-[r:SUPERSEDES]->(b) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other
          UNION
-         MATCH (b)-[r:CHANGES]->(a {natural_id: $id}) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other`,
+         MATCH (b)-[r:SUPERSEDES]->(a {natural_id: $id}) WHERE a.retracted IS NULL AND b.retracted IS NULL RETURN b AS other`,
         { other: vertexProps<{ natural_id: string }>() },
         { id: cur },
       );
@@ -1141,7 +1141,7 @@ export class StoryGroup extends SessionCore {
         if (r.m?.natural_id && !visited.has(r.m.natural_id)) toVisit.push(r.m.natural_id);
       }
       const viaC = await this.graph.query(
-        `MATCH (d:Decision)-[:CHANGES]->(x {natural_id: $id}) OPTIONAL MATCH (d)-[:MOTIVATES]->(m) RETURN d, m`,
+        `MATCH (d:Decision)-[:SUPERSEDES]->(x {natural_id: $id}) OPTIONAL MATCH (d)-[:MOTIVATES]->(m) RETURN d, m`,
         {
           d: optional(vertexProps<{ natural_id: string }>()),
           m: optional(vertexProps<{ natural_id: string }>()),
@@ -1156,7 +1156,7 @@ export class StoryGroup extends SessionCore {
       const mot = await this.graph.query(
         `MATCH (d:Decision)-[:MOTIVATES]->(m {natural_id: $id})
          OPTIONAL MATCH (d)-[:SUPERSEDES]->(s)
-         OPTIONAL MATCH (d)-[:CHANGES]->(c)
+         OPTIONAL MATCH (d)-[:SUPERSEDES]->(c)
          RETURN d, s, c`,
         {
           d: optional(vertexProps<{ natural_id: string }>()),
@@ -1174,7 +1174,7 @@ export class StoryGroup extends SessionCore {
       const decL = await this.graph.query(
         `MATCH (d:Decision {natural_id: $id})
          OPTIONAL MATCH (d)-[:SUPERSEDES]->(s)
-         OPTIONAL MATCH (d)-[:CHANGES]->(c)
+         OPTIONAL MATCH (d)-[:SUPERSEDES]->(c)
          OPTIONAL MATCH (d)-[:MOTIVATES]->(m)
          RETURN s, c, m`,
         {
@@ -1236,10 +1236,9 @@ export class StoryGroup extends SessionCore {
           succ?: { natural_id: string } | null;
         };
         let drow: SupersederRow | null = null;
-        // Collect candidates from both SUPERSEDES and CHANGES without LIMIT 1 so we can pick
-        // the decision that actually names a claim successor when the target is a claim.
-        // (replaceAnalysis SUPERSEDES the old claims as side-effect but MOTIVATES the new analysis;
-        // the conclude --replacing creates the decision that SUPERSEDES old claim and MOTIVATES new claim.)
+        // Every superseding decision, so the one that names a claim successor can be picked
+        // when the target is a claim: replacing an analysis supersedes its claims but motivates
+        // the new analysis, while `conclude --replacing` motivates the new claim.
         const supRows = await this.graph.query(
           `MATCH (d:Decision)-[:SUPERSEDES]->(t {natural_id: $id}) WHERE t.retracted IS NULL OPTIONAL MATCH (d)-[:MOTIVATES]->(succ) RETURN d, succ`,
           {
@@ -1248,15 +1247,7 @@ export class StoryGroup extends SessionCore {
           },
           { id: h },
         );
-        const chRows = await this.graph.query(
-          `MATCH (d:Decision)-[:CHANGES]->(t {natural_id: $id}) WHERE t.retracted IS NULL OPTIONAL MATCH (d)-[:MOTIVATES]->(succ) RETURN d, succ`,
-          {
-            d: vertexProps<{ natural_id: string; reason?: string }>(),
-            succ: optional(vertexProps<{ natural_id: string }>()),
-          },
-          { id: h },
-        );
-        const candidates = [...supRows, ...chRows].filter((r) => r.d);
+        const candidates = supRows.filter((r) => r.d);
         if (candidates.length > 0) {
           // Prefer a successor that is a claim when the superseded handle is a claim.
           const isClaim = kindOf(h) === "claim";

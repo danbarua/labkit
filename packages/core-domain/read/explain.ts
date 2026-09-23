@@ -732,9 +732,8 @@ async function explainGate(self: ReadSurface, subject: string): Promise<GateExpl
       is = "satisfied";
       because = report.checks.map(causeForCheck);
       break;
-    case "sidestepped":
-    case "retired":
-      is = report.state;
+    case "closed":
+      is = "closed";
       because = report.closure
         ? [{ handle: report.closure.decision, wording: report.closure.because }]
         : [];
@@ -808,12 +807,9 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   GRADES: { out: "graded", in: "was graded by" },
   ABOUT: { out: "is about", in: "is the subject of" },
   KEEPS: { out: "kept", in: "was kept by" },
-  CHANGES: { out: "changed", in: "was changed by" },
   BASED_ON: { out: "rests on", in: "was cited by" },
   IN_LIGHT_OF: { out: "is in light of", in: "was considered in light of" },
-  RESOLVES: { out: "settled", in: "was settled by" },
-  SIDESTEPS: { out: "sidestepped", in: "was sidestepped by" },
-  RETIRES: { out: "retired", in: "was retired by" },
+  CLOSES: { out: "closed", in: "was closed by" },
   ANSWERS: { out: "answers on", in: "was named as the answer by" },
   SHARPENS: { out: "sharpened", in: "was sharpened by" },
   ACCEPTS: { out: "left open", in: "was left open by" },

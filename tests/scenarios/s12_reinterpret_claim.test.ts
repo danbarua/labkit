@@ -170,8 +170,13 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     // like it. Matching on the sentence would not have noticed either way.
     expect(withdrawn.replacedBy?.claim).toEqual(narrowing.nowClaims.claim);
     expect(withdrawn.replacedBy?.asserts).toBe(NARROWER);
-    // Its findings are still there, and still say what they said.
-    expect(withdrawn.support).toHaveLength(2);
+    // Its findings are still there, and still say what they said, read as history on the
+    // interpretation they no longer support.
+    expect(withdrawn.superseded).toHaveLength(2);
+    expect(withdrawn.superseded.map((s) => s.reason)).toEqual([
+      "both types attenuate",
+      "both types attenuate",
+    ]);
 
     // Still readable, and readable as history rather than as something that
     // never happened.
@@ -215,13 +220,14 @@ describe("S-12 — the numbers are right; the sentence about them is wrong", () 
     ]);
     expect(now.superseded).toEqual([]);
 
-    // And the withdrawn interpretation's findings are not reported as
-    // withdrawn evidence: nothing about them changed.
+    // The withdrawn interpretation keeps its findings as history: nothing about them changed,
+    // the claim they bore on was replaced.
     const withdrawn = await later.reads.whySupported({
       claim: claimOf(programme.firstClaims, PREFERENTIAL),
     });
-    expect(withdrawn.superseded).toEqual([]);
-    void programme;
+    expect(withdrawn.superseded.map((s) => s.finding).sort()).toEqual(
+      now.support.map((s) => s.finding).sort(),
+    );
   });
 
   /**

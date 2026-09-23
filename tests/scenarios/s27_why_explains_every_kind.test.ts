@@ -135,7 +135,7 @@ describe("S-27: why explains every kind", () => {
     expect(reached).toContain(enquiry);
     // And how it is joined, in words a researcher would use.
     const settled = explained.because.find((c) => c.handle === enquiry);
-    expect(settled!.wording).toContain("settled");
+    expect(settled!.wording).toContain("closed");
     expect(claim).toBeTruthy();
   });
 

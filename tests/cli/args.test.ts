@@ -106,8 +106,7 @@ test("a command with no bad arguments reaches its action", async () => {
 
 test("a bad --state names the values it would have accepted", async () => {
   // The query schema is the validator. A typo is refused with the vocab, not a silent full list.
-  expect(await refusal(["gates", "--state", "blockd"])).toContain("sidestepped");
-  expect(await refusal(["gates", "--state", "blockd"])).toContain("retired");
+  expect(await refusal(["gates", "--state", "blockd"])).toContain("closed");
   expect(await refusal(["work", "--state", "carriedout"])).toContain("carried-out");
 });
 
@@ -167,7 +166,7 @@ test("main prints a validation message when --state is wrong", async () => {
     db = await mkdtemp(join(tmpdir(), "labkit-state-msg-"));
     const code = await main(["--db", db, "gates", "--state", "blockd"]);
     expect(code).toBe(1);
-    expect(chunks.join("")).toContain("sidestepped");
+    expect(chunks.join("")).toContain("closed");
     expect(chunks.join("")).not.toContain('"labkit":"request-failed"');
   } finally {
     process.stderr.write = write;

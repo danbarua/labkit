@@ -104,7 +104,7 @@ export class Shared extends SessionCore {
   protected async supersessionOf(claim: ClaimRef): Promise<Ref<"decision"> | undefined> {
     const rows = await this.graph.query(
       `MATCH (c:Claim {natural_id: $id})
-       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (narrowed:Decision)-[:SUPERSEDES]->(c)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
        RETURN narrowed, replaced`,
       {

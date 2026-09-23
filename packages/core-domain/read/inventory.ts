@@ -64,7 +64,7 @@ export class InventoryGroup extends SessionCore {
       `MATCH (e:LineOfEnquiry) WHERE e.retracted IS NULL
        OPTIONAL MATCH (q:Question)-[:MOTIVATES]->(e)
        OPTIONAL MATCH (u:EvidenceUnit)-[:ADDRESSES]->(e)
-       OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(e)
+       OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(e)
        RETURN e, q, u, closing`,
       {
         e: vertexProps<{ natural_id: string; name: string }>(),
@@ -133,7 +133,7 @@ export class InventoryGroup extends SessionCore {
       `MATCH (c:Criterion) WHERE c.retracted IS NULL
        OPTIONAL MATCH (c)-[:GOVERNS]->(g:Gate)
        OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
-       OPTIONAL MATCH (amended:Decision)-[:CHANGES]->(c)
+       OPTIONAL MATCH (amended:Decision)-[:SUPERSEDES]->(c)
        RETURN c, g, ev, amended`,
       {
         c: vertexProps<{ natural_id: string; proposition: string }>(),

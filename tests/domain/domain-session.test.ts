@@ -79,7 +79,7 @@ test("an interrupted reinterpret does not retract a finding it cannot replace", 
     claim: await claimNamed(session.reads, "T beats rewired"),
   });
 
-  // Fourth edge: MOTIVATES, EVALUATES, the CHANGES that withdraws the original,
+  // Fourth edge: MOTIVATES, EVALUATES, the SUPERSEDES that withdraws the original,
   // and then the SUPPORTS that carries the evidence across to the narrower
   // claim. Failing on the last one is the damaging moment.
   const interrupted = new ResearchSession(failingOn(graph, "createEdge", 4), {
@@ -149,7 +149,7 @@ test("an interrupted amendDesign leaves the gate governed by its original condit
     "solver converges within 500 iterations",
   ]);
 
-  // Second edge: GOVERNS for the replacement, then the CHANGES that retires
+  // Second edge: GOVERNS for the replacement, then the SUPERSEDES that retires
   // the original.
   const interrupted = new ResearchSession(failingOn(graph, "createEdge", 2), {
     events: session.events,
@@ -382,7 +382,7 @@ test("a close interrupted before BASED_ON writes nothing before retry", async ()
   await session.writes.closeEnquiry({ enquiry, answeredBy });
 
   const resolving = await graph.query(
-    `MATCH (d:Decision)-[:RESOLVES]->(:LineOfEnquiry {natural_id: $enquiry}) RETURN d`,
+    `MATCH (d:Decision)-[:CLOSES]->(:LineOfEnquiry {natural_id: $enquiry}) RETURN d`,
     { d: vertexProps<{ natural_id: string; reason: string }>() },
     { enquiry },
   );
@@ -476,7 +476,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
 });
 
 /**
- * The guard keys on `RESOLVES`, and that is load-bearing rather than incidental.
+ * The guard keys on `CLOSES`, and that is load-bearing rather than incidental.
  */
 test("a question accepted as unresolved can still be closed when evidence arrives", async () => {
   const s = session;
@@ -508,7 +508,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
   expect(accepted.closure).toBeNull();
   expect(accepted.open).toBe(true);
 
-  // Evidence arrives. This must be allowed -- ACCEPTS is not RESOLVES.
+  // Evidence arrives. This must be allowed -- ACCEPTS is not CLOSES.
   await s.writes.closeEnquiry({
     enquiry,
     answeredBy: claimOf(analysisClaims, "depth moves convergence"),
@@ -749,15 +749,13 @@ test("closing a blocked gate releases work without changing its failed check", a
 
   const closed = await session.writes.closeGate({
     gate,
-    closure: "sidestepped",
     because: "the report now labels this comparison exploratory",
   });
   const status = await session.reads.gateStatus({ gate });
-  expect(closed).toMatchObject({ gate, closure: "sidestepped" });
-  expect(status.state).toBe("sidestepped");
+  expect(closed).toMatchObject({ gate });
+  expect(status.state).toBe("closed");
   expect(status.closure).toEqual({
     decision: closed.decision,
-    kind: "sidestepped",
     because: "the report now labels this comparison exploratory",
   });
   expect(status.checks.map((check) => check.state)).toEqual(["failed"]);
@@ -766,13 +764,10 @@ test("closing a blocked gate releases work without changing its failed check", a
   );
   expect((await session.reads.now({})).blocked.work.map((row) => row.work)).not.toContain(work);
 
-  await expect(
-    session.writes.closeGate({ gate, closure: "retired", because: "duplicate" }),
-  ).rejects.toThrow(/already/);
+  await expect(session.writes.closeGate({ gate, because: "duplicate" })).rejects.toThrow(/already/);
   await expect(
     session.writes.closeGate({
       gate: "GATE_does_not_exist" as typeof gate,
-      closure: "retired",
       because: "missing",
     }),
   ).rejects.toThrow(/not found/);

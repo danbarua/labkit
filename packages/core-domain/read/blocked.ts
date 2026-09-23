@@ -49,22 +49,20 @@ export async function blockedBy(
     `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate)
        WHERE c.natural_id IN $ids
        OPTIONAL MATCH (g)-[:GATES]->(w)
-       OPTIONAL MATCH (sidestepping:Decision)-[:SIDESTEPS]->(g)
-       OPTIONAL MATCH (retiring:Decision)-[:RETIRES]->(g)
-       OPTIONAL MATCH (stopping:Decision)-[:RESOLVES]->(w)
-       RETURN c, g, w, sidestepping, retiring, stopping`,
+       OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(g)
+       OPTIONAL MATCH (stopping:Decision)-[:CLOSES]->(w)
+       RETURN c, g, w, closing, stopping`,
     {
       c: vertexProps<Identified>(),
       g: vertexProps<{ consequence: string } & Identified>(),
       w: optional(vertexProps<{ objective: string } & Identified>()),
-      sidestepping: optional(vertexProps<Identified>()),
-      retiring: optional(vertexProps<Identified>()),
+      closing: optional(vertexProps<Identified>()),
       stopping: optional(vertexProps<Identified>()),
     },
     { ids: [...criteria] },
   );
   for (const row of rows) {
-    if (row.sidestepping || row.retiring || row.stopping) continue;
+    if (row.closing || row.stopping) continue;
     // `ref()` rather than the raw id: the key is a handle, and
     // `check:no-stringly-typed` is right that a `Map<string, …>` here says
     // nothing about what the string is. It refuses a mismatched prefix too.
@@ -117,7 +115,7 @@ export function workStateFrom(
   if (task.implemented) return "carried-out";
   if ([...task.after.values()].some((done) => !done)) return "waiting";
   if (task.gates.size === 0) return task.everGated ? "waiting" : "planned";
-  const cleared = new Set<GateStatus["state"]>(["satisfied", "sidestepped", "retired"]);
+  const cleared = new Set<GateStatus["state"]>(["satisfied", "closed"]);
   return states.every((state) => state !== undefined && cleared.has(state)) ? "planned" : "waiting";
 }
 
@@ -199,7 +197,7 @@ export class BlockedGroup extends SessionCore {
     // A condition an amendment withdrew still `GOVERNS` the gate -- that is how
     // the original stays readable. What is in force is what nothing changed.
     const withdrawn = await this.graph.query(
-      `MATCH (:Decision)-[:CHANGES]->(c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
+      `MATCH (:Decision)-[:SUPERSEDES]->(c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
       { c: vertexProps<{ natural_id: string }>() },
       { id: gate },
     );
@@ -236,7 +234,7 @@ export class BlockedGroup extends SessionCore {
     for (;;) {
       const rows = await this.graph.query(
         `MATCH (d:Decision)-[:MOTIVATES]->(:Criterion {natural_id: $id})
-         MATCH (d)-[:CHANGES]->(was:Criterion)
+         MATCH (d)-[:SUPERSEDES]->(was:Criterion)
          OPTIONAL MATCH (d)-[:BASED_ON]->(e:Evidence)
          RETURN d, was, e`,
         {
@@ -278,13 +276,11 @@ export class BlockedGroup extends SessionCore {
   async gateStatus({ gate }: GateStatusQuery): Promise<GateStatus> {
     const declared = await this.graph.query(
       `MATCH (g:Gate {natural_id: $id})
-       OPTIONAL MATCH (sidestepping:Decision)-[:SIDESTEPS]->(g)
-       OPTIONAL MATCH (retiring:Decision)-[:RETIRES]->(g)
-       RETURN g, sidestepping, retiring`,
+       OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(g)
+       RETURN g, closing`,
       {
         g: vertexProps<{ consequence: string }>(),
-        sidestepping: optional(vertexProps<{ natural_id: string; reason: string }>()),
-        retiring: optional(vertexProps<{ natural_id: string; reason: string }>()),
+        closing: optional(vertexProps<{ natural_id: string; reason: string }>()),
       },
       { id: gate },
     );
@@ -332,12 +328,8 @@ export class BlockedGroup extends SessionCore {
       blocks: blocking.get(c.criterion) ?? [],
     }));
 
-    const closing = found.sidestepping
-      ? { kind: "sidestepped" as const, decision: found.sidestepping }
-      : found.retiring
-        ? { kind: "retired" as const, decision: found.retiring }
-        : undefined;
-    const state = closing?.kind ?? gateStateFrom(checks);
+    const closing = found.closing;
+    const state = closing ? ("closed" as const) : gateStateFrom(checks);
 
     // Criterion-scoped, deliberately unfiltered by gate: "has this check ever
     // been shown able to fail" is a question about the check itself.
@@ -351,7 +343,7 @@ export class BlockedGroup extends SessionCore {
 
     const gating = await this.graph.query(
       `MATCH (:Gate {natural_id: $id})-[:GATES]->(w)
-       OPTIONAL MATCH (stopping:Decision)-[:RESOLVES]->(w)
+       OPTIONAL MATCH (stopping:Decision)-[:CLOSES]->(w)
        RETURN w, stopping`,
       {
         w: vertexProps<{ objective: string; kind?: string } & Identified>(),
@@ -367,9 +359,8 @@ export class BlockedGroup extends SessionCore {
       ...(closing
         ? {
             closure: {
-              decision: ref("decision", closing.decision.natural_id),
-              kind: closing.kind,
-              because: closing.decision.reason,
+              decision: ref("decision", closing.natural_id),
+              because: closing.reason,
             },
           }
         : {}),
@@ -416,7 +407,7 @@ export class BlockedGroup extends SessionCore {
     // and nothing said which gate held which task.
     const gatedRows = await this.graph.query(
       `MATCH (g:Gate)-[:GATES]->(w)
-       OPTIONAL MATCH (stopped:Decision)-[:RESOLVES]->(w)
+       OPTIONAL MATCH (stopped:Decision)-[:CLOSES]->(w)
        RETURN g, w, stopped`,
       {
         g: vertexProps<{ natural_id: string }>(),
@@ -435,18 +426,12 @@ export class BlockedGroup extends SessionCore {
       ]);
     }
 
-    const closed = new Map<string, "sidestepped" | "retired">();
-    for (const [label, kind] of [
-      ["SIDESTEPS", "sidestepped"],
-      ["RETIRES", "retired"],
-    ] as const) {
-      const closedRows = await this.graph.query(
-        `MATCH (:Decision)-[:${label}]->(g:Gate) RETURN g`,
-        { g: vertexProps<{ natural_id: string }>() },
-        {},
-      );
-      for (const row of closedRows) closed.set(row.g.natural_id, kind);
-    }
+    const closedRows = await this.graph.query(
+      `MATCH (:Decision)-[:CLOSES]->(g:Gate) RETURN g`,
+      { g: vertexProps<{ natural_id: string }>() },
+      {},
+    );
+    const closed = new Set(closedRows.map((row) => row.g.natural_id));
 
     const listed = [...byGate.entries()]
       .map(([id, { consequence, rows: forGate }]) => {
@@ -461,7 +446,7 @@ export class BlockedGroup extends SessionCore {
         return {
           gate: ref("gate", id),
           consequence,
-          state: closed.get(id) ?? gateStateFrom(checks),
+          state: closed.has(id) ? ("closed" as const) : gateStateFrom(checks),
           ...(decidedAt ? { lastTouched: decidedAt } : {}),
           gating: (gating.get(id) ?? []).sort((a, b) => byHandle(a.work, b.work)),
         };
@@ -479,7 +464,7 @@ export class BlockedGroup extends SessionCore {
    */
   async stoppedWork({ work }: StoppedWorkQuery): Promise<StoppedReason | undefined> {
     const [row] = await this.graph.query(
-      `MATCH (d:Decision)-[:RESOLVES]->(:Task {natural_id: $id}) RETURN d`,
+      `MATCH (d:Decision)-[:CLOSES]->(:Task {natural_id: $id}) RETURN d`,
       { d: vertexProps<{ natural_id: string; reason: string; decided_at: string }>() },
       { id: work },
     );
@@ -500,7 +485,7 @@ export class BlockedGroup extends SessionCore {
        OPTIONAL MATCH (ever)-[:GATES]->(t)
        OPTIONAL MATCH (g:Gate)-[:GATES]->(t)
        OPTIONAL MATCH (t)-[:IMPLEMENTS]->(u:EvidenceUnit)
-       OPTIONAL MATCH (stop:Decision)-[:RESOLVES]->(t)
+       OPTIONAL MATCH (stop:Decision)-[:CLOSES]->(t)
        OPTIONAL MATCH (t)-[:AFTER]->(earlier:Task)
        OPTIONAL MATCH (earlier)-[:IMPLEMENTS]->(done:EvidenceUnit)
        RETURN t, ever, g, u, stop, earlier, done`,

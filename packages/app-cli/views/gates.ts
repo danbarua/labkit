@@ -34,7 +34,7 @@ export function renderGate(status: GateStatus, p: Palette): string {
     `${status.gate} — ${status.state}${status.everFailed ? `  ${p.contested("(has failed at least once)")}` : ""}`,
     `  consequence: ${status.consequence}`,
     status.closure
-      ? `  closed: ${status.closure.kind} by ${status.closure.decision}\n  because: ${status.closure.because}`
+      ? `  closed by ${status.closure.decision}\n  because: ${status.closure.because}`
       : "",
     "",
     `${p.heading("Conditions by state")}\n${bullets(

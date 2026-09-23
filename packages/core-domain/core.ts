@@ -359,15 +359,11 @@ export class SessionCore {
     if (claims.length === 0) return state;
     const rows = await this.graph.query(
       `MATCH (c:Claim) WHERE c.natural_id IN $ids
-       OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
-       OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
        OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
        OPTIONAL MATCH (replaced)-[:MOTIVATES]->(successor:Claim)
-       RETURN c, narrowed, insteadof, replaced, successor`,
+       RETURN c, replaced, successor`,
       {
         c: vertexProps<{ natural_id: string }>(),
-        narrowed: optional(vertexProps<{ natural_id: string }>()),
-        insteadof: optional(vertexProps<{ name: string; natural_id: string }>()),
         replaced: optional(vertexProps<{ natural_id: string }>()),
         successor: optional(vertexProps<{ name: string; natural_id: string }>()),
       },
@@ -377,23 +373,19 @@ export class SessionCore {
       const claim = ref("claim", row.c.natural_id);
       const entry = state.get(claim);
       if (!entry) continue;
-      if (!row.narrowed && !row.replaced) continue;
+      if (!row.replaced) continue;
       entry.withdrawn = true;
-      for (const decision of [row.narrowed, row.replaced]) {
-        if (!decision) continue;
-        const acted = ref("decision", decision.natural_id);
-        if (!entry.by.includes(acted)) entry.by.push(acted);
-      }
+      const acted = ref("decision", row.replaced.natural_id);
+      if (!entry.by.includes(acted)) entry.by.push(acted);
       // By handle: two successors phrased alike are two records, and this list is what a
       // refusal names. **It can be empty on a withdrawn claim.** `replaceAnalysis` supersedes a
       // claim and mints the replacement's conclusions without pairing them, so the decision
       // `MOTIVATES` the new *analysis* and no new claim.
-      for (const next of [row.insteadof, row.successor]) {
-        if (!next) continue;
-        const successor = ref("claim", next.natural_id);
-        if (!entry.insteadOf.some((c) => c.claim === successor))
-          entry.insteadOf.push({ claim: successor, asserts: next.name });
-      }
+      const next = row.successor;
+      if (!next) continue;
+      const successor = ref("claim", next.natural_id);
+      if (!entry.insteadOf.some((c) => c.claim === successor))
+        entry.insteadOf.push({ claim: successor, asserts: next.name });
     }
     return state;
   }
@@ -405,8 +397,6 @@ export class SessionCore {
   }): Promise<{ withdrawn: boolean; by?: Ref<"decision">; replacedBy?: ReplacementClaim }> {
     const rows: {
       c: { natural_id: string };
-      narrowed: { natural_id: string } | null;
-      insteadof: { name: string; natural_id: string } | null;
       replaced: { natural_id: string } | null;
       successor: { name: string; natural_id: string } | null;
     }[] = [];
@@ -415,15 +405,11 @@ export class SessionCore {
         ...(await this.graph.query(
           `MATCH (c:Claim {name: $name})<-[:${bearing}]-(:Evidence)<-[:PRODUCES]-(u:EvidenceUnit)
            ${this.withinScope(scope)}
-           OPTIONAL MATCH (narrowed:Decision)-[:CHANGES]->(c)
-           OPTIONAL MATCH (narrowed)-[:MOTIVATES]->(insteadof:Claim)
            OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
            OPTIONAL MATCH (replaced)-[:MOTIVATES]->(successor:Claim)
-           RETURN c, narrowed, insteadof, replaced, successor`,
+           RETURN c, replaced, successor`,
           {
             c: vertexProps<{ natural_id: string }>(),
-            narrowed: optional(vertexProps<{ natural_id: string }>()),
-            insteadof: optional(vertexProps<{ name: string; natural_id: string }>()),
             replaced: optional(vertexProps<{ natural_id: string }>()),
             successor: optional(vertexProps<{ name: string; natural_id: string }>()),
           },
@@ -435,28 +421,18 @@ export class SessionCore {
 
     // Every node asserting this proposition must have been withdrawn. One left
     // standing means the record still claims it.
-    // Either predicate counts. Reading one and not the other is the silent
-    // half of the two-clause trap above: a claim superseded but not narrowed
-    // would have read as standing.
-    const standing = new Set(
-      rows.filter((r) => !r.narrowed && !r.replaced).map((r) => r.c.natural_id),
-    );
+    const standing = new Set(rows.filter((r) => !r.replaced).map((r) => r.c.natural_id));
     if (standing.size > 0) return { withdrawn: false };
 
     // Identity as well as wording. A name alone is picked from whichever row
     // happens to carry one -- an arbitrary row and arbitrary text, in the field
     // that says what the record asserts.
-    const now =
-      rows.find((r) => r.insteadof)?.insteadof ?? rows.find((r) => r.successor)?.successor;
+    const now = rows.find((r) => r.successor)?.successor;
     // **Which decision withdrew it**, so a caller can tell its own act's
     // withdrawal from somebody else's. Only meaningful when exactly one
     // decision is responsible; with several the answer is that more than one
     // was, which no single id can say, so it is absent.
-    const deciding = [
-      ...new Set(
-        rows.flatMap((r) => [r.narrowed?.natural_id, r.replaced?.natural_id]).filter(Boolean),
-      ),
-    ];
+    const deciding = [...new Set(rows.map((r) => r.replaced?.natural_id).filter(Boolean))];
     return {
       withdrawn: true,
       ...(deciding.length === 1 ? { by: ref("decision", deciding[0] as string) } : {}),
@@ -488,7 +464,7 @@ export class SessionCore {
         `MATCH (d:Decision)-[:BASED_ON]->(e:Evidence)-[:${bearing}]->(:Claim {name: $name})
          MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
          ${this.withinScope(scope)}
-         MATCH (d)-[:RESOLVES]->(loe:LineOfEnquiry)<-[:MOTIVATES]-(q:Question)
+         MATCH (d)-[:CLOSES]->(loe:LineOfEnquiry)<-[:MOTIVATES]-(q:Question)
          RETURN q`,
         { q: vertexProps<{ name: string; natural_id: string }>() },
         { name: scope.proposition, ...this.scopeParams(scope) },
