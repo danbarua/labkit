@@ -39,8 +39,7 @@ import type {
   ProseForQuery,
   ReachableQuery,
 } from "../queries";
-import { compose, per, type Row } from "../facts";
-import { criterionDetail } from "../survey-facts";
+import { checkStateOf, criteriaChecks, evaluationsOf } from "./checks";
 import type { ReadSurface } from "./index";
 import type { Identified } from "./shared";
 
@@ -138,14 +137,18 @@ export class ExplainGroup extends SessionCore {
    * holds up.
    */
   async criterionStanding({ criterion }: CriterionStandingQuery): Promise<CriterionStanding> {
-    const { cypher, decoders } = compose(
-      `MATCH (crit:Criterion {natural_id: $id})`,
-      criterionDetail,
-      { crit: vertexProps<{ natural_id: string; proposition: string }>() },
-    );
-    const rows = (await this.graph.query(cypher, decoders, { id: criterion })) as unknown as Row[];
-    const detail = [...per(criterionDetail, rows).values()][0];
-    if (!detail) throw new Error(`no criterion named "${criterion}"`);
+    const checks = (
+      await criteriaChecks(this.graph, `MATCH (crit:Criterion {natural_id: $id})`, {
+        id: criterion,
+      })
+    ).get(criterion);
+    if (!checks) throw new Error(`no criterion named "${criterion}"`);
+    // The criterion as a whole: the worst state across every finding it was judged against.
+    const detail = {
+      state: checkStateOf(checks),
+      proposition: checks.proposition,
+      evaluations: evaluationsOf(checks),
+    };
 
     // The gates it governs, and what each protects. A separate read because
     // it is a different grain -- per gate, not per criterion.

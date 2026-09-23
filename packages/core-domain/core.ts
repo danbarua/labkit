@@ -5,8 +5,7 @@
 import type { TenantGraph } from "@labkit/core-db/graph";
 import type { IndexedString, Prose } from "@labkit/core-db/domain";
 import { optional, vertexProps } from "@labkit/core-db/cypher";
-import { compose, per, type Row } from "./facts";
-import { checkState } from "./survey-facts";
+import { checkStateOf, criteriaChecks } from "./read/checks";
 import {
   type AttributionContext,
   type Clock,
@@ -212,16 +211,15 @@ export class SessionCore {
       for (const row of rows) if (row.crit) criteria.add(row.crit.natural_id);
     }
     if (criteria.size === 0) return true;
-    const { cypher, decoders } = compose(
+    const checks = await criteriaChecks(
+      this.graph,
       `MATCH (crit:Criterion) WHERE crit.natural_id IN $ids`,
-      checkState,
-      { crit: vertexProps<{ natural_id: string }>() },
+      { ids: [...criteria] },
     );
-    const rows = (await this.graph.query(cypher, decoders, {
-      ids: [...criteria],
-    })) as unknown as Row[];
-    const states = per(checkState, rows);
-    return [...criteria].every((id) => states.get(id) === "passed");
+    return [...criteria].every((id) => {
+      const found = checks.get(id);
+      return found !== undefined && checkStateOf(found) === "passed";
+    });
   }
 
   /** Work these gates protect, and which therefore has to be run again when their condition changes. */

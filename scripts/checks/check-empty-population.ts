@@ -10,7 +10,7 @@
  *
  * **This is not hypothetical and the count is the point.** Run against an
  * empty tree on 2026-09-03, six of ten scanning checks passed: `doc-comments`,
- * `orm-unwrapped`, `facts`, `tests-assert`, `test-ceiling` and `test-teardown`.
+ * `orm-unwrapped`, `tests-assert`, `test-ceiling` and `test-teardown`.
  * Two of them printed the zero on the way past — *"0 fact module(s)"*, *"all 0
  * scenario files reset the database"* — so the number was in the operator's
  * face and the exit code ignored it.

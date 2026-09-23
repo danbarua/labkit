@@ -10,7 +10,6 @@ import type {
 } from "@labkit/core-db/domain";
 import { SEARCHABLE_TEXT, labelForNaturalId } from "@labkit/core-db/domain";
 import { SessionCore } from "../core";
-import { compose, per, type Row } from "../facts";
 import { byHandle, isRefOfKind, kindOf, ref, verdictOf } from "../report";
 import type {
   AffectedClaim,
@@ -47,7 +46,7 @@ import type {
   WhatDependsOnQuery,
   WhySupportedQuery,
 } from "../queries";
-import { checkStatus, checksAnchor } from "../survey-facts";
+import { checkStatusOf, checksAnchor, criteriaChecks } from "./checks";
 import { blockedBy } from "./blocked";
 import { dedupeById, type Identified } from "./shared";
 
@@ -673,16 +672,12 @@ export class StoryGroup extends SessionCore {
 
     const byCriterion = new Map<string, CheckStatus>();
     for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const { cypher, decoders } = compose(checksAnchor(bearing), checkStatus, {
-        crit: vertexProps<{ natural_id: string; proposition: string }>(),
-      });
-      const rows = (await this.graph.query(cypher, decoders, { claim })) as unknown as Row[];
-      for (const [criterion, checks] of per(checkStatus, rows)) {
-        // Keyed by criterion **and subject**: a rule judged against four
-        // findings is four checks a claim is held to, and keying by criterion
-        // alone would keep the last one seen (#293).
-        for (const check of checks) byCriterion.set(`${criterion}|${check.about ?? ""}`, check);
-      }
+      const checks = await criteriaChecks(this.graph, checksAnchor(bearing), { claim });
+      // Keyed by criterion and subject: a rule judged against four findings is four checks a
+      // claim is held to.
+      for (const [criterion, found] of checks)
+        for (const check of checkStatusOf(found))
+          byCriterion.set(`${criterion}|${check.about ?? ""}`, check);
     }
     const standard = [...byCriterion.values()];
     // Never-run counts against, exactly as it does for a gate: a check nobody

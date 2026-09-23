@@ -1,10 +1,11 @@
 import { optional, vertexProps } from "@labkit/core-db/cypher";
 import { SessionCore } from "../core";
-import { compose, per, type Row } from "../facts";
 import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
 import { byHandle, ref } from "../report";
 import type { KnownAtQuery } from "../queries";
-import { BEARINGS, checksMetBearing, standingAsOf } from "../survey-facts";
+
+/** The two ways a finding bears on a claim; a closure is read for each. */
+const BEARINGS = ["SUPPORTS", "CHALLENGES"] as const;
 
 export class StandingGroup extends SessionCore {
   /**
@@ -21,34 +22,56 @@ export class StandingGroup extends SessionCore {
     const standings = new Map<string, { resolved: boolean; promoted: boolean; open: boolean }>();
     const asked = new Map<string, { asks: string; accepted: boolean }>();
 
+    // Two passes, one per bearing: AGE has no edge alternation, and the cited finding may
+    // support or challenge the answering claim.
     for (const bearing of BEARINGS) {
-      const standing = standingAsOf(asOf, bearing);
-      const { cypher, decoders } = compose(
+      const rows = await this.graph.query(
         `MATCH (q:Question)
-       WHERE q.posed_at <= $at
-       OPTIONAL MATCH (accepting:Decision)-[:ACCEPTS]->(q)`,
-        standing,
+         WHERE q.posed_at <= $at
+         OPTIONAL MATCH (accepting:Decision)-[:ACCEPTS]->(q)
+         OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
+         OPTIONAL MATCH (resolving:Decision)-[:CLOSES]->(loe)
+         OPTIONAL MATCH (resolving)-[:ANSWERS]->(answering:Claim)
+         OPTIONAL MATCH (answering)-[:BASED_ON]->(part:Claim)
+         OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
+         OPTIONAL MATCH (cited)-[:${bearing}]->(borne:Claim)
+         OPTIONAL MATCH (vouching:Decision)-[:CONFIRMED]->(answering)
+         RETURN q, accepting, loe, resolving, answering, part, borne, vouching`,
         {
           q: vertexProps<{ natural_id: string; name: string }>(),
           accepting: optional(vertexProps<{ decided_at: string }>()),
+          loe: optional(vertexProps<{ natural_id: string; started_at?: string }>()),
+          resolving: optional(vertexProps<{ decided_at: string }>()),
+          answering: optional(vertexProps<{ natural_id: string }>()),
+          part: optional(vertexProps<{ natural_id: string }>()),
+          borne: optional(vertexProps<{ natural_id: string }>()),
+          vouching: optional(vertexProps<{ decided_at: string }>()),
         },
+        { at: asOf },
       );
-      const rows = (await this.graph.query(cypher, decoders, { at: asOf })) as unknown as Row[];
 
-      for (const [question, was] of per(standing, rows)) {
-        const seen = standings.get(question) ?? { resolved: false, promoted: false, open: false };
-        standings.set(question, {
-          resolved: seen.resolved || was.resolved,
-          promoted: seen.promoted || was.promoted,
-          open: seen.open || was.open,
-        });
-      }
       for (const row of rows) {
-        const q = row.q as { natural_id: string; name: string };
-        const entry = asked.get(q.natural_id) ?? { asks: q.name, accepted: false };
-        const accepting = row.accepting as { decided_at: string } | null;
-        entry.accepted ||= accepting !== null && accepting.decided_at <= asOf;
-        asked.set(q.natural_id, entry);
+        const question = row.q.natural_id;
+        const entry = asked.get(question) ?? { asks: row.q.name, accepted: false };
+        entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= asOf;
+        asked.set(question, entry);
+
+        const was = standings.get(question) ?? { resolved: false, promoted: false, open: false };
+        const existed =
+          row.loe !== null && (row.loe.started_at === undefined || row.loe.started_at <= asOf);
+        const closed = existed && row.resolving !== null && row.resolving.decided_at <= asOf;
+        const bearsOnAnswer =
+          row.answering !== null &&
+          row.borne !== null &&
+          (row.borne.natural_id === row.answering.natural_id ||
+            row.part?.natural_id === row.borne.natural_id);
+        const answered = closed && bearsOnAnswer;
+        standings.set(question, {
+          resolved: was.resolved || answered,
+          promoted:
+            was.promoted || (answered && row.vouching !== null && row.vouching.decided_at <= asOf),
+          open: was.open || (existed && !closed),
+        });
       }
     }
 
@@ -99,26 +122,36 @@ export class StandingGroup extends SessionCore {
     };
 
     const seen = new Map<string, Entry>();
-    const met = new Map<string, boolean>();
     for (const bearing of BEARINGS) {
-      const metFact = checksMetBearing(bearing);
-      const { cypher, decoders } = compose(anchor, metFact, {
-        q: vertexProps<{ natural_id: string; name: string }>(),
-        accepting: optional(
-          vertexProps<{
-            reason: string;
-            invalidation_check: string;
-            decided_at: string;
-          }>(),
-        ),
-        work: optional(vertexProps<{ natural_id: string }>()),
-      });
-      const rows = (await this.graph.query(cypher, decoders, {})) as unknown as Row[];
-      for (const [claim, ok] of per(metFact, rows)) met.set(claim, (met.get(claim) ?? true) && ok);
+      const rows = await this.graph.query(
+        `${anchor}
+         OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
+         OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(loe)
+         OPTIONAL MATCH (closing)-[:ANSWERS]->(answering:Claim)
+         OPTIONAL MATCH (answering)-[:BASED_ON]->(part:Claim)
+         OPTIONAL MATCH (closing)-[:BASED_ON]->(cited:Evidence)
+         OPTIONAL MATCH (cited)-[:${bearing}]->(borne:Claim)
+         OPTIONAL MATCH (answering)<-[:CONFIRMED]-(vouching:Decision)
+         RETURN q, accepting, work, loe, closing, answering, part, borne, vouching`,
+        {
+          q: vertexProps<{ natural_id: string; name: string }>(),
+          accepting: optional(
+            vertexProps<{ reason: string; invalidation_check: string; decided_at: string }>(),
+          ),
+          work: optional(vertexProps<{ natural_id: string }>()),
+          loe: optional(vertexProps<{ natural_id: string; name: string }>()),
+          closing: optional(vertexProps<Omit<Closing, "answered">>()),
+          answering: optional(vertexProps<{ natural_id: string }>()),
+          part: optional(vertexProps<{ natural_id: string }>()),
+          borne: optional(vertexProps<{ natural_id: string }>()),
+          vouching: optional(vertexProps<{ natural_id: string }>()),
+        },
+        {},
+      );
 
       for (const row of rows) {
-        const q = row.q as { natural_id: string; name: string };
-        const accepting = row.accepting as Entry["accepting"] | null;
+        const q = row.q;
+        const accepting = row.accepting;
         const entry: Entry = seen.get(q.natural_id) ?? {
           asks: q.name,
           worked: false,
@@ -129,11 +162,10 @@ export class StandingGroup extends SessionCore {
         if (accepting && (!entry.accepting || accepting.decided_at > entry.accepting.decided_at))
           entry.accepting = accepting;
 
-        const loe = row.loe as { natural_id: string; name: string } | null;
-        const answering = row.answering as { natural_id: string } | null;
-        const closingRow = row.closing as Omit<Closing, "answered"> | null;
-        const closing: Closing | null = closingRow && {
-          ...closingRow,
+        const loe = row.loe;
+        const answering = row.answering;
+        const closing: Closing | null = row.closing && {
+          ...row.closing,
           answered: answering !== null,
         };
         if (loe) {
@@ -144,8 +176,8 @@ export class StandingGroup extends SessionCore {
           }
           entry.pursuits.set(loe.natural_id, pursuit);
 
-          const borne = row.borne as { natural_id: string } | null;
-          const part = row.part as { natural_id: string } | null;
+          const borne = row.borne;
+          const part = row.part;
           const bearsOnAnswer = Boolean(
             answering &&
               borne &&
@@ -179,9 +211,8 @@ export class StandingGroup extends SessionCore {
       ...new Set([...liveFor.values()].filter((id): id is ClaimRef => id !== undefined)),
     ];
     const confirmatory = await this.confirmatoryOf(liveIds);
-    for (const live of liveIds) {
-      if (!met.has(live)) met.set(live, await this.checksMet(live));
-    }
+    const met = new Map<string, boolean>();
+    for (const live of liveIds) met.set(live, await this.checksMet(live));
 
     const survey: KnowledgeSurvey = {
       established: [],
