@@ -540,7 +540,7 @@ async function explainEnquiry(self: ReadSurface, subject: string): Promise<Enqui
   let is: string;
   switch (status.closure) {
     case "answered":
-      is = `closed — answered${status.answer ? ` ${status.answer}` : ""}`;
+      is = `closed — answered${status.bearing ? `, the answer ${status.bearing} the question` : ""}`;
       break;
     case "abandoned":
       is = "closed — abandoned";

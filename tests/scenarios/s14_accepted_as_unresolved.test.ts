@@ -88,7 +88,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
     expect(status.open).toBe(true);
     expect(status.closure).toBeNull();
     // Not answered. Accepting a question is not deciding it.
-    expect(status.answer).toBeNull();
+    expect(status.bearing).toBeNull();
 
     await captureConversation(
       {
@@ -226,7 +226,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
     const status = await (await afterwards()).reads.enquiryStatus({ enquiry });
     expect(status.open).toBe(false);
     expect(status.closure).toBe("answered");
-    expect(status.answer).toBe("yes");
+    expect(status.bearing).toBe("supports");
 
     // **And the deferral survives the answer.** The question was left open on a stated
     // condition, and a reader meeting the answer has to be able to ask whether that is the

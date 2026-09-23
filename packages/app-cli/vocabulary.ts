@@ -27,7 +27,6 @@ export const READING: Readonly<Record<string, Reading>> = {
   confirmatory: "settled",
   "carried-out": "settled",
   observed: "settled",
-  yes: "settled",
 
   // Evidence bears against it.
   failed: "contested",
@@ -38,7 +37,6 @@ export const READING: Readonly<Record<string, Reading>> = {
   disagrees: "contested",
   contradiction: "contested",
   "standard-unmet": "contested",
-  no: "contested",
 
   // Nothing has looked.
   "never-run": "untested",

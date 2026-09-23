@@ -20,7 +20,7 @@ export function renderEnquiry(status: EnquiryStatus, p: Palette): string {
     status.contributed.length
       ? `  produced ${status.contributed.length} finding${status.contributed.length === 1 ? "" : "s"}`
       : `  ${p.untested("has produced nothing yet")}`,
-    status.answer ? `  answer: ${status.answer}` : "",
+    status.bearing ? `  the answer ${status.bearing} the question` : "",
     status.restsOn ? `  resting on ${status.restsOn} work` : "",
     "",
     q ? `Pursuing "${q.asks}"  ${`(${q.question})`}` : p.untested("Pursuing nothing on the record"),

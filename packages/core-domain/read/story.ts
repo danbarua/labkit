@@ -148,7 +148,7 @@ export class StoryGroup extends SessionCore {
         contributed,
         open: true,
         closure: null,
-        answer: null,
+        bearing: null,
         evidence: [],
         question,
       };
@@ -161,7 +161,7 @@ export class StoryGroup extends SessionCore {
         contributed,
         open: false,
         closure: "abandoned",
-        answer: null,
+        bearing: null,
         evidence: [],
         question,
       };
@@ -187,7 +187,7 @@ export class StoryGroup extends SessionCore {
       contributed,
       open: false,
       closure: "answered",
-      answer: cited.some((r) => r.against !== null) ? "no" : "yes",
+      bearing: cited.some((r) => r.against !== null) ? "challenges" : "supports",
       answered: { claim: ref("claim", answered.natural_id), asserts: answered.name },
       evidence: dedupeById(
         cited.map((r) => ({

@@ -36,14 +36,12 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => {
     const parked = q.reopensIf ? p.quiet(`  (was parked until: ${q.reopensIf})`) : "";
-    // `supported`/`challenged`, never `yes`/`no`. The word is derived from the
-    // concluding claim's bearing, so beside a question it read as an answer to
-    // that question: Q_9 asks whether q narrows, the claim says it does not,
-    // the bearing supports it, and the line said "yes".
+    // The claim's bearing, never a yes or no: beside a question a polarity reads as an answer
+    // to the question's wording, and the claim may assert the opposite of it.
     const answers = q.answers
       .map(
         (answer) =>
-          `${`(${answer.claim})`} ${answer.answer === "no" ? "challenged" : "supported"}` +
+          `${`(${answer.claim})`} ${answer.bearing === "challenges" ? "challenged" : "supported"}` +
           `  ${answer.enquiry}`,
       )
       .join("; ");
