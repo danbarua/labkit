@@ -142,6 +142,42 @@ describe("S-26: work nobody is doing", () => {
     expect(standing.blocked.work.map((w) => w.work)).toEqual([]);
   });
 
+  /**
+   * A block decided today is read before one that has stood for a week. The record says
+   * nothing about which the researcher is still after; it says when each was last decided,
+   * and `now` puts the newest first.
+   */
+  test("now lists blocked gates most recently decided first", async () => {
+    const stale = await twoPlannedThings();
+    await session.writes.evaluateCriterion({
+      criterion: stale.criterion,
+      gate: stale.gate,
+      value: "GPU differs by 3e-4 on the sparse set",
+      outcome: "fail",
+    });
+    const { work: laterWork } = await session.writes.planWork({
+      objective: "retune the sparse-set tolerance",
+      acceptance: "the sparse set agrees to 1e-6",
+    });
+    const { criterion: laterCriterion } = await session.writes.stateCriterion(
+      "the retuned tolerance holds on the dense set too",
+    );
+    const { gate: fresh } = await session.writes.declareGate({
+      governedBy: [laterCriterion],
+      consequence: "the retune is not merged",
+      protecting: [laterWork],
+    });
+    await session.writes.evaluateCriterion({
+      criterion: laterCriterion,
+      gate: fresh,
+      value: "dense set differs by 2e-5",
+      outcome: "fail",
+    });
+
+    const standing = await (await afterwards()).reads.now({});
+    expect(standing.blocked.gates.map((g) => g.gate)).toEqual([fresh, stale.gate]);
+  });
+
   test("work is stopped once: a second reason is refused, not recorded beside the first", async () => {
     const { work } = await twoPlannedThings();
     await session.writes.stopWork({ work, because: DROPPED });
