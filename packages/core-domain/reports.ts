@@ -549,13 +549,7 @@ export const gateStatus = z.strictObject({
   gate: ref("gate"),
   consequence: prose(),
   state: z.enum(GATE_STATES),
-  closure: z
-    .strictObject({
-      decision: ref("decision"),
-      kind: z.enum(["sidestepped", "retired"]),
-      because: prose(),
-    })
-    .optional(),
+  closure: z.strictObject({ decision: ref("decision"), because: prose() }).optional(),
   checks: z.array(checkStatus),
   unmet: z.array(unmetCheck),
   counts: z.strictObject({
@@ -829,7 +823,6 @@ export const stoppedWork = z.strictObject({
 export const closedGate = z.strictObject({
   decision: ref("decision"),
   gate: ref("gate"),
-  closure: z.enum(["sidestepped", "retired"]),
   events: z.array(domainEvent),
 });
 /** What `plan_work` returns. */

@@ -462,7 +462,7 @@ export class Revising extends Shared {
         });
         unitOfWork.edge(decision, "MOTIVATES", narrower);
         unitOfWork.edge(review, "EVALUATES", input.of);
-        unitOfWork.edge(decision, "CHANGES", input.of);
+        unitOfWork.edge(decision, "SUPERSEDES", input.of);
         for (const part of origin.parts) unitOfWork.edge(narrower, "BASED_ON", part);
 
         return {
@@ -551,7 +551,7 @@ export class Revising extends Shared {
 
       for (const id of withdrawnIds) {
         unitOfWork.edge(review, "EVALUATES", id);
-        unitOfWork.edge(decision, "CHANGES", id);
+        unitOfWork.edge(decision, "SUPERSEDES", id);
       }
 
       // Keyed by id: keying on the statement merged two findings phrased alike.

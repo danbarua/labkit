@@ -438,7 +438,7 @@ export class ReadSurface extends SessionCore {
   }
   /**
    * `how <handle>` — ordered steps behind the current state of any handle.
-   * Refuses unknown like `why`. Walks SUPERSEDES/CHANGES (Notes and Decisions) and
+   * Refuses unknown like `why`. Walks SUPERSEDES/SUPERSEDES (Notes and Decisions) and
    * MOTIVATES pairings in StoryGroup; marks superseded with successor when present.
    */
   async how(query: HowQuery): Promise<How> {

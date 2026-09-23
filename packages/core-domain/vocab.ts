@@ -8,8 +8,7 @@ export const GATE_STATES = [
   "incomplete",
   "blocked",
   "satisfied",
-  "sidestepped",
-  "retired",
+  "closed",
 ] as const;
 
 export const WORK_STATES = ["planned", "waiting", "blocked", "carried-out", "abandoned"] as const;

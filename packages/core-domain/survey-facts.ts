@@ -51,7 +51,7 @@ export function answeringClaimBearing(
     name: "answeringClaim",
     grain: byQuestion,
     clause: `OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
-           OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(loe)
+           OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(loe)
            OPTIONAL MATCH (closing)-[:ANSWERS]->(answering:Claim)
            OPTIONAL MATCH (answering)-[:BASED_ON]->(part:Claim)
            OPTIONAL MATCH (closing)-[:BASED_ON]->(cited:Evidence)
@@ -493,7 +493,7 @@ export function standingAsOf(
     name: "standingAsOf",
     grain: byQuestion,
     clause: `OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
-           OPTIONAL MATCH (resolving:Decision)-[:RESOLVES]->(loe)
+           OPTIONAL MATCH (resolving:Decision)-[:CLOSES]->(loe)
            OPTIONAL MATCH (resolving)-[:ANSWERS]->(answering:Claim)
            OPTIONAL MATCH (answering)-[:BASED_ON]->(part:Claim)
            OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
@@ -540,7 +540,7 @@ export function standingAsOf(
 export function gateConditionsAnchor(scope: "one" | "every"): string {
   const gate = scope === "one" ? "(g:Gate {natural_id: $id})" : "(g:Gate)";
   return `MATCH (crit:Criterion)-[:GOVERNS]->${gate}
-       OPTIONAL MATCH (amended:Decision)-[:CHANGES]->(crit)`;
+       OPTIONAL MATCH (amended:Decision)-[:SUPERSEDES]->(crit)`;
 }
 
 /** The rows of {@link gateConditionsAnchor} whose condition nothing has amended away. */

@@ -8,9 +8,6 @@ import { z } from "zod";
 import { anyRefString, issue, refString } from "./brand";
 import { ref } from "./ref";
 
-export const GATE_CLOSURES = ["sidestepped", "retired"] as const;
-export type GateClosure = (typeof GATE_CLOSURES)[number];
-
 function inputRefString() {
   return z.string().transform((raw, ctx) =>
     issue(ctx, () => {
@@ -155,7 +152,6 @@ export type CloseEnquiryCommand = z.infer<typeof closeEnquiryCommand>;
 /** Close one gate without pretending its checks passed. */
 export const closeGateCommand = z.object({
   gate: refString("gate"),
-  closure: z.enum(GATE_CLOSURES),
   because: z.string(),
 });
 export type CloseGateCommand = z.infer<typeof closeGateCommand>;

@@ -204,7 +204,7 @@ describe("S-21: a finding drawn across findings", () => {
     const expectedParts = [...new Set(restingOn)].sort();
 
     expect(report.previously).toEqual([{ claim: synthesis, asserts: HEADLINE }]);
-    expect(edges.filter((edge) => edge.label === "CHANGES").map((edge) => edge.to)).toEqual([
+    expect(edges.filter((edge) => edge.label === "SUPERSEDES").map((edge) => edge.to)).toEqual([
       synthesis,
     ]);
     expect(edges.filter((edge) => edge.label === "MOTIVATES").map((edge) => edge.to)).toEqual([

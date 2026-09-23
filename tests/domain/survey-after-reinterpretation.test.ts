@@ -89,7 +89,7 @@ test("a reinterpretation does not move the question between buckets", async () =
   // The precondition, measured rather than inferred: does the evidence the
   // closing decision cites support more than one claim?
   const rows = await graph.query(
-    `MATCH (d:Decision)-[:RESOLVES]->(:LineOfEnquiry)
+    `MATCH (d:Decision)-[:CLOSES]->(:LineOfEnquiry)
      MATCH (d)-[:BASED_ON]->(e:Evidence)-[:SUPPORTS]->(c:Claim)
      RETURN c`,
     { c: vertexProps<{ natural_id: string; name: string }>() },

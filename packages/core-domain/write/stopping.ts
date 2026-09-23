@@ -36,7 +36,7 @@ export class Stopping extends SessionCore {
     return this.handle("closeEnquiry", input, async (unitOfWork) => {
       const [target] = await this.graph.query(
         `MATCH (loe:LineOfEnquiry {natural_id: $id})
-         OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(loe)
+         OPTIONAL MATCH (d:Decision)-[:CLOSES]->(loe)
          RETURN loe, d`,
         {
           loe: vertexProps<{ natural_id: string; name: string }>(),
@@ -121,7 +121,7 @@ export class Stopping extends SessionCore {
           invalidation_check: "new evidence bearing on this enquiry's question",
         }),
       );
-      unitOfWork.edge(decided, "RESOLVES", input.enquiry);
+      unitOfWork.edge(decided, "CLOSES", input.enquiry);
       if (input.answeredBy) unitOfWork.edge(decided, "ANSWERS", input.answeredBy);
       for (const basis of answer?.bearing ?? []) unitOfWork.edge(decided, "BASED_ON", basis);
 
@@ -195,13 +195,11 @@ export class Stopping extends SessionCore {
     return this.handle("closeGate", input, async (unitOfWork) => {
       const [target] = await this.graph.query(
         `MATCH (g:Gate {natural_id: $id})
-         OPTIONAL MATCH (s:Decision)-[:SIDESTEPS]->(g)
-         OPTIONAL MATCH (r:Decision)-[:RETIRES]->(g)
-         RETURN g, s, r`,
+         OPTIONAL MATCH (d:Decision)-[:CLOSES]->(g)
+         RETURN g, d`,
         {
           g: vertexProps<{ natural_id: string; consequence: string }>(),
-          s: optional(vertexProps<{ natural_id: string; reason: string }>()),
-          r: optional(vertexProps<{ natural_id: string; reason: string }>()),
+          d: optional(vertexProps<{ natural_id: string; reason: string }>()),
         },
         { id: input.gate },
       );
@@ -211,11 +209,10 @@ export class Stopping extends SessionCore {
           message: `${input.gate} not found`,
           subject: input.gate,
         });
-      const closed = target.s ?? target.r;
-      if (closed)
+      if (target.d)
         throw new DomainRefusal({
           kind: "invariant",
-          message: `${input.gate} is already ${closed.reason} by ${closed.natural_id}`,
+          message: `${input.gate} is already closed by ${target.d.natural_id}: ${target.d.reason}`,
           subject: input.gate,
         });
 
@@ -227,14 +224,10 @@ export class Stopping extends SessionCore {
           invalidation_check: "a reason for this gate to govern work again",
         }),
       );
-      unitOfWork.edge(
-        decision,
-        input.closure === "sidestepped" ? "SIDESTEPS" : "RETIRES",
-        input.gate,
-      );
+      unitOfWork.edge(decision, "CLOSES", input.gate);
       return {
         subject: input.gate,
-        result: { decision, gate: input.gate, closure: input.closure },
+        result: { decision, gate: input.gate },
       };
     });
   }
@@ -244,7 +237,7 @@ export class Stopping extends SessionCore {
     return this.handle("stopWork", input, async (unitOfWork) => {
       const [task] = await this.graph.query(
         `MATCH (t:Task {natural_id: $id})
-         OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(t)
+         OPTIONAL MATCH (d:Decision)-[:CLOSES]->(t)
          RETURN t, d`,
         {
           t: vertexProps<{ natural_id: string; objective: string }>(),
@@ -273,7 +266,7 @@ export class Stopping extends SessionCore {
           invalidation_check: "a reason to do this work after all",
         }),
       );
-      unitOfWork.edge(decision, "RESOLVES", input.work);
+      unitOfWork.edge(decision, "CLOSES", input.work);
 
       return {
         subject: input.work,

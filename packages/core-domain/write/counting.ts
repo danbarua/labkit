@@ -176,7 +176,7 @@ export class Counting extends SessionCore {
       // with nothing saying which the gate now requires. The message names the
       // condition to amend instead.
       const alreadyAmended = await this.graph.query(
-        `MATCH (:Decision)-[:CHANGES]->(c:Criterion {natural_id: $id}) RETURN c`,
+        `MATCH (:Decision)-[:SUPERSEDES]->(c:Criterion {natural_id: $id}) RETURN c`,
         { c: vertexProps<{ natural_id: string }>() },
         { id: input.criterion },
       );
@@ -203,7 +203,7 @@ export class Counting extends SessionCore {
           invalidation_check: "evidence that the amended setting was not the constraint after all",
         }),
       );
-      unitOfWork.edge(decision, "CHANGES", input.criterion);
+      unitOfWork.edge(decision, "SUPERSEDES", input.criterion);
       unitOfWork.edge(decision, "MOTIVATES", replacement);
       for (const cited of diagnosis) unitOfWork.edge(decision, "BASED_ON", cited);
       if (prior) unitOfWork.edge(decision, "SUPERSEDES", prior);

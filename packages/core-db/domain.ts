@@ -89,12 +89,9 @@ export const EDGE_LABELS = [
   "TRIGGERS", // CriterionEvaluation -> Gate
   "GATES", // Gate -> Task/Computation
   "AFTER", // Task -> Task (`plan --after`: this work waits on that work's result)
-  "CHANGES", // Decision -> Criterion
   "BASED_ON", // Decision -> Evidence | Review, CriterionEvaluation -> Evidence
   "IN_LIGHT_OF", // Decision -> Claim it was accepted in light of
-  "RESOLVES", // Decision -> Question | LineOfEnquiry | Task
-  "SIDESTEPS", // Decision -> Gate (`close gate --sidestepped`)
-  "RETIRES", // Decision -> Gate (`close gate --retired`)
+  "CLOSES", // Decision -> LineOfEnquiry | Task | Gate (`close`)
   "ANSWERS", // Decision -> Claim named as an enquiry's answer
   "SHARPENS", // Decision -> Question (`sharpen`)
   "ACCEPTS", // Decision -> Question (`accept`, left unresolved on purpose)
@@ -247,13 +244,6 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    */
   KEEPS: [["Decision", "Claim"]],
   /**
-   * What a decision withdrew or replaced: a design condition, an interpretation.
-   */
-  CHANGES: [
-    ["Decision", "Criterion"],
-    ["Decision", "Claim"],
-  ],
-  /**
    * What the researcher cited as the cause — `--because`. A review is the same reading as a
    * finding: the thing the decision rests on.
    */
@@ -269,13 +259,11 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
    * The item a decision closes. Question remains legal for replaying historical events; current
    * question standing is computed from the closures of its lines of enquiry.
    */
-  RESOLVES: [
-    ["Decision", "Question"],
+  CLOSES: [
     ["Decision", "LineOfEnquiry"],
     ["Decision", "Task"],
+    ["Decision", "Gate"],
   ],
-  SIDESTEPS: [["Decision", "Gate"]],
-  RETIRES: [["Decision", "Gate"]],
   ANSWERS: [["Decision", "Claim"]],
   SHARPENS: [["Decision", "Question"]],
   ACCEPTS: [["Decision", "Question"]],
@@ -285,6 +273,7 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   SUPERSEDES: [
     ["Decision", "Decision"],
     ["Decision", "Claim"],
+    ["Decision", "Criterion"],
     ["Decision", "Computation"],
     ["Note", "Note"],
   ],
@@ -426,7 +415,7 @@ export interface GateProps {
 
 export interface ReviewProps {
   /**
-   * `Prose`, and `EDGE_SCHEMA.CHANGES` says why that is a decision rather than a shrug: telling
+   * `Prose`, and `EDGE_SCHEMA.SUPERSEDES` says why that is a decision rather than a shrug: telling
    * a confirming review from a retracting one by reading this text *"would be text-matching"*,
    * so the model expresses it structurally instead.
    */

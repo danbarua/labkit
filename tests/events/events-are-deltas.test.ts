@@ -88,7 +88,7 @@ test("closeEnquiry states the decision and its exact pursuit target", async () =
   expect(closed.changes[1]).toEqual({
     change: "EdgeCreated",
     from: decision,
-    label: "RESOLVES",
+    label: "CLOSES",
     to: enquiry,
   });
 });

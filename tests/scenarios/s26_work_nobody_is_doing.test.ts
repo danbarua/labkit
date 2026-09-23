@@ -180,13 +180,9 @@ describe("S-26: work nobody is doing", () => {
     );
     expect(afterBlocked).toEqual([active]);
 
-    await session.writes.closeGate({
-      gate,
-      closure: "sidestepped",
-      because: "the sampler is no longer released",
-    });
+    await session.writes.closeGate({ gate, because: "the sampler is no longer released" });
     const closed = await (await afterwards()).reads.gateStatus({ gate });
-    expect(closed.state).toBe("sidestepped");
+    expect(closed.state).toBe("closed");
     expect(closed.gating.map((w) => w.work)).toEqual([active]);
     expect(closed.unmet.flatMap((check) => check.blocks)).toEqual([]);
   });

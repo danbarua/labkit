@@ -173,7 +173,7 @@ describe("line-of-enquiry closure", () => {
 
     const rows = await graph.query(
       `MATCH (loe:LineOfEnquiry {natural_id: $loeId})
-       OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(loe)
+       OPTIONAL MATCH (d:Decision)-[:CLOSES]->(loe)
        RETURN loe, d`,
       { loe: vertexProps(), d: optional(vertexProps<DecisionProps>()) },
       { loeId: lineOfEnquiry.natural_id },
@@ -190,29 +190,16 @@ describe("line-of-enquiry closure", () => {
       invalidation_check: "n/a",
       decided_at: "2026-01-01T00:00:00.000Z",
     });
-    await graph.createEdge(decision.natural_id, "RESOLVES", lineOfEnquiry.natural_id);
+    await graph.createEdge(decision.natural_id, "CLOSES", lineOfEnquiry.natural_id);
 
     const rows = await graph.query(
-      `MATCH (d:Decision)-[:RESOLVES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN d`,
+      `MATCH (d:Decision)-[:CLOSES]->(:LineOfEnquiry {natural_id: $loeId}) RETURN d`,
       { d: vertexProps<DecisionProps>() },
       { loeId: lineOfEnquiry.natural_id },
     );
 
     expect(rows).toHaveLength(1);
     expect(rows[0]!.d).toMatchObject({ reason: "accelerated ridge confirmed equivalent" });
-  });
-
-  test("still accepts the old question target when replaying historical events", async () => {
-    const { question } = await seedResearchThread();
-    const decision = await graph.createNode("Decision", {
-      reason: "historical close",
-      invalidation_check: "n/a",
-      decided_at: "2025-01-01T00:00:00.000Z",
-    });
-
-    await expect(
-      graph.createEdge(decision.natural_id, "RESOLVES", question.natural_id),
-    ).resolves.toBeUndefined();
   });
 });
 
