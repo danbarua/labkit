@@ -25,12 +25,19 @@ export class LearnedGroup extends SessionCore {
         q: vertexProps<{ natural_id: string; name: string }>(),
         loe: vertexProps<{ natural_id: string }>(),
         ev: optional(vertexProps<{ natural_id: string; statement: string }>()),
-        sup: optional(vertexProps<{ natural_id: string; name: string; kind?: string }>()),
-        ch: optional(vertexProps<{ natural_id: string; name: string; kind?: string }>()),
+        sup: optional(vertexProps<{ natural_id: string; name: string }>()),
+        ch: optional(vertexProps<{ natural_id: string; name: string }>()),
       },
       {},
     );
 
+    const confirmatory = await this.confirmatoryOf([
+      ...new Set(
+        rows
+          .flatMap((row) => [row.sup, row.ch])
+          .flatMap((c) => (c ? [ref("claim", c.natural_id)] : [])),
+      ),
+    ]);
     const byQuestion = new Map<string, LearnedUnderQuestion & { seen: Set<string> }>();
     for (const row of rows) {
       const entry = byQuestion.get(row.q.natural_id) ?? {
@@ -53,7 +60,7 @@ export class LearnedGroup extends SessionCore {
           claim: ref("claim", claim.natural_id),
           asserts: claim.name,
           bearing,
-          confirmed: claim.kind === "confirmatory",
+          confirmed: confirmatory.has(ref("claim", claim.natural_id)),
           finding: ref("evidence", row.ev.natural_id),
           states: row.ev.statement,
         });

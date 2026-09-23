@@ -39,14 +39,6 @@ import type { UnitOfWork } from "../projection";
 /** A handle whose specific kind is not known in advance — any id this record minted. */
 const anyRef = (id: string): Ref<Kind> => ref((kindOf(id) ?? id) as Kind, id);
 
-/**
- * The `Claim.kind` each write stores.
- */
-const STORED_KIND = {
-  undecided: "undecided",
-  confirmed: "confirmatory",
-} as const satisfies Record<string, NonNullable<ClaimProps["kind"]>>;
-
 /** What would make a decision of each class wrong. */
 const INVALIDATION_CHECK = {
   undecided: "a further finding that settles the proposition either way",
@@ -143,7 +135,6 @@ export class Revising extends Shared {
     return this.restating("isUndecided", input, {
       reason: "recorded as undecided",
       invalidation_check: INVALIDATION_CHECK.undecided,
-      kind: STORED_KIND.undecided,
       connect: (unitOfWork, decision) => {
         unitOfWork.edge(decision, "GRADES", input.claim);
         unitOfWork.edge(decision, "BASED_ON", input.because);
@@ -158,9 +149,7 @@ export class Revising extends Shared {
     return this.restating("isConfirmed", input, {
       reason: input.because,
       invalidation_check: INVALIDATION_CHECK.confirmed,
-      kind: STORED_KIND.confirmed,
       connect: (unitOfWork, decision) => {
-        // Same CONFIRMED edge the retired `promote` verb wrote.
         unitOfWork.edge(decision, "CONFIRMED", input.claim);
       },
     });
@@ -176,7 +165,6 @@ export class Revising extends Shared {
     spec: {
       reason: Prose;
       invalidation_check: Prose;
-      kind: NonNullable<ClaimProps["kind"]>;
       connect: (unitOfWork: UnitOfWork, decision: Ref<"decision">) => void;
     },
   ): Promise<Restated> {
@@ -190,7 +178,6 @@ export class Revising extends Shared {
         }),
       );
       spec.connect(unitOfWork, decision);
-      unitOfWork.set(input.claim, { kind: spec.kind });
 
       return {
         subject: input.claim,

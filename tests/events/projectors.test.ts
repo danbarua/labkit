@@ -152,10 +152,8 @@ describe("the event stream is a write-ahead log for a graph store", () => {
     // Same edges, by endpoint and type.
     expect([...state.edges].sort()).toEqual([...age.edges].sort());
 
-    // And the property `is` set in place, which is the change kind a projector
-    // that only handled creations would silently drop.
-    const confirmed = state.nodes.get(claims[0]!.claim)!;
-    expect(confirmed.props.kind).toBe("confirmatory");
+    // And the promotion, as the edge the decision wrote.
+    expect([...state.edges].some((e) => e.includes("CONFIRMED"))).toBe(true);
   });
 
   test("staging touches no store, and names what it makes", () => {

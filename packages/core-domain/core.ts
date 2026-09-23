@@ -20,6 +20,7 @@ import { graphProjector, type Projector } from "./projection";
 import type {
   ClaimRef,
   ClaimStanding,
+  DecisionRef,
   AnalysisRef,
   EnquiryRef,
   EvidenceRef,
@@ -55,6 +56,13 @@ type ClaimOrigin =
 export type Methods<T> = {
   [K in keyof T]-?: T[K] extends (...args: never[]) => unknown ? K : never;
 }[keyof T];
+
+/** What the latest live decision said a claim is. */
+export interface ConferredStanding {
+  standing: "confirmatory" | "undecided";
+  decision: DecisionRef;
+  because: string;
+}
 
 export class SessionCore {
   protected readonly clock: Clock;
@@ -238,6 +246,74 @@ export class SessionCore {
   }
 
   /**
+   * The standing the latest live decision conferred on each claim: confirmed by a CONFIRMED
+   * edge, undecided by a GRADES edge. A retracted decision confers nothing. Absent when no
+   * decision has spoken.
+   */
+  protected async standingsConferred(
+    claims: readonly ClaimRef[],
+  ): Promise<Map<ClaimRef, ConferredStanding>> {
+    const out = new Map<ClaimRef, ConferredStanding & { at: string }>();
+    if (claims.length === 0) return out;
+    for (const [label, standing] of [
+      ["CONFIRMED", "confirmatory"],
+      ["GRADES", "undecided"],
+    ] as const) {
+      const rows = await this.graph.query(
+        `MATCH (d:Decision)-[:${label}]->(c:Claim) WHERE c.natural_id IN $ids RETURN d, c`,
+        {
+          d: vertexProps<{
+            natural_id: string;
+            reason: string;
+            decided_at: string;
+            retracted?: boolean;
+          }>(),
+          c: vertexProps<{ natural_id: string }>(),
+        },
+        { ids: [...claims] },
+      );
+      for (const row of rows) {
+        if (row.d.retracted === true) continue;
+        const claim = ref("claim", row.c.natural_id);
+        const held = out.get(claim);
+        if (held && held.at > row.d.decided_at) continue;
+        out.set(claim, {
+          standing,
+          decision: ref("decision", row.d.natural_id),
+          because: row.d.reason,
+          at: row.d.decided_at,
+        });
+      }
+    }
+    return out;
+  }
+
+  protected async standingConferred(claim: ClaimRef): Promise<ConferredStanding | undefined> {
+    return (await this.standingsConferred([claim])).get(claim);
+  }
+
+  /**
+   * Which of these claims are confirmatory: what the latest live decision conferred, and
+   * failing any decision, what the conclusion said it was.
+   */
+  protected async confirmatoryOf(claims: readonly ClaimRef[]): Promise<Set<ClaimRef>> {
+    const out = new Set<ClaimRef>();
+    if (claims.length === 0) return out;
+    const conferred = await this.standingsConferred(claims);
+    const rows = await this.graph.query(
+      `MATCH (c:Claim) WHERE c.natural_id IN $ids RETURN c`,
+      { c: vertexProps<{ natural_id: string; kind?: string }>() },
+      { ids: [...claims] },
+    );
+    for (const row of rows) {
+      const claim = ref("claim", row.c.natural_id);
+      const standing = conferred.get(claim)?.standing ?? row.c.kind;
+      if (standing === "confirmatory") out.add(claim);
+    }
+    return out;
+  }
+
+  /**
    * Confirmatory results standing behind these gates.
    */
 
@@ -260,8 +336,11 @@ export class SessionCore {
           },
           { id: gate },
         );
+        const confirmatory = await this.confirmatoryOf(
+          rows.map((row) => ref("claim", row.c.natural_id)),
+        );
         for (const row of rows) {
-          if (row.c.kind !== "confirmatory") continue;
+          if (!confirmatory.has(ref("claim", row.c.natural_id))) continue;
           const claim = ref("claim", row.c.natural_id);
           affected.set(claim, { claim, asserts: row.c.name });
         }

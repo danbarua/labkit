@@ -189,7 +189,6 @@ describe("line-of-enquiry closure", () => {
       reason: "accelerated ridge confirmed equivalent",
       invalidation_check: "n/a",
       decided_at: "2026-01-01T00:00:00.000Z",
-      resolution_kind: "answered",
     });
     await graph.createEdge(decision.natural_id, "RESOLVES", lineOfEnquiry.natural_id);
 

@@ -281,6 +281,50 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
   });
 
   /**
+   * A verdict belongs to the finding it was about. When that finding is replaced, the verdict
+   * goes with it and the successor has not been checked: its check is never-run, not failed,
+   * and a gate whose other findings passed is incomplete rather than blocked.
+   */
+  test("a verdict about a superseded finding leaves with it; its successor is unchecked", async () => {
+    const w = await aRunPartlyReAnalysed(true);
+    if (w.criterion === undefined) throw new Error("unreachable: asked for a criterion");
+    const { work } = await session.writes.planWork({
+      objective: "report the stochastic-control comparison",
+      acceptance: "the aggregation scale is settled first",
+    });
+    const { gate } = await session.writes.declareGate({
+      governedBy: [w.criterion],
+      consequence:
+        "the stochastic-control comparison is reported only once its aggregation is right",
+      protecting: [work],
+    });
+    await session.writes.evaluateCriterion({
+      criterion: w.criterion,
+      gate,
+      value: "raw scale",
+      outcome: "fail",
+      about: w.revisited,
+    });
+    await session.writes.evaluateCriterion({
+      criterion: w.criterion,
+      gate,
+      value: "lattice control aggregated on the log scale",
+      outcome: "pass",
+      about: w.stands,
+    });
+    expect((await session.reads.gateStatus({ gate })).state).toBe("blocked");
+
+    const { claims } = await theLogScaleReAnalysis(w);
+    const successor = claimOf(claims, REVISITED);
+    const later = await afterwards();
+    const status = await later.reads.gateStatus({ gate });
+    expect(status.state).toBe("incomplete");
+    expect(status.checks.map((c) => `${c.about} ${c.state}`).sort()).toEqual(
+      [`${w.stands} passed`, `${successor} never-run`].sort(),
+    );
+  });
+
+  /**
    * **The pairing the act implies is recorded by the act.**
    */
   test("a successor is paired to the finding it replaces, with nothing named", async () => {

@@ -64,7 +64,6 @@ export function answeringClaimBearing(
           Node & {
             decided_at: string;
             reason: string;
-            resolution_kind?: string;
             retracted?: boolean;
           }
         >(),
@@ -152,11 +151,14 @@ export function verdictsWhere(
       value: "",
       basis: [],
       elsewhere: false,
+      superseded: false,
     }),
     fold: (verdict, row) => {
       const evaluation = row.ev as EvaluationNode | null;
-      // The subject as it now stands: the successor when one exists.
-      const judged = (row.instead as Node | null) ?? (row.judged as Node | null);
+      // The subject as it now stands: the successor when one exists. An evaluation of a claim
+      // that was superseded is scoped to the successor and carries no verdict on it.
+      const instead = row.instead as Node | null;
+      const judged = instead ?? (row.judged as Node | null);
       // Only the gate-scoped leaf yields `trig`; everywhere else both are
       // undefined and every verdict is at home.
       const reachedFor = row.trig as Node | null | undefined;
@@ -169,6 +171,7 @@ export function verdictsWhere(
         ? {
             ...verdict,
             elsewhere,
+            superseded: instead !== null,
             outcome: evaluation.outcome,
             at: evaluation.evaluated_at,
             value: evaluation.value,
@@ -218,6 +221,8 @@ export interface Verdict {
    * about a particular gate.
    */
   elsewhere: boolean;
+  /** The finding it judged has since been superseded; `about` names the successor. */
+  superseded: boolean;
 }
 
 type StoredOutcome = "pass" | "fail";
@@ -247,12 +252,23 @@ export type CheckState = "passed" | "failed" | "never-run" | "no-standing-verdic
 /** Retracted: it cited findings, and every one has since been invalidated. */
 const retracted = (v: Verdict): boolean => v.cited > 0 && v.standing === 0;
 
+/** A verdict that still speaks for its subject: not retracted, and not about a superseded finding. */
+const speaks = (v: Verdict): boolean => !retracted(v) && !v.superseded;
+
+/** Oldest first, ties broken by identity. */
+const byTime = <T extends { at: string; evaluation: string }>(a: T, b: T): number =>
+  a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation);
+
 /**
- * One subject's state, over whichever verdicts the caller chose.
+ * One subject's state over the verdicts that speak for it: any fail holds, so re-running a
+ * check until it passes does not clear it. A subject whose only verdicts were about a
+ * finding since superseded has not been checked; one whose verdicts were all retracted has
+ * been, and nothing stands.
  */
 function stateOf(group: IdentifiedVerdict[]): CheckState {
-  const standing = group.filter((v) => !retracted(v));
-  if (standing.length === 0) return group.length > 0 ? "no-standing-verdict" : "never-run";
+  const own = group.filter((v) => !v.superseded);
+  const standing = own.filter(speaks);
+  if (standing.length === 0) return own.some(retracted) ? "no-standing-verdict" : "never-run";
   return standing.some((v) => storedOutcome(v, v.evaluation) === "fail") ? "failed" : "passed";
 }
 
@@ -405,9 +421,7 @@ export function evaluationsOver(verdicts: Leaf<Verdict>): Derived<EvaluationReco
     from: (needs) => {
       const found = needs[verdicts.name] as Map<string, Verdict>;
       const criterion = needs.criterionProps as CriterionNode;
-      const ordered = [...found]
-        .map(([evaluation, v]) => ({ evaluation, ...v }))
-        .sort((a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation));
+      const ordered = [...found].map(([evaluation, v]) => ({ evaluation, ...v })).sort(byTime);
       return recordsOf(ordered, criterion.natural_id);
     },
   };
@@ -427,7 +441,7 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus[]>
       const ordered = [...found]
         .map(([evaluation, v]) => ({ evaluation, ...v }))
         .filter(bearsHere)
-        .sort((a, b) => a.at.localeCompare(b.at) || a.evaluation.localeCompare(b.evaluation));
+        .sort(byTime);
       const records = recordsOf(ordered, criterion.natural_id);
 
       // **One check per subject, not per criterion.** A rule judged against
@@ -443,7 +457,7 @@ export function checkStatusOver(verdicts: Leaf<Verdict>): Derived<CheckStatus[]>
       if (groups.size === 0) groups.set("", []);
 
       return [...groups].map(([subject, group]) => {
-        const standing = group.filter((v) => !retracted(v));
+        const standing = group.filter(speaks);
         const decisive = standing.find((v) => v.outcome === "fail") ?? standing[0];
         const decided = decisive && records.find((r) => r.evaluation === decisive.evaluation);
         return {
@@ -487,7 +501,7 @@ export function standingAsOf(
            OPTIONAL MATCH (vouching:Decision)-[:CONFIRMED]->(answering)`,
     yields: {
       loe: optional(vertexProps<Node & { started_at?: string }>()),
-      resolving: optional(vertexProps<{ decided_at: string; resolution_kind?: string }>()),
+      resolving: optional(vertexProps<{ decided_at: string }>()),
       part: optional(vertexProps<Node>()),
       cited: optional(vertexProps<Node>()),
       borne: optional(vertexProps<Node>()),
@@ -498,7 +512,7 @@ export function standingAsOf(
     fold: (standing, row) => {
       const loe = row.loe as (Node & { started_at?: string }) | null;
       const existed = loe !== null && (loe.started_at === undefined || loe.started_at <= at);
-      const resolving = row.resolving as { decided_at: string; resolution_kind?: string } | null;
+      const resolving = row.resolving as { decided_at: string } | null;
       const closed = existed && resolving !== null && resolving.decided_at <= at;
       const answering = row.answering as ClaimNode | null;
       const borne = row.borne as Node | null;
@@ -508,7 +522,7 @@ export function standingAsOf(
           borne &&
           (borne.natural_id === answering.natural_id || part?.natural_id === borne.natural_id),
       );
-      const answered = closed && resolving.resolution_kind === "answered" && bearsOnAnswer;
+      const answered = closed && bearsOnAnswer;
       const vouched = row.vouching as { decided_at: string } | null;
       return {
         resolved: standing.resolved || answered,

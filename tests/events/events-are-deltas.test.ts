@@ -84,11 +84,7 @@ test("closeEnquiry states the decision and its exact pursuit target", async () =
 
   const closed = recorded[0]!;
   expect(closed.changes.map((c) => c.change)).toEqual(["NodeCreated", "EdgeCreated"]);
-  expect(closed.changes[0]).toMatchObject({
-    id: decision,
-    label: "Decision",
-    props: { resolution_kind: "abandoned" },
-  });
+  expect(closed.changes[0]).toMatchObject({ id: decision, label: "Decision" });
   expect(closed.changes[1]).toEqual({
     change: "EdgeCreated",
     from: decision,

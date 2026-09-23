@@ -119,7 +119,6 @@ export class Stopping extends SessionCore {
               ? "closed without a cited result"
               : `answered on "${answer.asserts}"`,
           invalidation_check: "new evidence bearing on this enquiry's question",
-          resolution_kind: closure,
         }),
       );
       unitOfWork.edge(decided, "RESOLVES", input.enquiry);
@@ -196,11 +195,13 @@ export class Stopping extends SessionCore {
     return this.handle("closeGate", input, async (unitOfWork) => {
       const [target] = await this.graph.query(
         `MATCH (g:Gate {natural_id: $id})
-         OPTIONAL MATCH (d:Decision)-[:RESOLVES]->(g)
-         RETURN g, d`,
+         OPTIONAL MATCH (s:Decision)-[:SIDESTEPS]->(g)
+         OPTIONAL MATCH (r:Decision)-[:RETIRES]->(g)
+         RETURN g, s, r`,
         {
           g: vertexProps<{ natural_id: string; consequence: string }>(),
-          d: optional(vertexProps<{ natural_id: string; reason: string }>()),
+          s: optional(vertexProps<{ natural_id: string; reason: string }>()),
+          r: optional(vertexProps<{ natural_id: string; reason: string }>()),
         },
         { id: input.gate },
       );
@@ -210,10 +211,11 @@ export class Stopping extends SessionCore {
           message: `${input.gate} not found`,
           subject: input.gate,
         });
-      if (target.d)
+      const closed = target.s ?? target.r;
+      if (closed)
         throw new DomainRefusal({
           kind: "invariant",
-          message: `${input.gate} is already ${target.d.reason} by ${target.d.natural_id}`,
+          message: `${input.gate} is already ${closed.reason} by ${closed.natural_id}`,
           subject: input.gate,
         });
 
@@ -223,10 +225,13 @@ export class Stopping extends SessionCore {
           decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check: "a reason for this gate to govern work again",
-          resolution_kind: input.closure,
         }),
       );
-      unitOfWork.edge(decision, "RESOLVES", input.gate);
+      unitOfWork.edge(
+        decision,
+        input.closure === "sidestepped" ? "SIDESTEPS" : "RETIRES",
+        input.gate,
+      );
       return {
         subject: input.gate,
         result: { decision, gate: input.gate, closure: input.closure },
@@ -266,7 +271,6 @@ export class Stopping extends SessionCore {
           decided_at: this.clock.now(),
           reason: input.because,
           invalidation_check: "a reason to do this work after all",
-          resolution_kind: "stopped",
         }),
       );
       unitOfWork.edge(decision, "RESOLVES", input.work);

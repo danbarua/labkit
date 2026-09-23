@@ -107,12 +107,10 @@ describe("S-23: prespecified is not promoted", () => {
   });
 
   test("the stream says which standing each was recorded with", async () => {
-    await twoRoutesToConfirmatory();
+    const { promoted } = await twoRoutesToConfirmatory();
 
-    // The other route to the same distinction, and the one that survives a
-    // claim being promoted, demoted and promoted again: the act that minted
-    // the claim recorded the standing it was minted with, and every later
-    // change records what it became.
+    // The other route to the same distinction: the act that minted the claim recorded the
+    // standing it was minted with, and a promotion is a decision with an edge to the claim.
     const born = (await events.select({ operation: "conclude" })).map(
       (e) =>
         e.changes.find((c) => c.change === "NodeCreated" && c.label === "Claim") as {
@@ -123,11 +121,7 @@ describe("S-23: prespecified is not promoted", () => {
 
     const [promotion] = await events.select({ operation: "isConfirmed" });
     expect(promotion!.changes).toContainEqual(
-      expect.objectContaining({
-        change: "NodePropsChanged",
-        before: { kind: "exploratory" },
-        after: { kind: "confirmatory" },
-      }),
+      expect.objectContaining({ change: "EdgeCreated", label: "CONFIRMED", to: promoted }),
     );
   });
 });
