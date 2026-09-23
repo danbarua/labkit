@@ -48,6 +48,7 @@ const VERB_WORD: Record<string, string> = {
   RESTS_ON: "BASED_ON", // synthesise
   CHANGES: "SUPERSEDES", // amend: the old criterion stays, invalid, its replacement beside it
   RESOLVES: "CLOSES", // close
+  IN_LIGHT_OF: "BASED_ON", // accept --in-light-of
 };
 const verbWord = (change: GraphChange): GraphChange =>
   change.change === "EdgeCreated" && VERB_WORD[change.label]

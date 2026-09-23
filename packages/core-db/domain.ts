@@ -89,8 +89,7 @@ export const EDGE_LABELS = [
   "TRIGGERS", // CriterionEvaluation -> Gate
   "GATES", // Gate -> Task/Computation
   "AFTER", // Task -> Task (`plan --after`: this work waits on that work's result)
-  "BASED_ON", // Decision -> Evidence | Review, CriterionEvaluation -> Evidence
-  "IN_LIGHT_OF", // Decision -> Claim it was accepted in light of
+  "BASED_ON", // Decision -> Evidence | Review | Claim, Claim -> Claim, CriterionEvaluation -> Evidence
   "CLOSES", // Decision -> LineOfEnquiry | Task | Gate (`close`)
   "ANSWERS", // Decision -> Claim named as an enquiry's answer
   "SHARPENS", // Decision -> Question (`sharpen`)
@@ -252,9 +251,10 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Claim", "Claim"],
     ["Decision", "Evidence"],
     ["Decision", "Review"],
+    // `accept --in-light-of`: the claim an acceptance rests on.
+    ["Decision", "Claim"],
     ["CriterionEvaluation", "Evidence"],
   ],
-  IN_LIGHT_OF: [["Decision", "Claim"]],
   /**
    * The item a decision closes. Question remains legal for replaying historical events; current
    * question standing is computed from the closures of its lines of enquiry.

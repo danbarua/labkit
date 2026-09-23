@@ -178,7 +178,7 @@ export class Stopping extends SessionCore {
         }),
       );
       unitOfWork.edge(decision, "ACCEPTS", question);
-      unitOfWork.edge(decision, "IN_LIGHT_OF", input.inLightOf);
+      unitOfWork.edge(decision, "BASED_ON", input.inLightOf);
       // What was known when the call was made, which is what makes
       // `evidence` answerable afterwards rather than only now.
       for (const cited of basis) unitOfWork.edge(decision, "BASED_ON", cited);
