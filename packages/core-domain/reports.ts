@@ -980,6 +980,8 @@ const listedWork = z.strictObject({
   objective: prose(),
   state: z.enum(WORK_STATES),
   gates: z.array(ref("gate")),
+  /** Work this waits on. Until each is carried out, this is `waiting`. */
+  after: z.array(ref("work")),
 });
 
 /** `work_list` — the same wrapping, for the same reason. */

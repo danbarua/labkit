@@ -101,13 +101,21 @@ export function gateStateFrom(checks: readonly { state: CheckState }[]): GateSta
  * A task's state, from the edges that reach it.
  */
 export function workStateFrom(
-  task: { gates: Set<string>; everGated: boolean; implemented: boolean; stopped: boolean },
+  task: {
+    gates: Set<string>;
+    everGated: boolean;
+    implemented: boolean;
+    stopped: boolean;
+    /** The work it waits on, and whether each has a result. */
+    after: ReadonlyMap<string, boolean>;
+  },
   gateStates: ReadonlyMap<string, GateStatus["state"]>,
 ): WorkState {
   if (task.stopped) return "abandoned";
   const states = [...task.gates].map((g) => gateStates.get(g));
   if (states.includes("blocked")) return "blocked";
   if (task.implemented) return "carried-out";
+  if ([...task.after.values()].some((done) => !done)) return "waiting";
   if (task.gates.size === 0) return task.everGated ? "waiting" : "planned";
   const cleared = new Set<GateStatus["state"]>(["satisfied", "sidestepped", "retired"]);
   return states.every((state) => state !== undefined && cleared.has(state)) ? "planned" : "waiting";
@@ -493,7 +501,9 @@ export class BlockedGroup extends SessionCore {
        OPTIONAL MATCH (g:Gate)-[:GATES]->(t)
        OPTIONAL MATCH (t)-[:IMPLEMENTS]->(u:EvidenceUnit)
        OPTIONAL MATCH (stop:Decision)-[:RESOLVES]->(t)
-       RETURN t, ever, g, u, stop`,
+       OPTIONAL MATCH (t)-[:AFTER]->(earlier:Task)
+       OPTIONAL MATCH (earlier)-[:IMPLEMENTS]->(done:EvidenceUnit)
+       RETURN t, ever, g, u, stop, earlier, done`,
       {
         t: vertexProps<{ natural_id: string; objective: string }>(),
         // `ever` is deliberately unlabelled: the Gate label policy hides retracted gates, while
@@ -502,12 +512,14 @@ export class BlockedGroup extends SessionCore {
         g: optional(vertexProps<{ natural_id: string }>()),
         u: optional(vertexProps<{ natural_id: string }>()),
         stop: optional(vertexProps<{ natural_id: string }>()),
+        earlier: optional(vertexProps<{ natural_id: string }>()),
+        done: optional(vertexProps<{ natural_id: string }>()),
       },
       {},
     );
 
-    // One row per (task, historical gate, live gate, unit) combination. Collected before
-    // anything is decided.
+    // One row per (task, historical gate, live gate, unit, dependency) combination. Collected
+    // before anything is decided.
     const tasks = new Map<
       string,
       {
@@ -516,6 +528,7 @@ export class BlockedGroup extends SessionCore {
         everGated: boolean;
         implemented: boolean;
         stopped: boolean;
+        after: Map<string, boolean>;
       }
     >();
     for (const row of rows) {
@@ -526,11 +539,17 @@ export class BlockedGroup extends SessionCore {
         everGated: false,
         implemented: false,
         stopped: false,
+        after: new Map<string, boolean>(),
       };
       entry.everGated ||= row.ever !== null;
       entry.stopped ||= row.stop !== null;
       if (row.g?.natural_id) entry.gates.add(row.g.natural_id);
       if (row.u?.natural_id) entry.implemented = true;
+      if (row.earlier)
+        entry.after.set(
+          row.earlier.natural_id,
+          (entry.after.get(row.earlier.natural_id) ?? false) || row.done !== null,
+        );
       tasks.set(id, entry);
     }
 
@@ -545,6 +564,7 @@ export class BlockedGroup extends SessionCore {
         objective: t.objective,
         state: workStateFrom(t, gateStates),
         gates: [...t.gates].map((g) => ref("gate", g)),
+        after: [...t.after.keys()].map((w) => ref("work", w)),
       }))
       .sort((a, b) => byHandle(a.work, b.work));
 

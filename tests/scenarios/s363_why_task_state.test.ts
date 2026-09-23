@@ -100,6 +100,49 @@ describe("why <task> names the state work already computes", () => {
     expect(explained.because[0]!.wording).toBe("never-evaluated");
   });
 
+  test("work planned after other work waits on it, and names it", async () => {
+    const enquiry = await anEnquiry();
+    const { work: first } = await session.writes.planWork({
+      objective: "freeze the filterbank",
+      acceptance: "a bench result",
+      addressing: enquiry,
+    });
+    const { work: second } = await session.writes.planWork({
+      objective: "bring in the temporal instrument",
+      acceptance: "runs against the frozen filterbank",
+      addressing: enquiry,
+      after: [first],
+    });
+
+    const reader = await afterwards();
+    const listed = await reader.reads.workList({});
+    expect(listed.find((w) => w.work === second)).toMatchObject({
+      state: "waiting",
+      after: [first],
+    });
+    expect(listed.find((w) => w.work === first)).toMatchObject({ state: "planned", after: [] });
+    const explained = await reader.reads.why({ subject: second });
+    expect(explained.is).toBe("waiting");
+    expect(explained.because[0]).toEqual({ handle: first, wording: "waits on — planned" });
+
+    // Once the first has a result, the second is ready.
+    const { observations } = await session.writes.recordObservations({
+      enquiry,
+      name: "bench",
+      finding: "filterbank frozen",
+    });
+    await recordAnalysis(session.writes, {
+      enquiry,
+      method: "bench",
+      from: [observations],
+      implementing: first,
+      concludes: [{ proposition: "the filterbank is frozen", finding: "bench passed" }],
+    });
+    const after = await (await afterwards()).reads.workList({});
+    expect(after.find((w) => w.work === first)?.state).toBe("carried-out");
+    expect(after.find((w) => w.work === second)?.state).toBe("planned");
+  });
+
   test("carried-out work names the analysis that implemented it", async () => {
     const enquiry = await anEnquiry();
     const { observations } = await session.writes.recordObservations({

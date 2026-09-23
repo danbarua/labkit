@@ -374,8 +374,22 @@ describe("enumerating gates and work", () => {
       everGated: true,
       implemented: false,
       stopped: false,
+      after: new Map<string, boolean>(),
     };
     expect(workStateFrom(task, new Map())).toBe("waiting");
+    // Work it waits on holds it until that work has a result, gates or no gates.
+    expect(
+      workStateFrom(
+        { ...task, gates: new Set(), everGated: false, after: new Map([["TASK_1", false]]) },
+        new Map(),
+      ),
+    ).toBe("waiting");
+    expect(
+      workStateFrom(
+        { ...task, gates: new Set(), everGated: false, after: new Map([["TASK_1", true]]) },
+        new Map(),
+      ),
+    ).toBe("planned");
     expect(workStateFrom(task, new Map([["GATE_9", "satisfied"]]))).toBe("planned");
     expect(workStateFrom({ ...task, gates: new Set() }, new Map())).toBe("waiting");
     expect(workStateFrom({ ...task, gates: new Set(), everGated: false }, new Map())).toBe(
