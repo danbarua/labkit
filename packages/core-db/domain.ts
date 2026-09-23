@@ -414,11 +414,7 @@ export interface GateProps {
 }
 
 export interface ReviewProps {
-  /**
-   * `Prose`, and `EDGE_SCHEMA.SUPERSEDES` says why that is a decision rather than a shrug: telling
-   * a confirming review from a retracting one by reading this text *"would be text-matching"*,
-   * so the model expresses it structurally instead.
-   */
+  /** The reviewer's words. What the review retracted is the edges of the decision citing it. */
   verdict: Prose;
 }
 

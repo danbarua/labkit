@@ -36,8 +36,6 @@ function acceptedLines(qs: AcceptedQuestion[], p: Palette): string[] {
 function answeredLines(qs: AnsweredQuestion[], p: Palette): string[] {
   return qs.map((q) => {
     const parked = q.reopensIf ? p.quiet(`  (was parked until: ${q.reopensIf})`) : "";
-    // The claim's bearing, never a yes or no: beside a question a polarity reads as an answer
-    // to the question's wording, and the claim may assert the opposite of it.
     const answers = q.answers
       .map(
         (answer) =>
