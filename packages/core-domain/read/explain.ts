@@ -475,7 +475,10 @@ async function causesForWorkState(self: ReadSurface, listed: ListedWork): Promis
     case "blocked":
     case "waiting":
     case "planned":
-      return causesForGates(self, listed.gates);
+      return [
+        ...(await causesForWaitedOn(self, listed.after)),
+        ...(await causesForGates(self, listed.gates)),
+      ];
     case "carried-out":
       return implementingAnalyses(self, listed.work);
     default: {
@@ -483,6 +486,16 @@ async function causesForWorkState(self: ReadSurface, listed: ListedWork): Promis
       throw new Error(`unreached work state: ${state}`);
     }
   }
+}
+
+/** The work this waits on, each with where it stands. */
+async function causesForWaitedOn(self: ReadSurface, after: ListedWork["after"]): Promise<Cause[]> {
+  if (after.length === 0) return [];
+  const all = new Map((await self.workList({})).map((w) => [w.work, w]));
+  return after.map((work) => {
+    const earlier = all.get(work);
+    return { handle: work, wording: `waits on — ${earlier?.state ?? "not found"}` };
+  });
 }
 
 async function causesForGates(self: ReadSurface, gates: ListedWork["gates"]): Promise<Cause[]> {
@@ -789,6 +802,7 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   EVALUATED_AS: { out: "was evaluated as", in: "is a verdict on" },
   TRIGGERS: { out: "was judged against", in: "was judged by" },
   GATES: { out: "holds up", in: "is held up by" },
+  AFTER: { out: "waits on", in: "is waited on by" },
   REVERIFIES: { out: "re-checks", in: "was re-checked by" },
   CONFIRMED: { out: "confirmed", in: "was confirmed by" },
   GRADES: { out: "graded", in: "was graded by" },

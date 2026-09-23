@@ -88,6 +88,7 @@ export const EDGE_LABELS = [
   "EVALUATED_AS", // Criterion -> CriterionEvaluation
   "TRIGGERS", // CriterionEvaluation -> Gate
   "GATES", // Gate -> Task/Computation
+  "AFTER", // Task -> Task (`plan --after`: this work waits on that work's result)
   "CHANGES", // Decision -> Criterion
   "BASED_ON", // Decision -> Evidence | Review, CriterionEvaluation -> Evidence
   "IN_LIGHT_OF", // Decision -> Claim it was accepted in light of
@@ -224,6 +225,7 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Gate", "Task"],
     ["Gate", "Computation"],
   ],
+  AFTER: [["Task", "Task"]],
   /**
    * "Re-checked that finding, without reproducing the run behind it."
    */

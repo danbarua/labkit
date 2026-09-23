@@ -49,6 +49,7 @@ export class Counting extends SessionCore {
         }),
       );
       if (input.addressing) unitOfWork.edge(work, "ADDRESSES", input.addressing);
+      for (const earlier of input.after ?? []) unitOfWork.edge(work, "AFTER", earlier);
 
       return {
         subject: work,

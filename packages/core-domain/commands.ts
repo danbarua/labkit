@@ -173,6 +173,8 @@ export const planWorkCommand = z.object({
   acceptance: z.string(),
   mayRead: z.array(z.string()).optional(),
   addressing: refString("enquiry").optional(),
+  /** Work this waits on: it is not ready to start until each has a result. */
+  after: z.array(refString("work")).optional(),
 });
 export type PlanWorkCommand = z.infer<typeof planWorkCommand>;
 

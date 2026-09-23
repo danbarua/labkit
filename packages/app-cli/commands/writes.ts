@@ -266,12 +266,18 @@ export function registerWrites(program: Command, run: Run): void {
       collect(String),
     )
     .option("--enquiry <id>", "the line of enquiry this work exists to advance")
+    .option(
+      "--after <work>",
+      "work this waits on; not ready to start until it has a result (repeatable)",
+      collect(String),
+    )
     .action(
       async (opts: {
         objective: string;
         acceptance: string;
         mayRead?: string[];
         enquiry?: string;
+        after?: string[];
       }) =>
         parsed(
           planWorkCommand,
@@ -280,6 +286,7 @@ export function registerWrites(program: Command, run: Run): void {
             acceptance: opts.acceptance,
             ...(opts.mayRead === undefined ? {} : { mayRead: opts.mayRead }),
             ...(opts.enquiry === undefined ? {} : { addressing: opts.enquiry }),
+            ...(opts.after === undefined ? {} : { after: opts.after }),
           },
           (write, input) => write.planWork(input),
         ),
