@@ -286,16 +286,16 @@ describe("an event records the edges the act created", () => {
       because: "the prespecified check passed",
     });
     const [promoted] = await log.select({ operation: "isConfirmed" });
-    // The act's own words, and the change it made: `isConfirmed`
-    // sets `kind` in place, and the delta is what carries that.
+    // The act's own words, and the change it made: a decision, and its edge to the claim.
     expect(promoted!.command).toMatchObject({ because: "the prespecified check passed" });
     expect(promoted!.command).not.toHaveProperty("state");
-    expect(promoted!.changes).toContainEqual({
-      change: "NodePropsChanged",
-      id: exploratory.claims[0]!.claim,
-      before: { kind: "exploratory" },
-      after: { kind: "confirmatory" },
-    });
+    expect(promoted!.changes).toContainEqual(
+      expect.objectContaining({
+        change: "EdgeCreated",
+        label: "CONFIRMED",
+        to: exploratory.claims[0]!.claim,
+      }),
+    );
   });
 
   test("recordAnalysis reports every edge, not only its nodes", async () => {

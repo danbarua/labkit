@@ -1,5 +1,4 @@
 import { optional, vertexProps } from "@labkit/core-db/cypher";
-import type { ClaimProps } from "@labkit/core-db/domain";
 import { SessionCore } from "../core";
 import { compose, per, type Row } from "../facts";
 import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
@@ -81,8 +80,9 @@ export class StandingGroup extends SessionCore {
       natural_id: string;
       decided_at: string;
       reason: string;
-      resolution_kind?: string;
       retracted?: boolean;
+      /** The closing decision named an answer. Absent is abandoned. */
+      answered: boolean;
     };
     type Answer = {
       enquiry: string;
@@ -130,20 +130,20 @@ export class StandingGroup extends SessionCore {
           entry.accepting = accepting;
 
         const loe = row.loe as { natural_id: string; name: string } | null;
-        const closing = row.closing as Closing | null;
+        const answering = row.answering as { natural_id: string } | null;
+        const closingRow = row.closing as Omit<Closing, "answered"> | null;
+        const closing: Closing | null = closingRow && {
+          ...closingRow,
+          answered: answering !== null,
+        };
         if (loe) {
           const pursuit = entry.pursuits.get(loe.natural_id) ?? { name: loe.name, closing: null };
           if (closing && closing.retracted !== true) {
-            if (closing.resolution_kind !== "answered" && closing.resolution_kind !== "abandoned")
-              throw new Error(
-                `decision ${closing.natural_id} resolves enquiry ${loe.natural_id} with invalid resolution kind ${closing.resolution_kind ?? "absent"}`,
-              );
             if (!pursuit.closing || closing.decided_at > pursuit.closing.decided_at)
               pursuit.closing = closing;
           }
           entry.pursuits.set(loe.natural_id, pursuit);
 
-          const answering = row.answering as { natural_id: string } | null;
           const borne = row.borne as { natural_id: string } | null;
           const part = row.part as { natural_id: string } | null;
           const bearsOnAnswer = Boolean(
@@ -151,13 +151,7 @@ export class StandingGroup extends SessionCore {
               borne &&
               (borne.natural_id === answering.natural_id || part?.natural_id === borne.natural_id),
           );
-          if (
-            closing &&
-            closing.retracted !== true &&
-            closing.resolution_kind === "answered" &&
-            answering &&
-            bearsOnAnswer
-          ) {
+          if (closing && closing.retracted !== true && answering && bearsOnAnswer) {
             const key = `${loe.natural_id}\0${answering.natural_id}`;
             const prior = entry.answers.get(key);
             entry.answers.set(key, {
@@ -184,7 +178,7 @@ export class StandingGroup extends SessionCore {
     const liveIds = [
       ...new Set([...liveFor.values()].filter((id): id is ClaimRef => id !== undefined)),
     ];
-    const kinds = await this.kindsOf(liveIds);
+    const confirmatory = await this.confirmatoryOf(liveIds);
     for (const live of liveIds) {
       if (!met.has(live)) met.set(live, await this.checksMet(live));
     }
@@ -207,7 +201,7 @@ export class StandingGroup extends SessionCore {
           enquiry: answer.enquiry,
           claim: live,
           bearing: answer.bearing,
-          vouchedFor: kinds.get(live) === "confirmatory",
+          vouchedFor: confirmatory.has(live),
         });
       }
       liveAnswers.sort((a, b) => byHandle(a.enquiry, b.enquiry) || byHandle(a.claim, b.claim));
@@ -228,7 +222,7 @@ export class StandingGroup extends SessionCore {
       for (const [enquiry, pursuit] of closed) {
         const closing = pursuit.closing!;
         const recorded = [...entry.answers.values()].find((answer) => answer.enquiry === enquiry);
-        if (closing.resolution_kind === "answered" && !recorded)
+        if (closing.answered && !recorded)
           throw new Error(
             `answered decision ${closing.natural_id} has no answering claim for enquiry ${enquiry}`,
           );
@@ -240,7 +234,7 @@ export class StandingGroup extends SessionCore {
           pursuing: pursuit.name,
           question: standing.question,
           decision: ref("decision", closing.natural_id),
-          closure: closing.resolution_kind as "answered" | "abandoned",
+          closure: closing.answered ? ("answered" as const) : ("abandoned" as const),
           ...(shown
             ? {
                 answered: {
@@ -300,15 +294,5 @@ export class StandingGroup extends SessionCore {
       }
     }
     return out;
-  }
-
-  private async kindsOf(ids: ClaimRef[]): Promise<Map<ClaimRef, ClaimProps["kind"]>> {
-    if (ids.length === 0) return new Map();
-    const rows = await this.graph.query(
-      `MATCH (c:Claim) WHERE c.natural_id IN $ids RETURN c`,
-      { c: vertexProps<{ natural_id: string; kind?: ClaimProps["kind"] }>() },
-      { ids },
-    );
-    return new Map(rows.map((row) => [ref("claim", row.c.natural_id), row.c.kind]));
   }
 }

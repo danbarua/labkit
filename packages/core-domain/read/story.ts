@@ -83,7 +83,7 @@ export class StoryGroup extends SessionCore {
        RETURN q, resolving, answered, deferring`,
       {
         q: vertexProps<{ name: string; natural_id: string }>(),
-        resolving: optional(vertexProps<{ natural_id: string; resolution_kind?: string }>()),
+        resolving: optional(vertexProps<{ natural_id: string }>()),
         answered: optional(vertexProps<{ natural_id: string; name: string }>()),
         deferring: optional(
           vertexProps<{
@@ -113,6 +113,7 @@ export class StoryGroup extends SessionCore {
 
     const behind = rows[0]?.q ?? null;
     const resolving = rows.find((r) => r.resolving)?.resolving ?? null;
+    const answered = rows.find((r) => r.answered)?.answered ?? null;
     const accepting = rows.find((r) => r.deferring)?.deferring ?? null;
     const acceptedBasis = accepting
       ? await this.graph.query(
@@ -152,7 +153,8 @@ export class StoryGroup extends SessionCore {
         question,
       };
 
-    if (resolving.resolution_kind === "abandoned")
+    // Abandoned is a closing decision that names no answer.
+    if (!answered)
       return {
         enquiry,
         pursuing: loe.loe.name,
@@ -164,11 +166,6 @@ export class StoryGroup extends SessionCore {
         question,
       };
 
-    if (resolving.resolution_kind !== "answered")
-      throw new Error(
-        `decision ${resolving.natural_id} resolves enquiry ${enquiry} with invalid resolution kind ${resolving.resolution_kind ?? "absent"}`,
-      );
-
     const cited = await this.graph.query(
       `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence)
        OPTIONAL MATCH (e)-[:CHALLENGES]->(against:Claim)
@@ -179,10 +176,9 @@ export class StoryGroup extends SessionCore {
       },
       { id: resolving.natural_id },
     );
-    const answered = rows.find((r) => r.answered)?.answered ?? null;
-    if (cited.length === 0 || answered === null)
+    if (cited.length === 0)
       throw new Error(
-        `answered decision ${resolving.natural_id} lacks its answering claim or cited evidence for enquiry ${enquiry}`,
+        `answered decision ${resolving.natural_id} cites no evidence for enquiry ${enquiry}`,
       );
 
     return {
@@ -215,7 +211,7 @@ export class StoryGroup extends SessionCore {
       { c: vertexProps<{ kind?: string }>() },
       { id: claim },
     );
-    if (row?.c.kind !== "confirmatory") return "exploratory";
+    if (!(await this.confirmatoryOf([claim])).has(claim)) return "exploratory";
     return (await this.checksMet(claim)) ? "confirmatory" : "exploratory";
   }
 
@@ -713,24 +709,21 @@ export class StoryGroup extends SessionCore {
     const withdrawn = standing?.withdrawn ?? false;
     const replacedBy = standing?.insteadOf[0];
 
-    // Standing, and why it was conferred. Read from the claim rather than the conclusion so a
-    // promotion taken later is visible here at all. By handle, and with no traversal at all.
-    const promotion = await this.graph.query(
-      `MATCH (c:Claim {natural_id: $claim})
-       OPTIONAL MATCH (d:Decision)-[:CONFIRMED]->(c)
-       RETURN c, d`,
-      {
-        c: vertexProps<{ kind?: string }>(),
-        d: optional(vertexProps<{ reason: string }>()),
-      },
-      { claim },
-    );
-    const confirmed = promotion.some((r) => r.c.kind === "confirmatory");
-    // A finding that settles the proposition neither way. Read off the claim
-    // rather than off the edges, because the evidence is real and points
-    // somewhere -- what is absent is a direction anyone will stand behind.
-    const undecided = promotion.some((r) => r.c.kind === "undecided");
-    const promotedBecause = promotion.find((r) => r.d)?.d?.reason;
+    // Standing: confirmatory when the conclusion was prespecified as such, or when a decision
+    // confirmed it afterwards; undecided when a decision graded it so.
+    const [prespecified, conferred] = await Promise.all([
+      this.graph.query(
+        `MATCH (c:Claim {natural_id: $claim}) RETURN c`,
+        { c: vertexProps<{ kind?: string }>() },
+        { claim },
+      ),
+      this.standingConferred(claim),
+    ]);
+    const confirmed =
+      conferred?.standing === "confirmatory" ||
+      (conferred === undefined && prespecified.some((r) => r.c.kind === "confirmatory"));
+    const undecided = conferred?.standing === "undecided";
+    const promotedBecause = conferred?.standing === "confirmatory" ? conferred.because : undefined;
 
     // What a synthesis was drawn across. By handle, from the claim itself:
     // `synthesise` writes `BASED_ON` at the moment the act names the findings,

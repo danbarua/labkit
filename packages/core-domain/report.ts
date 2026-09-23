@@ -8,7 +8,6 @@ import type { ConcludedClaim, Explanation } from "./reports";
 import { GATE_STATES, WORK_STATES } from "./vocab";
 import type { Ref } from "./ref";
 
-export type { ResolutionKind } from "@labkit/core-db/domain";
 export { GATE_STATES, WORK_STATES };
 export {
   LABEL_BY_KIND,

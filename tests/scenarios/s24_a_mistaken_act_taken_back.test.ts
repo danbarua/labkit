@@ -80,8 +80,7 @@ describe("S-24 — a mistaken act taken back", () => {
     });
     expect((await session.reads.whySupported({ claim })).standing).toBe("confirmatory");
 
-    // The act mints nothing — it sets a property. Undoing it writes back what
-    // the graph held, which the event carries because nothing had projected yet.
+    // Undoing the promotion retracts the decision that conferred it.
     await session.writes.undo({ event: events[0]!.seq!, because: "promoted the wrong claim" });
     expect((await session.reads.whySupported({ claim })).standing).toBe(before);
   });

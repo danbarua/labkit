@@ -49,20 +49,22 @@ export async function blockedBy(
     `MATCH (c:Criterion)-[:GOVERNS]->(g:Gate)
        WHERE c.natural_id IN $ids
        OPTIONAL MATCH (g)-[:GATES]->(w)
-       OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(g)
+       OPTIONAL MATCH (sidestepping:Decision)-[:SIDESTEPS]->(g)
+       OPTIONAL MATCH (retiring:Decision)-[:RETIRES]->(g)
        OPTIONAL MATCH (stopping:Decision)-[:RESOLVES]->(w)
-       RETURN c, g, w, closing, stopping`,
+       RETURN c, g, w, sidestepping, retiring, stopping`,
     {
       c: vertexProps<Identified>(),
       g: vertexProps<{ consequence: string } & Identified>(),
       w: optional(vertexProps<{ objective: string } & Identified>()),
-      closing: optional(vertexProps<Identified>()),
+      sidestepping: optional(vertexProps<Identified>()),
+      retiring: optional(vertexProps<Identified>()),
       stopping: optional(vertexProps<Identified>()),
     },
     { ids: [...criteria] },
   );
   for (const row of rows) {
-    if (row.closing || row.stopping) continue;
+    if (row.sidestepping || row.retiring || row.stopping) continue;
     // `ref()` rather than the raw id: the key is a handle, and
     // `check:no-stringly-typed` is right that a `Map<string, …>` here says
     // nothing about what the string is. It refuses a mismatched prefix too.
@@ -268,13 +270,13 @@ export class BlockedGroup extends SessionCore {
   async gateStatus({ gate }: GateStatusQuery): Promise<GateStatus> {
     const declared = await this.graph.query(
       `MATCH (g:Gate {natural_id: $id})
-       OPTIONAL MATCH (closing:Decision)-[:RESOLVES]->(g)
-       RETURN g, closing`,
+       OPTIONAL MATCH (sidestepping:Decision)-[:SIDESTEPS]->(g)
+       OPTIONAL MATCH (retiring:Decision)-[:RETIRES]->(g)
+       RETURN g, sidestepping, retiring`,
       {
         g: vertexProps<{ consequence: string }>(),
-        closing: optional(
-          vertexProps<{ natural_id: string; reason: string; resolution_kind?: string }>(),
-        ),
+        sidestepping: optional(vertexProps<{ natural_id: string; reason: string }>()),
+        retiring: optional(vertexProps<{ natural_id: string; reason: string }>()),
       },
       { id: gate },
     );
@@ -322,12 +324,12 @@ export class BlockedGroup extends SessionCore {
       blocks: blocking.get(c.criterion) ?? [],
     }));
 
-    const kind = found.closing?.resolution_kind;
-    if (kind !== undefined && kind !== "sidestepped" && kind !== "retired")
-      throw new Error(
-        `decision ${found.closing!.natural_id} resolves gate ${gate} with invalid resolution kind ${kind}`,
-      );
-    const state = kind ?? gateStateFrom(checks);
+    const closing = found.sidestepping
+      ? { kind: "sidestepped" as const, decision: found.sidestepping }
+      : found.retiring
+        ? { kind: "retired" as const, decision: found.retiring }
+        : undefined;
+    const state = closing?.kind ?? gateStateFrom(checks);
 
     // Criterion-scoped, deliberately unfiltered by gate: "has this check ever
     // been shown able to fail" is a question about the check itself.
@@ -354,12 +356,12 @@ export class BlockedGroup extends SessionCore {
       gate,
       consequence: found.g.consequence,
       state,
-      ...(kind
+      ...(closing
         ? {
             closure: {
-              decision: ref("decision", found.closing!.natural_id),
-              kind,
-              because: found.closing!.reason,
+              decision: ref("decision", closing.decision.natural_id),
+              kind: closing.kind,
+              because: closing.decision.reason,
             },
           }
         : {}),
@@ -425,22 +427,17 @@ export class BlockedGroup extends SessionCore {
       ]);
     }
 
-    const closedRows = await this.graph.query(
-      `MATCH (closing:Decision)-[:RESOLVES]->(g:Gate) RETURN closing, g`,
-      {
-        closing: vertexProps<{ natural_id: string; resolution_kind?: string }>(),
-        g: vertexProps<{ natural_id: string }>(),
-      },
-      {},
-    );
     const closed = new Map<string, "sidestepped" | "retired">();
-    for (const row of closedRows) {
-      const kind = row.closing.resolution_kind;
-      if (kind !== "sidestepped" && kind !== "retired")
-        throw new Error(
-          `decision ${row.closing.natural_id} resolves gate ${row.g.natural_id} with invalid resolution kind ${kind ?? "absent"}`,
-        );
-      closed.set(row.g.natural_id, kind);
+    for (const [label, kind] of [
+      ["SIDESTEPS", "sidestepped"],
+      ["RETIRES", "retired"],
+    ] as const) {
+      const closedRows = await this.graph.query(
+        `MATCH (:Decision)-[:${label}]->(g:Gate) RETURN g`,
+        { g: vertexProps<{ natural_id: string }>() },
+        {},
+      );
+      for (const row of closedRows) closed.set(row.g.natural_id, kind);
     }
 
     const listed = [...byGate.entries()]

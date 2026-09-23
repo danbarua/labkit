@@ -91,7 +91,9 @@ export const EDGE_LABELS = [
   "CHANGES", // Decision -> Criterion
   "BASED_ON", // Decision -> Evidence | Review, CriterionEvaluation -> Evidence
   "IN_LIGHT_OF", // Decision -> Claim it was accepted in light of
-  "RESOLVES", // Decision -> Question | LineOfEnquiry | Task | Gate
+  "RESOLVES", // Decision -> Question | LineOfEnquiry | Task
+  "SIDESTEPS", // Decision -> Gate (`close gate --sidestepped`)
+  "RETIRES", // Decision -> Gate (`close gate --retired`)
   "ANSWERS", // Decision -> Claim named as an enquiry's answer
   "SHARPENS", // Decision -> Question (`sharpen`)
   "ACCEPTS", // Decision -> Question (`accept`, left unresolved on purpose)
@@ -269,8 +271,9 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Question"],
     ["Decision", "LineOfEnquiry"],
     ["Decision", "Task"],
-    ["Decision", "Gate"],
   ],
+  SIDESTEPS: [["Decision", "Gate"]],
+  RETIRES: [["Decision", "Gate"]],
   ANSWERS: [["Decision", "Claim"]],
   SHARPENS: [["Decision", "Question"]],
   ACCEPTS: [["Decision", "Question"]],
@@ -394,13 +397,9 @@ export interface ClaimProps {
   kind?: "exploratory" | "confirmatory" | "undecided";
 }
 
-export type ResolutionKind = "answered" | "abandoned" | "stopped" | "sidestepped" | "retired";
-
 /** No evidence string shadow, and no mutable open or closed property. */
 export interface DecisionProps {
   reason: Prose;
-  /** Present exactly when this decision closes one item through RESOLVES. */
-  resolution_kind?: ReadOnlyString<ResolutionKind>;
   /** What would reopen this decision. */
   invalidation_check: Prose;
   /** When the act was recorded, from the injected clock. Earned by row Z. */

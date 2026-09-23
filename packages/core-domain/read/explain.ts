@@ -798,6 +798,8 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   BASED_ON: { out: "rests on", in: "was cited by" },
   IN_LIGHT_OF: { out: "is in light of", in: "was considered in light of" },
   RESOLVES: { out: "settled", in: "was settled by" },
+  SIDESTEPS: { out: "sidestepped", in: "was sidestepped by" },
+  RETIRES: { out: "retired", in: "was retired by" },
   ANSWERS: { out: "answers on", in: "was named as the answer by" },
   SHARPENS: { out: "sharpened", in: "was sharpened by" },
   ACCEPTS: { out: "left open", in: "was left open by" },
