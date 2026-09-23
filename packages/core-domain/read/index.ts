@@ -43,7 +43,7 @@ import type {
   StoppedReason,
   TaskContract,
 } from "../report";
-import { kindOf } from "../report";
+import { byHandle, kindOf } from "../report";
 import { DomainRefusal } from "../refusal";
 import type { Neighbour } from "./explain";
 import { SessionCore, type Methods } from "../core";
@@ -318,6 +318,17 @@ export class ReadSurface extends SessionCore {
   }
 
   /**
+   * Blocked gates, most recently decided first, so a block from today is read before one that
+   * has stood for weeks. A gate nothing has decided sorts last.
+   */
+  static mostRecentFirst(gates: ListedGate[]): ListedGate[] {
+    return [...gates].sort(
+      (a, b) =>
+        (b.lastTouched ?? "").localeCompare(a.lastTouched ?? "") || byHandle(a.gate, b.gate),
+    );
+  }
+
+  /**
    * "What am I blocked on right now, what are my priorities?" — see `Standing`'s own doc
    * comment for the shape and why there is no `at=`.
    */
@@ -337,7 +348,7 @@ export class ReadSurface extends SessionCore {
     if (since === undefined) {
       return {
         blocked: {
-          gates: gates.filter((g) => g.state === "blocked"),
+          gates: ReadSurface.mostRecentFirst(gates.filter((g) => g.state === "blocked")),
           work: work.filter((w) => w.state === "blocked"),
         },
         unevaluated: {
@@ -376,7 +387,9 @@ export class ReadSurface extends SessionCore {
 
     return {
       blocked: {
-        gates: gates.filter((g) => g.state === "blocked" && touched.has(g.gate)),
+        gates: ReadSurface.mostRecentFirst(
+          gates.filter((g) => g.state === "blocked" && touched.has(g.gate)),
+        ),
         work: work.filter((w) => w.state === "blocked" && movedWork(w)),
       },
       unevaluated: {
