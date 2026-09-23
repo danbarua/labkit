@@ -176,7 +176,7 @@ describe("S-4: a negative result that closes the question", () => {
     expect(await (await afterwards()).reads.enquiryStatus({ enquiry: specificity })).toEqual(
       status,
     );
-    expect(status.answer).toBe("no");
+    expect(status.bearing).toBe("challenges");
   });
 
   test("Afterward 3: the neighbouring supported claim is untouched, and LabKit says so", async () => {
@@ -255,7 +255,7 @@ describe("S-4: a negative result that closes the question", () => {
     );
     expect(status.open).toBe(false);
     expect(status.closure).toBe("abandoned");
-    expect(status.answer).toBeNull();
+    expect(status.bearing).toBeNull();
     expect(status.evidence).toEqual([]);
   });
 
@@ -360,7 +360,7 @@ describe("S-4: a negative result that closes the question", () => {
     expect(status.closure).toBe("answered");
     // "yes" -- the answering finding supports it, despite the analysis also
     // challenging an unrelated proposition.
-    expect(status.answer).toBe("yes");
+    expect(status.bearing).toBe("supports");
     expect(status.evidence.map((e) => e.states)).toEqual([
       "clear separation between constructions",
     ]);

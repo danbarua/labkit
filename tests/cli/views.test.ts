@@ -38,7 +38,7 @@ test("an enquiry accepted as unresolved does not render as merely open", () => {
     contributed: [],
     open: true,
     closure: null,
-    answer: null,
+    bearing: null,
     evidence: [],
     question: {
       question: ref("question", "Q_1"),
@@ -64,7 +64,7 @@ test("an answered enquiry says whether its closure rests on promoted work", () =
     contributed: [],
     open: false,
     closure: "answered",
-    answer: "yes",
+    bearing: "supports",
     evidence: [{ evidence: ref("evidence", "EV_1"), states: "a result" }],
     question: q,
   };
@@ -244,7 +244,7 @@ test("every question in the survey carries its handle", () => {
         question: ref("question", "Q_1"),
         asks: "does it converge?",
         answers: [
-          { enquiry: ref("enquiry", "LOE_1"), claim: ref("claim", "CLM_1"), answer: "yes" },
+          { enquiry: ref("enquiry", "LOE_1"), claim: ref("claim", "CLM_1"), bearing: "supports" },
         ],
       },
     ],
@@ -635,7 +635,7 @@ test("colouring changes nothing a reader would read", () => {
         question: ref("question", "Q_1"),
         asks: "does it converge?",
         answers: [
-          { enquiry: ref("enquiry", "LOE_1"), claim: ref("claim", "CLM_1"), answer: "yes" },
+          { enquiry: ref("enquiry", "LOE_1"), claim: ref("claim", "CLM_1"), bearing: "supports" },
         ],
       },
     ],

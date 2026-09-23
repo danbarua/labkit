@@ -85,7 +85,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     const reader = await afterwards();
     const status = await reader.reads.enquiryStatus({ enquiry });
     expect(status.closure).toBe("answered");
-    expect(status.answer).toBe("yes");
+    expect(status.bearing).toBe("supports");
     expect(status.restsOn).toBe("exploratory");
 
     const known = await reader.reads.whatIsKnown();

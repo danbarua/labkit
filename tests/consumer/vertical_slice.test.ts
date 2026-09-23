@@ -287,7 +287,7 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
     // read surface treats as structure.
     expect(byAlice.closure).toBe("answered");
     expect(byBob.closure).toBe(byAlice.closure);
-    expect(byAlice.answer).toBe(byBob.answer);
+    expect(byAlice.bearing).toBe(byBob.bearing);
     expect(byAlice.open).toBe(byBob.open);
 
     // The difference exists only inside a finding's sentence.

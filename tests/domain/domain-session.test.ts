@@ -392,7 +392,7 @@ test("a close interrupted before BASED_ON writes nothing before retry", async ()
   // The question was answered "no" on a challenging finding. Anything else is
   // the interrupted close being reported as the researcher's act.
   expect(status.closure).toBe("answered");
-  expect(status.answer).toBe("no");
+  expect(status.bearing).toBe("challenges");
 });
 
 /**
@@ -472,7 +472,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   // that happened.
   const after = await s.reads.enquiryStatus({ enquiry });
   expect(after.closure).toBe("abandoned");
-  expect(after.answer).toBeNull();
+  expect(after.bearing).toBeNull();
 });
 
 /**
@@ -515,7 +515,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
   });
   const closed = await s.reads.enquiryStatus({ enquiry });
   expect(closed.closure).toBe("answered");
-  expect(closed.answer).toBe("yes");
+  expect(closed.bearing).toBe("supports");
 });
 
 /**

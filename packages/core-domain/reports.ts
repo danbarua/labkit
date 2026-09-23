@@ -238,7 +238,8 @@ const acceptedQuestion = questionStanding.extend({
 const pursuitAnswer = z.strictObject({
   enquiry: ref("enquiry"),
   claim: ref("claim"),
-  answer: z.enum(["yes", "no"]),
+  /** How the claim bears on the question: the bearing of the finding that reached it. */
+  bearing: z.enum(["supports", "challenges"]),
 });
 const answeredQuestion = questionStanding.extend({
   answers: z.array(pursuitAnswer),
@@ -251,7 +252,9 @@ const closedPursuit = z.strictObject({
   question: ref("question"),
   decision: ref("decision"),
   closure: z.enum(["answered", "abandoned"]),
-  answered: z.strictObject({ claim: ref("claim"), answer: z.enum(["yes", "no"]) }).optional(),
+  answered: z
+    .strictObject({ claim: ref("claim"), bearing: z.enum(["supports", "challenges"]) })
+    .optional(),
 });
 
 const identifiedArtefact = z.strictObject({
@@ -439,7 +442,8 @@ export const enquiryStatus = z.strictObject({
   contributed: z.array(citedFinding),
   open: z.boolean(),
   closure: z.enum(["answered", "abandoned"]).nullable(),
-  answer: z.enum(["yes", "no"]).nullable(),
+  /** The bearing of the findings the closure cited. Null when it is not answered. */
+  bearing: z.enum(["supports", "challenges"]).nullable(),
   answered: concludedClaim.optional(),
   restsOn: z.enum(["exploratory", "confirmatory"]).optional(),
   evidence: z.array(citedFinding),

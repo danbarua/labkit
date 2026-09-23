@@ -213,7 +213,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     inputSchema: {
       enquiry: z.string().describe(`enquiry id, e.g. ${ENQUIRY_PREFIX}7`),
       name: z.string().describe("what these observations are, in the researcher's words"),
-      finding: z.string().describe("what was observed"),
+      finding: z
+        .string()
+        .describe(
+          "what was observed, as text; recorded as a finding. Not the `observations` handle an " +
+            "earlier call returned: that names the artefact this call creates",
+        ),
       content_hash: z
         .string()
         .optional()

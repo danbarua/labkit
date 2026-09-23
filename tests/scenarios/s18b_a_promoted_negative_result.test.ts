@@ -72,7 +72,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
     });
 
     const status = await later.reads.enquiryStatus({ enquiry });
-    expect(status.answer).toBe("no");
+    expect(status.bearing).toBe("challenges");
     // The promotion happened and is what a reader deciding whether to build on
     // this needs to see. `exploratory` here says nobody vouched for it.
     expect(status.restsOn).toBe("confirmatory");
@@ -147,7 +147,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
       events: inMemoryEventLog(),
     });
     const status = await later.reads.enquiryStatus({ enquiry });
-    expect(status.answer).toBe("no");
+    expect(status.bearing).toBe("challenges");
     expect(status.restsOn).toBe("exploratory");
 
     const known = await later.reads.whatIsKnown();

@@ -208,7 +208,7 @@ export class StandingGroup extends SessionCore {
       const answerReport = liveAnswers.map((answer) => ({
         enquiry: ref("enquiry", answer.enquiry),
         claim: ref("claim", answer.claim),
-        answer: answer.bearing === "CHALLENGES" ? ("no" as const) : ("yes" as const),
+        bearing: answer.bearing === "CHALLENGES" ? ("challenges" as const) : ("supports" as const),
       }));
       const deferral = entry.accepting
         ? {
@@ -239,8 +239,9 @@ export class StandingGroup extends SessionCore {
             ? {
                 answered: {
                   claim: ref("claim", shown),
-                  answer:
-                    shownAnswer?.answer ?? (recorded!.bearing === "CHALLENGES" ? "no" : "yes"),
+                  bearing:
+                    shownAnswer?.bearing ??
+                    (recorded!.bearing === "CHALLENGES" ? "challenges" : "supports"),
                 },
               }
             : {}),

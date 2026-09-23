@@ -162,7 +162,7 @@ describe("S-21: a finding drawn across findings", () => {
     expect(status.closure).toBe("answered");
     // Answered "no", and resting on all four — the polarity comes from which
     // way the findings underneath it cut.
-    expect(status.answer).toBe("no");
+    expect(status.bearing).toBe("challenges");
     expect(status.evidence).toHaveLength(4);
   });
 
