@@ -20,7 +20,7 @@ export function isCollectionSlug(name: string): boolean {
   return LABEL_BY_SLUG.has(name);
 }
 
-export const DEFAULT_LIMIT = 50;
+export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 200;
 
 // A collection's items are listed without their neighbours unless the client asks for more.

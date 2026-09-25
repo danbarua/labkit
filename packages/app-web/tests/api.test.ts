@@ -311,7 +311,7 @@ describe("collections", () => {
   test("a collection is named by its slug where the label has an override", async () => {
     const r = await get("/collections/enquiry");
     expect(Object.keys(r.body._embedded)).toEqual(["enquiry"]);
-    expect(r.body._links.self.href).toBe(`${PUBLIC}/collections/enquiry?limit=50&offset=0`);
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/collections/enquiry?limit=25&offset=0`);
   });
 
   test("retracted nodes are not listed", async () => {
@@ -401,7 +401,7 @@ describe("collections", () => {
     const r = await get("/workspace/beta/question");
     for (const href of hrefs(r.body))
       expect(href.startsWith(`${PUBLIC}/workspace/beta`)).toBe(true);
-    expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/beta/question?limit=50&offset=0`);
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/beta/question?limit=25&offset=0`);
     expect(r.body._links.index.href).toBe(`${PUBLIC}/workspace/beta`);
     expect(r.body._embedded.question[0].name).toBe("beta question");
   });
