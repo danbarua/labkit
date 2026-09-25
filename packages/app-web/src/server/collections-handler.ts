@@ -1,9 +1,15 @@
-import { NODE_LABELS, SEARCHABLE_TEXT, type NodeLabel } from "@labkit/core-db/domain";
-import { ACT_SLUG, ACT_TYPE, LABEL_BY_SLUG, slugFor } from "./collection-paths";
-import { nodePath, problem, publicOrigin } from "./graph-handler";
+import { NODE_LABELS, type NodeLabel } from "@labkit/core-db/domain";
+import { ACT_SLUG, ACT_TYPE, collectionPath, LABEL_BY_SLUG, slugFor } from "./collection-paths";
+import {
+  isRaisedException,
+  MAX_DEPTH,
+  populateLinks,
+  problem,
+  publicOrigin,
+} from "./graph-handler";
 import type { TenantScope } from "./runtime";
 
-const COLLECTION_JSON = "application/vnd.collection+json";
+const HAL_JSON = "application/hal+json";
 
 // Not a node type: workspaces are the tenants, and only the default workspace can see them all.
 const WORKSPACE_SLUG = "workspace";
@@ -17,6 +23,9 @@ export function isCollectionSlug(name: string): boolean {
 export const DEFAULT_LIMIT = 50;
 export const MAX_LIMIT = 200;
 
+// A collection's items are listed without their neighbours unless the client asks for more.
+const DEFAULT_DEPTH = 0;
+
 export function pageParam(
   value: string | null,
   fallback: number,
@@ -27,7 +36,7 @@ export function pageParam(
   return Number.isInteger(n) ? Math.min(Math.max(n, min), max) : fallback;
 }
 
-// A parameter this handler does not read is the client's preference, such as `depth`, and every
+// A parameter this handler does not page by is the client's preference, such as `depth`, and every
 // link in the response carries it on unchanged.
 const PAGING = new Set(["limit", "offset"]);
 
@@ -56,17 +65,21 @@ export function withExtras(value: unknown, extras: [string, string][]): unknown 
   );
 }
 
-export function collectionJson(
+export function halJson(
   req: Request,
-  collection: Record<string, unknown>,
+  body: Record<string, unknown>,
   handled?: ReadonlySet<string>,
 ): Response {
   const extras = extrasOf(req, handled);
-  const body = { collection: { version: "1.0", ...collection } };
   return new Response(JSON.stringify(extras.length === 0 ? body : withExtras(body, extras)), {
     status: 200,
-    headers: { "content-type": COLLECTION_JSON },
+    headers: { "content-type": HAL_JSON },
   });
+}
+
+/** `[{ rel, href }]` as a `_links` object. */
+export function linksOf(links: { rel: string; href: string }[]): Record<string, { href: string }> {
+  return Object.fromEntries(links.map(({ rel, href }) => [rel, { href }]));
 }
 
 // The index lists one collection per node type, and the workspaces from the default workspace.
@@ -77,15 +90,15 @@ function index(req: Request, root: string, withWorkspaces: boolean): Response {
       ? [{ slug: WORKSPACE_SLUG, type: "Workspace" }]
       : [{ slug: ACT_SLUG, type: ACT_TYPE }]),
   ];
-  return collectionJson(req, {
-    href: root,
-    items: entries.map((entry) => ({
-      href: `${root}/${entry.slug}`,
-      data: [
-        { name: "slug", value: entry.slug },
-        { name: "type", value: entry.type },
-      ],
-    })),
+  return halJson(req, {
+    _links: { self: { href: root } },
+    _embedded: {
+      collection: entries.map((entry) => ({
+        slug: entry.slug,
+        type: entry.type,
+        _links: { self: { href: `${root}/${entry.slug}` } },
+      })),
+    },
   });
 }
 
@@ -105,45 +118,17 @@ export function pagingLinks(
   return links;
 }
 
-const HANDLE = /^[A-Za-z0-9]+_[A-Za-z0-9]+$/;
-const INTERNAL_PROPS = new Set(["natural_id", "retracted"]);
-
-type Data = { name: string; value: unknown };
-type Link = { rel: string; href: string; name: string };
-
-// Outbound relations of the given nodes, by source handle. Handles come from the graph, and are
-// checked before they go into the query text.
-async function outboundLinks(
-  scope: TenantScope,
-  label: NodeLabel,
-  ids: string[],
-  origin: string,
-): Promise<Map<string, Link[]>> {
-  const links = new Map<string, Link[]>();
-  const safe = ids.filter((id) => HANDLE.test(id));
-  if (safe.length === 0) return links;
-  const list = safe.map((id) => `'${id}'`).join(", ");
-  const result = await scope.query<{ src: string; rel: string; dst: string }>(
-    `SELECT r.src::text AS src, r.rel::text AS rel, r.dst::text AS dst
-     FROM ag_catalog.cypher(
-       '${scope.graphName}'::name,
-       $$MATCH (n:${label})-[e]->(m)
-         WHERE n.retracted IS NULL AND m.retracted IS NULL AND n.natural_id IN [${list}]
-         RETURN n.natural_id, type(e), m.natural_id$$
-     ) AS r(src ag_catalog.agtype, rel ag_catalog.agtype, dst ag_catalog.agtype)`,
-  );
-  for (const row of result.rows) {
-    const bucket = links.get(row.src) ?? [];
-    const href = `${origin}${nodePath(scope.prefix, row.dst)}`;
-    bucket.push({ rel: row.rel.toLowerCase(), href, name: row.dst });
-    links.set(row.src, bucket);
-  }
-  return links;
+interface CollectionHal {
+  _links: Record<string, { href: string }>;
+  offset: number;
+  limit: number;
+  count: number;
+  _embedded: Record<string, unknown[]>;
 }
 
-// A collection lists the live nodes of one type: id, type, what each links to, and, where
-// the type has one, its main text as `name`. A type with no text of its own is described by its
-// other properties instead.
+// A collection lists the live nodes of one type, each as the resource `labkit_get_entity_as_hal`
+// gives, to the depth the client asked for. The database answers with relative links; here they
+// become absolute, the label becomes its slug, and the client's other parameters ride on each.
 async function listing(
   req: Request,
   scope: TenantScope,
@@ -154,58 +139,41 @@ async function listing(
   const origin = publicOrigin(req).origin;
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
-  const nameProp = SEARCHABLE_TEXT[label]?.[0];
+  const depthParam = url.searchParams.get("depth");
+  const depth = depthParam === null ? DEFAULT_DEPTH : Number(depthParam);
+  if (!Number.isInteger(depth) || depth < 0 || depth > MAX_DEPTH) {
+    return problem(400, "Bad Request", `depth must be an integer from 0 to ${MAX_DEPTH}`);
+  }
 
-  // Label and property come from the domain constants above, never from the request.
-  const result = await scope.query<{ id: string; value: string | null }>(
-    `SELECT id, value FROM (
-       SELECT r.id::text AS id, r.value::text AS value
-       FROM ag_catalog.cypher(
-         '${scope.graphName}'::name,
-         $$MATCH (n:${label})
-           WHERE n.retracted IS NULL
-           RETURN n.natural_id, ${nameProp === undefined ? "properties(n)" : `n.${nameProp}`}$$
-       ) AS r(id ag_catalog.agtype, value ag_catalog.agtype)
-     ) t
-     ORDER BY length(id), id
-     LIMIT $1 OFFSET $2`,
-    [limit + 1, offset],
+  let hal: CollectionHal;
+  try {
+    const result = await scope.query<{ hal: CollectionHal }>(
+      "SELECT public.labkit_get_collection_as_hal($1, $2, $3, $4, $5) AS hal",
+      [scope.tenantId, label, offset, limit, depth],
+    );
+    hal = result.rows[0]!.hal;
+  } catch (err) {
+    if (isRaisedException(err)) return problem(404, "Not Found", err.message);
+    throw err;
+  }
+
+  const slug = slugFor(label);
+  const path = `${origin}${collectionPath(scope.prefix, slug)}`;
+  const paging = Object.fromEntries(
+    Object.entries(hal._links).map(([rel, link]) => [
+      rel,
+      { href: `${path}${new URL(link.href, origin).search}` },
+    ]),
   );
-  const rows = result.rows;
-  const page = rows.slice(0, limit);
-  const links = await outboundLinks(
-    scope,
-    label,
-    page.map((row) => row.id),
-    origin,
-  );
+  const items = hal._embedded[label] ?? [];
+  populateLinks(items, { origin, prefix: scope.prefix });
 
-  const self = `${root}/${slugFor(label)}`;
-
-  return collectionJson(req, {
-    href: `${self}?limit=${limit}&offset=${offset}`,
-    links: pagingLinks(root, self, limit, offset, rows.length > limit),
-    items: page.map((row) => {
-      const data: Data[] = [
-        { name: "id", value: row.id },
-        { name: "type", value: label },
-      ];
-      if (nameProp !== undefined) {
-        data.push({ name: "name", value: row.value });
-      } else {
-        const props = JSON.parse(row.value ?? "{}") as Record<string, unknown>;
-        for (const [name, value] of Object.entries(props)) {
-          if (!INTERNAL_PROPS.has(name) && (value === null || typeof value !== "object")) {
-            data.push({ name, value });
-          }
-        }
-      }
-      return {
-        href: `${origin}${nodePath(scope.prefix, row.id)}`,
-        data,
-        links: links.get(row.id) ?? [],
-      };
-    }),
+  return halJson(req, {
+    _links: { ...paging, index: { href: root } },
+    offset: hal.offset,
+    limit: hal.limit,
+    count: hal.count,
+    _embedded: { [slug]: items },
   });
 }
 
@@ -217,20 +185,24 @@ async function workspaceListing(req: Request, scope: TenantScope, root: string):
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
   const rows = (await scope.workspaces()).slice(offset, offset + limit + 1);
+  const page = rows.slice(0, limit);
 
   const self = `${root}/${WORKSPACE_SLUG}`;
-  return collectionJson(req, {
-    href: `${self}?limit=${limit}&offset=${offset}`,
-    links: pagingLinks(root, self, limit, offset, rows.length > limit),
-    items: rows.slice(0, limit).map((workspace) => {
-      return {
-        href: `${origin}/workspace/${encodeURIComponent(workspace.slug)}`,
-        data: [
-          { name: "slug", value: workspace.slug },
-          { name: "name", value: workspace.displayName },
-        ],
-      };
-    }),
+  return halJson(req, {
+    _links: {
+      self: { href: `${self}?limit=${limit}&offset=${offset}` },
+      ...linksOf(pagingLinks(root, self, limit, offset, rows.length > limit)),
+    },
+    offset,
+    limit,
+    count: page.length,
+    _embedded: {
+      [WORKSPACE_SLUG]: page.map((workspace) => ({
+        slug: workspace.slug,
+        name: workspace.displayName,
+        _links: { self: { href: `${origin}/workspace/${encodeURIComponent(workspace.slug)}` } },
+      })),
+    },
   });
 }
 

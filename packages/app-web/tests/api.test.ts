@@ -54,8 +54,8 @@ function hrefs(value: unknown, out: string[] = []): string[] {
   return out;
 }
 
-const dataOf = (item: any): Record<string, unknown> =>
-  Object.fromEntries(item.data.map((d: any) => [d.name, d.value]));
+// A collection's items, whatever the collection is called.
+const itemsOf = (body: any): any[] => Object.values(body._embedded).flat() as any[];
 
 describe("entities", () => {
   test("a bare handle returns one hop of neighbours", async () => {
@@ -197,7 +197,7 @@ describe("workspaces", () => {
 
   test("a handle that only exists in another workspace is a 404, not a fallback", async () => {
     expect((await get("/workspace/beta/LOE_1")).status).toBe(404);
-    expect((await get("/workspace/beta/enquiry")).body.collection.items).toEqual([]);
+    expect((await get("/workspace/beta/enquiry")).body._embedded.enquiry).toEqual([]);
   });
 
   test("an unknown workspace is a 404", async () => {
@@ -270,92 +270,116 @@ describe("workspaces", () => {
 describe("collections", () => {
   test("the index has a collection per node type, and workspaces in the default workspace", async () => {
     const r = await get("/collections");
-    expect(r.type).toBe("application/vnd.collection+json");
-    const slugs = r.body.collection.items.map((i: any) => dataOf(i).slug);
-    expect(slugs).toEqual(
+    expect(r.type).toBe("application/hal+json");
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/collections`);
+    const entries = r.body._embedded.collection;
+    expect(entries.map((i: any) => i.slug)).toEqual(
       expect.arrayContaining(["question", "enquiry", "evidence-unit", "evaluation", "workspace"]),
     );
-    expect(r.body.collection.items[0].href).toBe(`${PUBLIC}/collections/question`);
+    expect(entries[0]._links.self.href).toBe(`${PUBLIC}/collections/question`);
   });
 
   test("a workspace's own address is its collections index, and does not list workspaces", async () => {
     const r = await get("/workspace/beta");
     expect(r.status).toBe(200);
-    expect(r.type).toBe("application/vnd.collection+json");
-    expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/beta`);
-    const slugs = r.body.collection.items.map((i: any) => dataOf(i).slug);
+    expect(r.type).toBe("application/hal+json");
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/beta`);
+    const entries = r.body._embedded.collection;
+    const slugs = entries.map((i: any) => i.slug);
     expect(slugs).toContain("question");
     expect(slugs).not.toContain("workspace");
-    expect(r.body.collection.items[0].href).toBe(`${PUBLIC}/workspace/beta/question`);
+    expect(entries[0]._links.self.href).toBe(`${PUBLIC}/workspace/beta/question`);
     expect((await get("/workspace/beta/workspace")).status).toBe(404);
   });
 
   test("a trailing slash on a workspace address is the same index", async () => {
     const r = await get("/workspace/beta/");
     expect(r.status).toBe(200);
-    expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/beta`);
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/beta`);
   });
 
-  test("an item has id, type and the type's main text as name", async () => {
+  test("an item is the resource the graph gives for it, listed under the collection's slug", async () => {
     const r = await get("/collections/question");
-    const items = r.body.collection.items;
-    expect(items.map((i: any) => dataOf(i).id)).toEqual(["Q_1", "Q_2"]);
-    expect(dataOf(items[0])).toEqual({ id: "Q_1", type: "Question", name: "alpha question" });
-    expect(items[0].href).toBe(`${PUBLIC}/graph/Q_1`);
+    expect(r.type).toBe("application/hal+json");
+    const items = r.body._embedded.question;
+    expect(items.map((i: any) => i.id)).toEqual(["Q_1", "Q_2"]);
+    expect(items[0]).toMatchObject({ id: "Q_1", type: "Question", name: "alpha question" });
+    expect(items[0]._embedded).toBeUndefined();
+    expect(items[0]._links.self.href).toBe(`${PUBLIC}/graph/Q_1`);
+  });
+
+  test("a collection is named by its slug where the label has an override", async () => {
+    const r = await get("/collections/enquiry");
+    expect(Object.keys(r.body._embedded)).toEqual(["enquiry"]);
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/collections/enquiry?limit=50&offset=0`);
   });
 
   test("retracted nodes are not listed", async () => {
     const r = await get("/collections/question");
-    expect(r.body.collection.items.map((i: any) => dataOf(i).id)).not.toContain("Q_3");
+    expect(itemsOf(r.body).map((i: any) => i.id)).not.toContain("Q_3");
   });
 
-  test("a type with no text of its own carries its properties and links", async () => {
+  test("an item carries its own properties, and the edge properties on its links", async () => {
     const r = await get("/collections/evidence-unit");
-    const [item] = r.body.collection.items;
-    expect(dataOf(item)).toEqual({ id: "EU_1", type: "EvidenceUnit", role: "observation" });
-    expect(item.links.map((l: any) => `${l.rel}:${l.name}`).sort()).toEqual([
-      "addresses:LOE_1",
-      "produces:EV_1",
+    const [item] = itemsOf(r.body);
+    expect(item).toMatchObject({ id: "EU_1", type: "EvidenceUnit", role: "observation" });
+    expect(item._links["addresses:lineofenquiry"]).toEqual([
+      { href: `${PUBLIC}/graph/LOE_1`, dir: "out", type: "LineOfEnquiry", props: { weight: 1 } },
+    ]);
+    expect(item._links["produces:evidence"]).toEqual([
+      { href: `${PUBLIC}/graph/EV_1`, dir: "out", type: "Evidence" },
     ]);
   });
 
-  test("every item lists what it links to", async () => {
+  test("every item links to what it relates to", async () => {
     const r = await get("/collections/question");
-    expect(r.body.collection.items[0].links).toEqual([
-      { rel: "motivates", href: `${PUBLIC}/graph/LOE_1`, name: "LOE_1" },
+    expect(r.body._embedded.question[0]._links["motivates:lineofenquiry"]).toEqual([
+      { href: `${PUBLIC}/graph/LOE_1`, dir: "out", type: "LineOfEnquiry" },
     ]);
+  });
+
+  test("depth embeds each item's neighbours, and is a client preference every link carries", async () => {
+    const r = await get("/collections/question?depth=1");
+    const [q1] = r.body._embedded.question;
+    expect(q1._embedded["motivates:lineofenquiry"][0]).toMatchObject({ id: "LOE_1" });
+    for (const href of hrefs(r.body)) expect(href).toEndWith("depth=1");
+    expect((await get("/collections/question?depth=7")).status).toBe(400);
+    expect((await get("/collections/question?depth=x")).status).toBe(400);
   });
 
   test("paging links appear when there is more, and lead back", async () => {
     const first = await get("/collections/question?limit=1");
-    expect(first.body.collection.items).toHaveLength(1);
-    const rels = (b: any) => b.collection.links.map((l: any) => l.rel);
-    expect(rels(first.body)).toEqual(["index", "next"]);
+    expect(first.body._embedded.question).toHaveLength(1);
+    const rels = (b: any) => Object.keys(b._links).sort();
+    expect(rels(first.body)).toEqual(["index", "next", "self"]);
 
-    const next = first.body.collection.links.find((l: any) => l.rel === "next").href;
+    const next = first.body._links.next.href;
     const second = await get(next.replace(PUBLIC, ""));
-    expect(dataOf(second.body.collection.items[0]).id).toBe("Q_2");
-    expect(rels(second.body)).toEqual(["index", "prev"]);
+    expect(second.body._embedded.question[0].id).toBe("Q_2");
+    expect(rels(second.body)).toEqual(["index", "prev", "self"]);
   });
 
-  test("parameters the collection does not read are carried on by every link", async () => {
+  test("parameters the collection does not page by are carried on by every link", async () => {
     const r = await get("/workspace/alpha/question?limit=1&depth=0");
-    const collection = r.body.collection;
-    expect(collection.href).toBe(`${PUBLIC}/workspace/alpha/question?limit=1&offset=0&depth=0`);
-    const link = (rel: string) => collection.links.find((l: any) => l.rel === rel).href;
-    expect(link("next")).toBe(`${PUBLIC}/workspace/alpha/question?limit=1&offset=1&depth=0`);
-    expect(link("index")).toBe(`${PUBLIC}/workspace/alpha?depth=0`);
-    expect(collection.items[0].href).toBe(`${PUBLIC}/workspace/alpha/Q_1?depth=0`);
-    for (const href of hrefs(collection.items[0].links)) expect(href).toEndWith("?depth=0");
+    expect(r.body._links.self.href).toBe(
+      `${PUBLIC}/workspace/alpha/question?limit=1&offset=0&depth=0`,
+    );
+    expect(r.body._links.next.href).toBe(
+      `${PUBLIC}/workspace/alpha/question?limit=1&offset=1&depth=0`,
+    );
+    expect(r.body._links.index.href).toBe(`${PUBLIC}/workspace/alpha?depth=0`);
+    const [item] = r.body._embedded.question;
+    expect(item._links.self.href).toBe(`${PUBLIC}/workspace/alpha/Q_1?depth=0`);
+    for (const href of hrefs(item._links)) expect(href).toEndWith("?depth=0");
 
     const index = await get("/collections?depth=0");
     for (const href of hrefs(index.body)) expect(href).toEndWith("?depth=0");
   });
 
   test("limit and offset are clamped rather than rejected", async () => {
-    expect((await get("/collections/question?limit=0")).body.collection.items).toHaveLength(1);
+    expect((await get("/collections/question?limit=0")).body._embedded.question).toHaveLength(1);
     expect(
-      (await get("/collections/question?limit=x&offset=-5")).body.collection.items,
+      (await get("/collections/question?limit=x&offset=-5")).body._embedded.question,
     ).toHaveLength(2);
   });
 
@@ -367,32 +391,31 @@ describe("collections", () => {
 
   test("workspace lists every workspace, each addressed by its own index", async () => {
     const r = await get("/collections/workspace");
-    const items = r.body.collection.items;
-    expect(items.map((i: any) => dataOf(i).slug)).toEqual(["alpha", "beta"]);
-    expect(items[1].href).toBe(`${PUBLIC}/workspace/beta`);
-    expect(items[1].links).toBeUndefined();
+    const items = r.body._embedded.workspace;
+    expect(items.map((i: any) => i.slug)).toEqual(["alpha", "beta"]);
+    expect(items[1]).toMatchObject({ slug: "beta", name: "beta" });
+    expect(items[1]._links).toEqual({ self: { href: `${PUBLIC}/workspace/beta` } });
   });
 
   test("collection links stay in the workspace", async () => {
     const r = await get("/workspace/beta/question");
     for (const href of hrefs(r.body))
       expect(href.startsWith(`${PUBLIC}/workspace/beta`)).toBe(true);
-    expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/beta/question?limit=50&offset=0`);
-    expect(r.body.collection.links[0]).toEqual({ rel: "index", href: `${PUBLIC}/workspace/beta` });
-    expect(dataOf(r.body.collection.items[0]).name).toBe("beta question");
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/beta/question?limit=50&offset=0`);
+    expect(r.body._links.index.href).toBe(`${PUBLIC}/workspace/beta`);
+    expect(r.body._embedded.question[0].name).toBe("beta question");
   });
 });
 
 describe("acts", () => {
-  const link = (body: any, rel: string) =>
-    body.collection.links.find((l: any) => l.rel === rel)?.href.replace(PUBLIC, "");
+  const link = (body: any, rel: string) => body._links[rel]?.href.replace(PUBLIC, "");
 
   test("a workspace's acts are a collection of commands, oldest first, each linking to what it affected", async () => {
     const r = await get("/workspace/alpha/act");
-    expect(r.type).toBe("application/vnd.collection+json");
-    const items = r.body.collection.items;
-    expect(items.map((i: any) => dataOf(i).id)).toEqual(["1", "2", "3"]);
-    expect(dataOf(items[1])).toMatchObject({
+    expect(r.type).toBe("application/hal+json");
+    const items = r.body._embedded.act;
+    expect(items.map((i: any) => i.id)).toEqual(["1", "2", "3"]);
+    expect(items[1]).toMatchObject({
       type: "Act",
       name: "note NOTE_1",
       operation: "note",
@@ -400,28 +423,28 @@ describe("acts", () => {
       subject_type: "Note",
       changes: 2,
     });
-    expect(items[1].href).toBe(`${PUBLIC}/workspace/alpha/act/2`);
-    expect(items[1].links).toEqual([
-      { rel: "subject", href: `${PUBLIC}/workspace/alpha/NOTE_1`, name: "NOTE_1" },
-      { rel: "touched", href: `${PUBLIC}/workspace/alpha/Q_1`, name: "Q_1" },
-    ]);
+    expect(items[1]._links).toEqual({
+      self: { href: `${PUBLIC}/workspace/alpha/act/2`, type: "Act" },
+      subject: { href: `${PUBLIC}/workspace/alpha/NOTE_1`, type: "Note", dir: "out" },
+      touched: [{ href: `${PUBLIC}/workspace/alpha/Q_1`, type: "Question", dir: "out" }],
+    });
   });
 
   test("since names the last act on a page, and following it gives what came after", async () => {
     const first = await get("/workspace/alpha/act?limit=1");
     expect(link(first.body, "since")).toBe("/workspace/alpha/act?limit=1&since=1");
     const after = await get(link(first.body, "since"));
-    expect(after.body.collection.items.map((i: any) => dataOf(i).id)).toEqual(["2"]);
+    expect(after.body._embedded.act.map((i: any) => i.id)).toEqual(["2"]);
     expect(link(after.body, "since")).toBe("/workspace/alpha/act?limit=1&since=2");
 
     const caughtUp = await get("/workspace/alpha/act?limit=1&since=3");
-    expect(caughtUp.body.collection.items).toEqual([]);
+    expect(caughtUp.body._embedded.act).toEqual([]);
     expect(link(caughtUp.body, "since")).toBe("/workspace/alpha/act?limit=1&since=3");
   });
 
   test("paging within a since window keeps the window", async () => {
     const r = await get("/workspace/alpha/act?limit=1&since=0");
-    expect(r.body.collection.href).toBe(`${PUBLIC}/workspace/alpha/act?limit=1&offset=0&since=0`);
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/alpha/act?limit=1&offset=0&since=0`);
     expect(link(r.body, "next")).toBe("/workspace/alpha/act?limit=1&offset=1&since=0");
   });
 
@@ -517,12 +540,12 @@ describe("acts", () => {
     const node = await get("/workspace/alpha/Q_1?depth=0");
     expect(node.body._links.events.href).toBe(`${PUBLIC}/workspace/alpha/Q_1/events?depth=0`);
     const index = await get("/workspace/alpha");
-    const entry = index.body.collection.items.find((i: any) => dataOf(i).slug === "act");
-    expect(dataOf(entry)).toEqual({ slug: "act", type: "Act" });
+    const entry = index.body._embedded.collection.find((i: any) => i.slug === "act");
+    expect(entry).toMatchObject({ slug: "act", type: "Act" });
   });
 
   test("acts are per workspace, and an unknown act is a 404", async () => {
-    expect((await get("/workspace/beta/act")).body.collection.items).toEqual([]);
+    expect((await get("/workspace/beta/act")).body._embedded.act).toEqual([]);
     expect((await get("/workspace/beta/act/1")).status).toBe(404);
     expect((await get("/workspace/alpha/act/99")).status).toBe(404);
   });

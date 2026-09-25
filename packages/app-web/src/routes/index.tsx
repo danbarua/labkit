@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Bar } from "../ui/Bar";
-import { dataOf, fetchCollection } from "../ui/collection-api";
+import { fetchCollection, itemsOf } from "../ui/collection-api";
 
 export const Route = createFileRoute("/")({
   loader: ({ abortController }) =>
@@ -16,8 +16,8 @@ function Workspaces() {
       <div className="page">
         <h2>Workspaces</h2>
         <ul className="cards">
-          {workspaces.items.map((item) => {
-            const { slug, name } = dataOf(item) as { slug: string; name: string };
+          {itemsOf(workspaces).map((item) => {
+            const { slug, name } = item as { slug: string; name: string };
             return (
               <li key={slug}>
                 <Link to="/workspace/$slug" params={{ slug }}>

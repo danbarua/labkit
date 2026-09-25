@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Bar } from "../ui/Bar";
-import { dataOf, fetchCollection } from "../ui/collection-api";
+import { fetchCollection, itemsOf, lastSegment } from "../ui/collection-api";
 import { workspacePath } from "../ui/graph-api";
 import { toInt } from "../ui/search";
 
@@ -23,9 +23,10 @@ function CollectionPage() {
   const { slug, type } = Route.useParams();
   const { limit, offset } = Route.useSearch();
   const collection = Route.useLoaderData();
-  const size = limit ?? collection.items.length;
-  const hasNext = collection.links.some((link) => link.rel === "next");
-  const hasPrev = collection.links.some((link) => link.rel === "prev");
+  const items = itemsOf(collection);
+  const size = limit ?? items.length;
+  const hasNext = "next" in collection._links;
+  const hasPrev = "prev" in collection._links;
   const start = offset ?? 0;
 
   return (
@@ -33,16 +34,16 @@ function CollectionPage() {
       <Bar workspace={slug} />
       <div className="page">
         <h2>{type}</h2>
-        {collection.items.length === 0 ? (
+        {items.length === 0 ? (
           <p className="dim">nothing here</p>
         ) : (
           <table className="items">
             <tbody>
-              {collection.items.map((item) => {
-                const data = dataOf(item);
-                const id = String(data.id);
-                const { id: _id, type: _type, name, ...rest } = data;
-                const summary = name ?? Object.values(rest).join(" · ");
+              {items.map((item) => {
+                const id = String(item.id);
+                const { id: _id, type: _type, name, _links, _embedded, ...rest } = item;
+                const scalars = Object.values(rest).filter((value) => typeof value !== "object");
+                const summary = name ?? scalars.join(" · ");
                 return (
                   <tr key={id}>
                     <td>
@@ -52,7 +53,10 @@ function CollectionPage() {
                     </td>
                     <td>{String(summary)}</td>
                     <td className="dim">
-                      {item.links.map((link) => `${link.rel} ${link.name ?? ""}`).join(", ")}
+                      {Object.entries(_links)
+                        .filter(([rel]) => rel !== "self" && rel !== "start")
+                        .map(([rel, link]) => `${rel} ${[link].flat().map(lastSegment).join(" ")}`)
+                        .join(", ")}
                     </td>
                   </tr>
                 );

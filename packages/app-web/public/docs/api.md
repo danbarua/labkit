@@ -44,7 +44,7 @@ GET /graph/{id}?depth=1
 Every write to a workspace is recorded as an act: the command that was issued, and the changes it made. Acts are read from a workspace address only.
 
 ```
-GET /workspace/{slug}/act                 the workspace's acts, oldest first (collection+json)
+GET /workspace/{slug}/act                 the workspace's acts, oldest first (hal+json)
 GET /workspace/{slug}/act/{seq}           one act (hal+json)
 GET /workspace/{slug}/{id}/events         what happened to one entity, change by change (hal+json)
 ```
@@ -57,32 +57,31 @@ GET /workspace/{slug}/{id}/events         what happened to one entity, change by
 
 ## Collections: `/collections`
 
-`application/vnd.collection+json`. Entities listed by type.
+`application/hal+json`. Entities listed by type. A collection is a document, not a resource, so it has no `type`: its `_links` say where it is and how to page, and the things it lists are under `_embedded`, in a group named for the collection.
 
 ```
 GET /collections            one collection per node type
 GET /collections/{type}     the live nodes of that type
     ?limit=50               1 to 200
     ?offset=0
+    ?depth=0                0 to 6: hops of neighbours to embed in each item
 ```
 
-- `next`, `prev` and `index` links do the paging and navigation.
-- A query parameter the collection does not read, such as `depth`, is carried unchanged onto every link in the response, so `?depth=0` on a collection gives `?depth=0` on each item, on `next` and on `index`. `limit` and `offset` are the only ones it rewrites.
+- `self`, `next`, `prev` and `index` links do the paging and navigation. `next` is present only when there is more, and `prev` only after the first page. There is no total.
+- A query parameter the collection does not page by, such as `depth`, is carried unchanged onto every link in the response, so `?depth=1` on a collection gives `?depth=1` on each item, on `next` and on `index`. `limit` and `offset` are the only ones it rewrites.
 - Retracted nodes are not listed.
-- Each item's `href` is that entity's address. A collection lists things and does not define them.
+- The index (`/collections`, `/workspace/{slug}`) lists `{slug, type}` under `_embedded.collection`. `/collections/workspace` lists `{slug, name}` under `_embedded.workspace`, each with a `self` link to that workspace.
 
 ### What an item carries
 
-Every item has `data` entries `id` and `type`. Beyond that, nothing about the domain is written into this API by hand. It reads the domain's own definitions, so a type added or reshaped there shows up here without a change:
+An item is the entity resource that `/graph/{id}` returns for it, at the depth asked for: its own properties, a `_links` entry for every relation it has, and its neighbours under `_embedded` when `depth` is above 0. Nothing about the domain is written into this API by hand, so a type added or reshaped in the domain shows up here without a change.
 
 | An item shows | Taken from |
 |---|---|
-| The collections, and their `{type}` slugs | The domain's list of node types, plus `workspace`. The slug is the type name in kebab case (`evidence-unit`). A few are shortened by hand (`enquiry`, `evaluation`). |
-| `name` | The first of the type's searchable text properties in the domain. It is whatever that type considers its main text: a title, a statement, a reason. |
-| The node's other scalar properties, when the type has no `name` | The node itself. A type with no text of its own is described by what it carries (`role`) and by what it links to. |
-| `links` | The node's outbound relations. Each is `{rel, href, name}`, with `rel` the lower-cased edge label and `name` the target's handle. |
-
-Inbound relations are not listed in a collection. Follow the item's `href` with `depth=1` to see them.
+| The collections, and their `{type}` slugs | The domain's list of node types, plus `workspace`. The slug is the type name in kebab case (`evidence-unit`). A few are shortened by hand (`enquiry`, `evaluation`). The group under `_embedded` is named by the slug. |
+| `id`, `type` and every property | The node itself. Which property is a type's main text differs by type (`name`, `statement`, `text`). |
+| `_links.self` | That entity's address. A collection lists things and does not define them. |
+| `_links` by relation | Every relation the node has, in both directions, as `{href, dir, type}`, with `props` when the edge carries properties. The key is `relation:type` for an outbound relation and `type:relation` for an inbound one. |
 
 ## Errors
 

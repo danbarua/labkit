@@ -286,7 +286,13 @@ throwaway script before relying on it.
   partial provisioning.
 - **`LOAD`/`SET search_path` are session-scoped**, not schema state — every
   connecting process must call them itself (`bootstrapSession()` in
-  `src/db/client.ts`), they can't be migrated or provisioned away.
+  `src/db/client.ts`), they can't be migrated or provisioned away. A fresh
+  connection that runs `cypher()` before `LOAD 'age'` fails on its first call
+  with `unhandled cypher(cstring) function call` (the `detail` is the graph
+  name), whatever the query shape, including inside a plpgsql function. Run
+  `LOAD 'age'; SET search_path = ag_catalog, "$user", public;` as the first
+  statements of any script or test that opens its own connection; the pool in
+  `src/server/connections.ts` does this on every `connect` event.
 - **Never rely on `search_path` ordering to resolve an unqualified name —
   qualify explicitly.** `ag_catalog.` on every AGE catalog function
   (`ag_catalog.cypher(...)`, `ag_catalog.create_graph(...)`, etc. —

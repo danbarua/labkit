@@ -3,7 +3,7 @@ import { collectionPath, EVENTS_SEGMENT, slugFor } from "./collection-paths";
 import type { TenantScope } from "./runtime";
 // Bare links return one hop of neighbours. MAX_DEPTH mirrors the limit in labkit_get_entity_as_hal.
 const DEFAULT_DEPTH = 1;
-const MAX_DEPTH = 6;
+export const MAX_DEPTH = 6;
 
 // Where a node lives: the default workspace keeps it under `/graph`, any other workspace addresses
 // it directly under its own path.
@@ -28,7 +28,7 @@ export function problem(status: number, title: string, detail?: string): Respons
 
 // `RAISE EXCEPTION` in the database. Both drivers put the SQLSTATE in `code`, and only that is read,
 // because they do not share an error class.
-function isRaisedException(err: unknown): err is Error {
+export function isRaisedException(err: unknown): err is Error {
   return err instanceof Error && (err as { code?: unknown }).code === "P0001";
 }
 
@@ -160,12 +160,13 @@ export function apiCatalogHandler(req: Request): Response {
 
 interface LinkContext {
   origin: string;
-  search: string;
+  /** Set on every link when given; without it a link keeps the query it already has. */
+  search?: string;
   prefix: string;
 }
 
 // Walks the resource and makes every `_links` href absolute, in place.
-function populateLinks(obj: unknown, ctx: LinkContext): void {
+export function populateLinks(obj: unknown, ctx: LinkContext): void {
   if (obj === null || typeof obj !== "object") return;
   for (const [key, value] of Object.entries(obj)) {
     if (key === "_links" && value !== null && typeof value === "object") {
@@ -188,6 +189,6 @@ function absolute(link: unknown, ctx: LinkContext): unknown {
   const node = QUERY_HREF.exec(href);
   const path = node ? nodePath(ctx.prefix, node[1]!) : ctx.prefix + href;
   const absoluteUrl = new URL(path, ctx.origin);
-  absoluteUrl.search = ctx.search;
+  if (ctx.search !== undefined) absoluteUrl.search = ctx.search;
   return { ...link, href: absoluteUrl.toString() };
 }
