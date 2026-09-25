@@ -58,7 +58,7 @@ describe("labkit_get_collection_as_hal", () => {
     const hal = await collection(1, "Question", 0, 50, 0);
     expect(hal._embedded.Question.map((n: any) => n.id).sort()).toEqual(["Q_1", "Q_2"]);
     expect(hal.count).toBe(2);
-    expect(hal._links.self.href).toBe("/collections/Question?offset=0&limit=50");
+    expect(hal._links.self.href).toBe("/collections/Question?limit=50&offset=0");
     expect(hal._links.next).toBeUndefined();
     expect(hal._links.prev).toBeUndefined();
   });
@@ -66,12 +66,12 @@ describe("labkit_get_collection_as_hal", () => {
   test("paginates: limit narrows the page, offset advances it, next/prev name both", async () => {
     const page1 = await collection(1, "Question", 0, 1, 0);
     expect(page1._embedded.Question.map((n: any) => n.id)).toEqual(["Q_1"]);
-    expect(page1._links.next.href).toBe("/collections/Question?offset=1&limit=1");
+    expect(page1._links.next.href).toBe("/collections/Question?limit=1&offset=1");
     expect(page1._links.prev).toBeUndefined();
 
     const page2 = await collection(1, "Question", 1, 1, 0);
     expect(page2._embedded.Question.map((n: any) => n.id)).toEqual(["Q_2"]);
-    expect(page2._links.prev.href).toBe("/collections/Question?offset=0&limit=1");
+    expect(page2._links.prev.href).toBe("/collections/Question?limit=1&offset=0");
     expect(page2._links.next).toBeUndefined();
   });
 

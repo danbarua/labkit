@@ -5,10 +5,10 @@
 -- `depth`.
 --
 -- The label a caller asks for is checked against what the tenant's own graph actually has
--- (`ag_catalog.ag_label`), never against a fixed vocabulary: two tenants can carry entirely
+-- (its `_ag_label_vertex` children), never against a fixed vocabulary: two tenants can carry entirely
 -- different label sets, and this function does not assume either one.
 --
--- URLs are relative and pagination is the only thing embedded in them (`offset`/`limit`); turning
+-- URLs are relative and pagination is the only thing embedded in them (`limit`/`offset`); turning
 -- them absolute, substituting a label for its slug, and round-tripping a caller's other querystring
 -- preferences are HTTP-layer concerns, done the same way the single-entity view already does them.
 CREATE FUNCTION public.labkit_get_collection_as_hal(
@@ -47,10 +47,18 @@ BEGIN
     RAISE EXCEPTION 'no tenant %', p_tenant_id;
   END IF;
 
+  -- A vertex label is a table in the graph's schema that inherits `_ag_label_vertex`. Read from
+  -- `pg_catalog`, which every role can, because the role the API runs as cannot read `ag_label`.
   IF NOT EXISTS (
-    SELECT 1 FROM ag_catalog.ag_label l
-    JOIN ag_catalog.ag_graph g ON g.graphid = l.graph
-    WHERE g.name = graph_name AND l.kind = 'v' AND l.name = p_label
+    SELECT 1
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_catalog.pg_inherits i ON i.inhrelid = c.oid
+    JOIN pg_catalog.pg_class parent ON parent.oid = i.inhparent
+    WHERE n.nspname = graph_name
+      AND c.relname = p_label
+      AND parent.relnamespace = n.oid
+      AND parent.relname = '_ag_label_vertex'
   ) THEN
     RAISE EXCEPTION 'no label % in graph %', p_label, graph_name;
   END IF;
@@ -80,20 +88,20 @@ BEGIN
 
   links := jsonb_build_object(
     'self', jsonb_build_object(
-      'href', format('/collections/%s?offset=%s&limit=%s', p_label, p_offset, p_limit)
+      'href', format('/collections/%s?limit=%s&offset=%s', p_label, p_limit, p_offset)
     )
   );
   IF p_offset > 0 THEN
     links := links || jsonb_build_object(
       'prev', jsonb_build_object(
-        'href', format('/collections/%s?offset=%s&limit=%s', p_label, greatest(p_offset - p_limit, 0), p_limit)
+        'href', format('/collections/%s?limit=%s&offset=%s', p_label, p_limit, greatest(p_offset - p_limit, 0))
       )
     );
   END IF;
   IF has_more THEN
     links := links || jsonb_build_object(
       'next', jsonb_build_object(
-        'href', format('/collections/%s?offset=%s&limit=%s', p_label, p_offset + p_limit, p_limit)
+        'href', format('/collections/%s?limit=%s&offset=%s', p_label, p_limit, p_offset + p_limit)
       )
     );
   END IF;
