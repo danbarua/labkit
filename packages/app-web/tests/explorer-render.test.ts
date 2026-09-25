@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import {
   esc,
   eventRow,
+  findMathSpans,
   itemView,
   labelFor,
   mentionHtml,
@@ -104,6 +105,36 @@ describe("handles in prose", () => {
   test("a handle is found beside any of the bases", () => {
     const elsewhere = { "/w/y/Q_1": { type: "Question" } };
     expect(mentionHtml("Q_1", elsewhere, ["/w/x/", "/w/y/"])).toContain('data-nav="/w/y/Q_1"');
+  });
+});
+
+describe("maths in prose", () => {
+  const found = (text: string) => findMathSpans(text).map(([s, e]) => text.slice(s, e));
+
+  test("notation joined by an operator is one span", () => {
+    expect(found("where z_o = mean_{i in o} of x")).toEqual(["z_o = mean_{i in o}"]);
+    expect(found("the slope d(loss)/d(K_2) is small")).toEqual(["d(loss)/d(K_2)"]);
+  });
+
+  test("a single atom is not maths", () => {
+    expect(found("the value z_o here")).toEqual([]);
+  });
+
+  test("a handle is never an atom", () => {
+    expect(found("Q_1 = NOTE_20")).toEqual([]);
+  });
+
+  test("a snake_case word made of English is prose, not a variable", () => {
+    expect(found("window_size = manual_seed")).toEqual([]);
+  });
+
+  test("a span in a sentence with a handle keeps both, and is escaped", () => {
+    const html = mentionHtml("z_o = mean_{i in o} on Q_1", held, bases);
+    expect(html).toContain('<span class="math">z_o = mean_{i in o}</span>');
+    expect(html).toContain('data-nav="/w/x/Q_1"');
+    const hostile = mentionHtml("f(<b>) = g(x)", held, bases);
+    expect(hostile).toContain('<span class="math">f(&lt;b&gt;) = g(x)</span>');
+    expect(hostile).not.toContain("<b>");
   });
 });
 
