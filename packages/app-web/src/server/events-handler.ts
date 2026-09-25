@@ -2,9 +2,10 @@ import { labelForNaturalId } from "@labkit/core-db/domain";
 import { type RecordedEvent, touchedIn } from "@labkit/core-domain/events";
 import { ACT_SLUG, ACT_TYPE, EVENTS_SEGMENT } from "./collection-paths";
 import {
-  collectionJson,
   DEFAULT_LIMIT,
   extrasOf,
+  halJson,
+  linksOf,
   MAX_LIMIT,
   pageParam,
   pagingLinks,
@@ -117,17 +118,24 @@ function pageLinks(root: string, self: string, p: Page) {
 const selfOf = (p: Page, self: string) =>
   `${self}?limit=${p.limit}&offset=${p.offset}${p.since === undefined ? "" : `&since=${p.since}`}`;
 
-function actLinks(origin: string, scope: TenantScope, event: RecordedEvent) {
-  const node = (handle: string) => ({
+// A record an act names, as a link out of it.
+function nodeLink(origin: string, scope: TenantScope, handle: string) {
+  return {
     href: `${origin}${nodePath(scope.prefix, handle)}`,
-    name: handle,
-  });
-  return [
-    { rel: "subject", ...node(event.subject) },
-    ...touchedIn(event)
-      .filter((handle) => handle !== event.subject)
-      .map((handle) => ({ rel: "touched", ...node(handle) })),
-  ];
+    type: typeOf(handle),
+    dir: "out",
+  };
+}
+
+// The records an act affected: its subject, and every other record a change lands on.
+function actLinks(origin: string, scope: TenantScope, event: RecordedEvent) {
+  const touched = touchedIn(event).filter((handle) => handle !== event.subject);
+  return {
+    subject: nodeLink(origin, scope, event.subject),
+    ...(touched.length === 0
+      ? {}
+      : { touched: touched.map((handle) => nodeLink(origin, scope, handle)) }),
+  };
 }
 
 // One act as a collection item: what was issued, by whom, and links to the records it affected.
@@ -135,22 +143,20 @@ function actLinks(origin: string, scope: TenantScope, event: RecordedEvent) {
 function actItem(origin: string, scope: TenantScope, event: RecordedEvent) {
   const { attribution: by } = event;
   return {
-    href: `${origin}${scope.prefix}/${ACT_SLUG}/${event.seq}`,
-    data: [
-      { name: "id", value: String(event.seq) },
-      { name: "type", value: ACT_TYPE },
-      { name: "name", value: `${event.operation} ${event.subject}` },
-      { name: "at", value: event.at },
-      { name: "operation", value: event.operation },
-      { name: "subject", value: event.subject },
-      ...(typeOf(event.subject) === undefined
-        ? []
-        : [{ name: "subject_type", value: typeOf(event.subject) }]),
-      { name: "attribution_label", value: by.attribution_label },
-      { name: "attribution_how", value: by.attribution_how },
-      { name: "changes", value: event.changes.length },
-    ],
-    links: actLinks(origin, scope, event),
+    id: String(event.seq),
+    type: ACT_TYPE,
+    name: `${event.operation} ${event.subject}`,
+    at: event.at,
+    operation: event.operation,
+    subject: event.subject,
+    ...(typeOf(event.subject) === undefined ? {} : { subject_type: typeOf(event.subject) }),
+    attribution_label: by.attribution_label,
+    attribution_how: by.attribution_how,
+    changes: event.changes.length,
+    _links: {
+      self: { href: `${origin}${scope.prefix}/${ACT_SLUG}/${event.seq}`, type: ACT_TYPE },
+      ...actLinks(origin, scope, event),
+    },
   };
 }
 
@@ -160,12 +166,14 @@ async function acts(req: Request, scope: TenantScope): Promise<Response> {
   const root = `${origin}${scope.prefix}`;
   const self = `${root}/${ACT_SLUG}`;
   const p = await page(req, scope);
-  return collectionJson(
+  return halJson(
     req,
     {
-      href: selfOf(p, self),
-      links: pageLinks(root, self, p),
-      items: p.acts.map((event) => actItem(origin, scope, event)),
+      _links: { self: { href: selfOf(p, self) }, ...linksOf(pageLinks(root, self, p)) },
+      offset: p.offset,
+      limit: p.limit,
+      count: p.acts.length,
+      _embedded: { [ACT_SLUG]: p.acts.map((event) => actItem(origin, scope, event)) },
     },
     HANDLED,
   );
@@ -184,17 +192,10 @@ async function act(req: Request, scope: TenantScope, seq: number): Promise<Respo
 
   const event = toEvent(row);
   const root = `${origin}${scope.prefix}`;
-  const link = (handle: string) => ({
-    href: `${origin}${nodePath(scope.prefix, handle)}`,
-    type: typeOf(handle),
-    dir: "out",
-  });
-  const touched = touchedIn(event).filter((handle) => handle !== event.subject);
   const links = {
     self: { href: `${root}/${ACT_SLUG}/${event.seq}`, type: ACT_TYPE },
     index: { href: `${root}/${ACT_SLUG}` },
-    subject: link(event.subject),
-    ...(touched.length === 0 ? {} : { touched: touched.map(link) }),
+    ...actLinks(origin, scope, event),
   };
   const extras = extrasOf(req, HANDLED);
   return json({

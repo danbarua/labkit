@@ -28,6 +28,7 @@ export interface Workspace {
  * What a handler may touch for one request: one tenant's graph, read-only, inside one transaction.
  */
 export interface TenantScope {
+  tenantId: number;
   slug: string;
   graphName: string;
   /** Prepended to every path this scope links to: empty for the default workspace. */
@@ -87,6 +88,7 @@ export async function withTenant<T>(
       await client.query(`SELECT set_config($1, $2, true)`, [TENANT_SETTING, String(row.id)]);
       await client.query(`SET LOCAL ROLE ${APP_ROLE}`);
       const result = await work({
+        tenantId: row.id,
         slug: row.slug,
         graphName: row.graph_name,
         prefix: slug === undefined ? "" : `/workspace/${encodeURIComponent(row.slug)}`,
