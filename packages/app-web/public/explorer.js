@@ -99,7 +99,7 @@ function walk(node) {
 
 /* ---------------- state ---------------- */
 const ENTRY = "/collections/workspace";
-const ACCEPT = "application/vnd.collection+json, application/hal+json, application/json";
+const ACCEPT = "application/hal+json, application/json";
 const state = {
   history: [],
   pointer: -1,
@@ -144,25 +144,30 @@ function errMsg(err) {
   return String(err?.message || err);
 }
 
+// A collection is a HAL document that is not itself a resource: its `_links` say where it is and
+// how to page, and each thing it lists is a child under `_embedded`. A child with an `id` is a
+// resource; any other is a link to another collection.
 function parseCollection(json) {
-  const c = json.collection || {};
   const links = {};
-  (c.links || []).forEach((l) => {
-    links[l.rel] = l.href;
+  Object.keys(json._links || {}).forEach((rel) => {
+    const link = json._links[rel];
+    if (link && !Array.isArray(link) && link.href) links[rel] = link.href;
   });
-  const items = (c.items || []).map((it) => {
-    const d = {};
-    (it.data || []).forEach((kv) => {
-      d[kv.name] = kv.value;
+  const items = [];
+  Object.keys(json._embedded || {}).forEach((group) => {
+    [].concat(json._embedded[group]).forEach((child) => {
+      const href = child._links?.self?.href;
+      if (!href) return;
+      const data = {};
+      Object.keys(child).forEach((k) => {
+        if (k !== "_links" && k !== "_embedded") data[k] = child[k];
+      });
+      const id = data.id || null;
+      if (id) walk(child);
+      items.push({ href: href, data: data, id: id });
     });
-    return { href: it.href, data: d, id: d.id || null };
   });
-  items.forEach((it) => {
-    if (!it.id) return;
-    const r = ensureResource(stripQuery(it.href), it.data.type);
-    r.summary = it.data.name || it.data.value || r.summary;
-  });
-  return { href: c.href, links: links, items: items, nextHref: links.next || null };
+  return { href: links.self, links: links, items: items, nextHref: links.next || null };
 }
 
 // Fetches href and reports which media type came back. What happens next is
@@ -178,13 +183,13 @@ function request(href) {
         });
     }
     const ct = resp.headers.get("content-type") || "";
-    const kind = /collection\+json/.test(ct)
-      ? "collection"
-      : /hal\+json/.test(ct)
-        ? "resource"
-        : null;
-    if (!kind) throw new Error(`Unhandled content-type: ${ct}`);
-    return resp.json().then((json) => ({ kind: kind, json: json, href: resp.url }));
+    if (!/hal\+json/.test(ct)) throw new Error(`Unhandled content-type: ${ct}`);
+    // A resource says what it is; a collection is the HAL document that does not.
+    return resp.json().then((json) => ({
+      kind: json.type ? "resource" : "collection",
+      json: json,
+      href: resp.url,
+    }));
   });
 }
 
@@ -335,7 +340,7 @@ function itemRows(items) {
     if (it.id) {
       const key = stripQuery(it.href);
       const r = resources[key];
-      const lbl = String(it.data.name || it.data.value || "").toLowerCase();
+      const lbl = String(it.data.name || it.data.value || (r ? labelFor(r) : "")).toLowerCase();
       if (term && String(it.id).toLowerCase().indexOf(term) === -1 && lbl.indexOf(term) === -1)
         return;
       const view = itemView(it, r);

@@ -1,20 +1,36 @@
 import { getJson } from "./graph-api";
 
+export interface HalLink {
+  href: string;
+  type?: string;
+  dir?: string;
+  props?: Record<string, unknown>;
+}
+
+/** One thing a collection lists: its own properties, and `_links` to what it relates to. */
 export interface CollectionItem {
-  href: string;
-  data: { name: string; value: unknown }[];
-  links: { rel: string; href: string; name?: string }[];
+  id?: string;
+  type?: string;
+  name?: string;
+  slug?: string;
+  _links: Record<string, HalLink | HalLink[]>;
+  [property: string]: unknown;
 }
 
+/** A HAL document whose `_embedded` groups hold the items, and whose `_links` say how to page. */
 export interface Collection {
-  href: string;
-  links: { rel: string; href: string }[];
-  items: CollectionItem[];
+  _links: Record<string, HalLink | HalLink[]>;
+  _embedded: Record<string, CollectionItem[]>;
 }
 
-/** An item's data as a record, so a page can ask for `name` without scanning for it. */
-export function dataOf(item: CollectionItem): Record<string, unknown> {
-  return Object.fromEntries(item.data.map((d) => [d.name, d.value]));
+/** Every item, whichever group it is embedded under. */
+export function itemsOf(collection: Collection): CollectionItem[] {
+  return Object.values(collection._embedded).flat();
+}
+
+/** The handle or slug a link's address ends in. */
+export function lastSegment(link: HalLink): string {
+  return link.href.split("?")[0]?.split("/").pop() ?? "";
 }
 
 export async function fetchCollection(
@@ -26,6 +42,5 @@ export async function fetchCollection(
   if (page.limit !== undefined) query.set("limit", String(page.limit));
   if (page.offset !== undefined) query.set("offset", String(page.offset));
   const suffix = query.size > 0 ? `?${query}` : "";
-  const body = await getJson<{ collection: Collection }>(`${path}${suffix}`, signal);
-  return body.collection;
+  return getJson<Collection>(`${path}${suffix}`, signal);
 }

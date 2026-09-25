@@ -3,7 +3,7 @@
   "info": {
     "title": "LabKit graph API",
     "version": "1.0.0",
-    "description": "Read-only HAL+JSON view of the LabKit research graph. Each resource embeds its neighbours under `_embedded`, keyed `relation:type` for outbound links and `type:relation` for inbound ones. `/collections` lists entities by type as Collection+JSON. Everything is scoped to a workspace: bare `/graph` and `/collections` are the default one, and `/workspace/{slug}` selects another, where an entity is addressed as `/workspace/{slug}/{handle}`."
+    "description": "Read-only HAL+JSON view of the LabKit research graph. Each resource embeds its neighbours under `_embedded`, keyed `relation:type` for outbound links and `type:relation` for inbound ones. `/collections` lists entities by type, also as HAL+JSON: the items are under `_embedded` and `_links` page through them. Everything is scoped to a workspace: bare `/graph` and `/collections` are the default one, and `/workspace/{slug}` selects another, where an entity is addressed as `/workspace/{slug}/{handle}`."
   },
   "paths": {
     "/graph/{id}": {
@@ -87,9 +87,9 @@
         "summary": "One collection per node type",
         "responses": {
           "200": {
-            "description": "A Collection+JSON document.",
+            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
             "content": {
-              "application/vnd.collection+json": {
+              "application/hal+json": {
                 "schema": {
                   "type": "object"
                 }
@@ -101,7 +101,7 @@
     },
     "/collections/{type}": {
       "get": {
-        "summary": "The live nodes of one type: id, type and name",
+        "summary": "The live nodes of one type, each as an entity resource",
         "parameters": [
           {
             "name": "type",
@@ -132,13 +132,25 @@
               "minimum": 0,
               "default": 0
             }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "description": "Hops of neighbours to embed in each item, 0 to 6. Carried on every link in the response.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6,
+              "default": 0
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "A Collection+JSON document.",
+            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
             "content": {
-              "application/vnd.collection+json": {
+              "application/hal+json": {
                 "schema": {
                   "type": "object"
                 }
@@ -219,11 +231,6 @@
           "200": {
             "description": "A collection for a slug, an entity with its neighbours for a handle.",
             "content": {
-              "application/vnd.collection+json": {
-                "schema": {
-                  "type": "object"
-                }
-              },
               "application/hal+json": {
                 "schema": {
                   "type": "object"
@@ -294,7 +301,11 @@
           "200": {
             "description": "A collection of acts (type `Act`).",
             "content": {
-              "application/vnd.collection+json": {}
+              "application/hal+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
             }
           },
           "default": {
@@ -436,9 +447,9 @@
         "summary": "A workspace's collections: one per node type",
         "responses": {
           "200": {
-            "description": "A Collection+JSON document.",
+            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
             "content": {
-              "application/vnd.collection+json": {
+              "application/hal+json": {
                 "schema": {
                   "type": "object"
                 }

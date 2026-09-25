@@ -1,6 +1,6 @@
 import { createFileRoute, getRouteApi, Link } from "@tanstack/react-router";
 import { Bar } from "../ui/Bar";
-import { dataOf } from "../ui/collection-api";
+import { itemsOf } from "../ui/collection-api";
 
 const workspace = getRouteApi("/workspace/$slug");
 
@@ -17,8 +17,8 @@ function Collections() {
       <div className="page">
         <h2>{slug}</h2>
         <ul className="cards">
-          {index.items.map((item) => {
-            const { slug: type, type: label } = dataOf(item) as { slug: string; type: string };
+          {itemsOf(index).map((item) => {
+            const { slug: type, type: label } = item as { slug: string; type: string };
             return (
               <li key={type}>
                 <Link to="/workspace/$slug/$type" params={{ slug, type }}>
