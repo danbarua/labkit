@@ -411,7 +411,7 @@ function renderPane(el, countEl, pathEl, c, pane) {
   html += status(pane);
   if (pane === "lower" && c.nextHref && !colStatus.loading)
     html +=
-      '<button class="tbtn" id="load-more-btn" style="margin-top:6px;width:100%;">Load more</button>';
+      '<button class="tbtn primary" id="load-more-btn" style="margin-top:6px;width:100%;">Load more</button>';
   el.innerHTML = html;
 }
 
@@ -575,7 +575,7 @@ function eventsPanel(res) {
   else if (!ev.items.length) body += '<div class="empty-panel">No event names this record.</div>';
   if (!ev.loading && ev.next)
     body +=
-      '<button class="tbtn" id="events-more-btn" style="margin:8px 0;">Load more acts</button>';
+      '<button class="tbtn primary" id="events-more-btn" style="margin:8px 0;">Load more acts</button>';
   return `<div class="panel">${head}<div class="panel-body">${body}</div></div>`;
 }
 
