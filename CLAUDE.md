@@ -36,6 +36,7 @@ bun run build          # compile bin/labkit
 bun run dev            # the CLI
 bun run mcp            # the MCP server over stdio
 bun run db:generate    # after editing packages/core-db/schema.ts
+bun run db:bootstrap <url>  # prepare an empty Postgres: role, migrations, AGE
 bun run bonsai:record  # rebuild .labkit-bonsai from the probe scripts
 ```
 
