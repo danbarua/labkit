@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgentRouteImport } from './routes/agent'
+import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as WorkspaceSlugRouteRouteImport } from './routes/workspace.$slug.route'
 import { Route as WorkspaceSlugIndexRouteImport } from './routes/workspace.$slug.index'
 import { Route as WorkspaceSlugTypeRouteImport } from './routes/workspace.$slug.$type'
@@ -18,6 +20,16 @@ import { Route as WorkspaceSlugGraphIdRouteImport } from './routes/workspace.$sl
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentRoute = AgentRouteImport.update({
+  id: '/agent',
+  path: '/agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryRoute = GalleryRouteImport.update({
+  id: '/gallery',
+  path: '/gallery',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkspaceSlugRouteRoute = WorkspaceSlugRouteRouteImport.update({
@@ -43,6 +55,8 @@ const WorkspaceSlugGraphIdRoute = WorkspaceSlugGraphIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agent': typeof AgentRoute
+  '/gallery': typeof GalleryRoute
   '/workspace/$slug': typeof WorkspaceSlugRouteRouteWithChildren
   '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
   '/workspace/$slug/': typeof WorkspaceSlugIndexRoute
@@ -50,6 +64,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agent': typeof AgentRoute
+  '/gallery': typeof GalleryRoute
   '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
   '/workspace/$slug': typeof WorkspaceSlugIndexRoute
   '/workspace/$slug/graph/$id': typeof WorkspaceSlugGraphIdRoute
@@ -57,6 +73,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agent': typeof AgentRoute
+  '/gallery': typeof GalleryRoute
   '/workspace/$slug': typeof WorkspaceSlugRouteRouteWithChildren
   '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
   '/workspace/$slug/': typeof WorkspaceSlugIndexRoute
@@ -66,6 +84,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agent'
+    | '/gallery'
     | '/workspace/$slug'
     | '/workspace/$slug/$type'
     | '/workspace/$slug/'
@@ -73,12 +93,16 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agent'
+    | '/gallery'
     | '/workspace/$slug/$type'
     | '/workspace/$slug'
     | '/workspace/$slug/graph/$id'
   id:
     | '__root__'
     | '/'
+    | '/agent'
+    | '/gallery'
     | '/workspace/$slug'
     | '/workspace/$slug/$type'
     | '/workspace/$slug/'
@@ -87,6 +111,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentRoute: typeof AgentRoute
+  GalleryRoute: typeof GalleryRoute
   WorkspaceSlugRouteRoute: typeof WorkspaceSlugRouteRouteWithChildren
 }
 
@@ -97,6 +123,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent': {
+      id: '/agent'
+      path: '/agent'
+      fullPath: '/agent'
+      preLoaderRoute: typeof AgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery': {
+      id: '/gallery'
+      path: '/gallery'
+      fullPath: '/gallery'
+      preLoaderRoute: typeof GalleryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workspace/$slug': {
@@ -147,6 +187,8 @@ const WorkspaceSlugRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentRoute: AgentRoute,
+  GalleryRoute: GalleryRoute,
   WorkspaceSlugRouteRoute: WorkspaceSlugRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport

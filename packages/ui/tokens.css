@@ -1,0 +1,67 @@
+/*
+ * Design tokens for every @labkit/ui surface, scoped to `.lk-root` so a host page's own styles are
+ * left alone. Light is the base; dark follows the system unless the root says which it wants
+ * with data-theme.
+ */
+.lk-root {
+  color-scheme: light;
+  --lk-bg: #f8fafc;
+  --lk-surface: #ffffff;
+  --lk-surface-2: #eef2f6;
+  --lk-line: #e2e8f0;
+  --lk-text: #0b1220;
+  --lk-muted: #5c6b82;
+  --lk-faint: #94a3b8;
+  --lk-accent: #14b8a6;
+  --lk-accent-text: #0f766e;
+  --lk-accent-soft: rgba(20, 184, 166, 0.1);
+  --lk-danger: #dc2626;
+  --lk-danger-soft: rgba(220, 38, 38, 0.08);
+  --lk-warn: #b45309;
+  --lk-warn-soft: rgba(245, 158, 11, 0.14);
+  --lk-primary: #0b1220;
+  --lk-primary-text: #f8fafc;
+  --lk-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --lk-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --lk-radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .lk-root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --lk-bg: #0b1220;
+    --lk-surface: #131d33;
+    --lk-surface-2: #1a2743;
+    --lk-line: rgba(248, 250, 252, 0.12);
+    --lk-text: #f8fafc;
+    --lk-muted: #94a3b8;
+    --lk-faint: #64748b;
+    --lk-accent-text: #5eead4;
+    --lk-accent-soft: rgba(20, 184, 166, 0.16);
+    --lk-danger: #f87171;
+    --lk-danger-soft: rgba(248, 113, 113, 0.14);
+    --lk-warn: #fbbf24;
+    --lk-warn-soft: rgba(245, 158, 11, 0.16);
+    --lk-primary: #14b8a6;
+    --lk-primary-text: #0b1220;
+  }
+}
+
+.lk-root[data-theme="dark"] {
+  color-scheme: dark;
+  --lk-bg: #0b1220;
+  --lk-surface: #131d33;
+  --lk-surface-2: #1a2743;
+  --lk-line: rgba(248, 250, 252, 0.12);
+  --lk-text: #f8fafc;
+  --lk-muted: #94a3b8;
+  --lk-faint: #64748b;
+  --lk-accent-text: #5eead4;
+  --lk-accent-soft: rgba(20, 184, 166, 0.16);
+  --lk-danger: #f87171;
+  --lk-danger-soft: rgba(248, 113, 113, 0.14);
+  --lk-warn: #fbbf24;
+  --lk-warn-soft: rgba(245, 158, 11, 0.16);
+  --lk-primary: #14b8a6;
+  --lk-primary-text: #0b1220;
+}

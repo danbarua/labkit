@@ -21,8 +21,11 @@
     "typecheck": "bunx --bun tsc --noEmit"
   },
   "dependencies": {
+    "@labkit/acp-client": "workspace:*",
     "@labkit/core-db": "workspace:*",
     "@labkit/core-domain": "workspace:*",
+    "@labkit/ui": "workspace:*",
+    "@labkit/view-model": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-separator": "^1.1.7",
@@ -33,9 +36,12 @@
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@agentclientprotocol/sdk": "1.5.0",
     "@biomejs/biome": "2.5.13",
     "@electric-sql/pglite": "^0.5.7",
     "@electric-sql/pglite-age": "^0.0.8",
+    "@labkit/acp-fake": "workspace:*",
+    "@labkit/acp-scenarios": "workspace:*",
     "@playwright/test": "^1.55.0",
     "@tanstack/router-plugin": "^1.168.40",
     "@types/react": "^19.1.12",

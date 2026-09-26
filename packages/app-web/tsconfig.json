@@ -30,6 +30,7 @@
     "tests",
     "e2e",
     "playwright.config.ts",
-    "../core-db/sql-modules.d.ts"
+    "../core-db/sql-modules.d.ts",
+    "../ui"
   ]
 }
