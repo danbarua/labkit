@@ -182,7 +182,13 @@ function announceNewRecord(dataDir: string, pointedAt: string | undefined): void
   // A directory someone pointed `--db` at, holding files but no record, is a
   // restore that landed in the wrong shape. Creating an empty record there
   // reads like progress and answers every later command from nothing.
-  if (pointedAt !== undefined && existsSync(pointedAt) && readdirSync(pointedAt).length > 0)
+  // A `.labkit/` alone is a record another command is creating at this moment, not a stranger's
+  // files.
+  if (
+    pointedAt !== undefined &&
+    existsSync(pointedAt) &&
+    readdirSync(pointedAt).some((entry) => entry !== ".labkit")
+  )
     throw new Error(
       `${pointedAt} holds no record, and is not empty\n` +
         `  --db takes a project directory, a .labkit/, or an unpacked pglite cluster.\n` +

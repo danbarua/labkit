@@ -3,7 +3,7 @@
  * Dumps a real LabKit record to one `.sql` file, dated and named for the schema commit that
  * wrote it. `labkit restore` reads it back, into PGlite or a real Postgres.
  *
- * Goes through `connectDb`, which holds the lock: a second open of the same directory is the
+ * Goes through `connectDbExclusive`, which stops the record's daemon and holds the lock: a second open is the
  * concurrent-writer case the lock prevents. Never updated in place: a snapshot is dated for
  * the day it was taken. The schema commit is this checkout's `HEAD`.
  *
@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
-import { connectDb } from "@labkit/core-db/connect.ts";
+import { connectDbExclusive } from "@labkit/core-db/connect.ts";
 import { dumpSql } from "@labkit/core-db/dump.ts";
 
 const args = process.argv.slice(2);
@@ -59,7 +59,7 @@ if (existsSync(outPath)) {
   process.exit(1);
 }
 
-const connection = await connectDb(resolvedDbDir);
+const connection = await connectDbExclusive(resolvedDbDir);
 try {
   const sql = await dumpSql(connection);
   writeFileSync(outPath, sql);
