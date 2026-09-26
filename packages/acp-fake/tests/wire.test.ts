@@ -18,7 +18,7 @@ import {
   toolSucceeds,
 } from "@labkit/acp-scenarios";
 import { initialState, replay, type ViewEvent } from "@labkit/view-model";
-import { createFakeAcpServer, pickScenario } from "../index";
+import { createFakeAcpServer, inProcessFetch, pickScenario } from "../index";
 
 type Permission = (request: acp.RequestPermissionRequest) => Promise<acp.RequestPermissionResponse>;
 
@@ -29,15 +29,6 @@ interface Client {
   arrived(count: number): Promise<void>;
 }
 
-/** A `fetch` that delivers to the server in this process, so no port is opened. */
-function fetchInto(server: AcpServer): typeof fetch {
-  const deliver = (input: string | URL | Request, init?: RequestInit): Promise<Response> =>
-    server.handleRequest(
-      input instanceof Request ? new Request(input, init) : new Request(String(input), init),
-    );
-  return Object.assign(deliver, { preconnect: () => {} });
-}
-
 /** A real ACP client over Streamable HTTP, with its transport wired straight to `server`. */
 async function withClient<T>(
   server: AcpServer,
@@ -45,7 +36,7 @@ async function withClient<T>(
   run: (client: Client) => Promise<T>,
 ): Promise<T> {
   const updates: acp.SessionNotification[] = [];
-  const stream = createHttpStream("http://fake.test/acp", { fetch: fetchInto(server) });
+  const stream = createHttpStream("http://fake.test/acp", { fetch: inProcessFetch(server) });
   try {
     return await acp
       .client({ name: "wire-test" })

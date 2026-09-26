@@ -31,7 +31,9 @@ export type ViewEvent =
       readonly type: "permission_answered";
       readonly requestId: string;
       readonly outcome: RequestPermissionOutcome;
-    };
+    }
+  /** The client could not reach the agent or the agent's reply was an error. */
+  | { readonly type: "failed"; readonly message: string };
 
 /** Text chunks of one message join into one text block; anything else is kept as its own block. */
 function joinContent(
@@ -209,6 +211,16 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
     }
     case "prompt_ended":
       return { ...state, running: false, stopReason: event.stopReason };
+    case "failed": {
+      const block: Block = {
+        kind: "notice",
+        id: `notice:${state.blocks.length}`,
+        severity: "error",
+        title: "The request failed",
+        description: event.message,
+      };
+      return { ...state, running: false, blocks: [...state.blocks, block] };
+    }
     case "permission_requested": {
       const withCall = upsertToolCall(state, event.request.toolCall);
       const entry = { requestId: event.requestId, request: event.request };

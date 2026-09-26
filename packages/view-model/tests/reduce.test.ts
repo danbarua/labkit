@@ -148,6 +148,20 @@ describe("the client's own events", () => {
     expect(next.stopReason).toBeUndefined();
   });
 
+  test("a failed request ends the turn and shows why", () => {
+    const running = reduce(initialState, {
+      type: "prompt_started",
+      content: [{ type: "text", text: "go" }],
+    });
+    const state = reduce(running, { type: "failed", message: "connection refused" });
+    expect(state.running).toBe(false);
+    expect(state.blocks.at(-1)).toMatchObject({
+      kind: "notice",
+      severity: "error",
+      description: "connection refused",
+    });
+  });
+
   test("answering a request that is not known changes nothing", () => {
     const state = reduce(initialState, {
       type: "permission_answered",
