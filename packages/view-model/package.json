@@ -1,0 +1,13 @@
+{
+  "name": "@labkit/view-model",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.5.0"
+  },
+  "devDependencies": {
+    "@labkit/acp-scenarios": "workspace:*"
+  }
+}
