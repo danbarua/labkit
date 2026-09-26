@@ -50,10 +50,17 @@ const VERB_WORD: Record<string, string> = {
   RESOLVES: "CLOSES", // close
   IN_LIGHT_OF: "BASED_ON", // accept --in-light-of
 };
-const verbWord = (change: GraphChange): GraphChange =>
-  change.change === "EdgeCreated" && VERB_WORD[change.label]
+const verbWord = (change: GraphChange, act: Act): GraphChange => {
+  if (change.change !== "EdgeCreated") return change;
+  // An early `close enquiry` pointed its decision at the question. The act closed the enquiry
+  // it names, so that is where the edge goes.
+  const label = change.label as string;
+  if (act.operation === "closeEnquiry" && label === "RESOLVES" && change.to.startsWith("Q_"))
+    return { ...change, label: "CLOSES", to: act.subject };
+  return VERB_WORD[change.label]
     ? { ...change, label: VERB_WORD[change.label] as typeof change.label }
     : change;
+};
 
 // The tenant is rebuilt from nothing: its graph, its workspace row and its tenant row go.
 const admin = new Client({ connectionString: url });
@@ -80,7 +87,7 @@ try {
   // 1. The events, numbered by the database.
   let recorded = 0;
   for (const act of acts) {
-    const changes = act.changes.map(verbWord);
+    const changes = act.changes.map((change) => verbWord(change, act));
     await events.record({
       at: act.at,
       attribution: act.attribution,
