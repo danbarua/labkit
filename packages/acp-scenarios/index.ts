@@ -10,4 +10,14 @@ export {
   type Scenario,
   type Step,
 } from "./scenario";
-export { SCENARIOS } from "./scenarios";
+export {
+  noticesAndUsage,
+  permissionRequired,
+  plainAnswer,
+  planAndDiff,
+  SCENARIOS,
+  sessionReplay,
+  toolFails,
+  toolImageResult,
+  toolSucceeds,
+} from "./scenarios";
