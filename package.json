@@ -41,6 +41,7 @@
 		"check:bunx-bun": "bun scripts/checks/check-bunx-bun.ts",
 		"check:cli": "bash scripts/checks/smoke-cli.sh",
 		"probe:dogfood": "zsh scripts/db/probe-dogfood.sh",
+		"db:bootstrap": "bun scripts/db/bootstrap.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:generate:custom": "drizzle-kit generate --custom",
 		"ports": "bash scripts/dev/worktree-ports.sh",
