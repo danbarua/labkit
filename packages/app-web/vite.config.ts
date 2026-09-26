@@ -3,6 +3,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { labkitDev } from "./src/infra/dev-plugin";
+import { fakeAgent } from "./src/infra/fake-agent-plugin";
 
 const explorerPort = Number(process.env.LABKIT_PORT_EXPLORER ?? "8850");
 const apiPort = Number(process.env.LABKIT_PORT_WEB ?? "8899");
@@ -18,7 +19,12 @@ export default defineConfig(({ command, isPreview }) => ({
   // bundle is built for it, and the preview of that bundle serves it from the same place.
   base: command === "build" || isPreview ? "/app/" : "/",
   // The router plugin writes `src/routeTree.gen.ts` from `src/routes`, and must come before react().
-  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), labkitDev()],
+  plugins: [
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react(),
+    labkitDev(),
+    fakeAgent(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
