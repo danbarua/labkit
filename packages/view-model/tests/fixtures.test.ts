@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { type Fixture, FIXTURES, play } from "@labkit/acp-scenarios";
+import { FIXTURES } from "@labkit/acp-scenarios";
 import {
   type Block,
   pendingPermissions,
@@ -15,43 +15,12 @@ import {
   textOf,
   type ViewEvent,
 } from "../index";
-
-/** The events a client would see for a fixture: its own prompt, the agent's updates, its answers. */
-async function eventsOf(fixture: Fixture): Promise<ViewEvent[]> {
-  const events: ViewEvent[] = [];
-  const { scenario } = fixture;
-  if (scenario.prompt !== "") {
-    events.push({ type: "prompt_started", content: [{ type: "text", text: scenario.prompt }] });
-  }
-  let count = 0;
-  const stopReason = await play(scenario, {
-    update: (update) => {
-      events.push({ type: "update", update });
-    },
-    permission: (request) => {
-      const requestId = `req_${++count}`;
-      events.push({ type: "permission_requested", requestId, request });
-      const answer = fixture.decide(request);
-      if (answer === "cancel") {
-        events.push({ type: "permission_answered", requestId, outcome: { outcome: "cancelled" } });
-      } else if (answer !== "hold") {
-        events.push({
-          type: "permission_answered",
-          requestId,
-          outcome: { outcome: "selected", optionId: answer.optionId },
-        });
-      }
-      return answer;
-    },
-  });
-  if (stopReason !== undefined) events.push({ type: "prompt_ended", stopReason });
-  return events;
-}
+import { eventsOfFixture, stateOfFixture } from "../fixtures";
 
 async function viewOf(id: string): Promise<TranscriptState> {
   const fixture = FIXTURES.find((f) => f.id === id);
   if (fixture === undefined) throw new Error(`no fixture ${id}`);
-  return replay(await eventsOf(fixture));
+  return stateOfFixture(fixture);
 }
 
 const kinds = (state: TranscriptState): Block["kind"][] => state.blocks.map((b) => b.kind);
@@ -188,7 +157,7 @@ describe("a reopened session", () => {
   test("the same events always give the same view", async () => {
     const fixture = FIXTURES.find((f) => f.id === "plain-answer");
     if (fixture === undefined) throw new Error("no plain-answer fixture");
-    const events = await eventsOf(fixture);
+    const events = await eventsOfFixture(fixture);
     expect(replay(events)).toEqual(replay(events));
   });
 });

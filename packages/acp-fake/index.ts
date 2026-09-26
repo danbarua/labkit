@@ -5,4 +5,4 @@ export {
   type FakeWorld,
   pickScenario,
 } from "./fake-agent";
-export { createFakeAcpServer } from "./server";
+export { createFakeAcpServer, inProcessFetch } from "./server";
