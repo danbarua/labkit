@@ -80,7 +80,7 @@ export async function openPglite(dataDir: string): Promise<PGlite> {
 /**
  * The mutex, and the only thing standing between two processes and a corrupt database file.
  */
-function tryAcquire(lockPath: string): boolean {
+export function tryAcquire(lockPath: string): boolean {
   try {
     const fd = openSync(lockPath, "wx");
     writeSync(fd, String(process.pid));
@@ -104,7 +104,7 @@ function tryAcquire(lockPath: string): boolean {
   }
 }
 
-function holderOf(lockPath: string): string {
+export function holderOf(lockPath: string): string {
   try {
     return readFileSync(lockPath, "utf8").trim();
   } catch {
@@ -130,11 +130,22 @@ async function acquireLock(lockPath: string, timeoutMs = 10_000): Promise<void> 
   }
 }
 
-function releaseLock(lockPath: string): void {
+/** Removes the lock only if this process holds it. */
+export function releaseLock(lockPath: string): void {
   try {
-    unlinkSync(lockPath);
+    if (holderOf(lockPath) === String(process.pid)) unlinkSync(lockPath);
   } catch {
     // already gone -- fine
+  }
+}
+
+/** Whether a process is running. EPERM means it exists and cannot be signalled, so it counts. */
+export function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as { code?: string }).code !== "ESRCH";
   }
 }
 
@@ -190,6 +201,9 @@ export function directPostgresBackend(opts: { connectionString: string }): DbBac
   return {
     async connect(): Promise<LabKitDBConnection> {
       const client = new Client({ connectionString: opts.connectionString });
+      // Without a listener, a server going away mid-connection is an uncaught 'error' event that
+      // ends the process; the query in flight rejects on its own.
+      client.on("error", (err) => console.error(`labkit: connection lost: ${err.message}`));
       await client.connect();
       // `pg.Client.query(sql, params, cb)` takes a *callback* third, so
       // `QueryOptions` has to travel in the config-object form. That is why the

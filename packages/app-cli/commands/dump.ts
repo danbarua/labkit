@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { Command } from "commander";
-import { connectDb, dataDirFor } from "@labkit/core-db/connect";
+import { connectDbExclusive, dataDirFor } from "@labkit/core-db/connect";
 import { dumpPostgres, dumpSql, restoreInto, restorePostgres } from "@labkit/core-db/dump";
 import type { Globals } from "../session";
 import { writeOut } from "../stdout";
@@ -28,7 +28,7 @@ export function registerDump(program: Command): void {
       if (url) {
         sql = await dumpPostgres(url);
       } else {
-        const connection = await connectDb(globals.db);
+        const connection = await connectDbExclusive(globals.db);
         try {
           sql = await dumpSql(connection);
         } finally {

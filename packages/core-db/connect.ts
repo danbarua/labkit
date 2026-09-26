@@ -3,6 +3,7 @@ import { dirname, join, sep } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { directPostgresBackend, pgliteBackend, type LabKitDBConnection } from "./backend";
+import { daemonBackend, exclusiveBackend, lockPathFor } from "./daemon";
 import { noteDecision } from "./trace";
 
 export type { LabKitDBConnection };
@@ -115,11 +116,28 @@ export async function connectDb(projectRoot?: string): Promise<LabKitDBConnectio
     askedFor: projectRoot ?? null,
   });
   announceNewRecord(dataDir, projectRoot);
-  const connection = await pgliteBackend({
-    dataDir,
-    lockPath: `${dataDir}.lock`,
-  }).connect();
+  // `LABKIT_DAEMON=0` opens the record in this process for the length of the work, holding its
+  // lock, instead of going through the record's daemon.
+  const connection =
+    process.env.LABKIT_DAEMON === "0"
+      ? await pgliteBackend({ dataDir, lockPath: lockPathFor(dataDir) }).connect()
+      : await daemonBackend(dataDir).connect();
   return withTrace(connection, "pglite");
+}
+
+/**
+ * The embedded record opened in this process, its daemon stopped: for what needs the PGlite
+ * instance itself, `pg_dump` among it.
+ */
+export async function connectDbExclusive(projectRoot?: string): Promise<LabKitDBConnection> {
+  const dataDir = dataDirFor(projectRoot);
+  noteDecision("record", {
+    backend: "pglite",
+    exclusive: true,
+    dataDir,
+    askedFor: projectRoot ?? null,
+  });
+  return withTrace(await exclusiveBackend(dataDir).connect(), "pglite");
 }
 
 /**
@@ -164,7 +182,13 @@ function announceNewRecord(dataDir: string, pointedAt: string | undefined): void
   // A directory someone pointed `--db` at, holding files but no record, is a
   // restore that landed in the wrong shape. Creating an empty record there
   // reads like progress and answers every later command from nothing.
-  if (pointedAt !== undefined && existsSync(pointedAt) && readdirSync(pointedAt).length > 0)
+  // A `.labkit/` alone is a record another command is creating at this moment, not a stranger's
+  // files.
+  if (
+    pointedAt !== undefined &&
+    existsSync(pointedAt) &&
+    readdirSync(pointedAt).some((entry) => entry !== ".labkit")
+  )
     throw new Error(
       `${pointedAt} holds no record, and is not empty\n` +
         `  --db takes a project directory, a .labkit/, or an unpacked pglite cluster.\n` +
