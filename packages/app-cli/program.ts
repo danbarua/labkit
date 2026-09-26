@@ -84,5 +84,10 @@ export function buildProgram(run: Run): Command {
   registerServe(program);
   registerDump(program);
   registerRestore(program);
+  // Hidden: how a compiled binary spawns a record's daemon, since it has no source file to run.
+  program.command("daemon <datadir>", { hidden: true }).action(async (dataDir: string) => {
+    const { runDaemon } = await import("@labkit/core-db/daemon");
+    process.exit(await runDaemon(dataDir));
+  });
   return program;
 }
