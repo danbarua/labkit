@@ -10,59 +10,38 @@ The current protocol target is [ACP v1](https://agentclientprotocol.com/protocol
 Protocol drafts and separately negotiated extensions need explicit tracking; they are not silently
 counted as either implemented or irrelevant to the requested complete integration.
 
-The repository provides the agent in `packages/app-acp` and a tracked client fork in
-`packages/vscode` of the labkit-agent repository, which is not part of this monorepo. The installed upstream client ignores tool
-content and usage updates; the fork has executable webview tests for these paths. Those DOM tests
-do not establish native editor integration. Completion still requires evidence from the complete
-editor/agent path. The native UI inspection tool could not start during this audit.
+The agent is `packages/app-acp`; the VS Code client is `packages/app-vscode`, whose chat sidebar
+renders `@labkit/ui`'s `Conversation`. Tests of that client prove its bridge and handlers, not
+native editor integration. Completion still requires evidence from the complete editor/agent path.
 
 ## Status
 
-Every row below has one status:
+Open work items are GitHub issues: sub-issues of
+[#546](https://github.com/danbarua/labkit/issues/546), each naming its ID (G1–G30). This page
+keeps the items that are finished or declined, and the evidence for them:
 
 - **Done**: implemented, with an automated test that drives the real handler.
-- **Not done**: a known gap.
-- **Not doing**: out of scope by decision. Bringing it in scope needs a new row here.
+- **Not doing**: out of scope by decision. Bringing it in scope needs a new issue.
 
 Adapter tests prove what the agent does on the wire. They do not prove that the installed editor
-exposes it, so editor verification is listed as its own gap wherever it is still missing.
+exposes it, so editor verification is its own open item wherever it is still missing.
 
-### Work items
+### Finished and declined work items
 
 | ID  | Area                 | Item                                                                                                                                                                        | Status    |
 | --- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| G1  | Initialization       | The installed VS Code client uses the advertised capability set                                                                                                             | Not done  |
-| G2  | Authentication       | Real editor login and logout flows, and explanations for unsupported capabilities                                                                                           | Not done  |
 | G3  | Authentication       | MCP OAuth                                                                                                                                                                   | Not doing |
-| G4  | Session lifecycle    | Session discovery and restart workflows in the editor                                                                                                                       | Not done  |
-| G5  | Session lifecycle    | Audit cancellation and publication races against each lifecycle requirement                                                                                                 | Not done  |
-| G6  | Prompt lifecycle     | Audit terminal mappings, interruption states and user-visible explanations                                                                                                  | Not done  |
-| G7  | Prompt lifecycle     | Evidence that a live model recovers and completes workspace work (scripted runs do not count)                                                                               | Not done  |
-| G8  | Content              | Audio playback in the editor; review all content variants, annotations and capability combinations                                                                          | Not done  |
-| G9  | Tool calls           | Native permission UI, file navigation, rich content and diffs in the editor                                                                                                 | Not done  |
 | G10 | MCP                  | Binary MCP tool results (image, audio, blob resources) reach a capable model or render as a pointer on a target that cannot read the media                                  | Done      |
-| G11 | MCP                  | Stdio open failures report the server's exit code and stderr                                                                                                                | Not done  |
-| G12 | Client filesystem    | Client read, edit and save paths in the native editor                                                                                                                       | Not done  |
-| G13 | Client filesystem    | Tool descriptions and recovery paths match the operations actually available                                                                                                | Not done  |
-| G14 | Client terminals     | Terminal display in the native editor                                                                                                                                       | Not done  |
-| G15 | Client terminals     | Process-tree cleanup on Windows                                                                                                                                             | Not done  |
-| G16 | Plans                | Full plan replacement and display in the editor                                                                                                                             | Not done  |
 | G17 | Configuration        | Switching providers through `session/set_config_option` in the workspace launcher                                                                                           | Done      |
 | G18 | Configuration        | Model capabilities (thinking choices, output limits, prompt media) describe the selected catalog model, not an adapter guess                                                | Done      |
-| G19 | Commands             | Command refresh in the editor; audit supported command forms against the schema                                                                                             | Not done  |
-| G20 | Usage and cost       | A real context-measurement or billing source in the workspace launcher, and the editor's usage indicator                                                                    | Not done  |
-| G21 | Extensibility        | Audit `_meta` preservation and extension request and notification handling                                                                                                  | Not done  |
 | G22 | Transport            | ACP Streamable HTTP through the SDK's experimental server, for the labkit web UI: loopback only, bearer token, one live runtime per session ([design](acp-http-hosting.md)) | Done      |
 | G23 | Transport            | Framing, failures and shutdown verified on each supported transport (stdio and Streamable HTTP)                                                                             | Done      |
-| G24 | Operational evidence | Logs from real editor launches; a WARNING/ERROR-only scan explains every new failure path                                                                                   | Not done  |
 | G25 | Protocol errors      | A tool deadline (`toolTimeoutMs`) is a tool result under return-error-and-continue                                                                                          | Done      |
 | G26 | Protocol errors      | Requests before `initialize` get -32600 with `data.reason: "not_initialized"`                                                                                               | Done      |
 | G27 | Protocol errors      | Unknown methods are logged as `acp.method.unknown`                                                                                                                          | Done      |
-| G28 | Audit                | This matrix expanded into checked, requirement-level schema rows                                                                                                            | Not done  |
 | G29 | Configuration        | `session/set_config_option` during a running prompt selects at once and applies at the next boundary between turns                                                          | Done      |
-| G30 | Transport            | ACP WebSocket through the SDK's experimental server (needs a Bun socket adapter)                                                                                            | Not done  |
 
-Evidence for the Done rows:
+Evidence for the Done items:
 
 - G17, G18: `adapter-config-modes.test.ts`, "set_config_option switches the workspace launcher
   between providers…". Through the ACP handler it moves one session Anthropic → OpenAI →
@@ -144,10 +123,10 @@ Rules for this matrix:
 3. A tool failure is a tool result unless core policy fails the turn. It never kills the
    JSON-RPC connection.
 4. Usage, cost and context size are never invented.
-5. MCP OAuth is Not doing until a row is added for it (G3). ACP HTTP hosting follows
-   [acp-http-hosting.md](acp-http-hosting.md) (G22, G30).
+5. MCP OAuth is Not doing until an issue brings it in scope (G3). ACP HTTP hosting follows
+   [acp-http-hosting.md](acp-http-hosting.md) (G22; WebSocket, G30, is #570).
 6. A row is Done only when a test drives the real handler. Done here covers the agent's wire
-   behaviour; editor verification is tracked separately under Work items.
+   behaviour; editor verification is tracked separately, in the open items under #546.
 
 "UNSTABLE" means that `@agentclientprotocol/sdk@1.5.0` `schema.json` marks the field as not yet in
 the spec. Every initialize response and every tested method response is validated against that
@@ -191,7 +170,7 @@ The agent calls a client method only when the client advertised it.
 | Requirement                                              | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                  | Status |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | Tool failure is a tool result (rule 3)                   | `tool-failure.test.ts`: 23 non-MCP failure scenarios under both policies. Under return-error-and-continue each failure becomes a failed tool card plus a tool result, and the turn ends with `end_turn`. Under fail-turn the result is -32000 with classification, tool name and callId, and the connection and session keep serving prompts. No unhandled rejections. MCP equivalents are in `mcp-capabilities.test.ts`. | Done   |
-| Usage, cost and context size are never invented (rule 4) | `prompt-capabilities.test.ts`: the workspace launcher sends no `usage_update` and no usage field. Usage is published only when a host binds `AcpOptions` usage. A real usage source is G20.                                                                                                                                                                                                                               | Done   |
+| Usage, cost and context size are never invented (rule 4) | `prompt-capabilities.test.ts`: the workspace launcher sends no `usage_update` and no usage field. Usage is published only when a host binds `AcpOptions` usage. A real usage source is #556.                                                                                                                                                                                                                             | Done   |
 
 A tool deadline (`toolTimeoutMs`) is a tool result under return-error-and-continue: the model reads
 the `timeout` failure on its next step and the turn continues. Core policy still fails the turn on a
@@ -223,7 +202,7 @@ retrieves the latest launch. Persisted tests retain their own unique directories
 `.session-artifacts/`. Those scripted runs must remain labelled as scripted. Their transcripts
 cannot be cited as proof that a live model independently recovered or completed a task.
 
-Do not mark the full objective complete while any row under Work items is Not done. Optional
+Do not mark the full objective complete while any sub-issue of #546 is open. Optional
 protocol capabilities are still gaps against the user's request for the entire integration;
 optionality is not permission to redefine that request as a smaller implementation.
 
