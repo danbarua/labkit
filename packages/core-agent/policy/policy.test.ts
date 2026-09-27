@@ -1,11 +1,13 @@
 import { expect, test } from "@logtape/testing-bun/autoload";
+import { z } from "zod";
 
 import { BlobRefSchema, hashBlob, MediaKindSchema } from "../agent/content.ts";
-import { ActorIdSchema, AgentIdSchema, StepsSchema } from "../agent/types.ts";
+import { ActorIdSchema, AgentIdSchema, failure, StepsSchema } from "../agent/types.ts";
 import {
   builtinResolvers,
   copyResolvers,
   defaultPolicy,
+  effectiveToolResult,
   initialPolicy,
   patchPolicy,
   projectPolicy,
@@ -97,4 +99,36 @@ test("a custom projection pack still gets target-aware pointer rewriting", () =>
   expect(message.parts).toEqual([
     { type: "text", text: expect.stringContaining(`blob://${ref.id}.png`) },
   ]);
+});
+
+test("a continued tool failure reaches the model as one message and each validation problem once", () => {
+  const continuing = { toolFailure: "return-error-and-continue" } as const;
+  const parsed = z.object({ entries: z.array(z.string()) }).safeParse({ entries: "x" });
+  const invalid = failure(parsed.error, {
+    classification: "invalid_input",
+    phase: "validate_input",
+    operation: { id: "s/turn/1/call", kind: "tool", sessionId: "s", toolName: "update_plan" },
+  });
+  const result = effectiveToolResult({ kind: "failed", error: invalid }, continuing);
+  expect(result).toEqual({
+    kind: "succeeded",
+    value: {
+      text: JSON.stringify({
+        error: "Invalid tool arguments",
+        issues: [{ path: ["entries"], message: "Invalid input: expected array, received string" }],
+      }),
+    },
+  });
+  expect(invalid.cause).toMatchObject({ name: "ZodError", issues: [{ path: ["entries"] }] });
+  const broken = failure(new Error("broken", { cause: new Error("inner") }), {
+    operation: { id: "s/turn/1/echo", kind: "tool", sessionId: "s", toolName: "echo" },
+  });
+  expect(effectiveToolResult({ kind: "failed", error: broken }, continuing)).toEqual({
+    kind: "succeeded",
+    value: { text: '{"error":"broken"}' },
+  });
+  expect(effectiveToolResult({ kind: "failed", error: broken })).toEqual({
+    kind: "failed",
+    error: broken,
+  });
 });

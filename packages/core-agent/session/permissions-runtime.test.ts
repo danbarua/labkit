@@ -661,16 +661,10 @@ test("tolerant validation failures commit tool errors without permission or exec
           const invalid = JSON.parse(
             results.find((message) => message.tool_call_id === "invalid")!.content,
           );
-          expect(invalid.failure).toMatchObject({
-            classification: "invalid_input",
-            phase: "validate_input",
-            operation: { kind: "tool", callId: "invalid", toolName: "echo" },
+          expect(invalid).toEqual({
+            error: "Invalid tool arguments",
+            issues: [{ path: ["path"], message: expect.stringContaining("expected string") }],
           });
-          expect(invalid.failure.cause.issues).toEqual([
-            expect.objectContaining({ path: ["path"], code: "invalid_type", expected: "string" }),
-          ]);
-          expect(invalid.error).toContain("path");
-          expect(invalid.error).toContain("string");
           return {
             kind: "answer",
             text: "The invalid call was rejected; the valid read completed.",

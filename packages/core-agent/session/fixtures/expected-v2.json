@@ -3571,7 +3571,7 @@
           },
           {
             "role": "tool",
-            "content": "{\"error\":\"broken\",\"failure\":{\"message\":\"broken\",\"classification\":\"execution\",\"operation\":{\"id\":\"00000000-0000-4000-8000-000000000001/turn/1/2/bad\",\"kind\":\"tool\",\"sessionId\":\"00000000-0000-4000-8000-000000000001\",\"turnId\":\"00000000-0000-4000-8000-000000000001/turn/1\",\"toolName\":\"echo\",\"callId\":\"bad\"},\"phase\":\"run\",\"cause\":{\"name\":\"Error\",\"message\":\"broken\"}}}",
+            "content": "{\"error\":\"broken\"}",
             "tool_call_id": "bad"
           },
           {
@@ -3647,7 +3647,7 @@
               },
               {
                 "role": "tool",
-                "text": "{\"error\":\"broken\",\"failure\":{\"message\":\"broken\",\"classification\":\"execution\",\"operation\":{\"id\":\"00000000-0000-4000-8000-000000000001/turn/1/2/bad\",\"kind\":\"tool\",\"sessionId\":\"00000000-0000-4000-8000-000000000001\",\"turnId\":\"00000000-0000-4000-8000-000000000001/turn/1\",\"toolName\":\"echo\",\"callId\":\"bad\"},\"phase\":\"run\",\"cause\":{\"name\":\"Error\",\"message\":\"broken\"}}}",
+                "text": "{\"error\":\"broken\"}",
                 "callId": "bad"
               },
               {
@@ -3713,7 +3713,7 @@
                 },
                 {
                   "role": "tool",
-                  "text": "{\"error\":\"broken\",\"failure\":{\"message\":\"broken\",\"classification\":\"execution\",\"operation\":{\"id\":\"00000000-0000-4000-8000-000000000001/turn/1/2/bad\",\"kind\":\"tool\",\"sessionId\":\"00000000-0000-4000-8000-000000000001\",\"turnId\":\"00000000-0000-4000-8000-000000000001/turn/1\",\"toolName\":\"echo\",\"callId\":\"bad\"},\"phase\":\"run\",\"cause\":{\"name\":\"Error\",\"message\":\"broken\"}}}",
+                  "text": "{\"error\":\"broken\"}",
                   "callId": "bad"
                 },
                 {
@@ -4091,7 +4091,7 @@
                 },
                 {
                   "role": "tool",
-                  "text": "{\"error\":\"broken\",\"failure\":{\"message\":\"broken\",\"classification\":\"execution\",\"operation\":{\"id\":\"00000000-0000-4000-8000-000000000001/turn/1/2/bad\",\"kind\":\"tool\",\"sessionId\":\"00000000-0000-4000-8000-000000000001\",\"turnId\":\"00000000-0000-4000-8000-000000000001/turn/1\",\"toolName\":\"echo\",\"callId\":\"bad\"},\"phase\":\"run\",\"cause\":{\"name\":\"Error\",\"message\":\"broken\"}}}",
+                  "text": "{\"error\":\"broken\"}",
                   "callId": "bad"
                 },
                 {

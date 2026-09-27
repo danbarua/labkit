@@ -8,7 +8,13 @@ import {
   type PromptInput,
 } from "../agent/prompt.ts";
 import type { ToolRunResult } from "../agent/tool-batch.ts";
-import { StepsSchema, ToolNameSchema, type AgentMessage, type Result } from "../agent/types.ts";
+import {
+  StepsSchema,
+  ToolNameSchema,
+  type AgentMessage,
+  type Failure,
+  type Result,
+} from "../agent/types.ts";
 import { freeze } from "../fsm/fsm.ts";
 import {
   ProviderSettingsSchema,
@@ -417,10 +423,52 @@ export function effectiveToolResult(
   return policy?.toolFailure === "return-error-and-continue"
     ? {
         kind: "succeeded",
-        value: { text: JSON.stringify({ error: result.error.message, failure: result.error }) },
+        value: { text: JSON.stringify(modelToolError(result.error)) },
       }
     : result;
 }
+
+/**
+ * The failure as the model reads it: one message and, for a validation failure, each problem once
+ * as `{ path, message }`. A thrown value that is not an Error is carried as `detail`. Ids, phase, classification and the `cause` chain stay in the journal.
+ * A validation error's own message is its problems pretty-printed, so it is replaced by a summary
+ * rather than repeated beside `issues`.
+ */
+function modelToolError(error: Failure): {
+  error: string;
+  issues?: ToolIssue[];
+  detail?: Record<string, unknown>;
+} {
+  const cause = record(error.cause);
+  const raw = cause?.issues;
+  if (!Array.isArray(raw) || raw.length === 0)
+    // A thrown value that is not an Error has no message of its own; its fields are the only account.
+    return cause === undefined || typeof cause.message === "string"
+      ? { error: error.message }
+      : { error: error.message, detail: cause };
+  const issues = raw.map((value): ToolIssue => {
+    const issue = record(value);
+    return {
+      path: Array.isArray(issue?.path)
+        ? issue.path.filter((key) => typeof key === "string" || typeof key === "number")
+        : [],
+      message: typeof issue?.message === "string" ? issue.message : "Invalid value",
+    };
+  });
+  const summary =
+    error.classification === "invalid_output"
+      ? "The tool returned invalid output"
+      : "Invalid tool arguments";
+  return { error: error.message === cause?.message ? summary : error.message, issues };
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+type ToolIssue = { path: (string | number)[]; message: string };
 
 export function initialPolicy(
   capabilities: Capabilities,

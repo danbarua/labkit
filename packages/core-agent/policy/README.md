@@ -84,6 +84,10 @@ the batch and ends the turn.
 `off` permits immediate execution after the intent receipt. Permission scope is a turn-boundary
 choice.
 
+Under `return-error-and-continue` a failed call reaches the model as `{ error, issues? }`: one
+message and, for a validation failure, each problem once as `{ path, message }`. The full failure,
+with its ids, classification and cause, stays in the journal.
+
 ## Version behavior, not saved credentials
 
 Policy/projection/handoff resolver IDs such as `history@1` name behavior supplied by the environment.

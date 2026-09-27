@@ -259,7 +259,6 @@ for (const kind of ["completion", "tool"] as const) {
               },
             },
           });
-          expect(JSON.stringify(requests[1])).toContain('\\"classification\\":\\"timeout\\"');
           expect(JSON.stringify(requests[1])).toContain("exceeded its 20 ms deadline");
         }
         expect(signal?.aborted).toBe(true);
