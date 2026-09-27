@@ -11,6 +11,8 @@
   --font-sans: "IBM Plex Sans";
   --font-mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
