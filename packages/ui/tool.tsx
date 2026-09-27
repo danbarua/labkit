@@ -1,7 +1,7 @@
 import type { ContentBlock, ToolCall, ToolCallContent } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
 import { diffLines, STATUS_LABEL } from "./format";
-import { ArgumentsLine, inlineArguments, sameValue, ValueView } from "./value";
+import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
 
@@ -118,21 +118,29 @@ function outputRepeatsContent(content: readonly ToolCallContent[], rawOutput: un
     : false;
 }
 
+/**
+ * One tool call as a row that opens: what ran and on what, then its status. Opened, it shows the
+ * input and the result. A call waiting on the person starts open, since they need to see what
+ * they are being asked to allow.
+ */
 export function ToolCard({ call, permission }: { call: ToolCall; permission?: PermissionEntry }) {
   const status = call.status ?? "pending";
   const locations = call.locations ?? [];
   const content = call.content ?? [];
   const decision = permission === undefined ? undefined : decisionOf(permission);
   const args = call.rawInput === undefined ? undefined : inlineArguments(call.rawInput);
+  const preview = call.rawInput === undefined ? undefined : inputPreview(call.rawInput);
   const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
-  const hasBody =
-    locations.length > 0 || content.length > 0 || call.rawInput !== undefined || showOutput;
+  const waiting = permission !== undefined && permission.outcome === undefined;
 
   return (
-    <article className="lk-tool" data-status={status}>
-      <div className="lk-tool-head">
+    <details className="lk-tool" data-status={status} open={waiting}>
+      <summary className="lk-tool-head">
         <span className="lk-tool-title">{call.title}</span>
-        {call.name ? <span className="lk-tool-name">{call.name}</span> : null}
+        {call.name && call.name !== call.title ? (
+          <span className="lk-tool-name">{call.name}</span>
+        ) : null}
+        {preview === undefined ? null : <span className="lk-tool-preview">{preview}</span>}
         <span className="lk-tool-end">
           {call._meta?.["labkit.dev/reconstructed"] === true ? (
             <span
@@ -147,33 +155,39 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
           )}
           <span className={`lk-status ${status}`}>{STATUS_LABEL[status]}</span>
         </span>
-      </div>
-      {hasBody ? (
-        <div className="lk-tool-body">
-          {locations.length > 0 ? (
-            <div className="lk-locations">
-              {locations.map((l) => (l.line == null ? l.path : `${l.path}:${l.line}`)).join(", ")}
-            </div>
-          ) : null}
-          {args === undefined ? null : <ArgumentsLine args={args} />}
-          {content.map((item, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
-            <ToolContentView key={i} item={item} />
-          ))}
-          {args === undefined && call.rawInput !== undefined ? (
-            <details className="lk-raw">
-              <summary>Input</summary>
+      </summary>
+      <div className="lk-tool-body">
+        {locations.length > 0 ? (
+          <div className="lk-locations">
+            {locations.map((l) => (l.line == null ? l.path : `${l.path}:${l.line}`)).join(", ")}
+          </div>
+        ) : null}
+        {call.rawInput === undefined ? null : (
+          <section className="lk-tool-section">
+            <h4>Input</h4>
+            {args === undefined ? (
               <ValueView value={call.rawInput} />
-            </details>
-          ) : null}
-          {showOutput ? (
-            <details className="lk-raw">
-              <summary>Output</summary>
-              <ValueView value={call.rawOutput} />
-            </details>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
+            ) : (
+              <ArgumentsLine args={args} />
+            )}
+          </section>
+        )}
+        {content.length === 0 ? null : (
+          <section className="lk-tool-section">
+            <h4>Result</h4>
+            {content.map((item, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
+              <ToolContentView key={i} item={item} />
+            ))}
+          </section>
+        )}
+        {showOutput ? (
+          <details className="lk-raw">
+            <summary>Raw output</summary>
+            <ValueView value={call.rawOutput} />
+          </details>
+        ) : null}
+      </div>
+    </details>
   );
 }
