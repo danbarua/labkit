@@ -50,20 +50,28 @@
 		"check:web-types": "bun scripts/checks/check-web-types.ts",
 		"check:changed": "bun scripts/checks/check-changed.ts",
 		"docs:scenarios": "bun scripts/build/build-scenario-docs.ts",
-		"check:scenario-docs": "bun scripts/checks/check-scenario-docs.ts"
+		"check:scenario-docs": "bun scripts/checks/check-scenario-docs.ts",
+		"acp:dev": "bun packages/app-acp/cli.ts --config packages/app-acp/examples/vscode-workspace.ts",
+		"acp:build": "bun build packages/app-acp/cli.ts packages/app-acp/examples/vscode-workspace.ts --target=bun --splitting --sourcemap=external --outdir=packages/app-acp/dist",
+		"acp:start": "bun packages/app-acp/dist/cli.js --config packages/app-acp/dist/examples/vscode-workspace.js",
+		"acp:debug": "bun run acp:build && LABKIT_ACP_TEST_BUILT=1 LABKIT_ACP_KEEP_TRACE=1 LOGTAPE_TEST_MODE=always LOGTAPE_TEST_LOWEST_LEVEL=debug bun test packages/app-acp/stdio.test.ts packages/app-acp/observability-flow.test.ts",
+		"acp:logs": "bun packages/app-acp/logs.ts",
+		"test:agent": "bun test --timeout 20000 packages/core-agent packages/app-acp",
+		"test:agent:logs": "LOGTAPE_TEST_MODE=always LOGTAPE_TEST_LOWEST_LEVEL=debug bun run test:agent"
 	},
 	"private": true,
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.10",
+		"@biomejs/biome": "catalog:",
+		"@labkit/app-acp": "workspace:*",
 		"@labkit/app-cli": "workspace:*",
 		"@labkit/app-mcp": "workspace:*",
 		"@labkit/core-db": "workspace:*",
 		"@labkit/core-domain": "workspace:*",
-		"@types/bun": "latest",
-		"@types/pg": "^8.21.0",
+		"@types/bun": "catalog:",
+		"@types/pg": "catalog:",
 		"dependency-cruiser": "^18.2.0",
-		"drizzle-kit": "^0.30.6",
-		"typescript": "^6.0.3"
+		"drizzle-kit": "catalog:",
+		"typescript": "catalog:"
 	},
 	"peerDependencies": {
 		"typescript": ">=5"
@@ -72,17 +80,42 @@
 		"bun": ">=1.3.10"
 	},
 	"dependencies": {
-		"@electric-sql/pglite": "^0.5.7",
-		"@electric-sql/pglite-age": "^0.0.8",
-		"@electric-sql/pglite-tools": "^0.4.8",
-		"@modelcontextprotocol/sdk": "^1.30.0",
-		"commander": "^15.0.0",
-		"drizzle-orm": "^0.45.2",
-		"pg": "^8.23.0",
-		"picocolors": "^1.1.1",
-		"zod": "^4.4.3"
+		"@electric-sql/pglite": "catalog:",
+		"@electric-sql/pglite-age": "catalog:",
+		"@electric-sql/pglite-tools": "catalog:",
+		"@modelcontextprotocol/sdk": "catalog:",
+		"commander": "catalog:",
+		"drizzle-orm": "catalog:",
+		"pg": "catalog:",
+		"picocolors": "catalog:",
+		"zod": "catalog:"
 	},
-	"workspaces": [
-		"packages/*"
-	]
+	"workspaces": {
+		"packages": [
+			"packages/*"
+		],
+		"catalog": {
+			"@agentclientprotocol/sdk": "1.5.0",
+			"@biomejs/biome": "^2.5.14",
+			"@electric-sql/pglite": "^0.5.7",
+			"@electric-sql/pglite-age": "^0.0.8",
+			"@electric-sql/pglite-tools": "^0.4.8",
+			"@logtape/logtape": "^2.3.7",
+			"@logtape/testing-bun": "^2.3.7",
+			"@modelcontextprotocol/sdk": "1.30.1",
+			"@types/bun": "latest",
+			"@types/pg": "^8.21.0",
+			"@types/react": "^19.1.12",
+			"@types/react-dom": "^19.1.9",
+			"commander": "^15.0.0",
+			"drizzle-kit": "^0.30.6",
+			"drizzle-orm": "^0.45.2",
+			"pg": "^8.23.0",
+			"picocolors": "^1.1.1",
+			"react": "^19.1.1",
+			"react-dom": "^19.1.1",
+			"typescript": "^6.0.3",
+			"zod": "^4.6.5"
+		}
+	}
 }

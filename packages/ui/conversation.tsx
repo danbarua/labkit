@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef } from "react";
 import { AssistantMessage, Compaction, Notice, PlanView, Thought, UserMessage } from "./blocks";
 import { Composer } from "./composer";
+import { ConfigBar } from "./config-bar";
 import { fillPercent, formatCost } from "./format";
 import { PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
@@ -29,6 +30,8 @@ export interface ConversationProps {
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
   /** Leave unset to follow the system's light or dark setting. */
   readonly theme?: "light" | "dark";
+  /** Called when a configuration control changes. Without it the controls are shown read-only. */
+  readonly onSetConfig?: (configId: string, value: string | boolean) => void;
   /** The records prose may name, so a handle in a message becomes a chip. */
   readonly records?: RecordsConfig;
 }
@@ -86,6 +89,7 @@ export function Conversation({
   onAnswer,
   theme,
   records,
+  onSetConfig,
 }: ConversationProps) {
   const current = phase(state);
   const pending = pendingPermissions(state);
@@ -129,7 +133,18 @@ export function Conversation({
           </div>
         ) : null}
 
-        {onSend ? <Composer running={state.running} onSend={onSend} onCancel={onCancel} /> : null}
+        {state.configOptions && state.configOptions.length > 0 ? (
+          <ConfigBar options={state.configOptions} onSelect={onSetConfig} />
+        ) : null}
+
+        {onSend ? (
+          <Composer
+            running={state.running}
+            commands={state.commands}
+            onSend={onSend}
+            onCancel={onCancel}
+          />
+        ) : null}
       </section>
     </RecordsContext.Provider>
   );

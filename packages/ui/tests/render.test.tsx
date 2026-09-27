@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { FIXTURES } from "@labkit/acp-scenarios";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { renderToStaticMarkup } from "react-dom/server";
+import { commandsMatching } from "../composer";
 import { Conversation, type RecordsConfig } from "../index";
 
 async function draw(id: string, handlers = false): Promise<string> {
@@ -222,5 +223,114 @@ describe("records in prose", () => {
     const html = await said("z_o = mean_{i in o} on Q_1", { types: TYPES });
     expect(html.match(/lk-math/g)).toHaveLength(1);
     expect(html.match(/lk-handle/g)).toHaveLength(1);
+  });
+});
+
+describe("session configuration", () => {
+  const model = {
+    id: "model",
+    name: "Model",
+    type: "select" as const,
+    currentValue: "b",
+    options: [
+      { value: "a", name: "First" },
+      { value: "b", name: "Second" },
+    ],
+  };
+  const thinking = {
+    id: "thinking",
+    name: "Thinking",
+    type: "select" as const,
+    currentValue: "low",
+    options: [
+      { group: "g", name: "Effort", options: [{ value: "low", name: "Low" }] },
+      { group: "h", name: "Budget", options: [{ value: "1024", name: "1024 tokens" }] },
+    ],
+  };
+  const stream = { id: "stream", name: "Stream", type: "boolean" as const, currentValue: true };
+
+  const shown = async (configOptions: unknown[], props: Record<string, unknown> = {}) => {
+    const { reduce, initialState } = await import("@labkit/view-model");
+    const state = reduce(initialState, {
+      type: "update",
+      update: { sessionUpdate: "config_option_update", configOptions: configOptions as never },
+    });
+    return renderToStaticMarkup(<Conversation state={state} {...props} />);
+  };
+
+  test("a select shows every choice with the current one selected", async () => {
+    const html = await shown([model]);
+    expect(html).toContain("Model");
+    expect(html).toContain('<option value="b" selected="">Second</option>');
+    expect(html).toContain('<option value="a">First</option>');
+  });
+
+  test("grouped choices sit in labelled groups", async () => {
+    const html = await shown([thinking]);
+    expect(html).toContain('<optgroup label="Effort">');
+    expect(html).toContain('<optgroup label="Budget">');
+  });
+
+  test("a boolean option is a checkbox that is checked when the option is on", async () => {
+    const html = await shown([stream]);
+    expect(html).toContain('type="checkbox"');
+    expect(html).toContain('checked=""');
+  });
+
+  test("without a handler the controls are disabled, and with one they are not", async () => {
+    expect(await shown([model])).toContain("disabled");
+    expect(await shown([model], { onSetConfig: () => {} })).not.toContain("disabled");
+  });
+
+  test("no options, no bar", async () => {
+    expect(await shown([])).not.toContain("lk-config-bar");
+  });
+});
+
+describe("command suggestions", () => {
+  const commands = [
+    { name: "export", description: "Write the session as Markdown" },
+    { name: "review", description: "Review files" },
+  ];
+
+  test("a slash offers every command", () => {
+    expect(commandsMatching("/", commands).map((c) => c.name)).toEqual(["export", "review"]);
+  });
+
+  test("what follows the slash narrows the list", () => {
+    expect(commandsMatching("/ex", commands).map((c) => c.name)).toEqual(["export"]);
+    expect(commandsMatching("/x", commands)).toEqual([]);
+  });
+
+  test("nothing is offered once an argument is being typed, or for ordinary text", () => {
+    expect(commandsMatching("/export now", commands)).toEqual([]);
+    expect(commandsMatching("export", commands)).toEqual([]);
+    expect(commandsMatching("", commands)).toEqual([]);
+  });
+});
+
+describe("restored tool cards", () => {
+  const card = async (meta: Record<string, unknown> | undefined) => {
+    const { reduce, initialState } = await import("@labkit/view-model");
+    const state = reduce(initialState, {
+      type: "update",
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "c1",
+        title: "write_file",
+        status: "completed",
+        ...(meta === undefined ? {} : { _meta: meta }),
+      },
+    });
+    return renderToStaticMarkup(<Conversation state={state} />);
+  };
+
+  test("a card the agent rebuilt when the session was reopened says so", async () => {
+    expect(await card({ "labkit.dev/reconstructed": true })).toContain("restored");
+  });
+
+  test("a live card does not", async () => {
+    expect(await card(undefined)).not.toContain("restored");
+    expect(await card({ "labkit.dev/reconstructed": false })).not.toContain("restored");
   });
 });

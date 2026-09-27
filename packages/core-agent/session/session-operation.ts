@@ -1,0 +1,220 @@
+import { failure, type SessionId } from "../agent/types.ts";
+import { Actor, type Decision } from "../fsm/fsm.ts";
+import { diagnostic, diagnosticError } from "../logging/index.ts";
+import {
+  AppendResultSchema,
+  LoadResultSchema,
+  type AppendRequest,
+  type AppendResult,
+  type LoadResult,
+  type SessionPersistence,
+} from "./persistence.ts";
+
+/** Identity of one storage operation: an append, by append ID, or a load, by session ID. */
+export type StorageRef = Readonly<{ kind: "load" | "append"; id: string }>;
+
+/**
+ * State of one storage operation. `ready`: created, not started. `running`: the port call is in
+ * progress. `settled`: `result` is final. `cancellationRequested` means the port's AbortSignal was
+ * aborted; it does not certify that nothing was written.
+ */
+export type StorageState<T> =
+  | Readonly<{ status: "ready"; ref: StorageRef; cancellationRequested: boolean }>
+  | Readonly<{ status: "running"; ref: StorageRef; cancellationRequested: boolean }>
+  | Readonly<{ status: "settled"; ref: StorageRef; result: T }>;
+/** Based on agent/operation-actor.ts. Cancellation signals I/O but never certifies rollback. */
+function operation<T>(
+  ref: StorageRef,
+  run: (signal: AbortSignal) => Promise<T>,
+  failed: (error: unknown) => T,
+  sessionId: SessionId,
+) {
+  type Event = { type: "start" } | { type: "cancel" } | { type: "settled"; result: T };
+  type Command = { type: "run" } | { type: "cancel" } | { type: "notify"; result: T };
+  const controller = new AbortController();
+  let resolve!: (result: T) => void;
+  const result = new Promise<T>((done) => {
+    resolve = done;
+  });
+  const decide = (state: StorageState<T>, event: Event): Decision<StorageState<T>, Command> => {
+    if (state.status === "settled") return { state, commands: [] };
+    if (event.type === "cancel")
+      return { state: { ...state, cancellationRequested: true }, commands: [{ type: "cancel" }] };
+    if (event.type === "start" && state.status === "ready")
+      return {
+        state: { status: "running", ref, cancellationRequested: state.cancellationRequested },
+        commands: [{ type: "run" }],
+      };
+    if (event.type === "settled")
+      return {
+        state: { status: "settled", ref, result: event.result },
+        commands: [{ type: "notify", result: event.result }],
+      };
+    return { state, commands: [] };
+  };
+  const actor = new Actor<StorageState<T>, Event, Command>(
+    { status: "ready", ref, cancellationRequested: false },
+    decide,
+    (command) => {
+      if (command.type === "cancel") {
+        diagnostic("persistence", "debug", "storage.cancellation_requested", {
+          sessionId,
+          operation: ref.kind,
+          appendId: ref.kind === "append" ? ref.id : undefined,
+        });
+        controller.abort();
+      }
+      if (command.type === "notify") resolve(command.result);
+      if (command.type === "run")
+        void Promise.resolve()
+          .then(() => run(controller.signal))
+          .catch(failed)
+          .then((result) => actor.send({ type: "settled", result }));
+      return undefined;
+    },
+    (_, error) => ({ type: "settled", result: failed(error) }),
+  );
+  return {
+    get snapshot() {
+      return actor.snapshot;
+    },
+    result,
+    start: () => actor.send({ type: "start" }),
+    cancel: () => actor.send({ type: "cancel" }),
+  };
+}
+
+/**
+ * One `port.append` call as a storage operation. The call runs once `start()` is called; `result`
+ * resolves with its outcome and never rejects. A port that throws or answers malformed yields
+ * `indeterminate`, because the batch may have committed. `rejected` and `indeterminate` results
+ * carry a structured `persistence` failure.
+ *
+ * `cancel()` aborts the port's signal, before or during the call; only the adapter's result says
+ * whether anything was written. Neither method has an effect once the operation has settled.
+ */
+export function appendOperation(port: SessionPersistence, request: AppendRequest) {
+  const startedAt = performance.now();
+  return operation<AppendResult>(
+    { kind: "append", id: request.appendId },
+    async (signal) => {
+      diagnostic("persistence", "debug", "append.started", {
+        sessionId: request.sessionId,
+        appendId: request.appendId,
+        expectedRevision: request.expectedRevision,
+        count: request.records.length,
+      });
+      const raw = AppendResultSchema.parse(await port.append(request, signal));
+      const result =
+        raw.kind === "rejected" || raw.kind === "indeterminate"
+          ? {
+              ...raw,
+              error: failure(raw.error ?? raw.message, {
+                classification: "persistence",
+                operation: { id: request.appendId, kind: "append", sessionId: request.sessionId },
+                phase: "append",
+                details: { outcome: raw.kind, expectedRevision: request.expectedRevision },
+              }),
+            }
+          : raw;
+      diagnostic(
+        "persistence",
+        result.kind === "committed" ? "debug" : "warning",
+        "append.settled",
+        {
+          sessionId: request.sessionId,
+          appendId: request.appendId,
+          outcome: result.kind,
+          revision:
+            result.kind === "committed"
+              ? result.receipt.revision
+              : result.kind === "conflict"
+                ? result.revision
+                : undefined,
+          expectedRevision: request.expectedRevision,
+          durationMs: Math.round(performance.now() - startedAt),
+          ...("message" in result ? { reason: result.message, error: result.error } : {}),
+        },
+      );
+      return result;
+    },
+    (error) => {
+      diagnostic("persistence", "warning", "append.indeterminate", {
+        sessionId: request.sessionId,
+        appendId: request.appendId,
+        expectedRevision: request.expectedRevision,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: diagnosticError(error),
+        reason: "Append threw; commit outcome unknown until reconciliation",
+      });
+      const cause = failure(error, {
+        classification: "persistence",
+        operation: { id: request.appendId, kind: "append", sessionId: request.sessionId },
+        phase: "append",
+        details: { outcome: "indeterminate", expectedRevision: request.expectedRevision },
+      });
+      return { kind: "indeterminate", message: cause.message, error: cause };
+    },
+    request.sessionId,
+  );
+}
+
+/**
+ * One `port.load` call as a storage operation. The call runs once `start()` is called; `result`
+ * resolves with the committed batches, `not_found` or `failed`, and never rejects. A port that
+ * throws or answers malformed yields `failed`. Only the reply's shape is checked; journal integrity
+ * is checked by `replay`.
+ */
+export function loadOperation(port: SessionPersistence, sessionId: SessionId) {
+  const startedAt = performance.now();
+  return operation<LoadResult>(
+    { kind: "load", id: sessionId },
+    async (signal) => {
+      diagnostic("persistence", "debug", "load.started", { sessionId });
+      const raw = LoadResultSchema.parse(await port.load(sessionId, signal));
+      const result =
+        raw.kind === "failed"
+          ? {
+              ...raw,
+              error: failure(raw.error ?? raw.message, {
+                classification: "persistence",
+                operation: { id: sessionId, kind: "load", sessionId },
+                phase: "load",
+              }),
+            }
+          : raw;
+      diagnostic("persistence", result.kind === "failed" ? "warning" : "debug", "load.settled", {
+        sessionId,
+        outcome: result.kind,
+        revision: result.kind === "loaded" ? result.revision : undefined,
+        durationMs: Math.round(performance.now() - startedAt),
+        ...(result.kind === "failed" ? { reason: result.message, error: result.error } : {}),
+        ...(result.kind === "loaded" ? { batchCount: result.batches.length } : {}),
+      });
+      return result;
+    },
+    (error) => {
+      diagnostic("persistence", "warning", "load.failed", {
+        sessionId,
+        durationMs: Math.round(performance.now() - startedAt),
+        error: diagnosticError(error),
+      });
+      const cause = failure(error, {
+        classification: "persistence",
+        operation: { id: sessionId, kind: "load", sessionId },
+        phase: "load",
+      });
+      return { kind: "failed", message: cause.message, error: cause };
+    },
+    sessionId,
+  );
+}
+/**
+ * Loads a session's committed batches through one {@link loadOperation}. Resolves with its result
+ * and never rejects.
+ */
+export async function loadSession(port: SessionPersistence, sessionId: SessionId) {
+  const actor = loadOperation(port, sessionId);
+  await actor.start();
+  return actor.result;
+}

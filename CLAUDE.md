@@ -24,6 +24,13 @@ fresh worktree has no `node_modules`, so `typecheck` and `depcruise` fail with
 `TS2688: Cannot find type definition file for 'bun'`, which reads like a
 TypeScript problem and is not one.
 
+A dependency more than one package needs (`zod`, `react`, provider SDKs, dev
+tooling) is version-pinned once, in the root `package.json`'s
+`workspaces.catalog`, and every package's own `package.json` names it as
+`"catalog:"`. Bump the version in one place; `bun install` refuses a package
+that names a version instead. A dependency only one package needs stays local
+to that package's `package.json`.
+
 ## Commands
 
 ```sh
@@ -47,7 +54,12 @@ packages/core-db/       nodes and edges. All graph access goes through TenantGra
 packages/core-domain/   research actions. Verb-first: no createClaim(), only recordAnalysis().
 packages/app-mcp/       the agent surface.
 packages/app-cli/       the terminal surface. A composition root, nothing else.
+packages/core-agent/    durable, inspectable agent sessions: journal, projections, providers, effects.
+packages/app-acp/       the ACP agent: stdio and HTTP hosts, workspace tools, the launcher.
 ```
+
+The agent packages have their own guidance and reference in `docs/agent/`; start at
+`docs/agent/guidance.md`. `bun run test:agent` runs their tests.
 
 `packages/core-db/domain.ts` is the domain as graph structure — labels, edges, property
 shapes. `packages/core-domain/` is the domain as it matters to a researcher.

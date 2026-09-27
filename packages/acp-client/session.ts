@@ -29,6 +29,11 @@ export interface SessionClient {
   cancel(): Promise<void>;
   /** Answers a permission request the agent is waiting on. */
   answerPermission(requestId: string, outcome: acp.RequestPermissionOutcome): void;
+  /**
+   * Selects a configuration option, such as the model. The agent takes the selection at once and
+   * applies it between turns; the options it answers with come out through `onEvent`.
+   */
+  setConfigOption(configId: string, value: string | boolean): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -43,6 +48,12 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
   const open = new Map<string, (response: acp.RequestPermissionResponse) => void>();
   let requests = 0;
   let sessionId: string | undefined = options.sessionId;
+
+  const showConfigOptions = (configOptions: readonly acp.SessionConfigOption[]): void =>
+    onEvent({
+      type: "update",
+      update: { sessionUpdate: "config_option_update", configOptions: [...configOptions] },
+    });
 
   const answer = (requestId: string, outcome: acp.RequestPermissionOutcome): void => {
     const respond = open.get(requestId);
@@ -86,12 +97,20 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
       protocolVersion: acp.PROTOCOL_VERSION,
       clientCapabilities: {},
     });
+    let opened: { configOptions?: readonly acp.SessionConfigOption[] | null };
     if (sessionId === undefined) {
-      sessionId = (await agent.request(acp.methods.agent.session.new, { cwd, mcpServers: [] }))
-        .sessionId;
+      const created = await agent.request(acp.methods.agent.session.new, { cwd, mcpServers: [] });
+      sessionId = created.sessionId;
+      opened = created;
     } else {
-      await agent.request(acp.methods.agent.session.load, { sessionId, cwd, mcpServers: [] });
+      opened = await agent.request(acp.methods.agent.session.load, {
+        sessionId,
+        cwd,
+        mcpServers: [],
+      });
     }
+    // The options a session starts with come in the response to opening it, not as an update.
+    if (opened.configOptions) showConfigOptions(opened.configOptions);
   } catch (err) {
     connection.close(err);
     throw err;
@@ -115,6 +134,20 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
     },
     cancel: () => agent.notify(acp.methods.agent.session.cancel, { sessionId: id }),
     answerPermission: answer,
+    async setConfigOption(configId, value) {
+      try {
+        const { configOptions } = await agent.request(acp.methods.agent.session.setConfigOption, {
+          sessionId: id,
+          configId,
+          ...(typeof value === "boolean"
+            ? { type: "boolean" as const, value }
+            : { type: "id" as const, value }),
+        });
+        showConfigOptions(configOptions);
+      } catch (err) {
+        onEvent({ type: "failed", message: describeError(err) });
+      }
+    },
     async close() {
       for (const requestId of [...open.keys()]) answer(requestId, { outcome: "cancelled" });
       connection.close();

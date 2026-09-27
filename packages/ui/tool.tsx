@@ -117,6 +117,14 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         <span className="lk-tool-title">{call.title}</span>
         {call.name ? <span className="lk-tool-name">{call.name}</span> : null}
         <span className="lk-tool-end">
+          {call._meta?.["labkit.dev/reconstructed"] === true ? (
+            <span
+              className="lk-decision"
+              title="Rebuilt from the saved result when the session was reopened"
+            >
+              restored
+            </span>
+          ) : null}
           {decision === undefined ? null : (
             <span className={`lk-decision ${decision.tone}`}>{decision.label}</span>
           )}

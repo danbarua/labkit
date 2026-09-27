@@ -8,7 +8,7 @@
     "serve": "bun main.ts"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.5.0",
+    "@agentclientprotocol/sdk": "catalog:",
     "@labkit/acp-scenarios": "workspace:*"
   },
   "devDependencies": {
