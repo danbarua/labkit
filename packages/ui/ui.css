@@ -311,8 +311,96 @@
   font-size: 12px;
   user-select: none;
 }
-.lk-raw .lk-pre {
+.lk-raw > :not(summary) {
   margin-top: 6px;
+}
+
+/* a tool's input and result, drawn by shape */
+.lk-args {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+}
+.lk-args-value {
+  font-family: var(--lk-font-mono);
+  overflow-wrap: anywhere;
+}
+.lk-args-key {
+  margin-right: 6px;
+  color: var(--lk-muted);
+}
+.lk-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lk-muted {
+  color: var(--lk-muted);
+}
+.lk-scalar {
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+}
+.lk-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+}
+.lk-fields > div {
+  display: contents;
+}
+.lk-fields dt {
+  color: var(--lk-muted);
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.lk-fields dd {
+  margin: 0;
+  min-width: 0;
+}
+.lk-list {
+  margin: 0;
+  padding-left: 18px;
+}
+.lk-table-wrap {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--lk-line);
+  border-radius: 6px;
+}
+.lk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.lk-table th {
+  position: sticky;
+  top: 0;
+  background: var(--lk-surface);
+  color: var(--lk-muted);
+  font-weight: 500;
+  text-align: left;
+}
+.lk-table th,
+.lk-table td {
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--lk-line);
+  overflow-wrap: anywhere;
+}
+.lk-table tr:last-child td {
+  border-bottom: 0;
+}
+/* One scroll area for the whole value: a long result never makes the card taller than this, and
+   the blocks and tables inside it do not scroll on their own. */
+.lk-value {
+  max-height: 360px;
+  overflow: auto;
+}
+.lk-value .lk-pre,
+.lk-value .lk-table-wrap {
+  max-height: none;
 }
 .lk-img {
   display: block;

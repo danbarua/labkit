@@ -39,8 +39,11 @@ describe("the transcript", () => {
     expect(html).toContain("why CLM_3");
     expect(html).toContain("labkit_why");
     expect(html).toContain("lk-status completed");
-    expect(html).toContain("<summary>Input</summary>");
-    expect(html).toContain("&quot;handle&quot;: &quot;CLM_3&quot;");
+    // A one-field input is its value on one line, not a collapsed JSON block.
+    expect(html).toContain(
+      '<div class="lk-args"><span><code class="lk-args-value">CLM_3</code></span></div>',
+    );
+    expect(html).not.toContain("<summary>Input</summary>");
   });
 
   test("a failed tool says so", async () => {
