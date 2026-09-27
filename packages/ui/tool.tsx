@@ -118,10 +118,41 @@ function outputRepeatsContent(content: readonly ToolCallContent[], rawOutput: un
     : false;
 }
 
+/** A result that is seen rather than read, so its card is not closed over it. */
+const isShownNotRead = (item: ToolCallContent): boolean =>
+  item.type === "diff" || (item.type === "content" && item.content.type === "image");
+
+const RESTORED = "Rebuilt from the saved result when the session was reopened";
+
+/** Marks a call rebuilt from a saved session: an arrow turning back, with the reason on hover. */
+function RestoredMark() {
+  return (
+    <span className="lk-restored" role="img" aria-label={RESTORED} title={RESTORED}>
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path
+          d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v2.6h2.6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M8 5v3l2 1.3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
 /**
  * One tool call as a row that opens: what ran and on what, then its status. Opened, it shows the
- * input and the result. A call waiting on the person starts open, since they need to see what
- * they are being asked to allow.
+ * input and the result. A call starts open when there is something to look at rather than read:
+ * a request waiting on the person, or a result that is an image or a diff.
  */
 export function ToolCard({ call, permission }: { call: ToolCall; permission?: PermissionEntry }) {
   const status = call.status ?? "pending";
@@ -132,9 +163,10 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   const preview = call.rawInput === undefined ? undefined : inputPreview(call.rawInput);
   const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
   const waiting = permission !== undefined && permission.outcome === undefined;
+  const opensByDefault = waiting || content.some(isShownNotRead);
 
   return (
-    <details className="lk-tool" data-status={status} open={waiting}>
+    <details className="lk-tool" data-status={status} open={opensByDefault}>
       <summary className="lk-tool-head">
         <span className="lk-tool-title">{call.title}</span>
         {call.name && call.name !== call.title ? (
@@ -142,14 +174,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         ) : null}
         {preview === undefined ? null : <span className="lk-tool-preview">{preview}</span>}
         <span className="lk-tool-end">
-          {call._meta?.["labkit.dev/reconstructed"] === true ? (
-            <span
-              className="lk-decision"
-              title="Rebuilt from the saved result when the session was reopened"
-            >
-              restored
-            </span>
-          ) : null}
+          {call._meta?.["labkit.dev/reconstructed"] === true ? <RestoredMark /> : null}
           {decision === undefined ? null : (
             <span className={`lk-decision ${decision.tone}`}>{decision.label}</span>
           )}

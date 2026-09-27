@@ -298,6 +298,10 @@
   border-color: var(--lk-danger);
   background: var(--lk-danger-soft);
 }
+.lk-restored {
+  display: inline-flex;
+  color: var(--lk-muted);
+}
 .lk-decision {
   font-size: 12px;
   color: var(--lk-muted);

@@ -113,6 +113,34 @@ describe("a tool card", () => {
     expect(html).not.toContain("lk-tool-name");
   });
 
+  test("a call rebuilt from a saved session is marked by an icon that says so", () => {
+    const call = {
+      ...settled("list_dir", { path: "." }, { entries: [] }),
+      _meta: { "labkit.dev/reconstructed": true },
+    } as ToolCall;
+    const html = draw(call);
+    expect(html).toContain('class="lk-restored" role="img" aria-label="Rebuilt from the saved');
+    expect(html).not.toContain(">restored<");
+  });
+
+  test("a result that is an image or a diff starts open; text does not", () => {
+    const image = {
+      ...settled("plot", { handle: "COMP_5" }, "unused"),
+      content: [{ type: "content", content: { type: "image", mimeType: "image/png", data: "" } }],
+      rawOutput: undefined,
+    } as ToolCall;
+    const diff = {
+      ...settled("write_file", { path: "a.txt" }, "unused"),
+      content: [{ type: "diff", path: "a.txt", oldText: "a", newText: "b" }],
+      rawOutput: undefined,
+    } as ToolCall;
+    expect(draw(image)).toMatch(/^<details class="lk-tool"[^>]* open="">/);
+    expect(draw(diff)).toMatch(/^<details class="lk-tool"[^>]* open="">/);
+    expect(draw(settled("read_file", { path: "a" }, { text: "a" }))).not.toMatch(
+      /^<details[^>]* open=""/,
+    );
+  });
+
   test("a long input's row previews its first line", () => {
     const html = draw(settled("write_file", { path: "a.txt", text: "one\ntwo" }, "ok"));
     expect(html).toContain('<span class="lk-tool-preview">a.txt</span>');
