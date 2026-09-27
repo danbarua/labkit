@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 import { designAssets } from "./src/infra/design-assets";
 import { labkitDev } from "./src/infra/dev-plugin";
 import { agentBackend } from "./src/infra/agent-backend";
+import { transcripts } from "./src/infra/transcripts-plugin";
 
 const explorerPort = Number(process.env.LABKIT_PORT_EXPLORER ?? "8850");
 const apiPort = Number(process.env.LABKIT_PORT_WEB ?? "8899");
@@ -26,6 +27,7 @@ export default defineConfig(({ command, isPreview }) => ({
     react(),
     designAssets(),
     labkitDev(),
+    transcripts(),
     ...agent.plugins,
   ],
   resolve: {

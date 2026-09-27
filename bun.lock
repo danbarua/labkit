@@ -17,6 +17,7 @@
       },
       "devDependencies": {
         "@biomejs/biome": "catalog:",
+        "@labkit/acp-transcripts": "workspace:*",
         "@labkit/app-acp": "workspace:*",
         "@labkit/app-cli": "workspace:*",
         "@labkit/app-mcp": "workspace:*",
@@ -63,6 +64,13 @@
       "version": "0.0.0",
       "dependencies": {
         "@agentclientprotocol/sdk": "catalog:",
+      },
+    },
+    "packages/acp-transcripts": {
+      "name": "@labkit/acp-transcripts",
+      "version": "0.0.0",
+      "dependencies": {
+        "@labkit/view-model": "workspace:*",
       },
     },
     "packages/app-acp": {
@@ -133,6 +141,7 @@
       "name": "@labkit/app-web",
       "dependencies": {
         "@labkit/acp-client": "workspace:*",
+        "@labkit/acp-transcripts": "workspace:*",
         "@labkit/core-db": "workspace:*",
         "@labkit/core-domain": "workspace:*",
         "@labkit/ui": "workspace:*",
@@ -424,6 +433,8 @@
     "@labkit/acp-fake": ["@labkit/acp-fake@workspace:packages/acp-fake"],
 
     "@labkit/acp-scenarios": ["@labkit/acp-scenarios@workspace:packages/acp-scenarios"],
+
+    "@labkit/acp-transcripts": ["@labkit/acp-transcripts@workspace:packages/acp-transcripts"],
 
     "@labkit/app-acp": ["@labkit/app-acp@workspace:packages/app-acp"],
 

@@ -2,31 +2,61 @@ import { FIXTURES } from "@labkit/acp-scenarios";
 import { Conversation } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
-import type { TranscriptState } from "@labkit/view-model";
+import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { useEffect, useState } from "react";
 import { Bar } from "./Bar";
 
 type Theme = "system" | "light" | "dark";
 
+interface Entry {
+  readonly id: string;
+  readonly title: string;
+}
+
+/** `GET /transcripts`: `{id, title, description}` for each recorded session on disk. */
+async function transcriptList(signal: AbortSignal): Promise<Entry[]> {
+  const res = await fetch("/transcripts", { signal });
+  return (await res.json()) as Entry[];
+}
+
+/** `GET /transcripts/:id`: the recorded session whole, folded into a state the same way a live one is. */
+async function transcriptState(id: string, signal: AbortSignal): Promise<TranscriptState> {
+  const res = await fetch(`/transcripts/${id}`, { signal });
+  const { events } = (await res.json()) as { events: readonly ViewEvent[] };
+  return events.reduce(reduce, initialState);
+}
+
 /**
- * Every state in the shared corpus drawn at once: the surface to look at when a component changes,
- * and the same states the tests assert on. Handlers are wired to nothing, so nothing here sends.
+ * Every state in the shared corpus drawn at once: the scripted scenarios in `@labkit/acp-scenarios`
+ * (the surface to look at when a component changes, and what the tests assert on), and the real
+ * sessions in `@labkit/acp-transcripts` (fetched fresh from disk on every load, so hand-editing one
+ * of those files and reloading shows the change with no build). Handlers are wired to nothing, so
+ * nothing here sends.
  */
 export default function Gallery() {
+  const [entries, setEntries] = useState<readonly Entry[]>(FIXTURES);
   const [states, setStates] = useState<Record<string, TranscriptState>>({});
   const [theme, setTheme] = useState<Theme>("system");
 
   useEffect(() => {
-    let abandoned = false;
+    const controller = new AbortController();
     Promise.all(FIXTURES.map(async (f) => [f.id, await stateOfFixture(f)] as const)).then(
-      (entries) => {
-        if (!abandoned) setStates(Object.fromEntries(entries));
+      (loaded) => {
+        if (!controller.signal.aborted)
+          setStates((prev) => ({ ...prev, ...Object.fromEntries(loaded) }));
       },
     );
-    return () => {
-      abandoned = true;
-    };
+    transcriptList(controller.signal).then((list) => {
+      if (controller.signal.aborted) return;
+      setEntries([...FIXTURES, ...list]);
+      for (const { id } of list) {
+        transcriptState(id, controller.signal).then((state) => {
+          if (!controller.signal.aborted) setStates((prev) => ({ ...prev, [id]: state }));
+        });
+      }
+    });
+    return () => controller.abort();
   }, []);
 
   return (
@@ -52,12 +82,12 @@ export default function Gallery() {
           alignContent: "start",
         }}
       >
-        {FIXTURES.map((fixture) => {
-          const state = states[fixture.id];
+        {entries.map((entry) => {
+          const state = states[entry.id];
           return (
-            <section key={fixture.id} aria-label={fixture.title}>
+            <section key={entry.id} aria-label={entry.title}>
               <h3 style={{ margin: "0 0 6px", fontSize: 13 }}>
-                {fixture.title} <code style={{ color: "var(--text-dim)" }}>{fixture.id}</code>
+                {entry.title} <code style={{ color: "var(--text-dim)" }}>{entry.id}</code>
               </h3>
               <div style={{ height: 480, border: "1px solid var(--panel-border)" }}>
                 {state === undefined ? null : (
