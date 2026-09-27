@@ -2,11 +2,11 @@
 
 A read-only view of the LabKit research graph. Every response is JSON. Errors are `application/problem+json`.
 
-Machine-readable description: [/docs/openapi.json](/docs/openapi.json). Discovery: [/.well-known/api-catalog](/.well-known/api-catalog), [/sitemap.xml](/sitemap.xml).
+Machine-readable description: [/docs/openapi.json](/docs/openapi.json). Discovery: [/.well-known/api-catalog](/.well-known/api-catalog).
 
 ## Workspaces
 
-Everything below is scoped to a workspace, one research project's graph. Bare `/graph` and `/collections` are the default workspace. To read another, address it as `/workspace/{slug}`:
+Everything below is scoped to a workspace, one research project's graph. There is no default workspace: `/collections/workspace` lists them and every other path names one, as `/workspace/{slug}`:
 
 ```
 GET /workspace/{slug}                a workspace's collections, one per node type
@@ -14,18 +14,18 @@ GET /workspace/{slug}/{type}         one collection
 GET /workspace/{slug}/{id}           one entity
 ```
 
-- A workspace is a collection. `/collections/workspace` lists them, and each item's address is the workspace itself. That collection is offered from the default workspace only, since workspaces are not nested.
+- A workspace is a collection. `/collections/workspace` lists them, and each item's address is the workspace itself. It is offered at the API root only, since workspaces are not nested.
 - A slug that does not exist is a 404. A workspace never falls back to another one's data.
-- Links in a response keep you in the workspace you arrived by. `/workspace/{slug}/{id}` links to `/workspace/{slug}/…`, and the bare `/graph/{id}` links to the bare form.
+- Links in a response keep you in the workspace you arrived by. `/workspace/{slug}/{id}` links to `/workspace/{slug}/…`.
 - Inside a workspace a collection and an entity share a path level. A collection name is lower case and a handle is not, so a name is never both.
-- `/sitemap.xml` and `/.well-known/api-catalog` describe the default workspace only.
+- `/.well-known/api-catalog` describes the API root.
 
-## Entities: `/graph/{id}`
+## Entities: `/workspace/{slug}/{id}`
 
 An entity is addressed by its handle, a type prefix and a number (`Q_1`, `CLM_3`). `application/hal+json`.
 
 ```
-GET /graph/{id}?depth=1
+GET /workspace/{slug}/{id}?depth=1
 ```
 
 - The entity's own properties sit beside `id` and `type`.
@@ -55,13 +55,13 @@ GET /workspace/{slug}/{id}/events         what happened to one entity, change by
 - An act links to the entities it affected. `subject` is what the command addressed or created, and `touched` is everything else a change of it named.
 - `/{id}/events` is a document, not a resource, so it has no `self`. It rolls up the changes that name the entity, out of the acts that made them, so it lists changes and not acts. Each has the act it belongs to (`_links.parent`), its position in that act (`index`, from 1) and `dir`: `in` when an edge ends at the entity, `out` when one starts there, and `subject` when the change is to the entity itself. An act that was about the entity but changed nothing naming it is not listed; it is still in `/act`. The same events are also grouped as links, for navigating without reading the list: `acts:about` (the acts that changed the entity itself), `edgeCreated:in` and `edgeCreated:out` (the entity at the other end of each edge created). It pages by acts, so `limit` counts acts and not the changes they carry.
 
-## Collections: `/collections`
+## Collections: `/workspace/{slug}/{type}`
 
 `application/hal+json`. Entities listed by type. A collection is a document, not a resource, so it has no `type`: its `_links` say where it is and how to page, and the things it lists are under `_embedded`, in a group named for the collection.
 
 ```
-GET /collections            one collection per node type
-GET /collections/{type}     the live nodes of that type
+GET /workspace/{slug}          one collection per node type
+GET /workspace/{slug}/{type}   the live nodes of that type
     ?limit=25               1 to 200
     ?offset=0
     ?depth=0                0 to 6: hops of neighbours to embed in each item
@@ -70,11 +70,11 @@ GET /collections/{type}     the live nodes of that type
 - `self`, `next`, `prev` and `index` links do the paging and navigation. `next` is present only when there is more, and `prev` only after the first page. There is no total.
 - A query parameter the collection does not page by, such as `depth`, is carried unchanged onto every link in the response, so `?depth=1` on a collection gives `?depth=1` on each item, on `next` and on `index`. `limit` and `offset` are the only ones it rewrites.
 - Retracted nodes are not listed.
-- The index (`/collections`, `/workspace/{slug}`) lists `{slug, type}` under `_embedded.collection`. `/collections/workspace` lists `{slug, name}` under `_embedded.workspace`, each with a `self` link to that workspace.
+- The index (`/workspace/{slug}`) lists `{slug, type}` under `_embedded.collection`; at the API root (`/collections`) it lists only `workspace`. `/collections/workspace` lists `{slug, name}` under `_embedded.workspace`, each with a `self` link to that workspace.
 
 ### What an item carries
 
-An item is the entity resource that `/graph/{id}` returns for it, at the depth asked for: its own properties, a `_links` entry for every relation it has, and its neighbours under `_embedded` when `depth` is above 0. Nothing about the domain is written into this API by hand, so a type added or reshaped in the domain shows up here without a change.
+An item is the entity resource that `/workspace/{slug}/{id}` returns for it, at the depth asked for: its own properties, a `_links` entry for every relation it has, and its neighbours under `_embedded` when `depth` is above 0. Nothing about the domain is written into this API by hand, so a type added or reshaped in the domain shows up here without a change.
 
 | An item shows | Taken from |
 |---|---|

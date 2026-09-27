@@ -6,13 +6,7 @@ import {
 } from "./collections-handler";
 import { docsHandler } from "./docs-handler";
 import { eventsHandler, isEventsPath } from "./events-handler";
-import {
-  apiCatalogHandler,
-  graphHandler,
-  nodePath,
-  publicOrigin,
-  sitemapHandler,
-} from "./graph-handler";
+import { apiCatalogHandler, graphHandler, publicOrigin } from "./graph-handler";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -69,13 +63,13 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
 }
 
 // `/workspace/{slug}` is a workspace's collections, `/workspace/{slug}/{type}` one collection and
-// `/workspace/{slug}/{handle}` one node. The bare `/graph/{handle}` and `/collections…` are the
-// default workspace.
+// `/workspace/{slug}/{handle}` one node. There is no default workspace: `/collections/workspace`
+// lists them and every other path names one.
 const WORKSPACE_PATH = /^\/workspace\/([^/]+)(\/.*)?$/;
 
 async function inWorkspace(
   runtime: Runtime,
-  slug: string | undefined,
+  slug: string,
   work: (scope: TenantScope) => Promise<Response>,
 ): Promise<Response> {
   return (await withTenant(runtime, slug, work)) ?? notFound(`workspace ${slug} does not exist`);
@@ -117,7 +111,7 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
 
   if (path === "/collections" || path.startsWith("/collections/")) {
     console.debug("request: collections", path);
-    return inWorkspace(runtime, undefined, (scope) => rootCollectionsHandler(req, scope, path));
+    return rootCollectionsHandler(req, runtime, path);
   }
 
   if (path === "/.well-known/api-catalog") {
@@ -125,31 +119,13 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
     return apiCatalogHandler(req);
   }
 
-  if (path === "/sitemap.xml") {
-    console.debug("request: sitemap", path);
-    return inWorkspace(runtime, undefined, (scope) => sitemapHandler(req, scope));
-  }
-
-  if (/^\/graph\/?$/.test(path)) {
-    console.debug("request: graph without a handle, redirecting to the first question", path);
-    return Response.redirect(new URL(nodePath("", "Q_1"), publicOrigin(req)), 302);
-  }
-
-  const node = /^\/graph\/([^/]+)$/.exec(path)?.[1];
-  if (node !== undefined) {
-    console.debug("request: graph", path);
-    const id = decodeURIComponent(node);
-    return inWorkspace(runtime, undefined, (scope) => graphHandler(req, scope, id));
-  }
-
   if (path === "/") {
-    // `/api` is the HAL root for any Accept. `/` with HTML is the SPA and
-    // never reaches handle; if it does, still return the root document.
-    // const root = await loadRoot(runtime.graph);
-    // if (root == null) return notFound("no pose question in this graph");
-    // return hal(root);
-    console.debug("request: root", path);
-    return Response.redirect("/graph/Q_1", 302);
+    console.debug("request: root, redirecting to the workspaces", path);
+    return Response.redirect(new URL("/collections/workspace", publicOrigin(req)), 302);
+  }
+
+  if (path === "/graph" || path.startsWith("/graph/") || path === "/sitemap.xml") {
+    return notFound(`${path} names no workspace. Address it inside one: /workspace/{slug}/…`);
   }
 
   // const parts = path.split("/").filter((part) => part.length > 0);

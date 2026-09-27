@@ -5,10 +5,9 @@ import type { TenantScope } from "./runtime";
 const DEFAULT_DEPTH = 1;
 export const MAX_DEPTH = 6;
 
-// Where a node lives: the default workspace keeps it under `/graph`, any other workspace addresses
-// it directly under its own path.
+// Where a node lives: directly under its workspace's path.
 export function nodePath(prefix: string, id: string): string {
-  return prefix === "" ? `/graph/${id}` : `${prefix}/${id}`;
+  return `${prefix}/${id}`;
 }
 
 // The address the graph query gives a node, before it is made absolute.
@@ -76,11 +75,8 @@ export async function graphHandler(
     // The collection this node is listed in, carrying the same parameters as every other link.
     const collection = collectionPath(scope.prefix, slugFor(resource.type as NodeLabel));
     links.index = { href: `${publicOrigin(req).origin}${collection}?${search}` };
-    // Only a workspace has an event log to read.
-    if (scope.prefix !== "") {
-      const events = `${nodePath(scope.prefix, id)}/${EVENTS_SEGMENT}`;
-      links.events = { href: `${publicOrigin(req).origin}${events}?${search}` };
-    }
+    const events = `${nodePath(scope.prefix, id)}/${EVENTS_SEGMENT}`;
+    links.events = { href: `${publicOrigin(req).origin}${events}?${search}` };
 
     return new Response(JSON.stringify(resource), {
       status: 200,
@@ -95,15 +91,6 @@ export async function graphHandler(
   }
 }
 
-function xmlEscape(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
 // Behind the tunnel the request URL says http; the forwarded header says what the crawler used.
 export function publicOrigin(req: Request): URL {
   const url = new URL(req.url);
@@ -112,39 +99,12 @@ export function publicOrigin(req: Request): URL {
   return new URL(`${proto}://${url.host}`);
 }
 
-// Every live Question is an entry point into /graph; the rest of the graph is reached by following links.
-export async function sitemapHandler(req: Request, scope: TenantScope): Promise<Response> {
-  const result = await scope.query<{ id: string }>(`
-        SELECT trim(both '"' FROM natural_id::text) AS id
-        FROM ag_catalog.cypher(
-            '${scope.graphName}'::name,
-            $$MATCH (n:Question)
-              WHERE n.retracted IS NULL
-              RETURN n.natural_id
-              ORDER BY n.natural_id$$
-        ) AS node(natural_id ag_catalog.agtype)
-    `);
-  const origin = publicOrigin(req).origin;
-  const paths = [
-    "/docs/",
-    "/docs/api.md",
-    "/collections",
-    ...result.rows.map((row) => nodePath(scope.prefix, row.id)),
-  ];
-  const urls = paths.map((p) => `  <url><loc>${xmlEscape(origin + p)}</loc></url>`).join("\n");
-  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
-  return new Response(body, {
-    status: 200,
-    headers: { "content-type": "application/xml" },
-  });
-}
-
 // RFC 9727: one linkset entry per API.
 export function apiCatalogHandler(req: Request): Response {
   const origin = publicOrigin(req).origin;
   const catalog = {
     linkset: [
-      ...["/graph", "/collections"].map((anchor) => ({
+      ...["/collections"].map((anchor) => ({
         anchor: `${origin}${anchor}`,
         "service-desc": [{ href: `${origin}/docs/openapi.json`, type: "application/openapi+json" }],
         "service-doc": [{ href: `${origin}/docs/`, type: "text/markdown" }],

@@ -52,7 +52,7 @@ function decode(node: WireNode): Resource {
   return { id: node.id, type: node.type, properties, neighbors };
 }
 
-/** The API's path for a workspace: the default workspace is addressed by its slug like any other. */
+/** The API's path for a workspace. */
 export function workspacePath(workspace: string): string {
   return `/workspace/${encodeURIComponent(workspace)}`;
 }

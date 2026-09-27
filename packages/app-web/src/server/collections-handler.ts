@@ -7,11 +7,11 @@ import {
   problem,
   publicOrigin,
 } from "./graph-handler";
-import type { TenantScope } from "./runtime";
+import { listWorkspaces, type Runtime, type TenantScope, type Workspace } from "./runtime";
 
 const HAL_JSON = "application/hal+json";
 
-// Not a node type: workspaces are the tenants, and only the default workspace can see them all.
+// Not a node type: workspaces are the tenants, listed at the API root.
 const WORKSPACE_SLUG = "workspace";
 
 // Inside a workspace a collection and a node sit at the same path level. A handle such as `Q_1`
@@ -82,14 +82,8 @@ export function linksOf(links: { rel: string; href: string }[]): Record<string, 
   return Object.fromEntries(links.map(({ rel, href }) => [rel, { href }]));
 }
 
-// The index lists one collection per node type, and the workspaces from the default workspace.
-function index(req: Request, root: string, withWorkspaces: boolean): Response {
-  const entries = [
-    ...NODE_LABELS.map((label) => ({ slug: slugFor(label), type: label as string })),
-    ...(withWorkspaces
-      ? [{ slug: WORKSPACE_SLUG, type: "Workspace" }]
-      : [{ slug: ACT_SLUG, type: ACT_TYPE }]),
-  ];
+// An index lists collections: the workspaces at the API root, one per node type in a workspace.
+function index(req: Request, root: string, entries: { slug: string; type: string }[]): Response {
   return halJson(req, {
     _links: { self: { href: root } },
     _embedded: {
@@ -179,12 +173,16 @@ async function listing(
 
 // `/collections/workspace`: each workspace. A workspace is a collection, and its address is its
 // index.
-async function workspaceListing(req: Request, scope: TenantScope, root: string): Promise<Response> {
+async function workspaceListing(
+  req: Request,
+  workspaces: Workspace[],
+  root: string,
+): Promise<Response> {
   const url = new URL(req.url);
   const origin = publicOrigin(req).origin;
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
-  const rows = (await scope.workspaces()).slice(offset, offset + limit + 1);
+  const rows = workspaces.slice(offset, offset + limit + 1);
   const page = rows.slice(0, limit);
 
   const self = `${root}/${WORKSPACE_SLUG}`;
@@ -206,31 +204,42 @@ async function workspaceListing(req: Request, scope: TenantScope, root: string):
   });
 }
 
-// The collection called `name`, or the index when it is empty. `root` is where this workspace's
-// collections are addressed from; only the root handler offers the workspaces.
+// The collection called `name` in one workspace, or its index when it is empty.
 function serve(
   req: Request,
   scope: TenantScope,
   root: string,
   name: string,
-  withWorkspaces: boolean,
 ): Promise<Response> | Response {
-  if (name === "") return index(req, root, withWorkspaces);
-  if (name === WORKSPACE_SLUG && withWorkspaces) return workspaceListing(req, scope, root);
+  if (name === "") {
+    const entries = [
+      ...NODE_LABELS.map((label) => ({ slug: slugFor(label), type: label as string })),
+      { slug: ACT_SLUG, type: ACT_TYPE },
+    ];
+    return index(req, root, entries);
+  }
 
   const label = LABEL_BY_SLUG.get(name);
   if (label === undefined) return problem(404, "Not Found", `${name} is not a collection`);
   return listing(req, scope, root, label);
 }
 
-// `/collections` and `/collections/{type}`: the default workspace, and the list of workspaces.
+// `/collections` and `/collections/workspace`: the API root, which lists the workspaces. It names
+// no workspace, so every other collection is addressed inside one.
 export async function rootCollectionsHandler(
   req: Request,
-  scope: TenantScope,
+  runtime: Runtime,
   path: string,
 ): Promise<Response> {
   const name = path.replace(/^\/collections\/?/, "").replace(/\/$/, "");
-  return serve(req, scope, `${publicOrigin(req).origin}/collections`, name, true);
+  const root = `${publicOrigin(req).origin}/collections`;
+  if (name === "") return index(req, root, [{ slug: WORKSPACE_SLUG, type: "Workspace" }]);
+  if (name === WORKSPACE_SLUG) return workspaceListing(req, await listWorkspaces(runtime), root);
+  return problem(
+    404,
+    "Not Found",
+    `${path} names no workspace. Address a collection inside one: /workspace/{slug}/${name}`,
+  );
 }
 
 // `/workspace/{slug}` and `/workspace/{slug}/{type}`. `rest` is what follows the slug.
@@ -240,5 +249,5 @@ export async function workspaceCollectionsHandler(
   rest: string,
 ): Promise<Response> {
   const name = rest.replace(/^\//, "").replace(/\/$/, "");
-  return serve(req, scope, `${publicOrigin(req).origin}${scope.prefix}`, name, false);
+  return serve(req, scope, `${publicOrigin(req).origin}${scope.prefix}`, name);
 }
