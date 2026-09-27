@@ -1,30 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="lk-root">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Trace Console</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="icon" type="image/svg+xml" href="design/favicon.svg" />
+<link rel="stylesheet" href="design/tokens.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet" />
 <style>
+  /* The palette comes from design/tokens.css; these names alias it. */
   :root{
-    --ink:#0b1220;
-    --panel:#1e2a44;
-    --panel-2:#162036;
-    --line:rgb(248 250 252 / 12%);
-    --text:#f8fafc;
-    --text-dim:#94a3b8;
-    --text-faint:#64748b;
-    --accent:#14b8a6;
-    --accent-dim:rgba(20,184,166,0.14);
-    --danger:#f87171;
-    --primary:#14b8a6;
-    --primary-foreground:#0b1220;
-    --font-sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
-    --font-wordmark:"Outfit","Inter",ui-sans-serif,sans-serif;
+    --ink:var(--lk-bg);
+    --panel:var(--lk-panel);
+    --panel-2:var(--lk-panel-2);
+    --line:var(--lk-line);
+    --text:var(--lk-text);
+    --text-dim:var(--lk-muted);
+    --text-faint:var(--lk-faint);
+    --accent:var(--lk-accent);
+    --accent-dim:var(--lk-accent-dim);
+    --danger:var(--lk-danger);
+    --primary:var(--lk-primary);
+    --primary-foreground:var(--lk-primary-text);
+    --font-sans:var(--lk-font-sans);
+    --font-mono:var(--lk-font-mono);
+    --font-wordmark:var(--lk-font-wordmark);
 
     --c-question:#a78bfa;
     --c-lineofenquiry:#7c9bf5;
@@ -42,22 +44,6 @@
     --c-note:#fda4af;
     --c-workspace:#a3e635;
     --c-act:#8592b0;
-  }
-  @media (prefers-color-scheme: light){
-    :root:not([data-theme="dark"]){
-      --ink:#f8fafc; --panel:#ffffff; --panel-2:#eef2f6; --line:#e2e8f0;
-      --text:#0b1220; --text-dim:#5c6b82; --text-faint:#94a3b8;
-      --accent:#14b8a6; --accent-dim:rgba(20,184,166,0.10);
-      --danger:#dc2626;
-      --primary:#0b1220; --primary-foreground:#f8fafc;
-    }
-  }
-  :root[data-theme="light"]{
-    --ink:#f8fafc; --panel:#ffffff; --panel-2:#eef2f6; --line:#e2e8f0;
-    --text:#0b1220; --text-dim:#5c6b82; --text-faint:#94a3b8;
-    --accent:#14b8a6; --accent-dim:rgba(20,184,166,0.10);
-    --danger:#dc2626;
-    --primary:#0b1220; --primary-foreground:#f8fafc;
   }
 
   *{box-sizing:border-box;}
@@ -342,16 +328,7 @@
   <header class="topbar">
     <button class="hamburger" id="hamburger" aria-label="Toggle collections column">☰</button>
     <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 64 72" fill="none" aria-hidden="true">
-        <g fill="none" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
-          <path d="M23.2 6h17.6v4.4h-2.8V20.2L52.4 55.4A7.4 7.4 0 0 1 45.4 66H18.6A7.4 7.4 0 0 1 11.6 55.4L26 20.2V10.4h-2.8V6Z" stroke-width="3.25"/>
-          <path d="M15.36 46.2H19.61" stroke-width="2.35"/>
-          <circle cx="22.96" cy="46.2" r="3.35" fill="currentColor" stroke="none"/>
-          <path d="M25.53 44.05 32.51 38.24" stroke-width="2.35"/>
-          <circle cx="36.16" cy="35.2" r="2.7" stroke-width="2.35"/>
-          <circle cx="36.16" cy="56.8" r="2.7" stroke-width="2.35"/>
-        </g>
-      </svg>
+      <img class="brand-mark" src="design/mark.svg" alt="" />
       <span class="brand-name">Trace Console</span>
       <span class="brand-sub" id="brand-sub"></span>
     </div>

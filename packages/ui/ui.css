@@ -1,4 +1,4 @@
-@import "./tokens.css";
+@import "@labkit/design/tokens.css";
 
 .lk-root {
   display: flex;
