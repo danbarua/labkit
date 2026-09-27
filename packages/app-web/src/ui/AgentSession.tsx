@@ -77,17 +77,24 @@ function useAgentSession(url: string, cwd?: string) {
  */
 export default function AgentSession() {
   const cwd = import.meta.env.VITE_LABKIT_ACP_CWD as string | undefined;
+  const real = cwd !== undefined;
   const { state, status, send, cancel, answer, setConfig } = useAgentSession("/acp", cwd);
   return (
     <>
       <Bar />
       <div style={{ padding: "8px 16px", color: "var(--text-dim)", fontSize: 12 }}>
-        Fake agent ({status}). Try{" "}
-        {SCENARIOS.map((s) => (
-          <code key={s.id} style={{ marginRight: 8 }}>
-            /scenario {s.id}
-          </code>
-        ))}
+        {real ? (
+          `Agent (${status})`
+        ) : (
+          <>
+            Fake agent ({status}). Try{" "}
+            {SCENARIOS.map((s) => (
+              <code key={s.id} style={{ marginRight: 8 }}>
+                /scenario {s.id}
+              </code>
+            ))}
+          </>
+        )}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <Conversation
