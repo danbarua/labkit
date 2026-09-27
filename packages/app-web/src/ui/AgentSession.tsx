@@ -50,7 +50,12 @@ function useAgentSession(url: string) {
       client.current?.answerPermission(requestId, outcome),
     [],
   );
-  return { state, status, send, cancel, answer };
+  const setConfig = useCallback(
+    (configId: string, value: string | boolean) =>
+      void client.current?.setConfigOption(configId, value),
+    [],
+  );
+  return { state, status, send, cancel, answer, setConfig };
 }
 
 /**
@@ -58,7 +63,7 @@ function useAgentSession(url: string) {
  * a scripted turn for each prompt, and a prompt of `/scenario <id>` picks which.
  */
 export default function AgentSession() {
-  const { state, status, send, cancel, answer } = useAgentSession("/acp");
+  const { state, status, send, cancel, answer, setConfig } = useAgentSession("/acp");
   return (
     <>
       <Bar />
@@ -77,6 +82,7 @@ export default function AgentSession() {
           onSend={send}
           onCancel={cancel}
           onAnswer={answer}
+          onSetConfig={setConfig}
         />
       </div>
     </>

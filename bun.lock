@@ -77,6 +77,8 @@
         "zod": "^4.6.5",
       },
       "devDependencies": {
+        "@labkit/acp-client": "workspace:*",
+        "@labkit/view-model": "workspace:*",
         "@logtape/testing-bun": "^2.3.7",
       },
     },

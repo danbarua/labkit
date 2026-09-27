@@ -28,6 +28,8 @@
     "bun": ">=1.3.0"
   },
   "devDependencies": {
+    "@labkit/acp-client": "workspace:*",
+    "@labkit/view-model": "workspace:*",
     "@logtape/testing-bun": "^2.3.7"
   }
 }

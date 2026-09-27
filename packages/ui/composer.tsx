@@ -1,12 +1,28 @@
+import type { AvailableCommand } from "@agentclientprotocol/sdk";
 import { type KeyboardEvent, useState } from "react";
 
-/** The box the person types a prompt in. Enter sends; Shift+Enter adds a line. */
+/** The commands whose name starts what has been typed after a leading slash, before any argument. */
+export function commandsMatching(
+  text: string,
+  commands: readonly AvailableCommand[],
+): AvailableCommand[] {
+  const typed = /^\/(\S*)$/.exec(text);
+  if (typed === null) return [];
+  return commands.filter((command) => command.name.startsWith(typed[1] ?? ""));
+}
+
+/**
+ * The box the person types a prompt in. Enter sends; Shift+Enter adds a line. Typing `/` offers the
+ * agent's commands.
+ */
 export function Composer({
   running,
+  commands = [],
   onSend,
   onCancel,
 }: {
   running: boolean;
+  commands?: readonly AvailableCommand[];
   onSend: (text: string) => void;
   onCancel?: (() => void) | undefined;
 }) {
@@ -23,6 +39,7 @@ export function Composer({
       send();
     }
   };
+  const offered = commandsMatching(text, commands);
   return (
     <form
       className="lk-composer"
@@ -31,6 +48,17 @@ export function Composer({
         send();
       }}
     >
+      {offered.length > 0 ? (
+        <ul className="lk-commands" aria-label="Commands">
+          {offered.map((command) => (
+            <li key={command.name}>
+              <button type="button" onClick={() => setText(`/${command.name} `)}>
+                <code>/{command.name}</code> <span>{command.description}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <textarea
         name="message"
         aria-label="Message"
