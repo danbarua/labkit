@@ -1,5 +1,6 @@
 import type { ContentBlock, ToolCall, ToolCallContent } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
+import { CaretRightIcon, ClockCounterClockwiseIcon } from "@phosphor-icons/react";
 import { diffLines, STATUS_LABEL } from "./format";
 import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
 
@@ -124,27 +125,11 @@ const isShownNotRead = (item: ToolCallContent): boolean =>
 
 const RESTORED = "Rebuilt from the saved result when the session was reopened";
 
-/** Marks a call rebuilt from a saved session: an arrow turning back, with the reason on hover. */
+/** Marks a call rebuilt from a saved session, with the reason on hover. */
 function RestoredMark() {
   return (
     <span className="lk-restored" role="img" aria-label={RESTORED} title={RESTORED}>
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-        <path
-          d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v2.6h2.6"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M8 5v3l2 1.3"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-        />
-      </svg>
+      <ClockCounterClockwiseIcon aria-hidden="true" />
     </span>
   );
 }
@@ -168,6 +153,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   return (
     <details className="lk-tool" data-status={status} open={opensByDefault}>
       <summary className="lk-tool-head">
+        <CaretRightIcon className="lk-tool-caret" aria-hidden="true" />
         <span className="lk-tool-title">{call.title}</span>
         {call.name && call.name !== call.title ? (
           <span className="lk-tool-name">{call.name}</span>

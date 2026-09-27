@@ -237,14 +237,12 @@
 .lk-tool-head::-webkit-details-marker {
   display: none;
 }
-.lk-tool-head::before {
-  content: "›";
+.lk-tool-caret {
   flex: none;
-  width: 10px;
   color: var(--lk-muted);
   transition: transform 120ms ease;
 }
-.lk-tool[open] > .lk-tool-head::before {
+.lk-tool[open] > .lk-tool-head > .lk-tool-caret {
   transform: rotate(90deg);
 }
 .lk-tool-head:hover {
