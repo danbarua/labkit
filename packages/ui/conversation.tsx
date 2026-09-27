@@ -12,6 +12,7 @@ import { AssistantMessage, Compaction, Notice, PlanView, Thought, UserMessage } 
 import { Composer } from "./composer";
 import { fillPercent, formatCost } from "./format";
 import { PermissionPrompt } from "./permission";
+import { type RecordsConfig, RecordsContext } from "./records-context";
 import { ToolCard } from "./tool";
 
 const PHASE_LABEL: Record<Phase, string> = {
@@ -28,6 +29,8 @@ export interface ConversationProps {
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
   /** Leave unset to follow the system's light or dark setting. */
   readonly theme?: "light" | "dark";
+  /** The records prose may name, so a handle in a message becomes a chip. */
+  readonly records?: RecordsConfig;
 }
 
 function BlockView({ block, state }: { block: Block; state: TranscriptState }) {
@@ -76,49 +79,58 @@ function useStickToBottom(dependency: unknown) {
   return { ref, onScroll };
 }
 
-export function Conversation({ state, onSend, onCancel, onAnswer, theme }: ConversationProps) {
+export function Conversation({
+  state,
+  onSend,
+  onCancel,
+  onAnswer,
+  theme,
+  records,
+}: ConversationProps) {
   const current = phase(state);
   const pending = pendingPermissions(state);
   const { ref, onScroll } = useStickToBottom(state);
   const usage = state.usage;
 
   return (
-    <section className="lk-root" {...(theme ? { "data-theme": theme } : {})}>
-      <header className="lk-header">
-        <h2 className="lk-title">{state.title ?? "New session"}</h2>
-        <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
-        <div className="lk-header-end">
-          {usage === undefined ? null : (
-            <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>
-              <span className="lk-meter-bar">
-                <span style={{ width: `${fillPercent(usage.used, usage.size)}%` }} />
+    <RecordsContext.Provider value={records}>
+      <section className="lk-root" {...(theme ? { "data-theme": theme } : {})}>
+        <header className="lk-header">
+          <h2 className="lk-title">{state.title ?? "New session"}</h2>
+          <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
+          <div className="lk-header-end">
+            {usage === undefined ? null : (
+              <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>
+                <span className="lk-meter-bar">
+                  <span style={{ width: `${fillPercent(usage.used, usage.size)}%` }} />
+                </span>
+                {fillPercent(usage.used, usage.size)}%
+                {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
               </span>
-              {fillPercent(usage.used, usage.size)}%
-              {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
-            </span>
-          )}
-        </div>
-      </header>
+            )}
+          </div>
+        </header>
 
-      <div className="lk-log" ref={ref} onScroll={onScroll} role="log" aria-live="polite">
-        <div className="lk-blocks">
-          {state.blocks.length === 0 ? <div className="lk-empty">Nothing here yet.</div> : null}
-          {state.blocks.map((block, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: blocks are appended, never reordered
-            <BlockView key={i} block={block} state={state} />
-          ))}
+        <div className="lk-log" ref={ref} onScroll={onScroll} role="log" aria-live="polite">
+          <div className="lk-blocks">
+            {state.blocks.length === 0 ? <div className="lk-empty">Nothing here yet.</div> : null}
+            {state.blocks.map((block, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: blocks are appended, never reordered
+              <BlockView key={i} block={block} state={state} />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {pending.length > 0 ? (
-        <div className="lk-permissions">
-          {pending.map((entry) => (
-            <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
-          ))}
-        </div>
-      ) : null}
+        {pending.length > 0 ? (
+          <div className="lk-permissions">
+            {pending.map((entry) => (
+              <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
+            ))}
+          </div>
+        ) : null}
 
-      {onSend ? <Composer running={state.running} onSend={onSend} onCancel={onCancel} /> : null}
-    </section>
+        {onSend ? <Composer running={state.running} onSend={onSend} onCancel={onCancel} /> : null}
+      </section>
+    </RecordsContext.Provider>
   );
 }

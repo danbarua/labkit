@@ -515,3 +515,71 @@
     transition: none !important;
   }
 }
+
+/* maths and record handles in prose */
+.lk-math {
+  font-family: var(--lk-font-mono);
+  font-style: italic;
+  font-size: 0.95em;
+  color: var(--lk-accent-text);
+}
+.lk-handle {
+  --lk-chip: var(--lk-faint);
+  display: inline;
+  padding: 0 5px;
+  border: 1px solid var(--lk-chip);
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font-family: var(--lk-font-mono);
+  font-size: 0.9em;
+  line-height: inherit;
+}
+button.lk-handle {
+  cursor: pointer;
+}
+button.lk-handle:hover {
+  background: var(--lk-accent-soft);
+}
+.lk-handle[data-type="Question"] {
+  --lk-chip: #8b5cf6;
+}
+.lk-handle[data-type="LineOfEnquiry"] {
+  --lk-chip: #4f6fe0;
+}
+.lk-handle[data-type="Decision"] {
+  --lk-chip: #d97706;
+}
+.lk-handle[data-type="Evidence"] {
+  --lk-chip: #0ea5e9;
+}
+.lk-handle[data-type="EvidenceUnit"] {
+  --lk-chip: #14b8a6;
+}
+.lk-handle[data-type="Computation"] {
+  --lk-chip: #16a34a;
+}
+.lk-handle[data-type="Artefact"] {
+  --lk-chip: #64748b;
+}
+.lk-handle[data-type="Claim"] {
+  --lk-chip: #e11d48;
+}
+.lk-handle[data-type="Criterion"] {
+  --lk-chip: #c026d3;
+}
+.lk-handle[data-type="CriterionEvaluation"] {
+  --lk-chip: #db2777;
+}
+.lk-handle[data-type="Gate"] {
+  --lk-chip: #dc2626;
+}
+.lk-handle[data-type="Task"] {
+  --lk-chip: #059669;
+}
+.lk-handle[data-type="Review"] {
+  --lk-chip: #ca8a04;
+}
+.lk-handle[data-type="Note"] {
+  --lk-chip: #f43f5e;
+}
