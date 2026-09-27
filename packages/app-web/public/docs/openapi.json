@@ -3,13 +3,197 @@
   "info": {
     "title": "LabKit graph API",
     "version": "1.0.0",
-    "description": "Read-only HAL+JSON view of the LabKit research graph. Each resource embeds its neighbours under `_embedded`, keyed `relation:type` for outbound links and `type:relation` for inbound ones. `/collections` lists entities by type, also as HAL+JSON: the items are under `_embedded` and `_links` page through them. Everything is scoped to a workspace: bare `/graph` and `/collections` are the default one, and `/workspace/{slug}` selects another, where an entity is addressed as `/workspace/{slug}/{handle}`."
+    "description": "Read-only HAL+JSON view of the LabKit research graph. Each resource embeds its neighbours under `_embedded`, keyed `relation:type` for outbound links and `type:relation` for inbound ones. Collections list entities by type, also as HAL+JSON: the items are under `_embedded` and `_links` page through them. There is no default workspace. `/collections/workspace` lists the workspaces, and everything else is addressed inside one: `/workspace/{slug}`, `/workspace/{slug}/{type}` and `/workspace/{slug}/{handle}`."
   },
   "paths": {
-    "/graph/{id}": {
+    "/collections": {
+      "get": {
+        "summary": "The API root: the workspaces collection",
+        "responses": {
+          "200": {
+            "description": "A HAL document naming the `workspace` collection.",
+            "content": {
+              "application/hal+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/collections/workspace": {
+      "get": {
+        "summary": "Every workspace",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
+            "content": {
+              "application/hal+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unknown type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/{slug}": {
+      "get": {
+        "summary": "A workspace's collections: one per node type",
+        "responses": {
+          "200": {
+            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
+            "content": {
+              "application/hal+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "A workspace slug from /collections/workspace.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/workspace/{slug}/{type}": {
+      "get": {
+        "summary": "The live nodes of one type, each as an entity resource",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The workspace's slug, from /collections/workspace.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "description": "A slug from the workspace index, e.g. question, claim, evidence-unit.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "required": false,
+            "description": "Hops of neighbours to embed in each item, 0 to 6. Carried on every link in the response.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
+            "content": {
+              "application/hal+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Unknown type.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace/{slug}/{id}": {
       "get": {
         "summary": "One graph entity and its neighbours",
         "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "The workspace's slug, from /collections/workspace.",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "id",
             "in": "path",
@@ -75,94 +259,6 @@
                       "type": "string"
                     }
                   }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/collections": {
-      "get": {
-        "summary": "One collection per node type",
-        "responses": {
-          "200": {
-            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
-            "content": {
-              "application/hal+json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/collections/{type}": {
-      "get": {
-        "summary": "The live nodes of one type, each as an entity resource",
-        "parameters": [
-          {
-            "name": "type",
-            "in": "path",
-            "required": true,
-            "description": "A slug from /collections, e.g. question, claim, evidence-unit. `workspace` lists the workspaces (default workspace only).",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 25
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0
-            }
-          },
-          {
-            "name": "depth",
-            "in": "query",
-            "required": false,
-            "description": "Hops of neighbours to embed in each item, 0 to 6. Carried on every link in the response.",
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 6,
-              "default": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
-            "content": {
-              "application/hal+json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Unknown type.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "type": "object"
                 }
               }
             }
@@ -440,34 +536,6 @@
             }
           }
         }
-      }
-    },
-    "/workspace/{slug}": {
-      "get": {
-        "summary": "A workspace's collections: one per node type",
-        "responses": {
-          "200": {
-            "description": "A HAL document: `_links` (`self`, `index`, `next`, `prev`) and the items under `_embedded`.",
-            "content": {
-              "application/hal+json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "description": "A workspace slug from /collections/workspace.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
       }
     }
   }

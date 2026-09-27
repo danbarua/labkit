@@ -24,8 +24,7 @@ export const ACT_TYPE = "Act";
 // After a record's path: the changes that affected it, `/{handle}/events`.
 export const EVENTS_SEGMENT = "events";
 
-// Where a collection lives: the default workspace keeps them under `/collections`, any other
-// workspace addresses them directly under its own path.
+// Where a collection lives: directly under its workspace's path.
 export function collectionPath(prefix: string, slug: string): string {
-  return prefix === "" ? `/collections/${slug}` : `${prefix}/${slug}`;
+  return `${prefix}/${slug}`;
 }

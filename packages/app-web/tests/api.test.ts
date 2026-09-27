@@ -59,7 +59,7 @@ const itemsOf = (body: any): any[] => Object.values(body._embedded).flat() as an
 
 describe("entities", () => {
   test("a bare handle returns one hop of neighbours", async () => {
-    const r = await get("/graph/LOE_1");
+    const r = await get("/workspace/alpha/LOE_1");
     expect(r.status).toBe(200);
     expect(r.type).toBe("application/hal+json");
     expect(r.body).toMatchObject({ id: "LOE_1", type: "LineOfEnquiry", name: "alpha enquiry" });
@@ -71,16 +71,16 @@ describe("entities", () => {
   });
 
   test("depth=0 returns the entity alone", async () => {
-    const r = await get("/graph/LOE_1?depth=0");
+    const r = await get("/workspace/alpha/LOE_1?depth=0");
     expect(r.status).toBe(200);
     expect(r.body._embedded).toBeUndefined();
   });
 
   test("links repeat the depth that was applied", async () => {
-    const bare = await get("/graph/LOE_1");
-    expect(bare.body._links.self.href).toBe(`${PUBLIC}/graph/LOE_1?depth=1`);
-    const deep = await get("/graph/LOE_1?depth=2");
-    expect(deep.body._links.self.href).toBe(`${PUBLIC}/graph/LOE_1?depth=2`);
+    const bare = await get("/workspace/alpha/LOE_1");
+    expect(bare.body._links.self.href).toBe(`${PUBLIC}/workspace/alpha/LOE_1?depth=1`);
+    const deep = await get("/workspace/alpha/LOE_1?depth=2");
+    expect(deep.body._links.self.href).toBe(`${PUBLIC}/workspace/alpha/LOE_1?depth=2`);
     expect(hrefs(deep.body).filter((h) => !h.includes("{"))).toEqual(
       expect.arrayContaining([expect.stringContaining("depth=2")]),
     );
@@ -92,15 +92,15 @@ describe("entities", () => {
   });
 
   test("links at the boundary are absolute too, not just the embedded ones", async () => {
-    const r = await get("/graph/Q_1?depth=1");
+    const r = await get("/workspace/alpha/Q_1?depth=1");
     const boundary = r.body._embedded["motivates:lineofenquiry"][0]._links;
     for (const link of Object.values(boundary).flat() as { href: string }[]) {
-      expect(link.href.startsWith(`${PUBLIC}/graph/`)).toBe(true);
+      expect(link.href.startsWith(`${PUBLIC}/workspace/alpha/`)).toBe(true);
     }
   });
 
   test("every relation is in _links, embedded or not, with props when the edge has any", async () => {
-    const r = await get("/graph/EU_1?depth=1");
+    const r = await get("/workspace/alpha/EU_1?depth=1");
     expect(Object.keys(r.body._embedded).sort()).toEqual([
       "addresses:lineofenquiry",
       "produces:evidence",
@@ -108,7 +108,7 @@ describe("entities", () => {
     // addresses:lineofenquiry is embedded (LOE_1 is within depth) and carries an edge property.
     expect(r.body._links["addresses:lineofenquiry"]).toEqual([
       {
-        href: `${PUBLIC}/graph/LOE_1?depth=1`,
+        href: `${PUBLIC}/workspace/alpha/LOE_1?depth=1`,
         dir: "out",
         type: "LineOfEnquiry",
         props: { weight: 1 },
@@ -116,17 +116,17 @@ describe("entities", () => {
     ]);
     // produces:evidence is embedded too, with a plain edge, so no props key.
     expect(r.body._links["produces:evidence"]).toEqual([
-      { href: `${PUBLIC}/graph/EV_1?depth=1`, dir: "out", type: "Evidence" },
+      { href: `${PUBLIC}/workspace/alpha/EV_1?depth=1`, dir: "out", type: "Evidence" },
     ]);
   });
 
   test("a mid-tree resource, not only the boundary layer, gets links for its own relations", async () => {
-    const r = await get("/graph/Q_1?depth=2");
+    const r = await get("/workspace/alpha/Q_1?depth=2");
     const loe1 = r.body._embedded["motivates:lineofenquiry"][0];
     expect(loe1.depth).toBe(1);
     expect(loe1._links["evidenceunit:addresses"]).toEqual([
       {
-        href: `${PUBLIC}/graph/EU_1?depth=2`,
+        href: `${PUBLIC}/workspace/alpha/EU_1?depth=2`,
         dir: "in",
         type: "EvidenceUnit",
         props: { weight: 1 },
@@ -135,10 +135,10 @@ describe("entities", () => {
   });
 
   test("the edge property survives from the other end of the same relation", async () => {
-    const r = await get("/graph/LOE_1?depth=0");
+    const r = await get("/workspace/alpha/LOE_1?depth=0");
     expect(r.body._links["evidenceunit:addresses"]).toEqual([
       {
-        href: `${PUBLIC}/graph/EU_1?depth=0`,
+        href: `${PUBLIC}/workspace/alpha/EU_1?depth=0`,
         dir: "in",
         type: "EvidenceUnit",
         props: { weight: 1 },
@@ -147,39 +147,48 @@ describe("entities", () => {
   });
 
   test("index links to the collection the entity is listed in, with the same parameters", async () => {
-    const bare = await get("/graph/Q_1");
-    expect(bare.body._links.index.href).toBe(`${PUBLIC}/collections/question?depth=1`);
+    const bare = await get("/workspace/alpha/Q_1");
+    expect(bare.body._links.index.href).toBe(`${PUBLIC}/workspace/alpha/question?depth=1`);
     const inWorkspace = await get("/workspace/alpha/LOE_1?depth=0");
     expect(inWorkspace.body._links.index.href).toBe(`${PUBLIC}/workspace/alpha/enquiry?depth=0`);
   });
 
   test("expand is a URI template for depth", async () => {
-    const r = await get("/graph/Q_1");
+    const r = await get("/workspace/alpha/Q_1");
     expect(r.body._links.expand).toMatchObject({
-      href: `${PUBLIC}/graph/Q_1{?depth}`,
+      href: `${PUBLIC}/workspace/alpha/Q_1{?depth}`,
       templated: true,
     });
   });
 
   test.each(["7", "-1", "x", "1.5"])("depth=%s is a 400", async (depth: string) => {
-    const r = await get(`/graph/Q_1?depth=${depth}`);
+    const r = await get(`/workspace/alpha/Q_1?depth=${depth}`);
     expect(r.status).toBe(400);
     expect(r.type).toBe("application/problem+json");
   });
 
   test("an unknown handle is a 404", async () => {
-    expect((await get("/graph/Q_999")).status).toBe(404);
-    expect((await get("/graph/NOPE_1")).status).toBe(404);
+    expect((await get("/workspace/alpha/Q_999")).status).toBe(404);
+    expect((await get("/workspace/alpha/NOPE_1")).status).toBe(404);
   });
 
   test("a retracted node is not served", async () => {
-    expect((await get("/graph/Q_3")).status).toBe(404);
+    expect((await get("/workspace/alpha/Q_3")).status).toBe(404);
   });
 
-  test("bare /graph redirects to the first question", async () => {
-    const r = await get("/graph");
+  test("the root sends a browser to the workspaces", async () => {
+    const r = await get("/");
     expect(r.status).toBe(302);
-    expect(r.res.headers.get("location")).toBe(`${PUBLIC}/graph/Q_1`);
+    expect(r.res.headers.get("location")).toBe(`${PUBLIC}/collections/workspace`);
+  });
+
+  test("a bare /graph path names no workspace and is a 404 that says how to address one", async () => {
+    for (const path of ["/graph", "/graph/Q_1", "/sitemap.xml", "/collections/question"]) {
+      const r = await get(path);
+      expect(r.status).toBe(404);
+      expect(r.type).toBe("application/problem+json");
+      expect(r.body.detail).toContain("/workspace/{slug}");
+    }
   });
 });
 
@@ -189,10 +198,6 @@ describe("workspaces", () => {
     const beta = await get("/workspace/beta/Q_1");
     expect(alpha.body.name).toBe("alpha question");
     expect(beta.body.name).toBe("beta question");
-  });
-
-  test("the bare path is the default workspace, which is tenant 1", async () => {
-    expect((await get("/graph/Q_1")).body.name).toBe("alpha question");
   });
 
   test("a handle that only exists in another workspace is a 404, not a fallback", async () => {
@@ -212,11 +217,6 @@ describe("workspaces", () => {
     expect(links.length).toBeGreaterThan(0);
     for (const href of links) expect(href.startsWith(`${PUBLIC}/workspace/alpha/`)).toBe(true);
     expect(r.body._links.expand.href).toBe(`${PUBLIC}/workspace/alpha/LOE_1{?depth}`);
-  });
-
-  test("bare links do not mention workspaces", async () => {
-    const r = await get("/graph/LOE_1?depth=2");
-    for (const href of hrefs(r.body)) expect(href).not.toContain("/workspace/");
   });
 
   test("inside a workspace, only its nodes and its collections are routes", async () => {
@@ -268,15 +268,22 @@ describe("workspaces", () => {
 });
 
 describe("collections", () => {
-  test("the index has a collection per node type, and workspaces in the default workspace", async () => {
+  test("the API root offers the workspaces collection and no other", async () => {
     const r = await get("/collections");
     expect(r.type).toBe("application/hal+json");
     expect(r.body._links.self.href).toBe(`${PUBLIC}/collections`);
     const entries = r.body._embedded.collection;
+    expect(entries.map((i: any) => i.slug)).toEqual(["workspace"]);
+    expect(entries[0]._links.self.href).toBe(`${PUBLIC}/collections/workspace`);
+  });
+
+  test("a workspace's index has a collection per node type", async () => {
+    const r = await get("/workspace/alpha");
+    const entries = r.body._embedded.collection;
     expect(entries.map((i: any) => i.slug)).toEqual(
-      expect.arrayContaining(["question", "enquiry", "evidence-unit", "evaluation", "workspace"]),
+      expect.arrayContaining(["question", "enquiry", "evidence-unit", "evaluation", "act"]),
     );
-    expect(entries[0]._links.self.href).toBe(`${PUBLIC}/collections/question`);
+    expect(entries[0]._links.self.href).toBe(`${PUBLIC}/workspace/alpha/question`);
   });
 
   test("a workspace's own address is its collections index, and does not list workspaces", async () => {
@@ -299,56 +306,61 @@ describe("collections", () => {
   });
 
   test("an item is the resource the graph gives for it, listed under the collection's slug", async () => {
-    const r = await get("/collections/question");
+    const r = await get("/workspace/alpha/question");
     expect(r.type).toBe("application/hal+json");
     const items = r.body._embedded.question;
     expect(items.map((i: any) => i.id)).toEqual(["Q_1", "Q_2"]);
     expect(items[0]).toMatchObject({ id: "Q_1", type: "Question", name: "alpha question" });
     expect(items[0]._embedded).toBeUndefined();
-    expect(items[0]._links.self.href).toBe(`${PUBLIC}/graph/Q_1`);
+    expect(items[0]._links.self.href).toBe(`${PUBLIC}/workspace/alpha/Q_1`);
   });
 
   test("a collection is named by its slug where the label has an override", async () => {
-    const r = await get("/collections/enquiry");
+    const r = await get("/workspace/alpha/enquiry");
     expect(Object.keys(r.body._embedded)).toEqual(["enquiry"]);
-    expect(r.body._links.self.href).toBe(`${PUBLIC}/collections/enquiry?limit=25&offset=0`);
+    expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/alpha/enquiry?limit=25&offset=0`);
   });
 
   test("retracted nodes are not listed", async () => {
-    const r = await get("/collections/question");
+    const r = await get("/workspace/alpha/question");
     expect(itemsOf(r.body).map((i: any) => i.id)).not.toContain("Q_3");
   });
 
   test("an item carries its own properties, and the edge properties on its links", async () => {
-    const r = await get("/collections/evidence-unit");
+    const r = await get("/workspace/alpha/evidence-unit");
     const [item] = itemsOf(r.body);
     expect(item).toMatchObject({ id: "EU_1", type: "EvidenceUnit", role: "observation" });
     expect(item._links["addresses:lineofenquiry"]).toEqual([
-      { href: `${PUBLIC}/graph/LOE_1`, dir: "out", type: "LineOfEnquiry", props: { weight: 1 } },
+      {
+        href: `${PUBLIC}/workspace/alpha/LOE_1`,
+        dir: "out",
+        type: "LineOfEnquiry",
+        props: { weight: 1 },
+      },
     ]);
     expect(item._links["produces:evidence"]).toEqual([
-      { href: `${PUBLIC}/graph/EV_1`, dir: "out", type: "Evidence" },
+      { href: `${PUBLIC}/workspace/alpha/EV_1`, dir: "out", type: "Evidence" },
     ]);
   });
 
   test("every item links to what it relates to", async () => {
-    const r = await get("/collections/question");
+    const r = await get("/workspace/alpha/question");
     expect(r.body._embedded.question[0]._links["motivates:lineofenquiry"]).toEqual([
-      { href: `${PUBLIC}/graph/LOE_1`, dir: "out", type: "LineOfEnquiry" },
+      { href: `${PUBLIC}/workspace/alpha/LOE_1`, dir: "out", type: "LineOfEnquiry" },
     ]);
   });
 
   test("depth embeds each item's neighbours, and is a client preference every link carries", async () => {
-    const r = await get("/collections/question?depth=1");
+    const r = await get("/workspace/alpha/question?depth=1");
     const [q1] = r.body._embedded.question;
     expect(q1._embedded["motivates:lineofenquiry"][0]).toMatchObject({ id: "LOE_1" });
     for (const href of hrefs(r.body)) expect(href).toEndWith("depth=1");
-    expect((await get("/collections/question?depth=7")).status).toBe(400);
-    expect((await get("/collections/question?depth=x")).status).toBe(400);
+    expect((await get("/workspace/alpha/question?depth=7")).status).toBe(400);
+    expect((await get("/workspace/alpha/question?depth=x")).status).toBe(400);
   });
 
   test("paging links appear when there is more, and lead back", async () => {
-    const first = await get("/collections/question?limit=1");
+    const first = await get("/workspace/alpha/question?limit=1");
     expect(first.body._embedded.question).toHaveLength(1);
     const rels = (b: any) => Object.keys(b._links).sort();
     expect(rels(first.body)).toEqual(["index", "next", "self"]);
@@ -377,14 +389,16 @@ describe("collections", () => {
   });
 
   test("limit and offset are clamped rather than rejected", async () => {
-    expect((await get("/collections/question?limit=0")).body._embedded.question).toHaveLength(1);
+    expect((await get("/workspace/alpha/question?limit=0")).body._embedded.question).toHaveLength(
+      1,
+    );
     expect(
-      (await get("/collections/question?limit=x&offset=-5")).body._embedded.question,
+      (await get("/workspace/alpha/question?limit=x&offset=-5")).body._embedded.question,
     ).toHaveLength(2);
   });
 
   test("an unknown collection is a 404", async () => {
-    const r = await get("/collections/nope");
+    const r = await get("/workspace/alpha/nope");
     expect(r.status).toBe(404);
     expect(r.type).toBe("application/problem+json");
   });
@@ -589,16 +603,6 @@ describe("sql functions", () => {
 });
 
 describe("discovery", () => {
-  test("the sitemap lists the default workspace only", async () => {
-    const r = await get("/sitemap.xml");
-    expect(r.type).toBe("application/xml");
-    expect(r.body).toContain(`<loc>${PUBLIC}/graph/Q_1</loc>`);
-    expect(r.body).toContain(`<loc>${PUBLIC}/docs/</loc>`);
-    expect(r.body).not.toContain("/workspace/");
-    expect(r.body).not.toContain("Q_3");
-    expect(r.body).not.toContain("//graph");
-  });
-
   test("the api catalog is a linkset with the three relations RFC 9727 asks for", async () => {
     const r = await get("/.well-known/api-catalog");
     expect(r.type).toBe("application/linkset+json");
@@ -633,7 +637,7 @@ describe("discovery", () => {
 
 describe("cross-origin access", () => {
   test("a request that came by a public name may be read from any origin", async () => {
-    const r = await get("/graph/Q_1");
+    const r = await get("/workspace/alpha/Q_1");
     expect(r.res.headers.get("access-control-allow-origin")).toBe("*");
   });
 
@@ -662,7 +666,10 @@ describe("cross-origin access", () => {
   });
 
   test("only GET is served", async () => {
-    const res = await handle(new Request(`${PUBLIC}/graph/Q_1`, { method: "POST" }), runtime);
+    const res = await handle(
+      new Request(`${PUBLIC}/workspace/alpha/Q_1`, { method: "POST" }),
+      runtime,
+    );
     expect(res.status).toBe(405);
   });
 });
