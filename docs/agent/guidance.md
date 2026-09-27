@@ -27,7 +27,8 @@ architecture belongs in `docs/agent/`.
   its `README.md`.
 - `packages/core-agent/logging/`: environment-owned diagnostic logging. See its `README.md`.
 - `packages/app-acp/`: the ACP host, its stdio and HTTP launchers and the workspace example. See
-  its `README.md` and `docs/agent/acp-http-hosting.md`.
+  its `README.md` and `docs/agent/acp-http-hosting.md`. `labkit-tools.ts` offers the research verbs
+  to the agent as tools, built from the declarations in `packages/app-mcp/tools.ts`.
 
 Read `docs/agent/glossary.md` before writing plans, docs or code that name runtime concepts
 (turn, step, interjection, barge-in, configuration, load). Its definitions are canonical; code

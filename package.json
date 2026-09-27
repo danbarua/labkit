@@ -62,6 +62,7 @@
 	"private": true,
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.10",
+		"@labkit/app-acp": "workspace:*",
 		"@labkit/app-cli": "workspace:*",
 		"@labkit/app-mcp": "workspace:*",
 		"@labkit/core-db": "workspace:*",

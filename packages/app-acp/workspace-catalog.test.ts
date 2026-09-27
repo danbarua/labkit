@@ -370,3 +370,23 @@ test("discovery is lazy and once; without any provider, session creation names w
     await f.cleanup();
   }
 });
+
+test("LABKIT_ACP_RECORD adds the research verbs to a session's tools, and leaving it unset does not", async () => {
+  const f = await workspace();
+  try {
+    const toolNames = async (extra: Record<string, string>) => {
+      const agent = workspaceAgent({ ANTHROPIC_API_KEY: ANTHROPIC_SECRET, ...extra }, undefined, {
+        fetch: localServer(),
+      });
+      const options = await agent.sessionOptions({ cwd: f.cwd, signal: signal() });
+      return [...(options.bindings.tools?.keys() ?? [])];
+    };
+    expect((await toolNames({})).some((name) => name.startsWith("labkit_"))).toBe(false);
+    const withRecord = await toolNames({ LABKIT_ACP_RECORD: "overlap_bench" });
+    expect(withRecord).toContain("labkit_why");
+    expect(withRecord).toContain("labkit_note");
+    expect(withRecord).toContain("read_file");
+  } finally {
+    await f.cleanup();
+  }
+});

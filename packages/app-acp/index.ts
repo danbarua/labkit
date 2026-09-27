@@ -49,3 +49,5 @@ export {
   type FileWriteResult,
   type FileBefore,
 } from "./file-write.ts";
+
+export { labkitTools, LABKIT_TOOL_PREFIX } from "./labkit-tools.ts";

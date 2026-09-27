@@ -19,6 +19,7 @@ import type { AcpConfigBinding, AcpSelectOption } from "../session-config.ts";
 import { workspaceDirectory } from "../workspace-directory.ts";
 import { workspaceFiles } from "../workspace-files.ts";
 import { workspacePersistence } from "../workspace-persistence.ts";
+import { labkitTools } from "../labkit-tools.ts";
 import { workspaceTools } from "../workspace-tools.ts";
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -315,6 +316,11 @@ export function workspaceAgent(
         ...(mcpTools ?? []),
       ]);
       if (publishPlan) tools.set("update_plan", planTool(publishPlan));
+      if (env.LABKIT_ACP_RECORD) {
+        for (const [name, tool] of labkitTools({ tenant: env.LABKIT_ACP_RECORD })) {
+          tools.set(name, tool);
+        }
+      }
       if (env.LABKIT_ACP_TERMINAL === "1" && terminal)
         tools.set("run_command", terminalTool(terminal, files.root));
       const config: AcpConfigBinding[] = [
