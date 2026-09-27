@@ -50,7 +50,14 @@
 		"check:web-types": "bun scripts/checks/check-web-types.ts",
 		"check:changed": "bun scripts/checks/check-changed.ts",
 		"docs:scenarios": "bun scripts/build/build-scenario-docs.ts",
-		"check:scenario-docs": "bun scripts/checks/check-scenario-docs.ts"
+		"check:scenario-docs": "bun scripts/checks/check-scenario-docs.ts",
+		"acp:dev": "bun packages/app-acp/cli.ts --config packages/app-acp/examples/vscode-workspace.ts",
+		"acp:build": "bun build packages/app-acp/cli.ts packages/app-acp/examples/vscode-workspace.ts --target=bun --splitting --sourcemap=external --outdir=packages/app-acp/dist",
+		"acp:start": "bun packages/app-acp/dist/cli.js --config packages/app-acp/dist/examples/vscode-workspace.js",
+		"acp:debug": "bun run acp:build && LABKIT_ACP_TEST_BUILT=1 LABKIT_ACP_KEEP_TRACE=1 LOGTAPE_TEST_MODE=always LOGTAPE_TEST_LOWEST_LEVEL=debug bun test packages/app-acp/stdio.test.ts packages/app-acp/observability-flow.test.ts",
+		"acp:logs": "bun packages/app-acp/logs.ts",
+		"test:agent": "bun test --timeout 20000 packages/core-agent packages/app-acp",
+		"test:agent:logs": "LOGTAPE_TEST_MODE=always LOGTAPE_TEST_LOWEST_LEVEL=debug bun run test:agent"
 	},
 	"private": true,
 	"devDependencies": {

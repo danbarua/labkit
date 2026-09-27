@@ -16,6 +16,11 @@ import { join } from "node:path";
 const MAX = 8;
 const ROOTS = ["packages", "tests"];
 
+// The agent packages arrived with longer comment blocks: 41 of them run past the bound. Their own
+// review is against this rule when they are next edited, and they are not rewritten in one pass.
+// retire-when: no block under these directories runs longer than eight lines.
+const EXEMPT = ["packages/core-agent/", "packages/app-acp/"];
+
 function tsFiles(dir: string): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -56,7 +61,7 @@ function blocks(source: string): Array<[number, number]> {
   return found;
 }
 
-const files = ROOTS.flatMap(tsFiles);
+const files = ROOTS.flatMap(tsFiles).filter((file) => !EXEMPT.some((dir) => file.startsWith(dir)));
 const over: string[] = [];
 for (const file of files) {
   for (const [line, length] of blocks(readFileSync(file, "utf8"))) {

@@ -47,7 +47,12 @@ packages/core-db/       nodes and edges. All graph access goes through TenantGra
 packages/core-domain/   research actions. Verb-first: no createClaim(), only recordAnalysis().
 packages/app-mcp/       the agent surface.
 packages/app-cli/       the terminal surface. A composition root, nothing else.
+packages/core-agent/    durable, inspectable agent sessions: journal, projections, providers, effects.
+packages/app-acp/       the ACP agent: stdio and HTTP hosts, workspace tools, the launcher.
 ```
+
+The agent packages have their own guidance and reference in `docs/agent/`; start at
+`docs/agent/guidance.md`. `bun run test:agent` runs their tests.
 
 `packages/core-db/domain.ts` is the domain as graph structure — labels, edges, property
 shapes. `packages/core-domain/` is the domain as it matters to a researcher.

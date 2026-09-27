@@ -80,3 +80,7 @@ local:/
 .envrc
 # Written by `bun run check`; read back by its own failure digest.
 junit.xml
+
+# The built ACP launcher and the inspection output the agent's scripted runs write.
+packages/app-acp/dist/
+.session-artifacts/

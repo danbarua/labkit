@@ -1,0 +1,33 @@
+{
+  "name": "@labkit/app-acp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.5.0",
+    "@labkit/core-agent": "workspace:*",
+    "@logtape/logtape": "^2.3.7",
+    "@modelcontextprotocol/sdk": "1.30.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "zod": "^4.6.5"
+  },
+  "bin": {
+    "labkit-agent-acp": "./cli.ts"
+  },
+  "files": [
+    "*.ts",
+    "examples",
+    "!*.test.ts",
+    "!test-support.ts"
+  ],
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "devDependencies": {
+    "@logtape/testing-bun": "^2.3.7"
+  }
+}

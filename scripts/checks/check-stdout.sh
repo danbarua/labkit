@@ -34,12 +34,22 @@ cd "$ROOT"
 # check should still catch -- demonstrated on 2026-08-25 by adding a console.log
 # to `packages/app-cli/views/format.ts` and watching this go red.
 #
+# Five files from the agent packages are exceptions as well. Each is an entry point of its own
+# that runs as a script or as a test, and none is imported by the MCP server:
+#   packages/app-acp/logs.ts                              prints a launcher log for a person
+#   packages/app-acp/testing/mcp-server.ts                a test MCP server that speaks over stdio
+#   packages/app-acp/workspace-persistence.test.ts        test code and a child process it spawns
+#   packages/core-agent/session/fixture-runner.ts         prints the fixture report
+#   packages/core-agent/session/examples/completion-binding.ts   an example script
+# retire-when: those five write to stderr or return their text instead.
+#
 # Comment lines are dropped before matching. Naming the banned call in prose is
 # not making it -- the first version of this script failed on its own docstring,
 # which is the same trap tests/cli/coverage.test.ts already strips comments to avoid.
 matches="$(grep -rEn 'console\.(log|info|dir|table)\(|process\.stdout\.write\(' packages/ \
   --include='*.ts' 2>/dev/null \
   | grep -v '^packages/app-cli/cli\.ts:' \
+  | grep -vE '^packages/(app-acp/(logs\.ts|testing/mcp-server\.ts|workspace-persistence\.test\.ts)|core-agent/session/(fixture-runner\.ts|examples/completion-binding\.ts)):' \
   | grep -vE '^[^:]+:[0-9]+: *(\*|//|/\*)' || true)"
 
 if [ -n "$matches" ]; then
