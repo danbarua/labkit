@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# After a branch switch or `git worktree add`: $1 and $2 are the old and new HEAD, $3 is 1 for a
+# branch checkout and 0 for checking out files. A new worktree's old HEAD is all zeros.
+[ "${3:-0}" = "1" ] || exit 0
+# A rebase checks out the upstream partway through; post-rewrite reports once it has finished.
+[ -d "$(git rev-parse --git-path rebase-merge)" ] && exit 0
+[ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0
+exec "$(dirname "$0")/deps-changed.sh" "$1" "$2"

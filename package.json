@@ -9,6 +9,7 @@
 		"labkit": "packages/app-cli/cli.ts"
 	},
 	"scripts": {
+		"postinstall": "bun scripts/dev/stamp-install.ts",
 		"dev": "bun run packages/app-cli/cli.ts",
 		"mcp": "bun run packages/app-cli/cli.ts mcp",
 		"build": "bash scripts/build/build-binary.sh",

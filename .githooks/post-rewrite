@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# After `git pull --rebase` (and `git commit --amend`): ORIG_HEAD is where the branch was before.
+[ "${1:-}" = "rebase" ] || exit 0
+exec "$(dirname "$0")/deps-changed.sh" ORIG_HEAD HEAD
