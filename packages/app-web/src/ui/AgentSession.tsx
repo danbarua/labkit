@@ -11,37 +11,48 @@ import { Bar } from "./Bar";
 type Status = "connecting" | "ready" | "failed";
 
 /** One ACP session at `url`, as a view that follows it and the calls that drive it. */
-function useAgentSession(url: string) {
+function useAgentSession(url: string, cwd?: string) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const [status, setStatus] = useState<Status>("connecting");
   const client = useRef<SessionClient | null>(null);
 
   useEffect(() => {
-    let abandoned = false;
+    let cancelled = false;
     let opened: SessionClient | undefined;
     setStatus("connecting");
-    connectSession({ url, onEvent: dispatch }).then(
-      (connected) => {
-        if (abandoned) {
-          void connected.close();
-          return;
-        }
-        opened = connected;
-        client.current = connected;
-        setStatus("ready");
-      },
-      (err: unknown) => {
-        if (abandoned) return;
-        dispatch({ type: "failed", message: err instanceof Error ? err.message : String(err) });
-        setStatus("failed");
-      },
-    );
+    // React's development-mode double-invoke runs this effect, its cleanup, then this effect
+    // again, synchronously, with no gap for a second connect to see or reuse the first's. Deferring
+    // the real connect by a tick lets the first invocation's cleanup cancel it before it ever
+    // calls connectSession, so exactly one real ACP connection opens. Opening two at once is not
+    // merely wasteful: confirmed against a real agent's logs, the two occasionally race to open
+    // one connection's own per-session event stream, which the agent answers 409 to and the
+    // transport then treats as connection-fatal — even though the session itself was created
+    // successfully — surfacing as an error the person never caused.
+    const timer = setTimeout(() => {
+      connectSession({ url, cwd, onEvent: dispatch }).then(
+        (connected) => {
+          if (cancelled) {
+            void connected.close();
+            return;
+          }
+          opened = connected;
+          client.current = connected;
+          setStatus("ready");
+        },
+        (err: unknown) => {
+          if (cancelled) return;
+          dispatch({ type: "failed", message: err instanceof Error ? err.message : String(err) });
+          setStatus("failed");
+        },
+      );
+    }, 0);
     return () => {
-      abandoned = true;
+      cancelled = true;
+      clearTimeout(timer);
       client.current = null;
       void opened?.close();
     };
-  }, [url]);
+  }, [url, cwd]);
 
   const send = useCallback((text: string) => void client.current?.prompt(text), []);
   const cancel = useCallback(() => void client.current?.cancel(), []);
@@ -59,11 +70,14 @@ function useAgentSession(url: string) {
 }
 
 /**
- * A live session with the development fake agent, which the dev server mounts at `/acp`. It plays
- * a scripted turn for each prompt, and a prompt of `/scenario <id>` picks which.
+ * A live session with the agent the dev server mounts at `/acp`: the fake agent by default, or a
+ * real one when `LABKIT_ACP_AGENT_URL` names it. A real agent needs an absolute, writable `cwd`
+ * for its session store; `VITE_LABKIT_ACP_CWD` (set by `dev-with-agent.ts`) supplies one, and the
+ * fake agent ignores it. Without either, ACP's own default of `/` fails on a read-only root.
  */
 export default function AgentSession() {
-  const { state, status, send, cancel, answer, setConfig } = useAgentSession("/acp");
+  const cwd = import.meta.env.VITE_LABKIT_ACP_CWD as string | undefined;
+  const { state, status, send, cancel, answer, setConfig } = useAgentSession("/acp", cwd);
   return (
     <>
       <Bar />
