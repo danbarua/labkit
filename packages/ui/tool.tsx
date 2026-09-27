@@ -1,6 +1,7 @@
 import type { ContentBlock, ToolCall, ToolCallContent } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
-import { diffLines, pretty, STATUS_LABEL } from "./format";
+import { diffLines, STATUS_LABEL } from "./format";
+import { ArgumentsLine, inlineArguments, sameValue, ValueView } from "./value";
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
 
@@ -77,7 +78,12 @@ function DiffView({
 function ToolContentView({ item }: { item: ToolCallContent }) {
   switch (item.type) {
     case "content":
-      return <ContentView block={item.content} />;
+      // A tool's text is often its result serialised: drawn by shape, not as an escaped string.
+      return item.content.type === "text" ? (
+        <ValueView value={item.content.text} />
+      ) : (
+        <ContentView block={item.content} />
+      );
     case "diff":
       return <DiffView path={item.path} before={item.oldText} after={item.newText} />;
     case "terminal":
@@ -100,16 +106,27 @@ function decisionOf(entry: PermissionEntry): { label: string; tone: string } {
   return { label: option?.name ?? outcome.optionId, tone };
 }
 
+/**
+ * Whether `rawOutput` says only what the drawn content already says. Tools commonly report one
+ * result twice, as a text block and as the raw output; drawing both repeats it.
+ */
+function outputRepeatsContent(content: readonly ToolCallContent[], rawOutput: unknown): boolean {
+  if (content.length !== 1) return false;
+  const [only] = content;
+  return only?.type === "content" && only.content.type === "text"
+    ? sameValue(only.content.text, rawOutput)
+    : false;
+}
+
 export function ToolCard({ call, permission }: { call: ToolCall; permission?: PermissionEntry }) {
   const status = call.status ?? "pending";
   const locations = call.locations ?? [];
   const content = call.content ?? [];
   const decision = permission === undefined ? undefined : decisionOf(permission);
+  const args = call.rawInput === undefined ? undefined : inlineArguments(call.rawInput);
+  const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
   const hasBody =
-    locations.length > 0 ||
-    content.length > 0 ||
-    call.rawInput !== undefined ||
-    call.rawOutput !== undefined;
+    locations.length > 0 || content.length > 0 || call.rawInput !== undefined || showOutput;
 
   return (
     <article className="lk-tool" data-status={status}>
@@ -138,20 +155,21 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
               {locations.map((l) => (l.line == null ? l.path : `${l.path}:${l.line}`)).join(", ")}
             </div>
           ) : null}
+          {args === undefined ? null : <ArgumentsLine args={args} />}
           {content.map((item, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
             <ToolContentView key={i} item={item} />
           ))}
-          {call.rawInput !== undefined ? (
+          {args === undefined && call.rawInput !== undefined ? (
             <details className="lk-raw">
               <summary>Input</summary>
-              <pre className="lk-pre">{pretty(call.rawInput)}</pre>
+              <ValueView value={call.rawInput} />
             </details>
           ) : null}
-          {call.rawOutput !== undefined ? (
+          {showOutput ? (
             <details className="lk-raw">
               <summary>Output</summary>
-              <pre className="lk-pre">{pretty(call.rawOutput)}</pre>
+              <ValueView value={call.rawOutput} />
             </details>
           ) : null}
         </div>
