@@ -54,7 +54,8 @@
       "scripts/**",
       "*.ts",
       "!.claude/**",
-      "!packages/app-acp/dist/**"
+      "!packages/app-acp/dist/**",
+      "!packages/app-vscode/dist/**"
     ],
     "ignoreUnknown": true
   },
