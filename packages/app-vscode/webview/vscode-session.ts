@@ -31,13 +31,17 @@ interface VsCodeApi {
 
 declare function acquireVsCodeApi(): VsCodeApi;
 
+// VS Code throws if a webview calls `acquireVsCodeApi()` more than once in its lifetime. A
+// `reset` (a new session, or switching to another) remounts the React tree that calls
+// `vscodeSession`, so the handle is acquired once here, at module scope, and reused.
+const api = acquireVsCodeApi();
+
 /**
  * The webview's side of the bridge: posts outbound messages, and calls `onMessage` for each one
  * the extension host sends. Sends `ready` once, so a session already open before this script
  * loaded is not shown as if nothing had happened yet.
  */
 export function vscodeSession(onMessage: (message: InboundMessage) => void) {
-  const api = acquireVsCodeApi();
   const listener = (ev: MessageEvent<InboundMessage>) => onMessage(ev.data);
   window.addEventListener("message", listener);
   api.postMessage({ kind: "ready" });
