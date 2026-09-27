@@ -134,6 +134,10 @@
         "zod": "^4.4.3",
       },
     },
+    "packages/design": {
+      "name": "@labkit/design",
+      "version": "0.0.0",
+    },
     "packages/records": {
       "name": "@labkit/records",
       "version": "0.0.0",
@@ -143,6 +147,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@agentclientprotocol/sdk": "1.5.0",
+        "@labkit/design": "workspace:*",
         "@labkit/records": "workspace:*",
         "@labkit/view-model": "workspace:*",
         "react-markdown": "^10.1.0",
@@ -320,6 +325,8 @@
     "@labkit/core-db": ["@labkit/core-db@workspace:packages/core-db"],
 
     "@labkit/core-domain": ["@labkit/core-domain@workspace:packages/core-domain"],
+
+    "@labkit/design": ["@labkit/design@workspace:packages/design"],
 
     "@labkit/records": ["@labkit/records@workspace:packages/records"],
 

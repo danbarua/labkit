@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.5.0",
+    "@labkit/design": "workspace:*",
     "@labkit/records": "workspace:*",
     "@labkit/view-model": "workspace:*",
     "react-markdown": "^10.1.0",

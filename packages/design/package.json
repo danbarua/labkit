@@ -1,0 +1,13 @@
+{
+  "name": "@labkit/design",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./tokens.css": "./tokens.css",
+    "./mark.svg": "./mark.svg",
+    "./favicon.svg": "./favicon.svg"
+  }
+}

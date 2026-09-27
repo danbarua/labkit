@@ -1,7 +1,8 @@
 /*
- * Design tokens for every @labkit/ui surface, scoped to `.lk-root` so a host page's own styles are
- * left alone. Light is the base; dark follows the system unless the root says which it wants
- * with data-theme.
+ * The Labkit palette, fonts and theme rules, scoped to `.lk-root` so a host page's own styles
+ * are left alone. Light is the base; dark follows the system unless the root says which it wants
+ * with data-theme. --lk-panel, --lk-panel-2 and --lk-accent-dim are the app chrome's surfaces,
+ * which sit one step off the content surfaces in dark.
  */
 .lk-root {
   color-scheme: light;
@@ -23,7 +24,17 @@
   --lk-primary-text: #f8fafc;
   --lk-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --lk-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --lk-font-wordmark: "Outfit", "Inter", ui-sans-serif, sans-serif;
   --lk-radius: 8px;
+  --lk-paper: #f8fafc;
+  --lk-ink: #0b1220;
+  --lk-indigo: #1e2a44;
+  --lk-teal: #14b8a6;
+  --lk-amber: #f59e0b;
+  --lk-cool: #94a3b8;
+  --lk-panel: #ffffff;
+  --lk-panel-2: #eef2f6;
+  --lk-accent-dim: rgba(20, 184, 166, 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,6 +55,9 @@
     --lk-warn-soft: rgba(245, 158, 11, 0.16);
     --lk-primary: #14b8a6;
     --lk-primary-text: #0b1220;
+    --lk-panel: #1e2a44;
+    --lk-panel-2: #162036;
+    --lk-accent-dim: rgba(20, 184, 166, 0.14);
   }
 }
 
@@ -64,4 +78,7 @@
   --lk-warn-soft: rgba(245, 158, 11, 0.16);
   --lk-primary: #14b8a6;
   --lk-primary-text: #0b1220;
+  --lk-panel: #1e2a44;
+  --lk-panel-2: #162036;
+  --lk-accent-dim: rgba(20, 184, 166, 0.14);
 }
