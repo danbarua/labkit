@@ -24,6 +24,13 @@ fresh worktree has no `node_modules`, so `typecheck` and `depcruise` fail with
 `TS2688: Cannot find type definition file for 'bun'`, which reads like a
 TypeScript problem and is not one.
 
+A dependency more than one package needs (`zod`, `react`, provider SDKs, dev
+tooling) is version-pinned once, in the root `package.json`'s
+`workspaces.catalog`, and every package's own `package.json` names it as
+`"catalog:"`. Bump the version in one place; `bun install` refuses a package
+that names a version instead. A dependency only one package needs stays local
+to that package's `package.json`.
+
 ## Commands
 
 ```sh

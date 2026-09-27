@@ -6,7 +6,7 @@
   "main": "server.ts",
   "dependencies": {
     "@labkit/core-domain": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "zod": "^4.4.3"
+    "@modelcontextprotocol/sdk": "catalog:",
+    "zod": "catalog:"
   }
 }

@@ -43,14 +43,14 @@
     "!session/testing/persistence-contract.ts"
   ],
   "dependencies": {
-    "@logtape/logtape": "^2.3.7",
-    "zod": "^4.6.5"
+    "@logtape/logtape": "catalog:",
+    "zod": "catalog:"
   },
   "engines": {
     "bun": ">=1.3.0"
   },
   "devDependencies": {
-    "@logtape/testing-bun": "^2.3.7",
+    "@logtape/testing-bun": "catalog:",
     "prettier": "^3.8.3"
   }
 }
