@@ -134,17 +134,24 @@
         "zod": "^4.4.3",
       },
     },
+    "packages/records": {
+      "name": "@labkit/records",
+      "version": "0.0.0",
+    },
     "packages/ui": {
       "name": "@labkit/ui",
       "version": "0.0.0",
       "dependencies": {
         "@agentclientprotocol/sdk": "1.5.0",
+        "@labkit/records": "workspace:*",
         "@labkit/view-model": "workspace:*",
         "react-markdown": "^10.1.0",
         "remark-gfm": "^4.0.1",
+        "unist-util-visit": "^5.0.0",
       },
       "devDependencies": {
         "@labkit/acp-scenarios": "workspace:*",
+        "@types/mdast": "^4.0.4",
         "@types/react": "^19.1.12",
         "@types/react-dom": "^19.1.9",
         "react": "^19.1.1",
@@ -313,6 +320,8 @@
     "@labkit/core-db": ["@labkit/core-db@workspace:packages/core-db"],
 
     "@labkit/core-domain": ["@labkit/core-domain@workspace:packages/core-domain"],
+
+    "@labkit/records": ["@labkit/records@workspace:packages/records"],
 
     "@labkit/ui": ["@labkit/ui@workspace:packages/ui"],
 

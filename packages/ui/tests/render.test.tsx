@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { FIXTURES } from "@labkit/acp-scenarios";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Conversation } from "../index";
+import { Conversation, type RecordsConfig } from "../index";
 
 async function draw(id: string, handlers = false): Promise<string> {
   const fixture = FIXTURES.find((f) => f.id === id);
@@ -159,5 +159,68 @@ describe("the empty and read-only states", () => {
     );
     expect(html).toContain("Nothing here yet.");
     expect(html).not.toContain("<textarea");
+  });
+});
+
+describe("records in prose", () => {
+  const TYPES = { CLM: "Claim", EV: "Evidence", NOTE: "Note", Q: "Question" };
+
+  const said = async (text: string, records?: RecordsConfig) => {
+    const { reduce, initialState } = await import("@labkit/view-model");
+    const state = reduce(initialState, {
+      type: "update",
+      update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } },
+    });
+    return renderToStaticMarkup(
+      records ? <Conversation state={state} records={records} /> : <Conversation state={state} />,
+    );
+  };
+
+  test("a handle the host names is a chip carrying its type, and can be pressed when the host opens it", async () => {
+    const html = await said("Reading EV_4 next to CLM_3.", { types: TYPES, onOpen: () => {} });
+    expect(html).toContain(
+      '<button type="button" class="lk-handle" data-type="Evidence" title="Evidence">EV_4</button>',
+    );
+    expect(html).toContain('data-type="Claim"');
+  });
+
+  test("without an open handler the chip is shown but is not a button", async () => {
+    const html = await said("see CLM_3", { types: TYPES });
+    expect(html).toContain('<span class="lk-handle" data-type="Claim" title="Claim">CLM_3</span>');
+    expect(html).not.toContain("<button");
+  });
+
+  test("with no records at all, handles stay plain text", async () => {
+    const html = await said("see CLM_3");
+    expect(html).not.toContain("lk-handle");
+    expect(html).toContain("see CLM_3");
+  });
+
+  test("a handle-shaped word the domain does not name is left alone", async () => {
+    const html = await said("layer K_1", { types: TYPES });
+    expect(html).not.toContain("lk-handle");
+  });
+
+  test("maths is set apart, with or without records", async () => {
+    const html = await said("where z_o = mean_{i in o} of x");
+    expect(html).toContain('<span class="lk-math">z_o = mean_{i in o}</span>');
+  });
+
+  test("a handle in code or in a link is not turned into a chip", async () => {
+    const html = await said("run `CLM_3` or [CLM_3](https://example.org/x)", { types: TYPES });
+    expect(html).not.toContain("lk-handle");
+    expect(html).toContain("<code>CLM_3</code>");
+  });
+
+  test("a handle in bold text is still found, and the markup around it survives", async () => {
+    const html = await said("**Note NOTE_41 says so**", { types: TYPES });
+    expect(html).toContain("<strong>Note ");
+    expect(html).toContain('data-type="Note"');
+  });
+
+  test("the message with maths and a handle keeps both, each once", async () => {
+    const html = await said("z_o = mean_{i in o} on Q_1", { types: TYPES });
+    expect(html.match(/lk-math/g)).toHaveLength(1);
+    expect(html.match(/lk-handle/g)).toHaveLength(1);
   });
 });

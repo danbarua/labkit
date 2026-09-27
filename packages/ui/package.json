@@ -10,15 +10,18 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.5.0",
+    "@labkit/records": "workspace:*",
     "@labkit/view-model": "workspace:*",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "unist-util-visit": "^5.0.0"
   },
   "peerDependencies": {
     "react": "^19.1.1"
   },
   "devDependencies": {
     "@labkit/acp-scenarios": "workspace:*",
+    "@types/mdast": "^4.0.4",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "react": "^19.1.1",

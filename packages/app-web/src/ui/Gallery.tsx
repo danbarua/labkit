@@ -1,5 +1,6 @@
 import { FIXTURES } from "@labkit/acp-scenarios";
 import { Conversation } from "@labkit/ui";
+import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import type { TranscriptState } from "@labkit/view-model";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
@@ -60,7 +61,11 @@ export default function Gallery() {
               </h3>
               <div style={{ height: 480, border: "1px solid var(--panel-border)" }}>
                 {state === undefined ? null : (
-                  <Conversation state={state} {...(theme === "system" ? {} : { theme })} />
+                  <Conversation
+                    state={state}
+                    records={{ types: RECORD_TYPES }}
+                    {...(theme === "system" ? {} : { theme })}
+                  />
                 )}
               </div>
             </section>

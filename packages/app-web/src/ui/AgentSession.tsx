@@ -2,6 +2,7 @@ import type { RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import { connectSession, type SessionClient } from "@labkit/acp-client";
 import { SCENARIOS } from "@labkit/acp-scenarios";
 import { Conversation } from "@labkit/ui";
+import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import { initialState, reduce } from "@labkit/view-model";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -70,7 +71,13 @@ export default function AgentSession() {
         ))}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <Conversation state={state} onSend={send} onCancel={cancel} onAnswer={answer} />
+        <Conversation
+          state={state}
+          records={{ types: RECORD_TYPES }}
+          onSend={send}
+          onCancel={cancel}
+          onAnswer={answer}
+        />
       </div>
     </>
   );
