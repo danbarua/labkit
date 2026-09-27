@@ -48,6 +48,13 @@ full `LABKIT_DB_URL` instead.
 | --- | --- | --- |
 | `LABKIT_MCP_OUTPUT_SCHEMA` | `1` declares an `outputSchema` on every tool. Off because a union or discriminated union there fails every call in some clients. | off |
 
+## Agent session
+
+| variable | effect | default |
+| --- | --- | --- |
+| `LABKIT_ACP_AGENT_URL` | The dev server proxies `/acp` to the ACP agent's HTTP host at this origin, for example `http://127.0.0.1:8951`. Requires `LABKIT_ACP_HTTP_TOKEN`; the dev server refuses to start with one and not the other. | unset: the built-in fake agent answers `/acp` |
+| `LABKIT_ACP_HTTP_TOKEN` | The bearer token the agent's HTTP host was started with. The dev server adds it to each proxied request, so page script never holds it. | unset |
+
 ## Web end-to-end tests
 
 | variable | effect | default |

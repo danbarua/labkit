@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { designAssets } from "./src/infra/design-assets";
 import { labkitDev } from "./src/infra/dev-plugin";
-import { fakeAgent } from "./src/infra/fake-agent-plugin";
+import { agentBackend } from "./src/infra/agent-backend";
 
 const explorerPort = Number(process.env.LABKIT_PORT_EXPLORER ?? "8850");
 const apiPort = Number(process.env.LABKIT_PORT_WEB ?? "8899");
@@ -14,6 +14,7 @@ const apiPort = Number(process.env.LABKIT_PORT_WEB ?? "8899");
 const API_PATHS = /^\/(graph|collections|workspace|docs|sitemap\.xml|\.well-known|healthz)(\/|$)/;
 
 const api = { target: `http://127.0.0.1:${apiPort}` };
+const agent = agentBackend(process.env);
 
 export default defineConfig(({ command, isPreview }) => ({
   // The browser app is served under /app. Dev keeps Vite's own paths at the root, so only the
@@ -25,7 +26,7 @@ export default defineConfig(({ command, isPreview }) => ({
     react(),
     designAssets(),
     labkitDev(),
-    fakeAgent(),
+    ...agent.plugins,
   ],
   resolve: {
     alias: {
@@ -38,6 +39,7 @@ export default defineConfig(({ command, isPreview }) => ({
     strictPort: true,
     allowedHosts: ["labkit-central.framesift.ai"],
     proxy: {
+      ...agent.proxy,
       [API_PATHS.source]: api,
       // A bare `/` is the API's redirect for a client, and the browser app's for a browser.
       "^/$": {
