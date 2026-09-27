@@ -93,6 +93,8 @@ describe("permission", () => {
     }
     expect(html).toContain(">Cancel turn</button>");
     expect(html).toContain("conclude CLM_3 from COMP_5");
+    // The card of the call being asked about starts open; an answered one starts closed.
+    expect(html).toMatch(/<details class="lk-tool" data-status="[a-z_]+" open="">/);
   });
 
   test("with no handler the options are there but cannot be pressed", async () => {
@@ -104,6 +106,7 @@ describe("permission", () => {
     const html = await draw("permission-granted", true);
     expect(html).not.toContain("Permission needed");
     expect(html).toContain('lk-decision allow">Allow once</span>');
+    expect(html).not.toMatch(/<details class="lk-tool"[^>]* open="">/);
     const refused = await draw("permission-refused", true);
     expect(refused).toContain('lk-decision reject">Reject</span>');
     expect(refused).toContain("lk-status failed");

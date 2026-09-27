@@ -78,7 +78,7 @@ describe("a tool card", () => {
       ),
     );
     expect(html).not.toContain("\\&quot;");
-    expect(html).not.toContain("<summary>Output</summary>");
+    expect(html).not.toContain("<summary>Raw output</summary>");
     expect(html).toContain("<dt>path</dt>");
     expect(html).toContain("<th>name</th><th>type</th>");
     expect(html).toContain("<td>instruments</td><td>directory</td>");
@@ -105,15 +105,28 @@ describe("a tool card", () => {
     expect(html).toContain('<pre class="lk-pre">{\n  &quot;a&quot;: 1\n}\n</pre>');
   });
 
-  test("a large input is collapsed and drawn by shape: a list of steps is a table", () => {
+  test("a call is one closed row that names what it ran on", () => {
+    const html = draw(settled("list_dir", { path: "instruments" }, { entries: [] }));
+    expect(html).toMatch(/^<details class="lk-tool" data-status="completed">/);
+    expect(html).toContain('<span class="lk-tool-preview">instruments</span>');
+    // The title and the name are the same here, so the name is not said twice.
+    expect(html).not.toContain("lk-tool-name");
+  });
+
+  test("a long input's row previews its first line", () => {
+    const html = draw(settled("write_file", { path: "a.txt", text: "one\ntwo" }, "ok"));
+    expect(html).toContain('<span class="lk-tool-preview">a.txt</span>');
+  });
+
+  test("a large input is drawn by shape: a list of steps is a table", () => {
     const entries = [
       { content: "Read the file", priority: "high", status: "completed" },
       { content: "Write the file", priority: "medium", status: "pending" },
     ];
     const html = draw(settled("update_plan", { entries }, { entries }));
-    expect(html).toContain("<summary>Input</summary>");
+    expect(html).toContain("<h4>Input</h4>");
     expect(html).toContain("<th>content</th><th>priority</th><th>status</th>");
-    expect(html).not.toContain("<summary>Output</summary>");
+    expect(html).not.toContain("<summary>Raw output</summary>");
   });
 
   test("raw output that adds to what is shown is still offered", () => {
@@ -122,6 +135,6 @@ describe("a tool card", () => {
       content: [{ type: "content", content: { type: "text", text: "CLM_3 rests on EV_4." } }],
       rawOutput: { supports: ["EV_4"] },
     } as ToolCall;
-    expect(draw(call)).toContain("<summary>Output</summary>");
+    expect(draw(call)).toContain("<summary>Raw output</summary>");
   });
 });

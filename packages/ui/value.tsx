@@ -60,6 +60,23 @@ export function inlineArguments(
   return entries as [string, Scalar][];
 }
 
+/**
+ * One line that says what a call was given, for its collapsed row: its short fields joined, or
+ * failing that the first line of its first text field. `undefined` when nothing reads as a line.
+ */
+export function inputPreview(input: unknown): string | undefined {
+  const args = inlineArguments(input);
+  if (args !== undefined) {
+    return args
+      .map(([key, v]) => (key === undefined ? String(v) : `${key} ${String(v)}`))
+      .join(" · ");
+  }
+  const value = decode(input);
+  if (!isRecord(value)) return undefined;
+  const text = Object.values(value).find((v): v is string => typeof v === "string" && v !== "");
+  return text?.split("\n")[0];
+}
+
 function ScalarView({ value }: { value: Scalar }) {
   if (typeof value !== "string") return <code className="lk-scalar">{String(value)}</code>;
   if (value.includes("\n") || value.length > 200) return <pre className="lk-pre">{value}</pre>;
