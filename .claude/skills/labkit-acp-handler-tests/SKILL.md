@@ -169,8 +169,9 @@ diagnostics, report it as untestable with the reason. Do not test internals.
 1. Add the test and run it (`bun test <file> -t "<name>"`).
 2. Run `bun test packages/app-acp`, `bunx tsc --noEmit`, `bunx biome check` and Prettier on the
    changed files.
-3. In `docs/acp-conformance.md` under **Work items** (IDs G1–G28, statuses
-   `Done` / `Not done` / `Not doing`), flip the row and add it to **Evidence for the Done rows**
-   with the file and test name. Update **Evidence by area** if the area gains new coverage.
-4. Rows that need editor verification, an audit, live-model evidence or new implementation stay
-   Not done, however many tests pass.
+3. Open items are GitHub sub-issues of #546, each naming its ID (G1–G30). Close the item's issue
+   with the file and test name, add a Done row under **Finished and declined work items** in
+   `docs/agent/acp-conformance.md`, and add it to **Evidence for the Done items**. Update
+   **Evidence by area** if the area gains new coverage.
+4. Items that need editor verification, an audit, live-model evidence or new implementation stay
+   open, however many tests pass.
