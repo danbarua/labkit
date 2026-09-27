@@ -43,6 +43,7 @@ BASE_POOLER=6432
 BASE_ALPHA=8901
 BASE_BETA=8902
 BASE_EXPLORER=8850
+BASE_ACP=8951
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "")
@@ -86,6 +87,7 @@ PORT_POOLER=$((BASE_POOLER + offset))
 PORT_ALPHA=$((BASE_ALPHA + offset))
 PORT_BETA=$((BASE_BETA + offset))
 PORT_EXPLORER=$((BASE_EXPLORER + offset))
+PORT_ACP=$((BASE_ACP + offset))
 if [ "${1:-}" = "--export" ]; then
   printf 'export LABKIT_PORT_DB=%s\n' "$PORT_DB"
   printf 'export LABKIT_PORT_WEB=%s\n' "$PORT_WEB"
@@ -93,11 +95,12 @@ if [ "${1:-}" = "--export" ]; then
   printf 'export LABKIT_PORT_ALPHA=%s\n' "$PORT_ALPHA"
   printf 'export LABKIT_PORT_BETA=%s\n' "$PORT_BETA"
   printf 'export LABKIT_PORT_EXPLORER=%s\n' "$PORT_EXPLORER"
+  printf 'export LABKIT_PORT_ACP=%s\n' "$PORT_ACP"
   exit 0
 fi
 
 name=$([ -n "$toplevel" ] && basename "$toplevel" || echo "(not a git worktree)")
 printf '%s  offset %s%s\n' "$name" "$offset" \
   "$([ "$offset" = 0 ] && echo '  (the main checkout keeps the defaults)' || echo '')"
-printf '  db        %s\n  web       %s\n  pooler    %s\n  alpha     %s\n  beta      %s\n  explorer  %s\n' \
-  "$PORT_DB" "$PORT_WEB" "$PORT_POOLER" "$PORT_ALPHA" "$PORT_BETA" "$PORT_EXPLORER"
+printf '  db        %s\n  web       %s\n  pooler    %s\n  alpha     %s\n  beta      %s\n  explorer  %s\n  acp       %s\n' \
+  "$PORT_DB" "$PORT_WEB" "$PORT_POOLER" "$PORT_ALPHA" "$PORT_BETA" "$PORT_EXPLORER" "$PORT_ACP"

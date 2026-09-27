@@ -81,6 +81,8 @@ local:/
 # Written by `bun run check`; read back by its own failure digest.
 junit.xml
 
-# The built ACP launcher and the inspection output the agent's scripted runs write.
-packages/app-acp/dist/
+# The inspection output the agent's scripted runs write.
 .session-artifacts/
+
+# A dev-generated bearer token for the local ACP HTTP agent (bun run dev:with-agent).
+.labkit-dev/

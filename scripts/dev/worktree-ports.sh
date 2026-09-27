@@ -43,6 +43,7 @@ BASE_POOLER=6432
 BASE_ALPHA=8901
 BASE_BETA=8902
 BASE_EXPLORER=8850
+BASE_ACP=8951
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
 common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "")
@@ -86,6 +87,7 @@ PORT_POOLER=$((BASE_POOLER + offset))
 PORT_ALPHA=$((BASE_ALPHA + offset))
 PORT_BETA=$((BASE_BETA + offset))
 PORT_EXPLORER=$((BASE_EXPLORER + offset))
+PORT_ACP=$((BASE_ACP + offset))
 
 if [ "${1:-}" = "--export" ]; then
   printf 'export LABKIT_PORT_DB=%s\n' "$PORT_DB"
@@ -94,6 +96,7 @@ if [ "${1:-}" = "--export" ]; then
   printf 'export LABKIT_PORT_ALPHA=%s\n' "$PORT_ALPHA"
   printf 'export LABKIT_PORT_BETA=%s\n' "$PORT_BETA"
   printf 'export LABKIT_PORT_EXPLORER=%s\n' "$PORT_EXPLORER"
+  printf 'export LABKIT_PORT_ACP=%s\n' "$PORT_ACP"
   exit 0
 fi
 
