@@ -8,6 +8,7 @@ import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log"
 import { DomainRefusal } from "@labkit/core-domain";
 import { runner } from "./session";
 import { writeOut } from "./stdout";
+import { staleInstall } from "./installed";
 
 /**
  * The innermost message, and the SQLSTATE if there is one.
@@ -62,4 +63,11 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
   }
 }
 
-if (import.meta.main) process.exit(await main());
+if (import.meta.main) {
+  const stale = staleInstall();
+  if (stale) {
+    process.stderr.write(`labkit: ${stale}\n`);
+    process.exit(1);
+  }
+  process.exit(await main());
+}

@@ -24,6 +24,9 @@ fresh worktree has no `node_modules`, so `typecheck` and `depcruise` fail with
 `TS2688: Cannot find type definition file for 'bun'`, which reads like a
 TypeScript problem and is not one.
 
+The CLI refuses to start when `bun.lock` has changed since the last `bun install`, and the
+git hooks in `.githooks/` say so after a pull, a rebase or a branch switch that changes it.
+
 A dependency more than one package needs (`zod`, `react`, provider SDKs, dev
 tooling) is version-pinned once, in the root `package.json`'s
 `workspaces.catalog`, and every package's own `package.json` names it as
