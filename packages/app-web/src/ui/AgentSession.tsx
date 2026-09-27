@@ -5,7 +5,8 @@ import { Conversation } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import { initialState, reduce } from "@labkit/view-model";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Bar } from "./Bar";
 
 type Status = "connecting" | "ready" | "failed";
@@ -57,8 +58,18 @@ function useAgentSession(url: string) {
  * A live session with the development fake agent, which the dev server mounts at `/acp`. It plays
  * a scripted turn for each prompt, and a prompt of `/scenario <id>` picks which.
  */
-export default function AgentSession() {
+export default function AgentSession({ workspace }: { workspace?: string }) {
   const { state, status, send, cancel, answer } = useAgentSession("/acp");
+  const navigate = useNavigate();
+  // A handle can be opened only in a workspace, which the session does not carry itself.
+  const onOpen = useMemo(
+    () =>
+      workspace === undefined
+        ? undefined
+        : (id: string) =>
+            void navigate({ to: "/workspace/$slug/graph/$id", params: { slug: workspace, id } }),
+    [workspace, navigate],
+  );
   return (
     <>
       <Bar />
@@ -73,7 +84,7 @@ export default function AgentSession() {
       <div style={{ flex: 1, minHeight: 0 }}>
         <Conversation
           state={state}
-          records={{ types: RECORD_TYPES }}
+          records={{ types: RECORD_TYPES, ...(onOpen ? { onOpen } : {}) }}
           onSend={send}
           onCancel={cancel}
           onAnswer={answer}

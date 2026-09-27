@@ -6,11 +6,16 @@ import { lazy, Suspense } from "react";
 const AgentSession = import.meta.env.DEV ? lazy(() => import("../ui/AgentSession")) : undefined;
 
 export const Route = createFileRoute("/agent")({
+  validateSearch: (search: Record<string, unknown>): { workspace?: string } =>
+    typeof search.workspace === "string" && search.workspace !== ""
+      ? { workspace: search.workspace }
+      : {},
   component: () => {
     if (AgentSession === undefined) throw notFound();
+    const { workspace } = Route.useSearch();
     return (
       <Suspense fallback={null}>
-        <AgentSession />
+        <AgentSession {...(workspace === undefined ? {} : { workspace })} />
       </Suspense>
     );
   },
