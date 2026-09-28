@@ -1,17 +1,21 @@
 import type { ViewEvent } from "@labkit/view-model";
 import terms_of_reference from "./data/terms-of-reference.json";
+import terms_of_reference_live from "./data/terms-of-reference-live.json";
 import tool_permutations from "./data/tool-permutations.json";
+import tool_permutations_live from "./data/tool-permutations-live.json";
 
 /**
- * A real agent session, replayed through `session/load` against its saved journal and captured as
- * the `ViewEvent`s that produces -- not written by hand, and not a script's idea of what an agent
- * says. `events` folds through `@labkit/view-model`'s `reduce` exactly like a live session does.
+ * A real agent session as the `ViewEvent`s a client folded, not written by hand. A `-live` one is
+ * what the VS Code client received while the session ran (`capture/vscode-logs.ts`), with `at`:
+ * when each event arrived, in ms from the first. The others are the same sessions reopened with
+ * `session/load`: what reopening drew, not what was shown live.
  */
 export interface Transcript {
   readonly id: string;
   readonly title: string;
   readonly description: string;
   readonly events: readonly ViewEvent[];
+  readonly at?: readonly number[];
 }
 
 /**
@@ -23,4 +27,6 @@ export interface Transcript {
 export const TRANSCRIPTS: readonly Transcript[] = [
   terms_of_reference as Transcript,
   tool_permutations as Transcript,
+  terms_of_reference_live as Transcript,
+  tool_permutations_live as Transcript,
 ];

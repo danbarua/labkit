@@ -34,3 +34,19 @@ test("no transcript names the real machine path it was recorded from", () => {
     expect(JSON.stringify(transcript.events)).not.toContain("/Users/");
   }
 });
+
+test("a live transcript has one arrival time per event, never going back", () => {
+  const live = TRANSCRIPTS.filter((t) => t.id.endsWith("-live"));
+  expect(live.length).toBeGreaterThan(0);
+  for (const transcript of live) {
+    const at = transcript.at ?? [];
+    expect(at).toHaveLength(transcript.events.length);
+    expect(at.every((time, i) => i === 0 || time >= at[i - 1]!)).toBe(true);
+  }
+});
+
+test("the live tool-permutations session shows the thinking it streamed", () => {
+  const transcript = TRANSCRIPTS.find((t) => t.id === "tool-permutations-live")!;
+  const state = transcript.events.reduce(reduce, initialState);
+  expect(state.blocks.filter((b) => b.kind === "thought")).toHaveLength(2);
+});
