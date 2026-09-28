@@ -8,7 +8,10 @@ import { describe, expect, test } from "bun:test";
 import { FIXTURES } from "@labkit/acp-scenarios";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { SessionConfigOption } from "@agentclientprotocol/sdk";
 import { commandsMatching } from "../composer";
+import type { PickItem } from "../overlay/list";
+import { pickedSetting, settingItems } from "../session-controls";
 import { Conversation, type RecordsConfig } from "../index";
 
 async function draw(id: string, handlers = false): Promise<string> {
@@ -264,32 +267,52 @@ describe("session configuration", () => {
     return renderToStaticMarkup(<Conversation state={state} {...props} />);
   };
 
-  test("a select shows every choice with the current one selected", async () => {
-    const html = await shown([model]);
-    expect(html).toContain("Model");
-    expect(html).toContain('<option value="b" selected="">Second</option>');
-    expect(html).toContain('<option value="a">First</option>');
+  const featured = { ...model, category: "model" };
+
+  test("a featured setting is a small control showing its current value, that opens a picker", async () => {
+    const html = await shown([featured], { onSend: () => {}, onSetConfig: () => {} });
+    expect(html).toContain('aria-haspopup="dialog" aria-label="Model: Second"');
+    expect(html).toContain('<span class="lk-chip-value">Second</span>');
   });
 
-  test("grouped choices sit in labelled groups", async () => {
-    const html = await shown([thinking]);
-    expect(html).toContain('<optgroup label="Effort">');
-    expect(html).toContain('<optgroup label="Budget">');
+  test("the other settings sit behind one settings control, not a control each", async () => {
+    const html = await shown([model, thinking], { onSend: () => {}, onSetConfig: () => {} });
+    expect(html).toContain('aria-label="Session settings"');
+    expect(html).not.toContain("lk-chip-value");
   });
 
-  test("a boolean option is a checkbox that is checked when the option is on", async () => {
-    const html = await shown([stream]);
-    expect(html).toContain('type="checkbox"');
-    expect(html).toContain('checked=""');
+  test("without a handler the values are shown and cannot be changed", async () => {
+    const html = await shown([featured], { onSend: () => {} });
+    expect(html).toContain('<span class="lk-chip-value">Second</span>');
+    expect(html).not.toContain("aria-haspopup");
+    // A read-only transcript, with no composer, still says what it ran on.
+    const readOnly = await shown([featured]);
+    expect(readOnly).toContain("lk-session-summary");
+    expect(readOnly).toContain('<span class="lk-chip-value">Second</span>');
   });
 
-  test("without a handler the controls are disabled, and with one they are not", async () => {
-    expect(await shown([model])).toContain("disabled");
-    expect(await shown([model], { onSetConfig: () => {} })).not.toContain("disabled");
+  test("no options, no controls", async () => {
+    const html = await shown([], { onSend: () => {}, onSetConfig: () => {} });
+    expect(html).not.toContain("lk-chip");
+    expect(html).not.toContain("Session settings");
   });
 
-  test("no options, no bar", async () => {
-    expect(await shown([])).not.toContain("lk-config-bar");
+  test("a setting's choices keep the agent's groups and mark the current one", () => {
+    const items = settingItems(thinking as SessionConfigOption, false);
+    expect(items.map((i) => [i.group, i.label, i.current])).toEqual([
+      ["Effort", "Low", true],
+      ["Budget", "1024 tokens", false],
+    ]);
+    // Listed with other settings, each choice is headed by its setting as well.
+    expect(settingItems(thinking as SessionConfigOption, true)[0]?.group).toBe("Thinking · Effort");
+  });
+
+  test("a picked choice names its setting and value, a boolean as a boolean", () => {
+    const [on, off] = settingItems(stream as SessionConfigOption, false);
+    expect(on?.current).toBe(true);
+    expect(pickedSetting(off as PickItem)).toEqual(["stream", false]);
+    const [first] = settingItems(model as SessionConfigOption, false);
+    expect(pickedSetting(first as PickItem)).toEqual(["model", "a"]);
   });
 });
 

@@ -11,14 +11,14 @@ import { IconContext } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
 import { AssistantMessage, Compaction, Notice, PlanView, Thought, UserMessage } from "./blocks";
 import { Composer } from "./composer";
-import { ConfigBar } from "./config-bar";
 import { fillPercent, formatCost } from "./format";
+import type { PickItem } from "./overlay/list";
+import { ToastProvider } from "./overlay/toast";
 import { PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
+import { SessionControls } from "./session-controls";
+import { ICONS } from "./surface";
 import { ToolCard } from "./tool";
-
-/** Every icon in the conversation: one size and weight, in the colour of the text around it. */
-const ICONS = { size: 14, weight: "regular", color: "currentColor" } as const;
 
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Idle",
@@ -38,6 +38,8 @@ export interface ConversationProps {
   readonly onSetConfig?: (configId: string, value: string | boolean) => void;
   /** The records prose may name, so a handle in a message becomes a chip. */
   readonly records?: RecordsConfig;
+  /** What the composer's `@` can name. Without it the composer has no `@`. */
+  readonly mentions?: readonly PickItem[];
 }
 
 function BlockView({ block, state }: { block: Block; state: TranscriptState }) {
@@ -94,6 +96,7 @@ export function Conversation({
   theme,
   records,
   onSetConfig,
+  mentions,
 }: ConversationProps) {
   const current = phase(state);
   const pending = pendingPermissions(state);
@@ -104,52 +107,59 @@ export function Conversation({
     <RecordsContext.Provider value={records}>
       <IconContext.Provider value={ICONS}>
         <section className="lk-root" {...(theme ? { "data-theme": theme } : {})}>
-          <header className="lk-header">
-            <h2 className="lk-title">{state.title ?? "New session"}</h2>
-            <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
-            <div className="lk-header-end">
-              {usage === undefined ? null : (
-                <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>
-                  <span className="lk-meter-bar">
-                    <span style={{ width: `${fillPercent(usage.used, usage.size)}%` }} />
+          <ToastProvider>
+            <header className="lk-header">
+              <h2 className="lk-title">{state.title ?? "New session"}</h2>
+              <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
+              <div className="lk-header-end">
+                {usage === undefined ? null : (
+                  <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>
+                    <span className="lk-meter-bar">
+                      <span style={{ width: `${fillPercent(usage.used, usage.size)}%` }} />
+                    </span>
+                    {fillPercent(usage.used, usage.size)}%
+                    {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
                   </span>
-                  {fillPercent(usage.used, usage.size)}%
-                  {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
-                </span>
-              )}
+                )}
+              </div>
+            </header>
+
+            <div className="lk-log" ref={ref} onScroll={onScroll} role="log" aria-live="polite">
+              <div className="lk-blocks">
+                {state.blocks.length === 0 ? (
+                  <div className="lk-empty">Nothing here yet.</div>
+                ) : null}
+                {state.blocks.map((block, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: blocks are appended, never reordered
+                  <BlockView key={i} block={block} state={state} />
+                ))}
+              </div>
             </div>
-          </header>
 
-          <div className="lk-log" ref={ref} onScroll={onScroll} role="log" aria-live="polite">
-            <div className="lk-blocks">
-              {state.blocks.length === 0 ? <div className="lk-empty">Nothing here yet.</div> : null}
-              {state.blocks.map((block, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: blocks are appended, never reordered
-                <BlockView key={i} block={block} state={state} />
-              ))}
-            </div>
-          </div>
+            {pending.length > 0 ? (
+              <div className="lk-permissions">
+                {pending.map((entry) => (
+                  <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
+                ))}
+              </div>
+            ) : null}
 
-          {pending.length > 0 ? (
-            <div className="lk-permissions">
-              {pending.map((entry) => (
-                <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
-              ))}
-            </div>
-          ) : null}
-
-          {state.configOptions && state.configOptions.length > 0 ? (
-            <ConfigBar options={state.configOptions} onSelect={onSetConfig} />
-          ) : null}
-
-          {onSend ? (
-            <Composer
-              running={state.running}
-              commands={state.commands}
-              onSend={onSend}
-              onCancel={onCancel}
-            />
-          ) : null}
+            {onSend ? (
+              <Composer
+                running={state.running}
+                commands={state.commands}
+                configOptions={state.configOptions ?? []}
+                onSend={onSend}
+                onCancel={onCancel}
+                onSetConfig={onSetConfig}
+                mentions={mentions}
+              />
+            ) : state.configOptions && state.configOptions.length > 0 ? (
+              <div className="lk-session-summary">
+                <SessionControls options={state.configOptions} />
+              </div>
+            ) : null}
+          </ToastProvider>
         </section>
       </IconContext.Provider>
     </RecordsContext.Provider>
