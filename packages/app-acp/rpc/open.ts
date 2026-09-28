@@ -18,7 +18,7 @@ import { clientTerminal } from "../client-terminal.ts";
 import { availableCommands, bindCommands, type AcpCommand } from "../commands.ts";
 import type { AcpMcpBridge } from "../mcp-acp.ts";
 import { mcpConnections, McpOpenError } from "../mcp.ts";
-import { PlanEntriesSchema } from "../plan.ts";
+import { isPlanTool, PlanEntriesSchema } from "../plan.ts";
 import { bindConfig, configState, waitForBoundary, type ConfigState } from "../session-config.ts";
 import { usageReporter } from "../session-usage.ts";
 import { mcpToolContent } from "../tool-content.ts";
@@ -380,9 +380,20 @@ export function opener(deps: OpenDeps): OpenSession {
         const durable = runtime.snapshot.durable;
         const view = projectConversation(durable);
         const evidence = toolEvidence(durable);
-        updates.replay(client, id, view.context, `${id}/context`, evidence, renderers);
+        const plans = new Set(
+          [...tools].flatMap(([name, tool]) => (isPlanTool(tool) ? [name] : [])),
+        );
+        updates.replay(client, id, view.context, `${id}/context`, evidence, renderers, plans);
         view.log.forEach((turn, index) => {
-          updates.replay(client, id, turn.messages, `${id}/history/${index}`, evidence, renderers);
+          updates.replay(
+            client,
+            id,
+            turn.messages,
+            `${id}/history/${index}`,
+            evidence,
+            renderers,
+            plans,
+          );
         });
       }
       const registry = runtime.registry;

@@ -282,13 +282,13 @@ and whether the source was live or saved, without logging content bodies.
 
 ## Decide which environment owns an effect
 
-| Integration               | Ownership and consequence                                                                                                                                                                     |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workspace file tools      | Local operations enforce workspace checks. With client filesystem capability, reads/writes use editor semantics, including unsaved buffers. Client errors do not fall back to disk.           |
-| Client terminal           | Opt in with `LABKIT_ACP_TERMINAL=1`; execution needs client support and permission. Cwd is not an OS sandbox, and cancellation cannot undo command effects.                                   |
-| MCP tools                 | The discovered catalog is fixed for an open session and uses core permission/result gates. MCP roots are advisory, not process confinement. Restore reconnects but never repeats saved calls. |
-| Attachments               | Image, audio and embedded blocks need their `promptCapabilities` flag. Bytes/local resources are stored before admission as user input, not tool execution; no permission dialog is created.  |
-| Plan and progress updates | Display state only. A plan item does not execute itself or become complete because an unrelated tool succeeded.                                                                               |
+| Integration               | Ownership and consequence                                                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace file tools      | Local operations enforce workspace checks. With client filesystem capability, reads/writes use editor semantics, including unsaved buffers. Client errors do not fall back to disk.                           |
+| Client terminal           | Opt in with `LABKIT_ACP_TERMINAL=1`; execution needs client support and permission. Cwd is not an OS sandbox, and cancellation cannot undo command effects.                                                   |
+| MCP tools                 | The discovered catalog is fixed for an open session and uses core permission/result gates. MCP roots are advisory, not process confinement. Restore reconnects but never repeats saved calls.                 |
+| Attachments               | Image, audio and embedded blocks need their `promptCapabilities` flag. Bytes/local resources are stored before admission as user input, not tool execution; no permission dialog is created.                  |
+| Plan and progress updates | Display state only. A plan item does not execute itself or become complete because an unrelated tool succeeded. `session/load` replays each successful plan tool result as a `plan` update where it happened. |
 
 The workspace example stores journals and blobs in `<cwd>/.labkit/sessions/store.sqlite`. Back it up
 while stopped and retain the canonical workspace location: moving the database to another workspace
