@@ -7,6 +7,7 @@ import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bar } from "./Bar";
+import { BuildingBlocks } from "./BuildingBlocks";
 import { type TranscriptEntry, transcriptList, transcriptState } from "./transcripts-api";
 
 type Theme = "system" | "light" | "dark";
@@ -16,7 +17,8 @@ type Theme = "system" | "light" | "dark";
  * (the surface to look at when a component changes, and what the tests assert on), and the real
  * sessions in `@labkit/acp-transcripts` (fetched fresh from disk on every load, so hand-editing one
  * of those files and reloading shows the change with no build). Handlers are wired to nothing, so
- * nothing here sends. A real session's title links to it full screen, composer included.
+ * nothing here sends. A real session's title links to it full screen, composer included. The
+ * shared overlay pieces and the composer come first, each live in a tile of its own.
  */
 export default function Gallery() {
   const [entries, setEntries] = useState<readonly TranscriptEntry[]>(FIXTURES);
@@ -69,6 +71,7 @@ export default function Gallery() {
           alignContent: "start",
         }}
       >
+        <BuildingBlocks theme={theme === "system" ? undefined : theme} />
         {entries.map((entry) => {
           const state = states[entry.id];
           return (
