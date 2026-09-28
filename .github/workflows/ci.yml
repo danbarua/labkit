@@ -61,8 +61,8 @@ jobs:
           git push origin "$tag"
           echo "tagged $tag"
 
-  # The suite, split five ways. Round-robin over the sorted file list, so a new
-  # test file joins a shard without anyone updating one. Measured 34.6s-42.7s
+  # The suite, split five ways: root tests/ and every package's own tests. Round-robin
+  # over the sorted file list, so a new test file joins a shard without anyone updating one. Measured 34.6s-42.7s
   # a shard, against 192s in one run.
   test-shard:
     name: PR tests [${{ matrix.shard }} of 5]

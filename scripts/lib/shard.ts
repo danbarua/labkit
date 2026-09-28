@@ -25,8 +25,13 @@ const of = arg("of");
 const index = arg("index");
 if (index < 1 || index > of) throw new Error(`--index must be 1..${of}`);
 
-const files = [...new Glob("tests/**/*.test.ts").scanSync(".")].sort();
-if (files.length === 0) throw new Error("no test files matched tests/**/*.test.ts");
+// The root suite and every package's own tests. A package can have its own node_modules, and the
+// tests shipped in a dependency are not ours.
+const pattern = "{tests,packages}/**/*.test.{ts,tsx}";
+const files = [...new Glob(pattern).scanSync(".")]
+  .filter((file) => !file.includes("/node_modules/"))
+  .sort();
+if (files.length === 0) throw new Error(`no test files matched ${pattern}`);
 
 const mine = files.filter((_, i) => i % of === index - 1);
 if (mine.length === 0) throw new Error(`shard ${index} of ${of} has no files`);
