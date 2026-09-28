@@ -1,6 +1,7 @@
 @import "@labkit/design/tokens.css";
 
 .lk-root {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -617,28 +618,6 @@
   color: var(--lk-danger);
   border-color: var(--lk-danger);
 }
-.lk-composer {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  max-width: 820px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 8px 16px 16px;
-}
-.lk-composer textarea {
-  flex: 1 1 auto;
-  min-height: 44px;
-  max-height: 200px;
-  padding: 8px 10px;
-  resize: vertical;
-  border: 1px solid var(--lk-line);
-  border-radius: var(--lk-radius);
-  background: var(--lk-surface);
-  color: var(--lk-text);
-  font: inherit;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .lk-root * {
     animation: none !important;
@@ -714,57 +693,356 @@ button.lk-handle:hover {
   --lk-chip: #f43f5e;
 }
 
-/* session configuration above the composer */
-.lk-config-bar {
-  margin: 0;
+/* shared bits */
+.lk-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
   border: 0;
-  border-top: 1px solid var(--lk-line);
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  padding: 6px 16px;
-  font-size: 12px;
-  color: var(--lk-muted);
 }
-.lk-config {
+.lk-icon-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-}
-.lk-config select {
-  font: inherit;
-  color: var(--lk-text);
-  background: var(--lk-panel);
-  border: 1px solid var(--lk-line);
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
   border-radius: 6px;
-  padding: 2px 6px;
+  background: none;
+  color: var(--lk-muted);
+  font: inherit;
+  cursor: pointer;
 }
-
-/* the agent's commands offered while typing a slash */
-.lk-commands {
-  list-style: none;
-  margin: 0 0 6px;
-  padding: 4px;
-  border: 1px solid var(--lk-line);
-  border-radius: 8px;
-  background: var(--lk-panel);
+.lk-icon-btn:hover:not(:disabled) {
+  background: var(--lk-surface-2);
+  color: var(--lk-text);
+}
+.lk-glyph {
+  font-family: var(--lk-font-mono);
+  font-size: 14px;
+}
+.lk-btn-small {
+  padding: 2px 8px;
   font-size: 12px;
 }
-.lk-commands button {
-  display: flex;
-  gap: 8px;
+
+/* the composer: a box that grows, and a row of small controls under what is written */
+.lk-composer {
+  position: relative;
   width: 100%;
-  padding: 4px 6px;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 8px 16px 16px;
+}
+.lk-composer-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--lk-line);
+  border-radius: 12px;
+  background: var(--lk-surface);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.lk-composer-box:focus-within {
+  border-color: var(--lk-accent);
+  box-shadow: 0 0 0 3px var(--lk-accent-soft);
+}
+.lk-composer-box textarea {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  max-height: 40vh;
+  padding: 12px 14px 4px;
+  overflow-y: auto;
+  resize: none;
   border: 0;
   background: none;
   color: var(--lk-text);
-  text-align: left;
+  font: inherit;
+  line-height: 1.5;
+}
+.lk-composer-box textarea:focus-visible {
+  outline: none;
+}
+.lk-composer-box textarea::placeholder {
+  color: var(--lk-faint);
+}
+.lk-composer-hint {
+  padding: 10px 14px 0;
+  color: var(--lk-muted);
+  font-size: 12px;
+}
+.lk-composer-hint-command {
+  color: var(--lk-accent-text);
+  font-family: var(--lk-font-mono);
+}
+.lk-composer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px 8px;
+}
+.lk-composer-end {
+  margin-left: auto;
+}
+.lk-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lk-primary);
+  color: var(--lk-primary-text);
   cursor: pointer;
 }
-.lk-commands button:hover {
+.lk-send:disabled {
+  background: var(--lk-surface-2);
+  color: var(--lk-faint);
+  cursor: default;
+}
+.lk-send.stop {
+  background: var(--lk-text);
+  color: var(--lk-bg);
+}
+.lk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--lk-muted);
+  font: inherit;
+  font-size: 12px;
+}
+.lk-chip-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-chip-caret {
+  flex: none;
+  opacity: 0.7;
+}
+button.lk-chip {
+  cursor: pointer;
+}
+button.lk-chip:hover {
+  background: var(--lk-surface-2);
+  color: var(--lk-text);
+}
+button.lk-chip[aria-pressed="true"] {
+  color: var(--lk-accent-text);
+}
+.lk-suggest {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  border: 1px solid var(--lk-line);
+  border-radius: 10px;
+  background: var(--lk-panel);
+  box-shadow: 0 8px 24px rgba(11, 18, 32, 0.14);
+}
+.lk-session-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--lk-line);
+}
+
+/* a list picked from with the keyboard while focus stays in an input */
+.lk-options {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.lk-options-empty {
+  padding: 10px 12px;
+  color: var(--lk-muted);
+  font-size: 13px;
+}
+.lk-option-group {
+  padding: 8px 8px 4px;
+  color: var(--lk-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.lk-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.lk-option[data-active] {
   background: var(--lk-accent-soft);
 }
-.lk-commands span {
+.lk-option-icon {
+  display: inline-flex;
+  flex: none;
   color: var(--lk-muted);
+}
+.lk-option-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lk-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-option-detail {
+  overflow: hidden;
+  color: var(--lk-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-option-current {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  color: var(--lk-accent-text);
+}
+
+/* a modal dialog, and the palette that is the usual one */
+.lk-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  margin: 12vh auto auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--lk-line);
+  border-radius: 12px;
+  background: var(--lk-panel);
+  color: var(--lk-text);
+  box-shadow: 0 24px 64px rgba(11, 18, 32, 0.28);
+}
+.lk-modal::backdrop {
+  background: rgba(11, 18, 32, 0.45);
+}
+.lk-modal-body {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+.lk-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid var(--lk-line);
+}
+.lk-modal-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lk-palette {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.lk-palette-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--lk-line);
+  color: var(--lk-muted);
+}
+.lk-palette-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--lk-text);
+  font: inherit;
+  font-size: 14px;
+}
+.lk-palette-search input:focus-visible {
+  outline: none;
+}
+.lk-palette .lk-options {
+  max-height: 360px;
+}
+
+/* toasts, in the top corner under the header */
+.lk-toasts {
+  position: absolute;
+  top: 52px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.lk-toasts ol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lk-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(380px, calc(100vw - 32px));
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--lk-line);
+  border-radius: 10px;
+  background: var(--lk-panel);
+  box-shadow: 0 8px 24px rgba(11, 18, 32, 0.16);
+  font-size: 13px;
+  pointer-events: auto;
+  animation: lk-toast-in 160ms ease-out;
+}
+.lk-toast-message {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.lk-toast-icon {
+  flex: none;
+  color: var(--lk-muted);
+}
+.lk-toast[data-tone="success"] .lk-toast-icon {
+  color: var(--lk-accent-text);
+}
+.lk-toast[data-tone="error"] {
+  border-color: var(--lk-danger);
+}
+.lk-toast[data-tone="error"] .lk-toast-icon {
+  color: var(--lk-danger);
+}
+@keyframes lk-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
 }
