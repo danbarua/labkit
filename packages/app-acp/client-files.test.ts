@@ -110,3 +110,25 @@ test("client file deadline is a timed-out failure rather than user cancellation"
     emitted.mockRestore();
   }
 });
+
+test("a client error's data reaches the failure message without its stack", async () => {
+  const client = {
+    request: async () => {
+      throw Object.assign(new Error("Internal error"), {
+        data: {
+          path: "/workspace/gone.txt",
+          cause: { message: "nonexistent", stack: "at CLIENT_FRAME" },
+        },
+      });
+    },
+  } as unknown as AgentContext;
+  const signal = new AbortController().signal;
+  const files = clientFiles(client, { fs: { readTextFile: true } }, () => "session-files", signal);
+  const error = await files.readText!("/workspace/gone.txt", signal).catch((e: unknown) => e);
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toContain("nonexistent");
+  expect((error as Error).message).not.toContain("CLIENT_FRAME");
+  expect(JSON.stringify((error as Error).cause, ["data", "cause", "stack"])).toContain(
+    "CLIENT_FRAME",
+  );
+});

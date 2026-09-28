@@ -502,12 +502,10 @@ for (const scenario of scenarios) {
           (message) => message.role === "tool" && message.tool_call_id === "call1",
         );
         expect(result?.content).toContain(scenario.detail);
-        expect(JSON.parse(String(result?.content))).toMatchObject({
-          failure: {
-            classification: scenario.classification,
-            operation: { kind: "tool", toolName: scenario.call.name, callId: "call1" },
-          },
-        });
+        const returned = JSON.parse(String(result?.content));
+        expect(returned).not.toHaveProperty("failure");
+        expect(typeof returned.error).toBe("string");
+        expect(String(result?.content)).not.toContain('"stack"');
         expect(run.requests).toHaveLength(2);
       } finally {
         await run.cleanup();

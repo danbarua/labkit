@@ -8,7 +8,13 @@ import {
   type PromptInput,
 } from "../agent/prompt.ts";
 import type { ToolRunResult } from "../agent/tool-batch.ts";
-import { StepsSchema, ToolNameSchema, type AgentMessage, type Result } from "../agent/types.ts";
+import {
+  StepsSchema,
+  ToolNameSchema,
+  type AgentMessage,
+  type Failure,
+  type Result,
+} from "../agent/types.ts";
 import { freeze } from "../fsm/fsm.ts";
 import {
   ProviderSettingsSchema,
@@ -417,10 +423,59 @@ export function effectiveToolResult(
   return policy?.toolFailure === "return-error-and-continue"
     ? {
         kind: "succeeded",
-        value: { text: JSON.stringify({ error: result.error.message, failure: result.error }) },
+        value: { text: JSON.stringify(modelToolError(result.error)) },
       }
     : result;
 }
+
+/**
+ * The failure as the model reads it: one message, each validation problem once as
+ * `{ path, message }`, and for a thrown value that is not an Error its fields as `detail`. Ids,
+ * phase, classification and the `cause` chain stay in the journal, and a deadline's message, which
+ * names the operation id, is restated without it. Only an `invalid_input` or `invalid_output`
+ * failure trades its message (the problems pretty-printed) for a summary: a tool that fails to
+ * parse data it read was given valid arguments, so it keeps its own message.
+ */
+function modelToolError(error: Failure): {
+  error: string;
+  issues?: ToolIssue[];
+  detail?: Record<string, unknown>;
+} {
+  if (error.classification === "timeout" && error.timeoutMs !== undefined)
+    return { error: `The tool exceeded its ${error.timeoutMs} ms deadline and was stopped` };
+  const cause = record(error.cause);
+  const summary = validationSummary[error.classification ?? ""];
+  const raw = cause?.issues;
+  if (summary !== undefined && Array.isArray(raw) && raw.length > 0) {
+    const issues = raw.map((value): ToolIssue => {
+      const issue = record(value);
+      return {
+        path: Array.isArray(issue?.path)
+          ? issue.path.filter((key) => typeof key === "string" || typeof key === "number")
+          : [],
+        message: typeof issue?.message === "string" ? issue.message : "Invalid value",
+      };
+    });
+    return { error: error.message === cause?.message ? summary : error.message, issues };
+  }
+  if (cause === undefined || typeof cause.message === "string") return { error: error.message };
+  const { cause: _chain, ...detail } = cause;
+  return { error: error.message, detail };
+}
+
+const validationSummary: Readonly<Record<string, string>> = {
+  invalid_input: "Invalid tool arguments",
+  // An output check runs after the tool, so its effect may already have happened.
+  invalid_output: "The tool ran, but its output was invalid",
+};
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+type ToolIssue = { path: (string | number)[]; message: string };
 
 export function initialPolicy(
   capabilities: Capabilities,

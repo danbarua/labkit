@@ -83,7 +83,7 @@ export function clientFiles(
       if (cancelled || timedOut) throw error;
       const details = diagnosticError(error);
       throw new Error(
-        `${operation} failed for ${path}: ${details.message ?? "Unknown client error"}${details.data === undefined ? "" : `; ${JSON.stringify(details.data)}`}`,
+        `${operation} failed for ${path}: ${details.message ?? "Unknown client error"}${details.data === undefined ? "" : `; ${JSON.stringify(details.data, withoutStacks)}`}`,
         {
           cause: error,
         },
@@ -169,4 +169,9 @@ export function clientFiles(
         }
       : {}),
   };
+}
+
+/** A message is read by the model; the stack stays on the `cause` the diagnostics record. */
+function withoutStacks(key: string, value: unknown): unknown {
+  return key === "stack" ? undefined : value;
 }
