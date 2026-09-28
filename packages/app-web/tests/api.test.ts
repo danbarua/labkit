@@ -244,7 +244,7 @@ describe("workspaces", () => {
     const paths = [
       "/collections/workspace",
       "/workspace/alpha/LOE_1?depth=2",
-      "/collections/question",
+      "/workspace/alpha/question",
     ];
     const results = await Promise.all(
       Array.from({ length: 100 }, (_, i) => get(paths[i % paths.length] as string)),
