@@ -2,7 +2,13 @@ import { expect, test } from "@logtape/testing-bun/autoload";
 import { z } from "zod";
 
 import { BlobRefSchema, hashBlob, MediaKindSchema } from "../agent/content.ts";
-import { ActorIdSchema, AgentIdSchema, failure, StepsSchema } from "../agent/types.ts";
+import {
+  ActorIdSchema,
+  AgentIdSchema,
+  failure,
+  StepsSchema,
+  type Failure,
+} from "../agent/types.ts";
 import {
   builtinResolvers,
   copyResolvers,
@@ -130,5 +136,29 @@ test("a continued tool failure reaches the model as one message and each validat
   expect(effectiveToolResult({ kind: "failed", error: broken })).toEqual({
     kind: "failed",
     error: broken,
+  });
+});
+
+test("a continued tool failure says an invalid output came after the tool ran, and restates a deadline without ids", () => {
+  const continuing = { toolFailure: "return-error-and-continue" } as const;
+  const text = (error: Failure) => {
+    const result = effectiveToolResult({ kind: "failed", error }, continuing);
+    return result.kind === "succeeded" ? JSON.parse(result.value.text) : undefined;
+  };
+  const parsed = z.string().safeParse(5);
+  expect(text(failure(parsed.error, { classification: "invalid_output" }))).toEqual({
+    error: "The tool ran, but its output was invalid",
+    issues: [{ path: [], message: "Invalid input: expected string, received number" }],
+  });
+  expect(
+    text({
+      message: "tool operation s/turn/1/2/echo exceeded its 20 ms deadline",
+      classification: "timeout",
+      timeoutMs: 20,
+    }),
+  ).toEqual({ error: "The tool exceeded its 20 ms deadline and was stopped" });
+  expect(text(failure({ code: 7, reason: "gone", cause: { deep: true } }))).toEqual({
+    error: "Unknown failure",
+    detail: { code: 7, reason: "gone" },
   });
 });

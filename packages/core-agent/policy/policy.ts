@@ -429,38 +429,45 @@ export function effectiveToolResult(
 }
 
 /**
- * The failure as the model reads it: one message and, for a validation failure, each problem once
- * as `{ path, message }`. A thrown value that is not an Error is carried as `detail`. Ids, phase, classification and the `cause` chain stay in the journal.
- * A validation error's own message is its problems pretty-printed, so it is replaced by a summary
- * rather than repeated beside `issues`.
+ * The failure as the model reads it: one message, each validation problem once as
+ * `{ path, message }`, and for a thrown value that is not an Error its fields as `detail`. Ids,
+ * phase, classification and the `cause` chain stay in the journal, and a deadline's message, which
+ * names the operation id, is restated without it. Only an `invalid_input` or `invalid_output`
+ * failure trades its message (the problems pretty-printed) for a summary: a tool that fails to
+ * parse data it read was given valid arguments, so it keeps its own message.
  */
 function modelToolError(error: Failure): {
   error: string;
   issues?: ToolIssue[];
   detail?: Record<string, unknown>;
 } {
+  if (error.classification === "timeout" && error.timeoutMs !== undefined)
+    return { error: `The tool exceeded its ${error.timeoutMs} ms deadline and was stopped` };
   const cause = record(error.cause);
+  const summary = validationSummary[error.classification ?? ""];
   const raw = cause?.issues;
-  if (!Array.isArray(raw) || raw.length === 0)
-    // A thrown value that is not an Error has no message of its own; its fields are the only account.
-    return cause === undefined || typeof cause.message === "string"
-      ? { error: error.message }
-      : { error: error.message, detail: cause };
-  const issues = raw.map((value): ToolIssue => {
-    const issue = record(value);
-    return {
-      path: Array.isArray(issue?.path)
-        ? issue.path.filter((key) => typeof key === "string" || typeof key === "number")
-        : [],
-      message: typeof issue?.message === "string" ? issue.message : "Invalid value",
-    };
-  });
-  const summary =
-    error.classification === "invalid_output"
-      ? "The tool returned invalid output"
-      : "Invalid tool arguments";
-  return { error: error.message === cause?.message ? summary : error.message, issues };
+  if (summary !== undefined && Array.isArray(raw) && raw.length > 0) {
+    const issues = raw.map((value): ToolIssue => {
+      const issue = record(value);
+      return {
+        path: Array.isArray(issue?.path)
+          ? issue.path.filter((key) => typeof key === "string" || typeof key === "number")
+          : [],
+        message: typeof issue?.message === "string" ? issue.message : "Invalid value",
+      };
+    });
+    return { error: error.message === cause?.message ? summary : error.message, issues };
+  }
+  if (cause === undefined || typeof cause.message === "string") return { error: error.message };
+  const { cause: _chain, ...detail } = cause;
+  return { error: error.message, detail };
 }
+
+const validationSummary: Readonly<Record<string, string>> = {
+  invalid_input: "Invalid tool arguments",
+  // An output check runs after the tool, so its effect may already have happened.
+  invalid_output: "The tool ran, but its output was invalid",
+};
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)

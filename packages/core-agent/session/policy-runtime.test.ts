@@ -225,6 +225,51 @@ test("tool failure continuation preserves raw evidence and deterministic correla
       .durable,
   ).toEqual(session.snapshot.durable);
 });
+test("a validation error thrown while a tool runs is not reported to the model as invalid arguments", async () => {
+  const options = boundOptions();
+  let calls = 0;
+  const session = await createSession({
+    ...options,
+    configuration: {
+      ...options.configuration,
+      policy: { toolFailure: "return-error-and-continue" },
+    },
+    bindings: {
+      ...options.bindings,
+      tools: new Map([
+        [
+          "echo",
+          defineTool({
+            input: z.object({ text: z.string() }),
+            // The arguments are valid; the data the tool reads is not.
+            run: ({ text }) => String(z.number().parse(text)),
+          }),
+        ],
+      ]),
+      complete: () =>
+        ++calls === 1
+          ? {
+              kind: "tools",
+              text: "work",
+              calls: [{ id: "a", name: "echo", args: { text: "x" } }],
+            }
+          : { kind: "answer", text: "done" },
+    },
+  });
+  expect(await session.input("Go").settled).toMatchObject({
+    record: { outcome: { kind: "completed" } },
+  });
+  const failed = session.snapshot.durable.conversation.log[0]!.messages.find(
+    (message) => message.role === "tool",
+  )!;
+  const returned = JSON.parse(failed.text);
+  expect(returned).toEqual({ error: expect.stringContaining("expected number") });
+  expect(
+    session.snapshot.durable.records.find(
+      (record) => record.body.kind === "tool" && record.body.result.kind === "failed",
+    )?.body,
+  ).toMatchObject({ result: { kind: "failed", error: { classification: "execution" } } });
+});
 test("restore reconciles a projection the live environment lacks; observer errors cannot fail a session", async () => {
   const options = boundOptions();
   const seen: string[] = [];
