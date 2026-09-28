@@ -98,13 +98,16 @@ export type BatchCommand =
   | { type: "cancel_tool"; child: Ref<"tool">; reason?: Failure }
   | { type: "notify"; outcome: BatchOutcome };
 
+/** ID of the `tool` child that runs call `callId` of tool batch `batchId`. */
+export const toolOperationId = (batchId: string, callId: string) => `${batchId}/${callId}`;
+
 /**
  * Builds the tool batch machine for batch `id`. Each call runs as a `tool` child with ref
  * `<batch id>/<call id>`. The batch settles once: when every call succeeded, or at the first failed or
  * cancelled call.
  */
 export function toolBatchMachine(id: Ref<"batch">) {
-  const toolRef = (callId: string) => ref("tool", `${id.id}/${callId}`);
+  const toolRef = (callId: string) => ref("tool", toolOperationId(id.id, callId));
   const settle = (
     pending: ToolCalls,
     outcome: BatchOutcome,

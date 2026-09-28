@@ -28,7 +28,7 @@ import type { AdapterCore } from "./core.ts";
 import { forwardPermission } from "./permission.ts";
 import type { Session } from "./session.ts";
 import type { SessionRegistry } from "./sessions.ts";
-import { toolEvidence, type SessionUpdates } from "./updates.ts";
+import { replayFacts, type SessionUpdates } from "./updates.ts";
 
 /** Everything opening a session needs from the connection. */
 export type OpenDeps = Readonly<{
@@ -379,11 +379,18 @@ export function opener(deps: OpenDeps): OpenSession {
       if (id && replay) {
         const durable = runtime.snapshot.durable;
         const view = projectConversation(durable);
-        const evidence = toolEvidence(durable);
-        updates.replay(client, id, view.context, `${id}/context`, evidence, renderers);
-        view.log.forEach((turn, index) => {
-          updates.replay(client, id, turn.messages, `${id}/history/${index}`, evidence, renderers);
-        });
+        const facts = replayFacts(durable);
+        await updates.replay(client, id, view.context, `${id}/context`, facts, tools, renderers);
+        for (const [index, turn] of view.log.entries())
+          await updates.replay(
+            client,
+            id,
+            turn.messages,
+            `${id}/history/${index}`,
+            facts,
+            tools,
+            renderers,
+          );
       }
       const registry = runtime.registry;
       if (registry.kind === "pending_adoption")

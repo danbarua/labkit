@@ -14,7 +14,8 @@ import { Actor } from "../../fsm/fsm.ts";
 import { diagnosticError } from "../../logging/index.ts";
 import type { HostContext } from "../context.ts";
 import type { ExecutionContext, HostToolOutcome } from "../host.ts";
-import { ToolLocationSchema, ToolOutputSchema } from "../ports.ts";
+import { ToolOutputSchema } from "../ports.ts";
+import { settledTool, toolAnnouncement, toolLocations } from "../tool-display.ts";
 
 /** Largest text-media tool part inlined as text (the same 256 KiB as MCP and read_file results). */
 const MAX_INLINE_TEXT = 256 * 1024;
@@ -92,13 +93,6 @@ export function runTools(
             toolName: batchCommand.call.name,
             ...(command.permission ? { permissionChildId: command.permission.id } : {}),
           });
-          if (!host.closed)
-            host.notifyTool({
-              ...identity,
-              sessionUpdate: "tool_call_update",
-              status: "failed",
-              rawOutput: { refused: true, reason: refused.message },
-            });
           const outcome: HostToolOutcome = {
             turnId,
             batchId: command.child.id,
@@ -117,6 +111,7 @@ export function runTools(
               }),
             },
           };
+          if (!host.closed) host.notifyTool(settledTool(identity, outcome.result));
           host.pendingTools.set(`${outcome.batchId}/${outcome.callId}`, {
             outcome,
             batch,
@@ -127,16 +122,7 @@ export function runTools(
           });
           break;
         }
-        if (!grant)
-          host.notifyTool({
-            ...identity,
-            sessionUpdate: "tool_call",
-            title: batchCommand.call.name,
-            name: batchCommand.call.name,
-            kind: tool.kind ?? "other",
-            status: "pending",
-            rawInput: batchCommand.call.args,
-          });
+        if (!grant) host.notifyTool(toolAnnouncement(identity, batchCommand.call, tool));
         if (host.closed) break;
         let status = "pending";
 
@@ -164,9 +150,7 @@ export function runTools(
               const input = await tool.parseInput(raw);
               if (!host.closed && status === "pending" && tool.locations) {
                 try {
-                  const locations = z
-                    .array(ToolLocationSchema)
-                    .parse(tool.locations(structuredClone(input)));
+                  const locations = toolLocations(tool, input)!;
                   host.emit({
                     type: "tool.locations_resolved",
                     ...identity,
@@ -272,21 +256,15 @@ export function runTools(
               ...(state.status === "failed" ? { error: diagnosticError(state.error) } : {}),
             });
             status = next;
-            host.notifyTool({
-              ...identity,
-              sessionUpdate: "tool_call_update",
-              status: next,
-              ...(state.status === "succeeded"
-                ? {
-                    rawOutput: state.value.text,
-                    ...(state.value.parts ? { parts: state.value.parts } : {}),
-                  }
+            host.notifyTool(
+              state.status === "succeeded"
+                ? settledTool(identity, { kind: "succeeded", value: state.value })
                 : state.status === "failed"
-                  ? { rawOutput: { error: state.error.message } }
+                  ? settledTool(identity, { kind: "failed", error: state.error })
                   : state.status === "cancelled"
-                    ? { rawOutput: { error: "Tool cancelled" } }
-                    : {}),
-            });
+                    ? settledTool(identity, { kind: "cancelled" })
+                    : { ...identity, sessionUpdate: "tool_call_update", status: next },
+            );
           },
         );
         break;

@@ -18,42 +18,17 @@ const token = `${crypto.randomUUID()}${crypto.randomUUID()}`;
 const url = "http://acp.test/acp";
 
 /**
- * Whether a tool card's raw output says the call was refused. Live the output is an object and after
- * `session/load` it is the saved result text, with different wording for the reason, so only the
- * fact of refusal is comparable.
+ * What a reader sees: every block, and every tool card whole. `_meta` is left out: after
+ * `session/load` it carries `labkit.dev/reconstructed`, which marks a card as restored; nothing else
+ * may differ.
  */
-function refusedIn(rawOutput: unknown): boolean | undefined {
-  const value = typeof rawOutput === "string" ? safeParse(rawOutput) : rawOutput;
-  if (value === null || typeof value !== "object") return undefined;
-  return (value as { refused?: unknown }).refused === true;
-}
-
-function safeParse(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-}
-
-/** What a reader sees: block kinds and text, and each tool card's title, status and whether it was refused. */
 function seen(state: ReturnType<typeof reduce>) {
-  return state.blocks.map((block) => {
-    if (block.kind === "tool") {
-      const card = state.toolCalls[block.toolCallId];
-      return {
-        kind: "tool",
-        title: card?.title,
-        status: card?.status,
-        refused: refusedIn(card?.rawOutput),
-      };
-    }
-    if ("content" in block) {
-      const text = block.content.map((part) => (part.type === "text" ? part.text : part.type));
-      return { kind: block.kind, text: text.join("") };
-    }
-    return { kind: block.kind };
-  });
+  return {
+    blocks: state.blocks,
+    toolCalls: Object.fromEntries(
+      Object.entries(state.toolCalls).map(([id, { _meta, ...card }]) => [id, card]),
+    ),
+  };
 }
 
 function host(options: Parameters<typeof acpHttpHandler>[0]) {
@@ -87,27 +62,46 @@ async function open(fetcher: typeof fetch, sessionId?: string) {
   return { client, state: () => state, events };
 }
 
-test("a plain answer looks the same live and after session/load", async () => {
+/** Follows one prompt live, answering every permission request with the first option of `kind`. */
+async function answering(fetcher: typeof fetch, kind: "allow_once" | "reject_once") {
+  let state = initialState;
+  const client = await connectSession({
+    url,
+    fetch: fetcher,
+    onEvent: (event) => {
+      state = reduce(state, event);
+      if (event.type === "permission_requested") {
+        const option = event.request.options.find((candidate) => candidate.kind === kind);
+        void client.answerPermission(event.requestId, {
+          outcome: "selected",
+          optionId: option!.optionId,
+        });
+      }
+    },
+  });
+  await client.prompt("Go");
+  const id = client.sessionId;
+  await client.close();
+  return { id, state };
+}
+
+async function reopen(fetcher: typeof fetch, id: string, blocks: number) {
+  const reopened = await open(fetcher, id);
+  await until(() => reopened.state().blocks.length >= blocks);
+  await reopened.client.close();
+  return reopened.state();
+}
+
+test("a plain answer is the same live and after session/load", async () => {
   const { options } = setup();
   const { handler, fetch } = host(options);
-  const live = await open(fetch);
-  await live.client.prompt("Go");
-  const before = seen(live.state());
-  expect(before).toEqual([
-    { kind: "user", text: "Go" },
-    { kind: "assistant", text: "Hello 🌍" },
-  ]);
-  const id = live.client.sessionId;
-  await live.client.close();
-
-  const reopened = await open(fetch, id);
-  await until(() => seen(reopened.state()).length >= before.length);
-  expect(seen(reopened.state())).toEqual(before);
-  await reopened.client.close();
+  const { id, state } = await answering(fetch, "allow_once");
+  expect(state.blocks.map((block) => block.kind)).toEqual(["user", "assistant"]);
+  expect(seen(await reopen(fetch, id, state.blocks.length))).toEqual(seen(state));
   await handler.close();
 });
 
-test("a refused tool call and the reply after it look the same live and after session/load", async () => {
+test("a refused tool call and the reply after it are the same live and after session/load", async () => {
   let completions = 0;
   const { options } = setup({
     complete: () => (++completions === 1 ? tools : answer),
@@ -116,42 +110,76 @@ test("a refused tool call and the reply after it look the same live and after se
     ]),
   });
   const { handler, fetch } = host(options);
+  const { id, state } = await answering(fetch, "reject_once");
+  expect(state.blocks.map((block) => block.kind)).toEqual([
+    "user",
+    "assistant",
+    "tool",
+    "assistant",
+  ]);
+  expect(Object.values(state.toolCalls)).toMatchObject([
+    { status: "failed", rawOutput: { refused: true } },
+  ]);
+  expect(seen(await reopen(fetch, id, state.blocks.length))).toEqual(seen(state));
+  await handler.close();
+});
 
-  let respond: (() => void) | undefined;
-  let state = initialState;
-  const client = await connectSession({
-    url,
-    fetch,
-    onEvent: (event) => {
-      state = reduce(state, event);
-      if (event.type === "permission_requested") {
-        const reject = event.request.options.find((option) => option.kind === "reject_once");
-        respond = () =>
-          client.answerPermission(event.requestId, {
-            outcome: "selected",
-            optionId: reject!.optionId,
-          });
-      }
+test("a located read and a failed call are the same live and after session/load", async () => {
+  let completions = 0;
+  const base = setup({
+    complete: () =>
+      ++completions === 1
+        ? {
+            kind: "tools",
+            text: "Looking",
+            calls: [
+              { id: "one", name: "look", args: { path: "/workspace/notes.md" } },
+              { id: "two", name: "boom", args: {} },
+            ],
+          }
+        : answer,
+    tools: new Map([
+      [
+        "look",
+        defineTool({
+          input: z.object({ path: z.string() }),
+          kind: "read",
+          locations: ({ path }) => [{ path, line: 3 }],
+          run: () => "contents",
+        }),
+      ],
+      [
+        "boom",
+        defineTool({
+          input: z.object({}),
+          run: () => {
+            throw new Error("disk on fire");
+          },
+        }),
+      ],
+    ]),
+  });
+  const options: typeof base.options = {
+    ...base.options,
+    sessionOptions: async (context) => {
+      const original = await base.options.sessionOptions(context);
+      return {
+        ...original,
+        configuration: {
+          ...original.configuration,
+          agents: new Map([["a", { model: "m", tools: ["look", "boom"] }]]),
+          policy: { toolFailure: "return-error-and-continue" },
+        },
+      };
     },
-  });
-  const turn = client.prompt("Go");
-  await until(() => respond !== undefined);
-  respond!();
-  await turn;
-
-  const live = seen(state);
-  expect(live.map((item) => item.kind)).toEqual(["user", "assistant", "tool", "assistant"]);
-  expect(live.find((item) => item.kind === "tool")).toMatchObject({
-    status: "failed",
-    refused: true,
-  });
-  const id = client.sessionId;
-  await client.close();
-
-  const reopened = await open(fetch, id);
-  await until(() => seen(reopened.state()).length >= live.length);
-  expect(seen(reopened.state())).toEqual(live);
-  await reopened.client.close();
+  };
+  const { handler, fetch } = host(options);
+  const { id, state } = await answering(fetch, "allow_once");
+  expect(Object.values(state.toolCalls)).toMatchObject([
+    { kind: "read", status: "completed", locations: [{ path: "/workspace/notes.md", line: 3 }] },
+    { status: "failed", rawOutput: { error: "disk on fire" } },
+  ]);
+  expect(seen(await reopen(fetch, id, state.blocks.length))).toEqual(seen(state));
   await handler.close();
 });
 

@@ -2,12 +2,13 @@ import { z } from "zod";
 
 import type { TurnCommand } from "../../agent/agent-fsm.ts";
 import { PermissionDecisionsSchema, type PermissionDecisions } from "../../agent/permissions.ts";
-import { failure, ref, type ActorId, type Failure } from "../../agent/types.ts";
+import { failure, type ActorId, type Failure } from "../../agent/types.ts";
 import { freeze } from "../../fsm/fsm.ts";
 import { diagnosticError } from "../../logging/index.ts";
 import type { HostContext } from "../context.ts";
 import type { ExecutionContext, HostToolNotification } from "../host.ts";
-import { PermissionResponseSchema, ToolLocationSchema, type ToolLocation } from "../ports.ts";
+import { PermissionResponseSchema, type ToolLocation } from "../ports.ts";
+import { toolAnnouncement, toolCallIdOf, toolLocations } from "../tool-display.ts";
 
 /**
  * Asks the permission port about each tool call of a completion, in order, and records the
@@ -57,18 +58,10 @@ export function requestPermission(
               turnId,
               batchId: command.batch.id,
               callId: call.id,
-              toolCallId: ref("tool", `${command.batch.id}/${call.id}`).id,
+              toolCallId: toolCallIdOf(command.batch.id, call.id),
               name: call.name,
             };
-            const display = {
-              ...identity,
-              sessionUpdate: "tool_call" as const,
-              title: call.name,
-              name: call.name,
-              kind: tool.kind ?? "other",
-              status: "pending" as const,
-              rawInput: call.args,
-            };
+            const display = toolAnnouncement(identity, call, tool);
             grant.pending.push(display);
             host.notifyTool(display);
             signal.throwIfAborted();
@@ -78,9 +71,7 @@ export function requestPermission(
             let locations: readonly ToolLocation[] | undefined;
             if (tool.locations) {
               try {
-                locations = z
-                  .array(ToolLocationSchema)
-                  .parse(tool.locations(structuredClone(input)));
+                locations = toolLocations(tool, input);
               } catch (error) {
                 host.emit({
                   type: "tool.locations_failed",
