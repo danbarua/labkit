@@ -11,7 +11,8 @@ type Theme = "system" | "light" | "dark";
 type Loaded = { kind: "loading" } | { kind: "missing" } | { kind: "failed"; message: string };
 
 // Passing handlers is what makes `Conversation` draw the composer and live config controls. They
-// do nothing, so the page looks like a live session and never sends.
+// do nothing, so the page looks like a live session and never sends; a setting that is picked is
+// shown as picked, as the agent's confirmation would.
 const inert = () => {};
 
 /**
@@ -72,7 +73,18 @@ export default function TranscriptMockup({ slug }: { slug: string }) {
             onSend={inert}
             onCancel={inert}
             onAnswer={inert}
-            onSetConfig={inert}
+            onSetConfig={(configId, value) =>
+              setState((prev) =>
+                "kind" in prev
+                  ? prev
+                  : {
+                      ...prev,
+                      configOptions: prev.configOptions?.map((o) =>
+                        o.id === configId ? ({ ...o, currentValue: value } as typeof o) : o,
+                      ),
+                    },
+              )
+            }
             {...(theme === "system" ? {} : { theme })}
           />
         </div>
