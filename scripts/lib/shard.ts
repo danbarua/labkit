@@ -35,4 +35,6 @@ if (files.length === 0) throw new Error(`no test files matched ${pattern}`);
 
 const mine = files.filter((_, i) => i % of === index - 1);
 if (mine.length === 0) throw new Error(`shard ${index} of ${of} has no files`);
-console.log(mine.join(" "));
+// `bun test` reads a path without a leading `./` as a substring filter, so `tests/x.test.ts` would
+// also run `packages/a/tests/x.test.ts` in this shard.
+console.log(mine.map((file) => `./${file}`).join(" "));
