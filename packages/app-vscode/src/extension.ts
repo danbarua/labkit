@@ -12,6 +12,7 @@ import { SessionUpdateHandler } from "./handlers/SessionUpdateHandler";
 import { ChatWebviewProvider } from "./ui/ChatWebviewProvider";
 import { SessionTreeProvider } from "./ui/SessionTreeProvider";
 import { StatusBarManager } from "./ui/StatusBarManager";
+import { WebAppPanel } from "./ui/WebAppPanel";
 import { sendEvent } from "./utils/Diagnostics";
 import {
   configureDiagnostics,
@@ -238,6 +239,10 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   // Send Prompt (from keybinding — just focus chat)
+  const openWebAppCmd = vscode.commands.registerCommand("labkit.openWebApp", () =>
+    WebAppPanel.show(),
+  );
+
   const sendPromptCmd = vscode.commands.registerCommand("acp.sendPrompt", async () => {
     vscode.commands.executeCommand("acp-chat.focus");
   });
@@ -565,6 +570,7 @@ export function activate(context: vscode.ExtensionContext): void {
     newConversationCmd,
     disconnectAgentCmd,
     openChatCmd,
+    openWebAppCmd,
     sendPromptCmd,
     cancelTurnCmd,
     restartAgentCmd,
