@@ -1,0 +1,46 @@
+[
+  {
+    "type": "dependency",
+    "from": "packages/core-domain/core.ts",
+    "to": "packages/core-domain/read/checks.ts",
+    "unresolvedTo": "./read/checks",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "core-knows-no-verbs"
+    }
+  },
+  {
+    "type": "cycle",
+    "from": "packages/core-agent/session/runtime/env-events.ts",
+    "to": "packages/core-agent/session/runtime/instance.ts",
+    "unresolvedTo": "./instance.ts",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "packages/core-agent/session/runtime/instance.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "packages/core-agent/session/runtime/env-events.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  }
+]

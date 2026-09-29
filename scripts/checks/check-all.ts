@@ -136,8 +136,20 @@ export function stepsFor(): Step[] {
       // commit. `typecheck` takes the flag in `package.json`, where its command
       // lives.
       name: "depcruise",
-      argv: ["bunx", "--bun", "depcruise", "packages", "tests", "--output-type", "err"],
-      says: "The layering rules hold, and nothing imports in a circle.",
+      // `--ignore-known` passes the violations recorded in
+      // `.dependency-cruiser-known-violations.json` (`bunx --bun depcruise-baseline packages
+      // tests` rewrites it) and fails on any other.
+      argv: [
+        "bunx",
+        "--bun",
+        "depcruise",
+        "packages",
+        "tests",
+        "--output-type",
+        "err",
+        "--ignore-known",
+      ],
+      says: "The layering rules hold, and nothing imports in a circle at runtime.",
     },
     ...Object.keys(scripts)
       .filter((name) => name.startsWith("check:"))
