@@ -6,11 +6,13 @@
  */
 import type { Matchers } from "bun:test";
 
-/** `Matchers` with each assertion returning the promise it returns at runtime. */
+/** `Matchers` with each assertion, `.not` included, returning the promise it returns at runtime. */
 type AsyncMatchers<T> = {
-  [K in keyof Matchers<T>]: Matchers<T>[K] extends (...args: infer A) => void
-    ? (...args: A) => Promise<void>
-    : Matchers<T>[K];
+  [K in keyof Matchers<T>]: K extends "not"
+    ? AsyncMatchers<T>
+    : Matchers<T>[K] extends (...args: infer A) => void
+      ? (...args: A) => Promise<void>
+      : Matchers<T>[K];
 };
 
 declare module "bun:test" {
