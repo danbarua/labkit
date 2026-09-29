@@ -37,7 +37,7 @@ if [ -z "$bin" ]; then
   fi
 fi
 [ -x "$bin" ] || {
-  echo "mcp-call: no labkit binary at '$bin'. Build one with \`bun run build\`," >&2
+  echo "mcp-call: no labkit binary at '$bin'. Build one with \`bun run cli:build\`," >&2
   echo "          or set LABKIT_BIN to the one you mean." >&2
   exit 1
 }
