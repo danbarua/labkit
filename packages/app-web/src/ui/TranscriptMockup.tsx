@@ -104,6 +104,7 @@ function Replay({ slug, recording }: { slug: string; recording: Recording }) {
           onCancel={inert}
           onAnswer={inert}
           onMessageAction={inert}
+          attach={{ maxFiles: 4, maxBytes: 5 * 1024 * 1024 }}
           onSetConfig={(configId, value) => setPicked((prev) => new Map(prev).set(configId, value))}
           {...(theme === "system" ? {} : { theme })}
         />

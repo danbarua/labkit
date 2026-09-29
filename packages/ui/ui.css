@@ -950,6 +950,61 @@ button.lk-handle:hover {
     border-color 120ms ease,
     box-shadow 120ms ease;
 }
+.lk-composer-box[data-dragging] {
+  border-color: var(--lk-accent);
+  border-style: dashed;
+}
+/* files waiting to go with the next message */
+.lk-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px 0;
+}
+.lk-attachments ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lk-attachment {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 4px 3px 6px;
+  border: 1px solid var(--lk-line);
+  border-radius: 8px;
+  background: var(--lk-bg);
+  font-size: 12px;
+}
+.lk-attachment-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.lk-attachment-icon {
+  flex: none;
+  color: var(--lk-muted);
+}
+.lk-attachment-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-attachment-size {
+  flex: none;
+  color: var(--lk-muted);
+}
+.lk-attachment-refused {
+  margin: 0;
+  color: var(--lk-danger);
+  font-size: 12px;
+}
 .lk-composer-box:focus-within {
   border-color: var(--lk-accent);
   box-shadow: 0 0 0 3px var(--lk-accent-soft);

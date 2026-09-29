@@ -161,8 +161,9 @@ function ComposerDemo({ initialText }: { initialText?: string }) {
     <>
       <div style={{ ...pad, flex: 1 }}>
         <p style={note}>
-          Type <code>/</code> or <code>@</code>, or use the controls under the box. Sending shows
-          what would be sent; the stop button then ends the pretend turn.
+          Type <code>/</code> or <code>@</code>, or use the controls under the box. Paste, drop or
+          attach files (images, PDF, CSV; up to 4, 5 MB each). Sending shows what would be sent; the
+          stop button then ends the pretend turn.
         </p>
       </div>
       <Composer
@@ -171,9 +172,15 @@ function ComposerDemo({ initialText }: { initialText?: string }) {
         configOptions={config}
         mentions={MENTIONS}
         onSetConfig={(id, value) => setConfig((c) => withSetting(c, id, value))}
-        onSend={(text) => {
+        onSend={(text, files) => {
           setRunning(true);
-          toasts.show(`Would send: ${text}`, { tone: "success" });
+          const attached = files.length === 0 ? "" : ` with ${files.map((f) => f.name).join(", ")}`;
+          toasts.show(`Would send: ${text}${attached}`, { tone: "success" });
+        }}
+        attach={{
+          accept: ["image/*", "application/pdf", ".csv"],
+          maxFiles: 4,
+          maxBytes: 5 * 1024 * 1024,
         }}
         onCancel={() => setRunning(false)}
         {...(initialText === undefined ? {} : { initialText })}

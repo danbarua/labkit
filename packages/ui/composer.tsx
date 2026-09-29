@@ -1,5 +1,6 @@
 import type { AvailableCommand, SessionConfigOption } from "@agentclientprotocol/sdk";
-import { ArrowUpIcon, AtIcon, StopIcon } from "@phosphor-icons/react";
+import { ArrowUpIcon, AtIcon, PaperclipIcon, StopIcon } from "@phosphor-icons/react";
+import { type AttachLimits, AttachmentChips, useAttachments } from "./attachments";
 import { type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   filterItems,
@@ -45,7 +46,8 @@ type Overlay = { optionId: string } | "settings" | "commands" | "mentions" | nul
 
 export interface ComposerProps {
   running: boolean;
-  onSend: (text: string) => void;
+  /** The text, and any files attached to go with it. */
+  onSend: (text: string, files: readonly File[]) => void;
   onCancel?: (() => void) | undefined;
   commands?: readonly AvailableCommand[];
   configOptions?: readonly SessionConfigOption[];
@@ -55,6 +57,8 @@ export interface ComposerProps {
   mentions?: readonly PickItem[] | undefined;
   /** What the box holds when it first appears. */
   initialText?: string;
+  /** The files it takes, pasted, dropped or chosen. Without this it takes none. */
+  attach?: AttachLimits | undefined;
 }
 
 /**
@@ -73,7 +77,11 @@ export function Composer({
   onSetConfig,
   mentions,
   initialText = "",
+  attach,
 }: ComposerProps) {
+  const attachments = useAttachments(attach);
+  const [dragging, setDragging] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(initialText);
   const [caret, setCaret] = useState(initialText.length);
   const [dismissed, setDismissed] = useState<string | null>(null);
@@ -127,10 +135,11 @@ export function Composer({
 
   const send = () => {
     const trimmed = text.trim();
-    if (trimmed === "" || running) return;
-    onSend(trimmed);
+    if ((trimmed === "" && attachments.files.length === 0) || running) return;
+    onSend(trimmed, attachments.files);
     setText("");
     setCaret(0);
+    attachments.clear();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -146,7 +155,13 @@ export function Composer({
       event.preventDefault();
       send();
     }
+    // Backspace in an empty box takes back the last file attached.
+    if (event.key === "Backspace" && text === "" && attachments.files.length > 0) {
+      event.preventDefault();
+      attachments.remove(attachments.files.length - 1);
+    }
   };
+  const hasFiles = (types: readonly string[]) => attach !== undefined && types.includes("Files");
 
   // The box grows with what is written, up to the cap its style sets, then scrolls. Once the text
   // first goes past one line, the height it had then is its least until it is emptied, so deleting
@@ -260,8 +275,27 @@ export function Composer({
         event.preventDefault();
         send();
       }}
+      onDragOver={(event) => {
+        if (!hasFiles(event.dataTransfer.types)) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(event) => {
+        if (!hasFiles(event.dataTransfer.types)) return;
+        event.preventDefault();
+        setDragging(false);
+        attachments.add([...event.dataTransfer.files]);
+      }}
     >
-      <div className="lk-composer-box" ref={shell}>
+      <div className="lk-composer-box" ref={shell} data-dragging={dragging || undefined}>
+        <AttachmentChips
+          files={attachments.files}
+          refused={attachments.refused}
+          onRemove={attachments.remove}
+        />
         {listOpen ? (
           <div className="lk-suggest">
             <OptionList
@@ -303,6 +337,11 @@ export function Composer({
           }}
           onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
           onKeyDown={onKeyDown}
+          onPaste={(event) => {
+            if (attach === undefined || event.clipboardData.files.length === 0) return;
+            event.preventDefault();
+            attachments.add([...event.clipboardData.files]);
+          }}
         />
         <div id={statusId} className="lk-sr-only" aria-live="polite">
           {listOpen
@@ -310,6 +349,30 @@ export function Composer({
             : ""}
         </div>
         <div className="lk-composer-bar">
+          {attach === undefined ? null : (
+            <>
+              <button
+                type="button"
+                className="lk-icon-btn"
+                aria-label="Attach files"
+                title="Attach files"
+                onClick={() => picker.current?.click()}
+              >
+                <PaperclipIcon aria-hidden="true" />
+              </button>
+              <input
+                ref={picker}
+                type="file"
+                multiple
+                hidden
+                {...(attach.accept ? { accept: attach.accept.join(",") } : {})}
+                onChange={(event) => {
+                  attachments.add([...(event.target.files ?? [])]);
+                  event.target.value = "";
+                }}
+              />
+            </>
+          )}
           {commands.length === 0 ? null : (
             <button
               type="button"
@@ -357,7 +420,7 @@ export function Composer({
                 className="lk-send"
                 aria-label="Send"
                 title="Send (Enter)"
-                disabled={text.trim() === ""}
+                disabled={text.trim() === "" && attachments.files.length === 0}
               >
                 <ArrowUpIcon size={16} weight="bold" aria-hidden="true" />
               </button>

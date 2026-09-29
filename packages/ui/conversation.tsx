@@ -10,6 +10,7 @@ import {
 import { IconContext } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
 import { currentActivity } from "./activity";
+import type { AttachLimits } from "./attachments";
 import {
   AssistantMessage,
   Compaction,
@@ -40,7 +41,9 @@ const PHASE_LABEL: Record<Phase, string> = {
 export interface ConversationProps {
   readonly state: TranscriptState;
   /** Without this the conversation is read-only and has no composer. */
-  readonly onSend?: (text: string) => void;
+  readonly onSend?: (text: string, files: readonly File[]) => void;
+  /** The files the composer takes. Without this it takes none. */
+  readonly attach?: AttachLimits;
   readonly onCancel?: () => void;
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
   /** Leave unset to follow the system's light or dark setting. */
@@ -123,6 +126,7 @@ export function Conversation({
   onSetConfig,
   mentions,
   onMessageAction,
+  attach,
 }: ConversationProps) {
   const current = phase(state);
   const pending = pendingPermissions(state);
@@ -201,6 +205,7 @@ export function Conversation({
                 onCancel={onCancel}
                 onSetConfig={onSetConfig}
                 mentions={mentions}
+                attach={attach}
               />
             ) : state.configOptions && state.configOptions.length > 0 ? (
               <div className="lk-session-summary">
