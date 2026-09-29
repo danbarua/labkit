@@ -25,7 +25,8 @@ fresh worktree has no `node_modules`, so `typecheck` and `depcruise` fail with
 TypeScript problem and is not one.
 
 The CLI refuses to start when `bun.lock` has changed since the last `bun install`, and the
-git hooks in `.githooks/` say so after a pull, a rebase or a branch switch that changes it.
+git hooks in `.githooks/` say so after a pull, a rebase or a branch switch that changes it, and
+after `git worktree add`, since a new worktree has no `node_modules`.
 
 A dependency more than one package needs (`zod`, `react`, provider SDKs, dev
 tooling) is version-pinned once, in the root `package.json`'s

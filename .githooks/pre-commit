@@ -15,6 +15,12 @@ if ! command -v bun > /dev/null 2>&1; then
   exit 0
 fi
 
+# Without node_modules nearly every check fails, and no failure names the cause.
+if [ ! -d "$(git rev-parse --show-toplevel)/node_modules" ]; then
+  echo "pre-commit: this checkout has no node_modules; run: bun install" >&2
+  exit 1
+fi
+
 # Quiet on success. A hook that prints twenty-three green ticks before every
 # commit trains people to stop reading it.
 if output=$(bun run check:quick 2>&1); then
