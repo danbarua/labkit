@@ -15,18 +15,21 @@ export class WebAppPanel {
     const configured = vscode.workspace
       .getConfiguration("labkit")
       .get<string>("webAppUrl", "http://127.0.0.1:8850/app/");
-    // Resolves a local address to one this window can reach, for remote and forwarded setups.
-    const url = (await vscode.env.asExternalUri(vscode.Uri.parse(configured))).toString(true);
-    const reachable = await answers(url);
+    // `configured` is an address as the extension host sees it, and the check runs there. The tab
+    // runs on the client, which in a remote or forwarded window reaches the app at another
+    // address; `asExternalUri` gives that one.
+    const reachable = await answers(configured);
     if (!reachable.ok) {
-      logError(`LabKit web app not reachable at ${url}`, reachable.error);
+      logError(`LabKit web app not reachable at ${configured}`, reachable.error);
       void vscode.window.showErrorMessage(
-        `The LabKit web app is not answering at ${url} (${reachable.error}). Start it with \`bun run --cwd packages/app-web dev\` (or \`dev:with-agent\` for the real agent), or set labkit.webAppUrl to where it runs.`,
+        `The LabKit web app is not answering at ${configured} (${reachable.error}). Start it with \`bun run --cwd packages/app-web dev\` (or \`dev:with-agent\` for the real agent), or set labkit.webAppUrl to where it runs.`,
       );
       return;
     }
+    const url = (await vscode.env.asExternalUri(vscode.Uri.parse(configured))).toString(true);
     if (WebAppPanel.current) {
       WebAppPanel.current.panel.reveal();
+      // VS Code does not resend unchanged html, so this reloads the app only when the URL changed.
       WebAppPanel.current.load(url);
       return;
     }

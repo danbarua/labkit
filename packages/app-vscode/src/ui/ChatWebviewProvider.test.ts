@@ -2,11 +2,9 @@
 
 import { expect, mock, test } from "bun:test";
 
-mock.module("vscode", () => ({
-  Uri: { joinPath: (base: unknown, ...parts: string[]) => ({ base, parts }) },
-  window: { createOutputChannel: () => ({ appendLine() {}, dispose() {} }) },
-  workspace: { getConfiguration: () => ({ get: (_name: string, fallback: unknown) => fallback }) },
-}));
+import { vscodeFake } from "../testing/vscode-fake.ts";
+
+mock.module("vscode", () => vscodeFake);
 
 const { ChatWebviewProvider } = await import("./ChatWebviewProvider.ts");
 

@@ -238,11 +238,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.executeCommand("acp-chat.focus");
   });
 
-  // Send Prompt (from keybinding — just focus chat)
+  // Open Web App
   const openWebAppCmd = vscode.commands.registerCommand("labkit.openWebApp", () =>
     WebAppPanel.show(),
   );
 
+  // Send Prompt (from keybinding — just focus chat)
   const sendPromptCmd = vscode.commands.registerCommand("acp.sendPrompt", async () => {
     vscode.commands.executeCommand("acp-chat.focus");
   });
