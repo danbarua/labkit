@@ -37,14 +37,16 @@ to that package's `package.json`.
 ## Commands
 
 ```sh
-bun run check          # test + typecheck + depcruise + every check:* -- run this before committing
+bun run check          # test + typecheck + depcruise + every check:* and <subject>:check-* -- run this before committing
 bun test               # the suite, against embedded PGlite
 bun run test:pg        # the same suite against real Postgres + AGE in docker
 bun run typecheck
 bun run format         # biome writes; check:format and check:lint are in the sweep
-bun run build          # compile bin/labkit
-bun run dev            # the CLI
-bun run mcp            # the MCP server over stdio
+bun run cli:build      # compile bin/labkit
+bun run cli:dev        # the CLI
+bun run mcp:dev        # the MCP server over stdio
+bun run web:dev        # the web app, with the fake agent
+bun run vscode:dev     # VS Code with the extension loaded, on this checkout
 bun run db:generate    # after editing packages/core-db/schema.ts
 bun run db:bootstrap <url>  # prepare an empty Postgres: role, migrations, AGE
 bun run bonsai:record  # rebuild .labkit-bonsai from the probe scripts

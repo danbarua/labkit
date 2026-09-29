@@ -35,7 +35,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { summaryOf } from "./check-all-checks.ts";
+import { isCheck, summaryOf } from "./check-all-checks.ts";
 
 /**
  * A thing to run: a label, the argv, and the sentence printed before it runs.
@@ -69,7 +69,7 @@ const scripts: Record<string, string> = JSON.parse(readFileSync("package.json", 
  */
 const JUNIT = "junit.xml";
 
-/** The script file a `check:*` command runs, for `summaryOf` to read. */
+/** The script file a check command runs, for `summaryOf` to read. */
 const fileFor = (name: string): string | undefined =>
   scripts[name]?.split(/\s+/).find((token) => token.startsWith("scripts/"));
 
@@ -152,7 +152,7 @@ export function stepsFor(): Step[] {
       says: "The layering rules hold, and nothing imports in a circle at runtime.",
     },
     ...Object.keys(scripts)
-      .filter((name) => name.startsWith("check:"))
+      .filter(isCheck)
       // `check:quick` is a composite of the others, not a check. Running it
       // here would run this derivation again, from inside itself.
       .filter((name) => name !== "check:quick" && name !== "check:changed")

@@ -141,7 +141,7 @@ describe("a worktree resolves to the repository, not to itself", () => {
 
 /**
  * The filesystem answer, tested directly — it is the case the walk cannot solve and the
- * environment `bun run build` ships into: a compiled binary on a host without git.
+ * environment `bun run cli:build` ships into: a compiled binary on a host without git.
  */
 describe("dotGitProjectRoot — the answer with no git to ask", () => {
   const git = (cwd: string, ...args: string[]) =>

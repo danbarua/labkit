@@ -30,6 +30,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, copyFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pkg from "../../package.json";
+import { isCheck } from "./check-all-checks.ts";
 
 /**
  * The checks this can run: the ones that scan a population of files.
@@ -65,7 +66,7 @@ const REPO = join(import.meta.dir, "..", "..");
 
 /** Each `check:*` script that folds over files, as its script path. */
 const scanning = Object.entries(pkg.scripts as Record<string, string>)
-  .filter(([name]) => name.startsWith("check:") && !NOT_SCANNED.has(name))
+  .filter(([name]) => isCheck(name) && !NOT_SCANNED.has(name))
   .map(([name, command]) => ({ name, script: command.replace(/^bun\s+/, "") }));
 
 /** An empty tree with the directories a check might scan, and real dependencies. */

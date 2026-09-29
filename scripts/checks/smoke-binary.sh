@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # The compiled binary works against a database that does not exist yet, as a CLI and as an MCP server.
 #
-# **This check exists because that had never once been done.** `bun run build`
+# **This check exists because that had never once been done.** `bun run cli:build`
 # produced `bin/labkit` and exited 0, and the binary died on the first command
 # it was ever given -- three separate times over, each hidden behind the last:
 # drizzle's migration folder, the two extension tarballs, and PGlite's own
 # `pglite.data`. All three were `import.meta.url` naming a directory that does
 # not exist once the code is inside a bundle. Every one of them was invisible to
-# `bun test` and `bun run dev`, which read those files off disk and work.
+# `bun test` and `bun run cli:dev`, which read those files off disk and work.
 #
-# The cheap part is the point: `bun run build` takes ~0.2s. There was never a
+# The cheap part is the point: `bun run cli:build` takes ~0.2s. There was never a
 # cost reason not to run the thing.
 #
 # A **fresh** directory every time, deliberately. The failure was in the code
