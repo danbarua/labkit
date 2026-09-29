@@ -1,4 +1,5 @@
 import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
+import type { Recording } from "./playback";
 
 export interface TranscriptEntry {
   readonly id: string;
@@ -12,16 +13,25 @@ export async function transcriptList(signal: AbortSignal): Promise<TranscriptEnt
 }
 
 /**
- * `GET /transcripts/:id`: the recorded session whole, folded into a state the same way a live one
- * is. Resolves to `undefined` when no transcript has that id.
+ * `GET /transcripts/:id`: the recorded session's events, and when each arrived where that was
+ * recorded. Resolves to `undefined` when no transcript has that id.
  */
+export async function transcriptRecording(
+  id: string,
+  signal: AbortSignal,
+): Promise<Recording | undefined> {
+  const res = await fetch(`/transcripts/${encodeURIComponent(id)}`, { signal });
+  if (res.status === 404) return undefined;
+  if (!res.ok) throw new Error(`GET /transcripts/${id} answered ${res.status}`);
+  const { events, at } = (await res.json()) as { events: readonly ViewEvent[]; at?: number[] };
+  return at === undefined ? { events } : { events, at };
+}
+
+/** The recorded session whole, folded into a state the same way a live one is. */
 export async function transcriptState(
   id: string,
   signal: AbortSignal,
 ): Promise<TranscriptState | undefined> {
-  const res = await fetch(`/transcripts/${encodeURIComponent(id)}`, { signal });
-  if (res.status === 404) return undefined;
-  if (!res.ok) throw new Error(`GET /transcripts/${id} answered ${res.status}`);
-  const { events } = (await res.json()) as { events: readonly ViewEvent[] };
-  return events.reduce(reduce, initialState);
+  const recording = await transcriptRecording(id, signal);
+  return recording?.events.reduce(reduce, initialState);
 }
