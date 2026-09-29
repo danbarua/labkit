@@ -10,7 +10,7 @@
  * retire-when: the sweep runs each workspace's
  * own `typecheck` without being told which ones exist.
  *
- * Usage: bun run check:web-types
+ * Usage: bun run web:check-types
  * Exit:  0 when the types agree, 1 otherwise.
  */
 

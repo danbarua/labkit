@@ -86,7 +86,7 @@ the CLI above is the same record, for a person at a terminal.
 
 ```sh
 bun install
-bun run build        # compiles bin/labkit
+bun run cli:build    # compiles bin/labkit
 ./bin/labkit mcp     # speaks MCP over stdio
 ```
 
@@ -184,7 +184,7 @@ The same binary, without the `mcp` subcommand:
 ```sh
 labkit --help
 labkit now             # what am I blocked on, what are my priorities?
-bun run dev --help     # the same thing, from source
+bun run cli:dev --help # the same thing, from source
 bun run example        # a narrated lifecycle, for reading
 ```
 

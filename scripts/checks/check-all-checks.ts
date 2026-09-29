@@ -111,7 +111,14 @@ export function summaryOf(path: string): string | null {
   return stripped ? stripped : null;
 }
 
-/** Every script file a `check`, `check:*` or `probe:*` package script runs. */
+/**
+ * A package script `bun run check` runs: `check:*`, or a package's own check named
+ * `<subject>:check-*`, such as `web:check-types`.
+ */
+export const isCheck = (name: string): boolean =>
+  name.startsWith("check:") || /^[^:]+:check-/.test(name);
+
+/** Every script file a `check`, a check (see {@link isCheck}) or a `probe:*` package script runs. */
 export function checkScriptPaths(): string[] {
   const { scripts }: { scripts: Record<string, string> } = JSON.parse(
     readFileSync("package.json", "utf8"),
@@ -123,7 +130,7 @@ export function checkScriptPaths(): string[] {
         // into `package.json` for a person to run, not about one prefix. The
         // probe is the reason: nobody running it should have to read forty
         // lines to learn what it asks.
-        .filter(([name]) => name.startsWith("check") || name.startsWith("probe:"))
+        .filter(([name]) => name === "check" || isCheck(name) || name.startsWith("probe:"))
         .map(([, command]) => command.split(/\s+/).find((token) => token.startsWith("scripts/")))
         .filter((path): path is string => path !== undefined),
     ),

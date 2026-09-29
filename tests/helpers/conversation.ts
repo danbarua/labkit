@@ -1,5 +1,5 @@
 /**
- * Captures a scenario's acts so `bun run docs:scenarios` can render the conversation.
+ * Captures a scenario's acts so `bun run scenarios:build` can render the conversation.
  *
  * Silent unless `LABKIT_SCENARIO_DOCS` names a directory, so an ordinary test run writes
  * nothing. One scenario file captures one test — whichever the file treats as the whole

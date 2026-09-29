@@ -26,7 +26,7 @@
 # files, and `--compile-executable-path` names an input rather than a staging
 # location.
 #
-# Usage: bun run build
+# Usage: bun run cli:build
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && while [[ "$PWD" != "/" && ! -f "package.json" ]]; do cd ..; done && pwd)"

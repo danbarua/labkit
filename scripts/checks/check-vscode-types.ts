@@ -9,7 +9,7 @@
  * retire-when: the sweep runs each workspace's own `typecheck` without being told which ones
  * exist.
  *
- * Usage: bun run check:vscode-types
+ * Usage: bun run vscode:check-types
  * Exit:  0 when the types agree, 1 otherwise.
  */
 

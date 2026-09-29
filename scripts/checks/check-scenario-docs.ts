@@ -4,7 +4,7 @@
  *
  * Regenerates into a temp directory and compares. The pages are read off the event log,
  * so a difference means a scenario changed and the pages did not — run
- * `bun run docs:scenarios` and commit what it writes.
+ * `bun run scenarios:build` and commit what it writes.
  *
  * retire-when: docs/scenarios/ is deleted, or the pages stop being generated.
  */
@@ -51,6 +51,6 @@ for (const name of orphan)
   process.stderr.write(`  no scenario writes it: docs/scenarios/${name}\n`);
 process.stderr.write(
   `FAILED: ${stale.length + orphan.length} page(s) disagree with the scenarios.\n` +
-    `  Run \`bun run docs:scenarios\` and commit the result.\n`,
+    `  Run \`bun run scenarios:build\` and commit the result.\n`,
 );
 process.exit(1);
