@@ -91,6 +91,10 @@
         "title": "ACP: Open Chat Panel"
       },
       {
+        "command": "labkit.openWebApp",
+        "title": "LabKit: Open Web App"
+      },
+      {
         "command": "acp.addAgent",
         "title": "ACP: Add Agent Configuration",
         "icon": "$(add)"
@@ -291,6 +295,11 @@
           "type": "string",
           "default": "",
           "description": "Default working directory for agent sessions. Leave empty to use the current workspace folder."
+        },
+        "labkit.webAppUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8850/app/",
+          "description": "Where the LabKit web app runs. \"LabKit: Open Web App\" shows it in an editor tab. The main checkout's dev server is on 8850; another worktree's port comes from packages/app-web/scripts/worktree-ports.sh."
         },
         "acp.logTraffic": {
           "type": "boolean",
