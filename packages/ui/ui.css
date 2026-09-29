@@ -21,6 +21,13 @@
   box-sizing: border-box;
 }
 
+/* A scrollbar is a thin thumb and nothing else: no track, no border, no background. */
+.lk-root,
+.lk-root * {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--lk-muted) 45%, transparent) transparent;
+}
+
 .lk-root :focus-visible {
   outline: 2px solid var(--lk-accent);
   outline-offset: 2px;
