@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # After a branch switch or `git worktree add`: $1 and $2 are the old and new HEAD, $3 is 1 for a
 # branch checkout and 0 for checking out files. A new worktree's old HEAD is all zeros.
+# A new worktree starts with no node_modules of its own.
+if [[ "${1:-}" =~ ^0+$ ]]; then
+  if [ ! -d "$(git rev-parse --show-toplevel)/node_modules" ]; then
+    echo >&2
+    echo "New worktree without node_modules; run: bun install" >&2
+  fi
+  exit 0
+fi
 [ "${3:-0}" = "1" ] || exit 0
 # A rebase checks out the upstream partway through; post-rewrite reports once it has finished.
 [ -d "$(git rev-parse --git-path rebase-merge)" ] && exit 0
