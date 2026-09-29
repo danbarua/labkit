@@ -15,6 +15,7 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import { diffLines, STATUS_LABEL } from "./format";
+import { toolTally } from "./grouping";
 import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
@@ -238,6 +239,56 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
             <ValueView value={call.rawOutput} />
           </details>
         ) : null}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * A run of consecutive tool calls as one row: how many, which tools, and how they went. Opened, it
+ * is the calls' own rows. It shows the spinner while any call is still going.
+ */
+export function ToolGroup({
+  calls,
+}: {
+  calls: readonly { call: ToolCall; permission?: PermissionEntry | undefined }[];
+}) {
+  const outcomes = calls.map(({ call, permission }) => {
+    const status = call.status ?? "pending";
+    const refused = wasRefused(call, permission === undefined ? undefined : decisionOf(permission));
+    return refused ? "refused" : status;
+  });
+  const count = (what: string) => outcomes.filter((o) => o === what).length;
+  const running = count("in_progress") + count("pending");
+  const failed = count("failed");
+  const refused = count("refused");
+  // The icon says how the run went as a whole; the tallies beside it name the calls that failed.
+  const overall: ToolCallStatus =
+    running > 0 ? "in_progress" : failed + refused === calls.length ? "failed" : "completed";
+  return (
+    <details
+      className="lk-tool lk-tool-group"
+      data-status={overall}
+      onToggle={(event) => {
+        if (event.currentTarget.open) revealBody(event.currentTarget);
+      }}
+    >
+      <summary className="lk-tool-head">
+        <CaretRightIcon className="lk-tool-caret" aria-hidden="true" />
+        <span className="lk-tool-count">{calls.length} tool calls</span>
+        <span className="lk-tool-preview">
+          {toolTally(calls.map(({ call }) => call.name ?? call.title))}
+        </span>
+        <span className="lk-tool-end">
+          {failed > 0 ? <span className="lk-tool-tally failed">{failed} failed</span> : null}
+          {refused > 0 ? <span className="lk-tool-tally refused">{refused} refused</span> : null}
+          <StatusIcon status={overall} refused={false} />
+        </span>
+      </summary>
+      <div className="lk-tool-group-body">
+        {calls.map(({ call, permission }) => (
+          <ToolCard key={call.toolCallId} call={call} {...(permission ? { permission } : {})} />
+        ))}
       </div>
     </details>
   );

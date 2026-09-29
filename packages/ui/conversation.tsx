@@ -18,7 +18,8 @@ import { PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
 import { ICONS } from "./surface";
-import { ToolCard } from "./tool";
+import { drawnBlocks } from "./grouping";
+import { ToolCard, ToolGroup } from "./tool";
 
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Idle",
@@ -129,10 +130,21 @@ export function Conversation({
                 {state.blocks.length === 0 ? (
                   <div className="lk-empty">Nothing here yet.</div>
                 ) : null}
-                {state.blocks.map((block, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: blocks are appended, never reordered
-                  <BlockView key={i} block={block} state={state} />
-                ))}
+                {drawnBlocks(state).map((item) =>
+                  item.kind === "block" ? (
+                    <BlockView key={item.index} block={item.block} state={state} />
+                  ) : (
+                    <ToolGroup
+                      key={item.index}
+                      calls={item.blocks.flatMap((block) => {
+                        const call = state.toolCalls[block.toolCallId];
+                        return call === undefined
+                          ? []
+                          : [{ call, permission: permissionFor(state, block.toolCallId) }];
+                      })}
+                    />
+                  ),
+                )}
               </div>
             </div>
 
