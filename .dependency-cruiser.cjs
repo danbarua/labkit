@@ -88,6 +88,7 @@ module.exports = {
     exclude: {
       path: ["(^|/)node_modules/", "(^|/)dist/", "(^|/)\\.session-artifacts/", "routeTree\\.gen\\.ts$"],
     },
+    parser: "swc",
     tsPreCompilationDeps: true,
     tsConfig: { fileName: "tsconfig.json" },
     enhancedResolveOptions: {

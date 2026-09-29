@@ -3,7 +3,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import ts from "typescript";
+import ts from "typescript-api";
 
 /** Parses one file. `true` keeps parent pointers and node text available. */
 function parse(path: string): ts.SourceFile {

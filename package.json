@@ -31,6 +31,7 @@
 		"check:lint": "biome lint .",
 		"check:migrations": "bun scripts/checks/check-migrations.ts",
 		"check:no-stringly-typed": "bun scripts/checks/check-no-stringly-typed.ts",
+		"check:oxlint": "bunx --bun oxlint --type-aware packages scripts tests",
 		"check:no-tracked-symlinks": "bash scripts/checks/check-no-tracked-symlinks.sh",
 		"check:orm-unwrapped": "bun scripts/checks/check-orm-unwrapped.ts",
 		"check:prop-classes": "bun scripts/checks/check-prop-classes.ts",
@@ -75,12 +76,16 @@
 		"@labkit/app-vscode": "workspace:*",
 		"@labkit/core-db": "workspace:*",
 		"@labkit/core-domain": "workspace:*",
+		"@swc/core": "1.16.12",
 		"@types/bun": "catalog:",
 		"@types/pg": "catalog:",
 		"@vitejs/plugin-react": "catalog:",
 		"dependency-cruiser": "^18.2.0",
 		"drizzle-kit": "catalog:",
+		"oxlint": "1.86.0",
+		"oxlint-tsgolint": "7.0.2003",
 		"typescript": "catalog:",
+		"typescript-api": "npm:typescript@6.0.3",
 		"vite": "catalog:"
 	},
 	"peerDependencies": {
@@ -124,7 +129,7 @@
 			"picocolors": "^1.1.1",
 			"react": "^19.1.1",
 			"react-dom": "^19.1.1",
-			"typescript": "^6.0.3",
+			"typescript": "^7.0.2",
 			"zod": "^4.6.5",
 			"vite": "^7.1.5",
 			"@vitejs/plugin-react": "^5.0.2"
