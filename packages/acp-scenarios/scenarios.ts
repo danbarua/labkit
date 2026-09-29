@@ -211,6 +211,74 @@ export const toolImageResult: Scenario = {
   ],
 };
 
+/** AUC by seed for COMP_5 and its control: the data a `plot` call carries. */
+const aucBySeed = [0.71, 0.74, 0.73, 0.77, 0.79, 0.78, 0.81, 0.83].flatMap((auc, i) => [
+  { seed: i + 1, auc, run: "COMP_5" },
+  { seed: i + 1, auc: [0.62, 0.64, 0.61, 0.66, 0.63, 0.65, 0.64, 0.66][i], run: "control" },
+]);
+
+const plotInput = {
+  title: "AUC by seed",
+  data: aucBySeed,
+  mark: "line",
+  x: "seed",
+  y: "auc",
+  color: "run",
+};
+
+/** The Vega-Lite spec the plot tool makes of its input: the data inline, the layout settled. */
+const plotSpec = {
+  $schema: "https://vega.github.io/schema/vega-lite/v6.json",
+  title: plotInput.title,
+  width: "container",
+  height: 220,
+  data: { values: aucBySeed },
+  mark: { type: "line", point: true },
+  encoding: {
+    x: { field: "seed", type: "ordinal", title: "Seed" },
+    y: { field: "auc", type: "quantitative", title: "AUC", scale: { zero: false } },
+    color: { field: "run", type: "nominal", title: null },
+  },
+};
+
+export const toolPlot: Scenario = {
+  id: "tool-plot",
+  title: "A plot: the model supplies data, the client draws the chart",
+  prompt: "Plot AUC by seed for COMP_5 against its control.",
+  stopReason: "end_turn",
+  steps: [
+    update({
+      sessionUpdate: "tool_call",
+      toolCallId: "call_vl",
+      title: "plot AUC by seed",
+      name: "plot",
+      kind: "other",
+      status: "pending",
+      rawInput: plotInput,
+    }),
+    update({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "call_vl",
+      status: "completed",
+      content: [
+        {
+          type: "content",
+          content: {
+            type: "resource",
+            resource: {
+              uri: "plot://COMP_5/auc-by-seed",
+              mimeType: "application/vnd.vegalite.v6+json",
+              text: JSON.stringify(plotSpec),
+            },
+          },
+        },
+      ],
+      rawOutput: { points: aucBySeed.length },
+    }),
+    say("COMP_5 is above the control at every seed, and the gap widens from seed 4 on.", "m1"),
+  ],
+};
+
 export const planAndDiff: Scenario = {
   id: "plan-and-diff",
   title: "A plan and a file edit",
@@ -318,6 +386,7 @@ export const SCENARIOS: readonly Scenario[] = [
   toolFails,
   permissionRequired,
   toolImageResult,
+  toolPlot,
   planAndDiff,
   sessionReplay,
   noticesAndUsage,

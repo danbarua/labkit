@@ -17,6 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { diffLines, STATUS_LABEL } from "./format";
 import { toolTally } from "./grouping";
+import { isVegaLite, VegaLitePlot } from "./plot";
 import { toolView } from "./tool-views";
 import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
 
@@ -50,6 +51,8 @@ export function ContentView({ block }: { block: ContentBlock }) {
       );
     case "resource": {
       const { resource } = block;
+      if ("text" in resource && isVegaLite(resource.mimeType))
+        return <VegaLitePlot spec={resource.text} />;
       return "text" in resource ? (
         <>
           <div className="lk-caption">{resource.uri}</div>
@@ -199,7 +202,10 @@ function revealBody(row: HTMLElement): void {
 
 /** A result that is seen rather than read, so its card is not closed over it. */
 const isShownNotRead = (item: ToolCallContent): boolean =>
-  item.type === "diff" || (item.type === "content" && item.content.type === "image");
+  item.type === "diff" ||
+  (item.type === "content" &&
+    (item.content.type === "image" ||
+      (item.content.type === "resource" && isVegaLite(item.content.resource.mimeType))));
 
 /**
  * One tool call as a row that opens: what ran and on what, then its status. Opened, it shows the
@@ -217,6 +223,16 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   const opensByDefault = waiting || content.some(isShownNotRead);
   // The tool's own view of its result, when it has one; else the result is drawn by its shape.
   const view = toolView(call);
+  // A result to look at (a chart, an image, a diff) comes before the input that made it, so a
+  // plot is not pushed out of view by its own data.
+  const seenFirst = content.some(isShownNotRead);
+  const inputSection =
+    call.rawInput === undefined ? null : (
+      <section className="lk-tool-section">
+        <h4>Input</h4>
+        {args === undefined ? <ValueView value={call.rawInput} /> : <ArgumentsLine args={args} />}
+      </section>
+    );
 
   return (
     <details
@@ -253,16 +269,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         </span>
       </summary>
       <div className="lk-tool-body">
-        {call.rawInput === undefined ? null : (
-          <section className="lk-tool-section">
-            <h4>Input</h4>
-            {args === undefined ? (
-              <ValueView value={call.rawInput} />
-            ) : (
-              <ArgumentsLine args={args} />
-            )}
-          </section>
-        )}
+        {seenFirst ? null : inputSection}
         {view !== undefined ? (
           <section className="lk-tool-section">
             <h4>Result</h4>
@@ -284,6 +291,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
             ))}
           </section>
         )}
+        {seenFirst ? inputSection : null}
         {showOutput || (view !== undefined && call.rawOutput !== undefined) ? (
           <details className="lk-raw">
             <summary>Raw output</summary>

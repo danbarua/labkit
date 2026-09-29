@@ -334,6 +334,17 @@
   font-size: 12px;
   color: var(--lk-muted);
 }
+/* a chart the agent described */
+.lk-plot {
+  width: 100%;
+  min-height: 120px;
+  color: var(--lk-text);
+}
+.lk-plot svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* tools' own views of their results */
 .lk-file,
 .lk-listing {
