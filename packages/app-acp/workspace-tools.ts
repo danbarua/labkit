@@ -11,6 +11,7 @@ import { SessionIdSchema } from "@labkit/core-agent/types";
 import { z } from "zod";
 
 import type { ClientFiles } from "./client-files.ts";
+import { messageText } from "./error-message.ts";
 import { recordWriteEvidence, type FileBefore } from "./file-write.ts";
 import { FileReadRangeSchema, MAX_FILE_BYTES, type WorkspaceFiles } from "./workspace-files.ts";
 
@@ -96,7 +97,7 @@ export function workspaceTools(
               throw error;
             const cause = diagnosticError(error);
             throw new Error(
-              `read_file failed for ${JSON.stringify(path)}: ${cause.message}. ` +
+              `read_file failed for ${JSON.stringify(path)}: ${messageText(cause, "unknown error")}. ` +
                 `For an oversized response, call read_file with ${JSON.stringify({ path, line: line ?? 1, limit: limit === undefined ? 100 : Math.max(1, Math.floor(limit / 2)) })} to select fewer lines. ` +
                 `For a missing or incorrect path, call list_dir with ${JSON.stringify({ path: dirname(path) })} to discover existing names, then read a path returned by that listing. ` +
                 `If the parent is missing, list an existing ancestor or list_dir with {"path":"."} (workspace root ${JSON.stringify(files.root)}). ` +
@@ -159,7 +160,7 @@ export function workspaceTools(
                 kind: "unavailable",
                 reasonCode: "read_failed",
                 source: "client",
-                reason: `Editor baseline read failed: ${diagnosticError(error).message}. File existence is unknown`,
+                reason: `Editor baseline read failed: ${messageText(diagnosticError(error), "unknown error")}. File existence is unknown`,
               };
             }
           }

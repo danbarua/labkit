@@ -469,10 +469,10 @@ test("concurrent loads from two connections take the session over one after the 
     expect(winner).not.toBe(loser);
     expect((await winner.prompt(sessionId)).stopReason).toBe("end_turn");
     expect((await rejection(loser.prompt(sessionId))).message).toContain(
-      `connection ${second!.connectionId} took it over`,
+      `connection ${second!.connectionId as string} took it over`,
     );
     expect((await rejection(a.prompt(sessionId))).message).toContain(
-      `connection ${first!.connectionId} took it over`,
+      `connection ${first!.connectionId as string} took it over`,
     );
   } finally {
     for (const connection of clients) await connection.close();

@@ -18,6 +18,7 @@ import { streamResponse, streamVector } from "../core-agent/providers/testing/st
 import type { AcpOptions } from "./adapter.ts";
 import { workspaceAgent } from "./examples/vscode-workspace.ts";
 import type { AcpPromptCapabilities } from "./prompt-input.ts";
+import { bodyText } from "./testing/fixtures.ts";
 import { harness, setup } from "./testing/harness.ts";
 
 type Flag = "image" | "audio" | "embeddedContext";
@@ -98,7 +99,7 @@ function bound(profile: CompletionProfile, promptCapabilities: AcpPromptCapabili
                 transport: {
                   baseUrl: "https://provider.invalid",
                   fetch: (async (_url: string, init?: RequestInit) => {
-                    bodies.push(JSON.parse(String(init?.body)));
+                    bodies.push(JSON.parse(bodyText(init)));
                     return streamResponse(streamVector(profile));
                   }) as unknown as typeof fetch,
                 },

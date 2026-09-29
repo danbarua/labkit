@@ -130,7 +130,10 @@ test("separate processes contend atomically; cancelled retry preserves its commi
       return result;
     }),
   );
-  expect(outcomes.map((value) => value.kind).sort()).toEqual(["committed", "conflict"]);
+  expect(outcomes.map((value) => value.kind).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))).toEqual([
+    "committed",
+    "conflict",
+  ]);
   const committed = outcomes.find((value) => value.kind === "committed");
   const controller = new AbortController();
   controller.abort();

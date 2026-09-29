@@ -25,9 +25,13 @@ export const prompt = (sessionId: string) => ({
   prompt: [{ type: "text", text: "Go" }],
 });
 
-export function configurable(
-  complete: (model: string) => unknown | Promise<unknown> = () => answer,
-) {
+/** The JSON text a scripted provider's `fetch` received; the transport always sends a string. */
+export function bodyText(init: RequestInit | undefined): string {
+  if (typeof init?.body !== "string") throw new Error("Expected a JSON string request body");
+  return init.body;
+}
+
+export function configurable(complete: (model: string) => unknown = () => answer) {
   const base = setup();
   const requests: { model: string; tools?: { function: { name: string } }[] }[] = [];
   const options: AcpOptions = {
@@ -58,7 +62,7 @@ export function configurable(
                 transport: {
                   baseUrl: "https://test.invalid",
                   fetch: (async (_url, init) => {
-                    const body = JSON.parse(String(init?.body));
+                    const body = JSON.parse(bodyText(init));
                     requests.push(body);
                     const result = (await complete(body.model)) as {
                       text: string;

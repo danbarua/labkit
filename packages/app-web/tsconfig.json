@@ -29,6 +29,7 @@
     "e2e",
     "playwright.config.ts",
     "../core-db/sql-modules.d.ts",
+    "../../types/bun-test.d.ts",
     "../ui"
   ]
 }

@@ -327,7 +327,7 @@ export async function workspaceFiles(cwd: string, additionalDirectories: readonl
       cwd: primary.root,
       path: resolve(cwd, raw),
       limitBytes,
-      ...(range ?? {}),
+      ...range,
     };
     diagnostic("acp.files", "debug", "workspace.file.started", context);
     try {
