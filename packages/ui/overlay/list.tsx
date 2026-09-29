@@ -113,6 +113,7 @@ export function OptionList({
   onPick,
   onHover,
   empty = "Nothing matches",
+  onKeyDown,
 }: {
   id: string;
   label: string;
@@ -121,6 +122,11 @@ export function OptionList({
   onPick: (item: PickItem) => void;
   onHover: (index: number) => void;
   empty?: string;
+  /**
+   * Given when the list holds focus itself, with no search box in front of it: the list takes
+   * focus when its overlay opens, and these keys move through it.
+   */
+  onKeyDown?: (event: KeyboardEvent) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -175,7 +181,21 @@ export function OptionList({
   );
 
   return (
-    <div ref={ref} id={id} role="listbox" aria-label={label} className="lk-options">
+    <div
+      ref={ref}
+      id={id}
+      role="listbox"
+      aria-label={label}
+      className="lk-options"
+      {...(onKeyDown === undefined
+        ? {}
+        : {
+            tabIndex: 0,
+            "data-autofocus": true,
+            "aria-activedescendant": active < 0 ? undefined : optionId(id, active),
+            onKeyDown,
+          })}
+    >
       {groups.map(([group, members], g) =>
         group === undefined ? (
           members.map(option)

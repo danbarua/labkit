@@ -937,6 +937,12 @@ button.lk-chip[aria-pressed="true"] {
   color: var(--lk-text);
   box-shadow: 0 24px 64px rgba(11, 18, 32, 0.28);
 }
+/* A dialog placed on something (a composer's picker): no centring; the owner sets the edges. */
+.lk-modal.lk-modal-placed {
+  margin: 0;
+  top: auto;
+  right: auto;
+}
 .lk-modal::backdrop {
   background: rgba(11, 18, 32, 0.45);
 }

@@ -80,6 +80,38 @@ describe("a palette", () => {
     const html = renderToStaticMarkup(<PalettePanel title="Model" items={[]} onPick={() => {}} />);
     expect(html).toContain('role="status">Nothing matches');
   });
+
+  test("without search the list itself takes focus and points at the current item", () => {
+    const html = renderToStaticMarkup(
+      <PalettePanel
+        title="Thinking"
+        items={[item("Low"), item("High", { current: true })]}
+        onPick={() => {}}
+        search={false}
+      />,
+    );
+    expect(html).not.toContain("<input");
+    expect(html).toMatch(/role="listbox"[^>]*tabindex="0"[^>]*data-autofocus="true"/);
+    const active = /aria-activedescendant="([^"]+)"/.exec(html)?.[1];
+    expect(html).toContain(`id="${active}" role="option" aria-selected="true"`);
+  });
+});
+
+describe("a placed modal", () => {
+  test("sits where it is put instead of the centre of the window", () => {
+    const html = renderToStaticMarkup(
+      <Modal
+        open
+        onClose={() => {}}
+        title="Mode"
+        place={{ left: 136, bottom: 282, width: 420, maxHeight: 440 }}
+      >
+        <p>body</p>
+      </Modal>,
+    );
+    expect(html).toContain('class="lk-modal lk-modal-placed"');
+    expect(html).toContain("left:136px;bottom:282px;width:420px;max-height:440px");
+  });
 });
 
 describe("a modal", () => {

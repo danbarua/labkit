@@ -9,6 +9,7 @@ import {
   type PickItem,
   useListNavigation,
 } from "./overlay/list";
+import type { Place } from "./overlay/modal";
 import { CommandPalette } from "./overlay/palette";
 import { arrange, pickedSetting, SessionControls, settingItems } from "./session-controls";
 
@@ -77,6 +78,8 @@ export function Composer({
   const [caret, setCaret] = useState(initialText.length);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const shell = useRef<HTMLDivElement>(null);
+  const [placed, setPlaced] = useState<Place | undefined>(undefined);
   const box = useRef<HTMLTextAreaElement>(null);
   const listId = useId();
   const statusId = useId();
@@ -164,6 +167,8 @@ export function Composer({
       return {
         title: "Commands",
         placeholder: "Search commands",
+        search: true,
+        span: "box" as const,
         items: commands.map(commandItem),
         onPick: (item: PickItem) => place(splice(text, 0, 0, `${item.label} `)),
       };
@@ -172,6 +177,8 @@ export function Composer({
       return {
         title: "Mention",
         placeholder: "Search what to mention",
+        search: true,
+        span: "box" as const,
         items: mentions ?? [],
         onPick: (item: PickItem) => {
           const lead = caret > 0 && !/\s/.test(text[caret - 1] ?? "") ? " " : "";
@@ -184,6 +191,8 @@ export function Composer({
       return {
         title: "Session settings",
         placeholder: "Search settings",
+        search: true,
+        span: "left" as const,
         items: rest.flatMap((option) => settingItems(option, true)),
         onPick: setting,
       };
@@ -191,16 +200,43 @@ export function Composer({
     if (overlay !== null) {
       const option = configOptions.find((o) => o.id === overlay.optionId);
       if (option !== undefined) {
+        const items = settingItems(option, false);
         return {
           title: option.name,
           placeholder: `Search ${option.name.toLowerCase()}`,
-          items: settingItems(option, false),
+          items,
           onPick: setting,
+          // Worth searching: models, or any list too long to take in at a glance. Not two modes.
+          search: option.category === "model" || items.length > 8,
+          span: "left" as const,
         };
       }
     }
     return undefined;
   })();
+
+  // A picker opens on the composer box, above it: full width for what goes into the message (a
+  // command, a mention), narrower and left-aligned for a setting.
+  const span = paletteProps?.span;
+  useLayoutEffect(() => {
+    const box = shell.current;
+    if (span === undefined || box === null) {
+      setPlaced(undefined);
+      return;
+    }
+    const measure = () => {
+      const rect = box.getBoundingClientRect();
+      setPlaced({
+        left: rect.left,
+        bottom: window.innerHeight - rect.top + 8,
+        width: span === "box" ? rect.width : Math.min(420, rect.width),
+        maxHeight: Math.max(160, rect.top - 16),
+      });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [span]);
 
   return (
     <form
@@ -210,7 +246,7 @@ export function Composer({
         send();
       }}
     >
-      <div className="lk-composer-box">
+      <div className="lk-composer-box" ref={shell}>
         {listOpen ? (
           <div className="lk-suggest">
             <OptionList
@@ -321,6 +357,8 @@ export function Composer({
         items={paletteProps?.items ?? []}
         onPick={paletteProps?.onPick ?? (() => {})}
         {...(paletteProps?.placeholder ? { placeholder: paletteProps.placeholder } : {})}
+        search={paletteProps?.search ?? true}
+        place={placed}
       />
     </form>
   );

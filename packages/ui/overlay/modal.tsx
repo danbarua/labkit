@@ -3,6 +3,12 @@ import { type ReactNode, useEffect, useId, useRef } from "react";
 import { useFocusTrap } from "./focus-trap";
 
 /**
+ * Where a dialog sits instead of the centre of the window: its left edge and the space below its
+ * bottom edge, in viewport pixels, its width, and the most it may be tall.
+ */
+export type Place = Readonly<{ left: number; bottom: number; width: number; maxHeight: number }>;
+
+/**
  * A modal dialog on the browser's own `<dialog>`: while open the rest of the page cannot be
  * reached, Escape or a click on the backdrop closes it, and focus returns to what opened it.
  *
@@ -15,6 +21,7 @@ export function Modal({
   title,
   hideTitle = false,
   className,
+  place,
   children,
 }: {
   open: boolean;
@@ -23,6 +30,7 @@ export function Modal({
   title: string;
   hideTitle?: boolean;
   className?: string;
+  place?: Place;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -40,7 +48,19 @@ export function Modal({
     // biome-ignore lint/a11y/useKeyWithClickEvents: the backdrop click's keyboard twin is Escape, handled by onCancel
     <dialog
       ref={ref}
-      className={["lk-modal", className].filter(Boolean).join(" ")}
+      className={["lk-modal", className, place ? "lk-modal-placed" : undefined]
+        .filter(Boolean)
+        .join(" ")}
+      {...(place === undefined
+        ? {}
+        : {
+            style: {
+              left: place.left,
+              bottom: place.bottom,
+              width: place.width,
+              maxHeight: place.maxHeight,
+            },
+          })}
       aria-labelledby={titleId}
       // Escape: the browser would close the dialog behind React's back; the owner decides.
       onCancel={(event) => {
