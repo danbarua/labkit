@@ -4,6 +4,7 @@ import type { AgentContext, ClientCapabilities } from "@agentclientprotocol/sdk"
 import type { ToolRunContext } from "@labkit/core-agent/host";
 import { diagnostic, diagnosticError } from "@labkit/core-agent/logging";
 
+import { messageText } from "./error-message.ts";
 import { waitForBoundary } from "./session-config.ts";
 import { FileReadRangeSchema, MAX_FILE_BYTES, type FileReadRange } from "./workspace-files.ts";
 
@@ -52,7 +53,7 @@ export function clientFiles(
       operation,
       path,
       timeoutMs: 60000,
-      ...(range ?? {}),
+      ...range,
     };
     diagnostic("acp", "debug", "client_file.requested", fields);
     try {
@@ -83,7 +84,7 @@ export function clientFiles(
       if (cancelled || timedOut) throw error;
       const details = diagnosticError(error);
       throw new Error(
-        `${operation} failed for ${path}: ${details.message ?? "Unknown client error"}${details.data === undefined ? "" : `; ${JSON.stringify(details.data, withoutStacks)}`}`,
+        `${operation} failed for ${path}: ${messageText(details, "Unknown client error")}${details.data === undefined ? "" : `; ${JSON.stringify(details.data, withoutStacks)}`}`,
         {
           cause: error,
         },

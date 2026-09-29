@@ -2,6 +2,7 @@ import type { AgentContext } from "@agentclientprotocol/sdk";
 import type { PermissionPort } from "@labkit/core-agent";
 import { diagnostic, diagnosticError } from "@labkit/core-agent/logging";
 
+import { messageText } from "../error-message.ts";
 import type { AdapterCore } from "./core.ts";
 import type { Session } from "./session.ts";
 import { locatedTitle } from "./updates.ts";
@@ -112,7 +113,7 @@ export function forwardPermission(
             );
             reject(
               new Error(
-                `The client failed session/request_permission for ${request.toolCall.title}: ${diagnosticError(error).message ?? "unknown client error"}. The tool did not run.`,
+                `The client failed session/request_permission for ${request.toolCall.title}: ${messageText(diagnosticError(error), "unknown client error")}. The tool did not run.`,
                 { cause: error },
               ),
             );

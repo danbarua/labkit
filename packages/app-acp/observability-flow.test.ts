@@ -75,7 +75,9 @@ test("persisted CLI trace joins ACP, permission, tool and provider failure acros
       }
       expect(buffer).toBe("");
     })();
-    const send = (message: unknown) => child.stdin.write(`${JSON.stringify(message)}\n`);
+    const send = (message: unknown) => {
+      void child.stdin.write(`${JSON.stringify(message)}\n`);
+    };
     const wait = async (predicate: () => boolean) => {
       const deadline = Date.now() + 5_000;
       while (!predicate()) {
@@ -95,7 +97,7 @@ test("persisted CLI trace joins ACP, permission, tool and provider failure acros
       wait,
       response,
       async stop() {
-        child.stdin.end();
+        void child.stdin.end();
         expect(await child.exited).toBe(0);
         await reading;
         expect(await stderr).toContain(logs);

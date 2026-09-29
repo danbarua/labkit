@@ -185,7 +185,7 @@ export function acpHttpHandler(
     close() {
       stopping ??= (async () => {
         await server.close();
-        await Promise.allSettled([...live]);
+        await Promise.allSettled(live);
       })();
       return stopping;
     },

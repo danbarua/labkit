@@ -2,7 +2,7 @@ import { expect, test } from "@logtape/testing-bun/autoload";
 
 import { deferred, until } from "../core-agent/agent/test-support.ts";
 import type { AcpOptions } from "./adapter.ts";
-import { answer } from "./testing/fixtures.ts";
+import { answer, bodyText } from "./testing/fixtures.ts";
 import { harness, setup } from "./testing/harness.ts";
 
 test("commands are discovered on new/load and expand once before journal admission while retaining attachments", async () => {
@@ -41,7 +41,7 @@ test("commands are discovered on new/load and expand once before journal admissi
                 transport: {
                   baseUrl: "https://provider.invalid",
                   fetch: (async (_url, init) => {
-                    requestText = String(init?.body);
+                    requestText = bodyText(init);
                     return Response.json({ choices: [{ message: { content: "Done" } }] });
                   }) as typeof fetch,
                 },
