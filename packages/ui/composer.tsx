@@ -148,13 +148,28 @@ export function Composer({
     }
   };
 
-  // The box grows with what is written, up to the cap its style sets, then scrolls.
+  // The box grows with what is written, up to the cap its style sets, then scrolls. Once the text
+  // first goes past one line, the height it had then is its least until it is emptied, so deleting
+  // back to one line does not make it jump between one line and two at the wrap.
+  const emptyHeight = useRef(0);
+  const wrappedHeight = useRef(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the text changes
   useLayoutEffect(() => {
     const el = box.current;
     if (el === null) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    const needed = el.scrollHeight;
+    if (text === "") {
+      emptyHeight.current = needed;
+      wrappedHeight.current = 0;
+    } else if (
+      wrappedHeight.current === 0 &&
+      emptyHeight.current > 0 &&
+      needed > emptyHeight.current
+    ) {
+      wrappedHeight.current = needed;
+    }
+    el.style.height = `${Math.max(needed, wrappedHeight.current)}px`;
   }, [text]);
 
   // Once a command is chosen, what it expects next, until something is written after it.

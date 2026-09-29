@@ -17,6 +17,9 @@
 
 * {
   box-sizing: border-box;
+  /* A scrollbar is a thin thumb and nothing else: no track, no border, no background. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-dim) 45%, transparent) transparent;
 }
 
 html,
