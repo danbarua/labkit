@@ -10,6 +10,7 @@ import {
   CheckCircleIcon,
   CircleDashedIcon,
   CircleNotchIcon,
+  MinusCircleIcon,
   type Icon,
   ProhibitIcon,
   XCircleIcon,
@@ -111,14 +112,28 @@ function ToolContentView({ item }: { item: ToolCallContent }) {
   }
 }
 
-/** What the person decided about a call, in the words of the option they chose. */
-function decisionOf(entry: PermissionEntry): { label: string; tone: string } {
+/** A receipt's words for each kind of option, whatever the agent named the option itself. */
+const RECEIPT: Record<string, string> = {
+  allow_once: "Allowed once",
+  allow_always: "Allowed always",
+  reject_once: "Denied",
+  reject_always: "Denied always",
+};
+
+/**
+ * What the person decided about a call, as a receipt: past tense from the kind of option they
+ * chose ("Allowed once", "Denied"), with the agent's own name for the option as the hover text.
+ * A request cancelled before anyone answered is its own case, never a denial.
+ */
+function decisionOf(entry: PermissionEntry): { label: string; tone: string; option?: string } {
   const { outcome } = entry;
   if (outcome === undefined) return { label: "Waiting for you", tone: "waiting" };
-  if (outcome.outcome === "cancelled") return { label: "Cancelled", tone: "" };
+  if (outcome.outcome === "cancelled")
+    return { label: "Cancelled before a decision", tone: "cancelled" };
   const option = entry.request.options.find((o) => o.optionId === outcome.optionId);
   const tone = option?.kind.startsWith("allow") ? "allow" : "reject";
-  return { label: option?.name ?? outcome.optionId, tone };
+  const label = (option && RECEIPT[option.kind]) ?? option?.name ?? outcome.optionId;
+  return { label, tone, ...(option ? { option: option.name } : {}) };
 }
 
 /**
@@ -141,6 +156,7 @@ const wasRefused = (call: ToolCall, decision: { tone: string } | undefined): boo
     (call.rawOutput as { refused?: unknown }).refused === true);
 
 const STATUS_ICON: Record<string, Icon> = {
+  cancelled: MinusCircleIcon,
   pending: CircleDashedIcon,
   in_progress: CircleNotchIcon,
   completed: CheckCircleIcon,
@@ -148,10 +164,21 @@ const STATUS_ICON: Record<string, Icon> = {
   refused: ProhibitIcon,
 };
 
-/** The call's status as a coloured icon, its word as the label a screen reader or a hover shows. */
-function StatusIcon({ status, refused }: { status: ToolCallStatus; refused: boolean }) {
-  const shown = refused ? "refused" : status;
-  const label = refused ? "Refused" : STATUS_LABEL[status];
+/**
+ * The call's status as a coloured icon, its word as the label a screen reader or a hover shows. A
+ * call whose permission request was cancelled did not fail and was not refused: it has its own.
+ */
+function StatusIcon({
+  status,
+  refused,
+  cancelled = false,
+}: {
+  status: ToolCallStatus;
+  refused: boolean;
+  cancelled?: boolean;
+}) {
+  const shown = cancelled ? "cancelled" : refused ? "refused" : status;
+  const label = cancelled ? "Cancelled" : refused ? "Refused" : STATUS_LABEL[status];
   const Glyph = STATUS_ICON[shown] ?? CircleDashedIcon;
   return (
     <span className={`lk-status ${shown}`} role="img" aria-label={label} title={label}>
@@ -208,9 +235,18 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         {preview === undefined ? null : <span className="lk-tool-preview">{preview}</span>}
         <span className="lk-tool-end">
           {decision === undefined ? null : (
-            <span className={`lk-decision ${decision.tone}`}>{decision.label}</span>
+            <span
+              className={`lk-decision ${decision.tone}`}
+              {...(decision.option ? { title: decision.option } : {})}
+            >
+              {decision.label}
+            </span>
           )}
-          <StatusIcon status={status} refused={wasRefused(call, decision)} />
+          <StatusIcon
+            status={status}
+            refused={wasRefused(call, decision)}
+            cancelled={decision?.tone === "cancelled"}
+          />
         </span>
       </summary>
       <div className="lk-tool-body">
@@ -255,16 +291,19 @@ export function ToolGroup({
 }) {
   const outcomes = calls.map(({ call, permission }) => {
     const status = call.status ?? "pending";
-    const refused = wasRefused(call, permission === undefined ? undefined : decisionOf(permission));
-    return refused ? "refused" : status;
+    const decision = permission === undefined ? undefined : decisionOf(permission);
+    if (decision?.tone === "cancelled") return "cancelled";
+    return wasRefused(call, decision) ? "refused" : status;
   });
   const count = (what: string) => outcomes.filter((o) => o === what).length;
   const running = count("in_progress") + count("pending");
   const failed = count("failed");
   const refused = count("refused");
-  // The icon says how the run went as a whole; the tallies beside it name the calls that failed.
+  const cancelled = count("cancelled");
+  // The icon says how the run went as a whole: done if any call completed. The tallies beside it
+  // name the calls that did not.
   const overall: ToolCallStatus =
-    running > 0 ? "in_progress" : failed + refused === calls.length ? "failed" : "completed";
+    running > 0 ? "in_progress" : count("completed") === 0 ? "failed" : "completed";
   return (
     <details
       className="lk-tool lk-tool-group"
@@ -282,6 +321,9 @@ export function ToolGroup({
         <span className="lk-tool-end">
           {failed > 0 ? <span className="lk-tool-tally failed">{failed} failed</span> : null}
           {refused > 0 ? <span className="lk-tool-tally refused">{refused} refused</span> : null}
+          {cancelled > 0 ? (
+            <span className="lk-tool-tally cancelled">{cancelled} cancelled</span>
+          ) : null}
           <StatusIcon status={overall} refused={false} />
         </span>
       </summary>

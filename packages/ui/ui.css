@@ -345,6 +345,9 @@
 .lk-tool-tally.refused {
   color: var(--lk-danger);
 }
+.lk-tool-tally.cancelled {
+  color: var(--lk-muted);
+}
 .lk-tool-group-body {
   display: flex;
   flex-direction: column;
@@ -400,6 +403,10 @@
 }
 .lk-decision.waiting {
   color: var(--lk-warn);
+}
+.lk-decision.cancelled {
+  color: var(--lk-muted);
+  font-style: italic;
 }
 .lk-tool-body {
   display: flex;
@@ -651,6 +658,16 @@
   width: 100%;
   margin: 0 auto;
   padding: 0 16px 8px;
+}
+.lk-permission-batch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px dashed var(--lk-warn);
+  border-radius: var(--lk-radius);
+  font-size: 13px;
 }
 .lk-permission {
   padding: 12px;

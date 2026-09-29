@@ -108,11 +108,19 @@ describe("permission", () => {
   test("once answered the prompt is gone and the card records the choice", async () => {
     const html = await draw("permission-granted", true);
     expect(html).not.toContain("Permission needed");
-    expect(html).toContain('lk-decision allow">Allow once</span>');
+    // A receipt in the past tense, from the kind of option; the agent's name for it on hover.
+    expect(html).toContain('lk-decision allow" title="Allow once">Allowed once</span>');
     expect(html).not.toMatch(/<details class="lk-tool"[^>]* open="">/);
     const refused = await draw("permission-refused", true);
-    expect(refused).toContain('lk-decision reject">Reject</span>');
+    expect(refused).toContain('lk-decision reject" title="Reject">Denied</span>');
     expect(refused).toContain('class="lk-status refused" role="img" aria-label="Refused"');
+  });
+
+  test("a request cancelled before an answer is recorded as that, not as a denial", async () => {
+    const html = await draw("permission-cancelled", true);
+    expect(html).toContain('lk-decision cancelled">Cancelled before a decision</span>');
+    expect(html).toContain('class="lk-status cancelled" role="img" aria-label="Cancelled"');
+    expect(html).not.toContain("Denied");
   });
 });
 

@@ -23,7 +23,7 @@ import { Composer } from "./composer";
 import { fillPercent, formatCost } from "./format";
 import type { PickItem } from "./overlay/list";
 import { ToastProvider } from "./overlay/toast";
-import { PermissionPrompt } from "./permission";
+import { PermissionBatch, PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
 import { ICONS } from "./surface";
@@ -174,6 +174,9 @@ export function Conversation({
 
             {pending.length > 0 ? (
               <div className="lk-permissions">
+                {pending.length > 1 ? (
+                  <PermissionBatch entries={pending} onAnswer={onAnswer} />
+                ) : null}
                 {pending.map((entry) => (
                   <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
                 ))}
