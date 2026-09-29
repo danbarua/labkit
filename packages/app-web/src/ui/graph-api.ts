@@ -65,7 +65,8 @@ export function graphPath(workspace: string, id: string): string {
 export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
   const text = await res.text();
-  if (!res.ok) throw new Error(`${res.status}: ${text.trim() || res.statusText}`);
+  if (!res.ok)
+    throw new Error(`GET ${url} answered ${res.status}: ${text.trim() || res.statusText}`);
   try {
     return JSON.parse(text) as T;
   } catch {
