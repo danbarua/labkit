@@ -1,6 +1,21 @@
-import type { ContentBlock, ToolCall, ToolCallContent } from "@agentclientprotocol/sdk";
+import type {
+  ContentBlock,
+  ToolCall,
+  ToolCallContent,
+  ToolCallStatus,
+} from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
-import { diffLines, pretty, STATUS_LABEL } from "./format";
+import {
+  CaretRightIcon,
+  CheckCircleIcon,
+  CircleDashedIcon,
+  CircleNotchIcon,
+  type Icon,
+  ProhibitIcon,
+  XCircleIcon,
+} from "@phosphor-icons/react";
+import { diffLines, STATUS_LABEL } from "./format";
+import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
 
@@ -77,7 +92,12 @@ function DiffView({
 function ToolContentView({ item }: { item: ToolCallContent }) {
   switch (item.type) {
     case "content":
-      return <ContentView block={item.content} />;
+      // A tool's text is often its result serialised: drawn by shape, not as an escaped string.
+      return item.content.type === "text" ? (
+        <ValueView value={item.content.text} />
+      ) : (
+        <ContentView block={item.content} />
+      );
     case "diff":
       return <DiffView path={item.path} before={item.oldText} after={item.newText} />;
     case "terminal":
@@ -100,62 +120,125 @@ function decisionOf(entry: PermissionEntry): { label: string; tone: string } {
   return { label: option?.name ?? outcome.optionId, tone };
 }
 
+/**
+ * Whether `rawOutput` says only what the drawn content already says. Tools commonly report one
+ * result twice, as a text block and as the raw output; drawing both repeats it.
+ */
+function outputRepeatsContent(content: readonly ToolCallContent[], rawOutput: unknown): boolean {
+  if (content.length !== 1) return false;
+  const [only] = content;
+  return only?.type === "content" && only.content.type === "text"
+    ? sameValue(only.content.text, rawOutput)
+    : false;
+}
+
+/** Whether the call did not run because the person refused it. */
+const wasRefused = (call: ToolCall, decision: { tone: string } | undefined): boolean =>
+  decision?.tone === "reject" ||
+  (typeof call.rawOutput === "object" &&
+    call.rawOutput !== null &&
+    (call.rawOutput as { refused?: unknown }).refused === true);
+
+const STATUS_ICON: Record<string, Icon> = {
+  pending: CircleDashedIcon,
+  in_progress: CircleNotchIcon,
+  completed: CheckCircleIcon,
+  failed: XCircleIcon,
+  refused: ProhibitIcon,
+};
+
+/** The call's status as a coloured icon, its word as the label a screen reader or a hover shows. */
+function StatusIcon({ status, refused }: { status: ToolCallStatus; refused: boolean }) {
+  const shown = refused ? "refused" : status;
+  const label = refused ? "Refused" : STATUS_LABEL[status];
+  const Glyph = STATUS_ICON[shown] ?? CircleDashedIcon;
+  return (
+    <span className={`lk-status ${shown}`} role="img" aria-label={label} title={label}>
+      <Glyph aria-hidden="true" weight="fill" />
+    </span>
+  );
+}
+
+/**
+ * Scrolls the transcript just far enough that an opened row's contents are in view, or its top if
+ * the contents are taller than the view.
+ */
+function revealBody(row: HTMLElement): void {
+  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  row.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "auto" });
+}
+
+/** A result that is seen rather than read, so its card is not closed over it. */
+const isShownNotRead = (item: ToolCallContent): boolean =>
+  item.type === "diff" || (item.type === "content" && item.content.type === "image");
+
+/**
+ * One tool call as a row that opens: what ran and on what, then its status. Opened, it shows the
+ * input and the result. A call starts open when there is something to look at rather than read:
+ * a request waiting on the person, or a result that is an image or a diff.
+ */
 export function ToolCard({ call, permission }: { call: ToolCall; permission?: PermissionEntry }) {
   const status = call.status ?? "pending";
-  const locations = call.locations ?? [];
   const content = call.content ?? [];
   const decision = permission === undefined ? undefined : decisionOf(permission);
-  const hasBody =
-    locations.length > 0 ||
-    content.length > 0 ||
-    call.rawInput !== undefined ||
-    call.rawOutput !== undefined;
+  const args = call.rawInput === undefined ? undefined : inlineArguments(call.rawInput);
+  const preview = call.rawInput === undefined ? undefined : inputPreview(call.rawInput);
+  const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
+  const waiting = permission !== undefined && permission.outcome === undefined;
+  const opensByDefault = waiting || content.some(isShownNotRead);
 
   return (
-    <article className="lk-tool" data-status={status}>
-      <div className="lk-tool-head">
-        <span className="lk-tool-title">{call.title}</span>
-        {call.name ? <span className="lk-tool-name">{call.name}</span> : null}
+    <details
+      className="lk-tool"
+      data-status={status}
+      open={opensByDefault}
+      onToggle={(event) => {
+        if (event.currentTarget.open) revealBody(event.currentTarget);
+      }}
+    >
+      {/* The row names the tool and what it was given; the agent's title, which says the same
+          at more length, is its hover text. */}
+      <summary
+        className="lk-tool-head"
+        {...(call.name && call.title !== call.name ? { title: call.title } : {})}
+      >
+        <CaretRightIcon className="lk-tool-caret" aria-hidden="true" />
+        <span className="lk-tool-name">{call.name ?? call.title}</span>
+        {preview === undefined ? null : <span className="lk-tool-preview">{preview}</span>}
         <span className="lk-tool-end">
-          {call._meta?.["labkit.dev/reconstructed"] === true ? (
-            <span
-              className="lk-decision"
-              title="Rebuilt from the saved result when the session was reopened"
-            >
-              restored
-            </span>
-          ) : null}
           {decision === undefined ? null : (
             <span className={`lk-decision ${decision.tone}`}>{decision.label}</span>
           )}
-          <span className={`lk-status ${status}`}>{STATUS_LABEL[status]}</span>
+          <StatusIcon status={status} refused={wasRefused(call, decision)} />
         </span>
+      </summary>
+      <div className="lk-tool-body">
+        {call.rawInput === undefined ? null : (
+          <section className="lk-tool-section">
+            <h4>Input</h4>
+            {args === undefined ? (
+              <ValueView value={call.rawInput} />
+            ) : (
+              <ArgumentsLine args={args} />
+            )}
+          </section>
+        )}
+        {content.length === 0 ? null : (
+          <section className="lk-tool-section">
+            <h4>Result</h4>
+            {content.map((item, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
+              <ToolContentView key={i} item={item} />
+            ))}
+          </section>
+        )}
+        {showOutput ? (
+          <details className="lk-raw">
+            <summary>Raw output</summary>
+            <ValueView value={call.rawOutput} />
+          </details>
+        ) : null}
       </div>
-      {hasBody ? (
-        <div className="lk-tool-body">
-          {locations.length > 0 ? (
-            <div className="lk-locations">
-              {locations.map((l) => (l.line == null ? l.path : `${l.path}:${l.line}`)).join(", ")}
-            </div>
-          ) : null}
-          {content.map((item, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
-            <ToolContentView key={i} item={item} />
-          ))}
-          {call.rawInput !== undefined ? (
-            <details className="lk-raw">
-              <summary>Input</summary>
-              <pre className="lk-pre">{pretty(call.rawInput)}</pre>
-            </details>
-          ) : null}
-          {call.rawOutput !== undefined ? (
-            <details className="lk-raw">
-              <summary>Output</summary>
-              <pre className="lk-pre">{pretty(call.rawOutput)}</pre>
-            </details>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
+    </details>
   );
 }

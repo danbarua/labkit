@@ -13,6 +13,7 @@
     "@labkit/design": "workspace:*",
     "@labkit/records": "workspace:*",
     "@labkit/view-model": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "unist-util-visit": "^5.0.0"

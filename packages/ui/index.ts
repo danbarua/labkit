@@ -1,4 +1,17 @@
+export { Composer, type ComposerProps } from "./composer";
 export { Conversation, type ConversationProps } from "./conversation";
 export { diffLines } from "./format";
 export { MarkdownText } from "./markdown";
-export { type RecordsConfig } from "./records-context";
+export { focusableIn, useFocusTrap } from "./overlay/focus-trap";
+export { filterItems, OptionList, type PickItem, useListNavigation } from "./overlay/list";
+export { Modal } from "./overlay/modal";
+export { CommandPalette, PalettePanel, type PaletteProps } from "./overlay/palette";
+export {
+  ToastProvider,
+  type ToastOptions,
+  type Toasts,
+  type ToastTone,
+  useToasts,
+} from "./overlay/toast";
+export type { RecordsConfig } from "./records-context";
+export { Surface } from "./surface";

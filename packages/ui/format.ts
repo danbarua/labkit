@@ -77,12 +77,3 @@ export function fillPercent(used: number, size: number): number {
   if (size <= 0) return 0;
   return Math.min(100, Math.max(0, Math.round((used / size) * 100)));
 }
-
-/** A value as indented JSON, for showing what a tool was given or returned. */
-export function pretty(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2) ?? String(value);
-  } catch {
-    return String(value);
-  }
-}

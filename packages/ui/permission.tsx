@@ -1,6 +1,6 @@
 import type { PermissionOption, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
-import { pretty } from "./format";
+import { ValueView } from "./value";
 
 const buttonClass = (kind: PermissionOption["kind"]): string => {
   if (kind === "allow_once") return "lk-btn primary";
@@ -28,9 +28,7 @@ export function PermissionPrompt({
         {toolCall.name ? <span className="lk-mono">{toolCall.name} · </span> : null}
         it asks before it runs
       </p>
-      {toolCall.rawInput === undefined ? null : (
-        <pre className="lk-pre">{pretty(toolCall.rawInput)}</pre>
-      )}
+      {toolCall.rawInput === undefined ? null : <ValueView value={toolCall.rawInput} />}
       <div className="lk-actions">
         {options.map((option) => (
           <button

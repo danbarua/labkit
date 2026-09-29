@@ -2,6 +2,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { routeTree } from "./routeTree.gen";
+import { LoadError } from "./ui/LoadError";
 import "./styles.css";
 
 // The API owns every other path, so the browser app answers only under this one.
@@ -10,9 +11,7 @@ const router = createRouter({
   basepath: "/app",
   defaultPreload: "intent",
   defaultPendingMs: 300,
-  defaultErrorComponent: ({ error }) => (
-    <p className="load-error page">{error instanceof Error ? error.message : String(error)}</p>
-  ),
+  defaultErrorComponent: LoadError,
   defaultPendingComponent: () => <p className="dim page">loading…</p>,
 });
 

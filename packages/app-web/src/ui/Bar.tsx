@@ -15,6 +15,17 @@ export function Bar({ workspace, children }: { workspace?: string; children?: Re
           {workspace}
         </Link>
       )}
+      {/* Pages that exist only in development; a host with no address bar reaches them from here. */}
+      {import.meta.env.DEV ? (
+        <>
+          <Link to="/gallery" className="crumb">
+            gallery
+          </Link>
+          <Link to="/agent" className="crumb">
+            agent
+          </Link>
+        </>
+      ) : null}
       {children}
     </header>
   );
