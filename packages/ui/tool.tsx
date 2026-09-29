@@ -1,6 +1,19 @@
-import type { ContentBlock, ToolCall, ToolCallContent } from "@agentclientprotocol/sdk";
+import type {
+  ContentBlock,
+  ToolCall,
+  ToolCallContent,
+  ToolCallStatus,
+} from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
-import { CaretRightIcon, ClockCounterClockwiseIcon } from "@phosphor-icons/react";
+import {
+  CaretRightIcon,
+  CheckCircleIcon,
+  CircleDashedIcon,
+  CircleNotchIcon,
+  type Icon,
+  ProhibitIcon,
+  XCircleIcon,
+} from "@phosphor-icons/react";
 import { diffLines, STATUS_LABEL } from "./format";
 import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
 
@@ -119,20 +132,36 @@ function outputRepeatsContent(content: readonly ToolCallContent[], rawOutput: un
     : false;
 }
 
-/** A result that is seen rather than read, so its card is not closed over it. */
-const isShownNotRead = (item: ToolCallContent): boolean =>
-  item.type === "diff" || (item.type === "content" && item.content.type === "image");
+/** Whether the call did not run because the person refused it. */
+const wasRefused = (call: ToolCall, decision: { tone: string } | undefined): boolean =>
+  decision?.tone === "reject" ||
+  (typeof call.rawOutput === "object" &&
+    call.rawOutput !== null &&
+    (call.rawOutput as { refused?: unknown }).refused === true);
 
-const RESTORED = "Rebuilt from the saved result when the session was reopened";
+const STATUS_ICON: Record<string, Icon> = {
+  pending: CircleDashedIcon,
+  in_progress: CircleNotchIcon,
+  completed: CheckCircleIcon,
+  failed: XCircleIcon,
+  refused: ProhibitIcon,
+};
 
-/** Marks a call rebuilt from a saved session, with the reason on hover. */
-function RestoredMark() {
+/** The call's status as a coloured icon, its word as the label a screen reader or a hover shows. */
+function StatusIcon({ status, refused }: { status: ToolCallStatus; refused: boolean }) {
+  const shown = refused ? "refused" : status;
+  const label = refused ? "Refused" : STATUS_LABEL[status];
+  const Glyph = STATUS_ICON[shown] ?? CircleDashedIcon;
   return (
-    <span className="lk-restored" role="img" aria-label={RESTORED} title={RESTORED}>
-      <ClockCounterClockwiseIcon aria-hidden="true" />
+    <span className={`lk-status ${shown}`} role="img" aria-label={label} title={label}>
+      <Glyph aria-hidden="true" weight="fill" />
     </span>
   );
 }
+
+/** A result that is seen rather than read, so its card is not closed over it. */
+const isShownNotRead = (item: ToolCallContent): boolean =>
+  item.type === "diff" || (item.type === "content" && item.content.type === "image");
 
 /**
  * One tool call as a row that opens: what ran and on what, then its status. Opened, it shows the
@@ -160,11 +189,10 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         ) : null}
         {preview === undefined ? null : <span className="lk-tool-preview">{preview}</span>}
         <span className="lk-tool-end">
-          {call._meta?.["labkit.dev/reconstructed"] === true ? <RestoredMark /> : null}
           {decision === undefined ? null : (
             <span className={`lk-decision ${decision.tone}`}>{decision.label}</span>
           )}
-          <span className={`lk-status ${status}`}>{STATUS_LABEL[status]}</span>
+          <StatusIcon status={status} refused={wasRefused(call, decision)} />
         </span>
       </summary>
       <div className="lk-tool-body">

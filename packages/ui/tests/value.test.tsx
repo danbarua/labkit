@@ -113,14 +113,10 @@ describe("a tool card", () => {
     expect(html).not.toContain("lk-tool-name");
   });
 
-  test("a call rebuilt from a saved session is marked by an icon that says so", () => {
-    const call = {
-      ...settled("list_dir", { path: "." }, { entries: [] }),
-      _meta: { "labkit.dev/reconstructed": true },
-    } as ToolCall;
-    const html = draw(call);
-    expect(html).toContain('class="lk-restored" role="img" aria-label="Rebuilt from the saved');
-    expect(html).not.toContain(">restored<");
+  test("a call from a reopened session is drawn the same as the live one", () => {
+    const live = settled("list_dir", { path: "." }, { entries: [] });
+    const reopened = { ...live, _meta: { "labkit.dev/reconstructed": true } } as ToolCall;
+    expect(draw(reopened)).toBe(draw(live));
   });
 
   test("a result that is an image or a diff starts open; text does not", () => {

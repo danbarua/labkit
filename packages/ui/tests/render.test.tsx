@@ -112,7 +112,7 @@ describe("permission", () => {
     expect(html).not.toMatch(/<details class="lk-tool"[^>]* open="">/);
     const refused = await draw("permission-refused", true);
     expect(refused).toContain('lk-decision reject">Reject</span>');
-    expect(refused).toContain("lk-status failed");
+    expect(refused).toContain('class="lk-status refused" role="img" aria-label="Refused"');
   });
 });
 
@@ -335,31 +335,5 @@ describe("command suggestions", () => {
     expect(commandsMatching("/export now", commands)).toEqual([]);
     expect(commandsMatching("export", commands)).toEqual([]);
     expect(commandsMatching("", commands)).toEqual([]);
-  });
-});
-
-describe("restored tool cards", () => {
-  const card = async (meta: Record<string, unknown> | undefined) => {
-    const { reduce, initialState } = await import("@labkit/view-model");
-    const state = reduce(initialState, {
-      type: "update",
-      update: {
-        sessionUpdate: "tool_call",
-        toolCallId: "c1",
-        title: "write_file",
-        status: "completed",
-        ...(meta === undefined ? {} : { _meta: meta }),
-      },
-    });
-    return renderToStaticMarkup(<Conversation state={state} />);
-  };
-
-  test("a card the agent rebuilt when the session was reopened says so", async () => {
-    expect(await card({ "labkit.dev/reconstructed": true })).toContain("restored");
-  });
-
-  test("a live card does not", async () => {
-    expect(await card(undefined)).not.toContain("restored");
-    expect(await card({ "labkit.dev/reconstructed": false })).not.toContain("restored");
   });
 });

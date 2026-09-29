@@ -42,9 +42,6 @@ export default function TranscriptMockup({ slug }: { slug: string }) {
   return (
     <>
       <Bar>
-        <Link to="/gallery" className="crumb">
-          gallery
-        </Link>
         <code className="crumb">{slug}</code>
         <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           {(["system", "light", "dark"] as const).map((t) => (
