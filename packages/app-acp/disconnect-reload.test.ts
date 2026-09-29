@@ -208,7 +208,7 @@ class Launcher {
 
   send(method: string, params: unknown) {
     const id = ++this.#id;
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
+    void this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
     return id;
   }
 
@@ -246,7 +246,7 @@ class Launcher {
 
   /** Disconnect as an editor does: close stdin and wait for the launcher to exit. */
   async disconnect() {
-    this.child.stdin.end();
+    void this.child.stdin.end();
     const code = await this.child.exited;
     await this.#reading;
     return code;

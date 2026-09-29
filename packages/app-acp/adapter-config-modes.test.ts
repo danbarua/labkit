@@ -14,7 +14,7 @@ import { streamResponse, streamVector } from "../core-agent/providers/testing/st
 import type { AcpOptions } from "./adapter.ts";
 import { workspaceAgent } from "./examples/vscode-workspace.ts";
 import { selectChoices } from "./session-config.ts";
-import { answer, configurable, offline, prompt } from "./testing/fixtures.ts";
+import { answer, bodyText, configurable, offline, prompt } from "./testing/fixtures.ts";
 import { harness } from "./testing/harness.ts";
 
 function booleanConfiguration() {
@@ -153,7 +153,7 @@ test("set_config_option during a running prompt selects at once; the running req
   const scripted = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input instanceof Request ? input.url : input));
     if (url.pathname.endsWith("/models")) throw new Error("connect ECONNREFUSED 127.0.0.1:8000");
-    requests.push({ host: url.host, model: JSON.parse(String(init?.body)).model });
+    requests.push({ host: url.host, model: JSON.parse(bodyText(init)).model });
     if (requests.length === 1) await held.promise;
     return streamResponse(
       streamVector(url.host.includes("anthropic") ? anthropicMessagesV3 : openaiResponsesV3),
@@ -374,7 +374,7 @@ test("set_config_option switches the workspace launcher between providers; the n
   const scripted = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input instanceof Request ? input.url : input));
     if (url.pathname.endsWith("/models")) throw new Error("connect ECONNREFUSED 127.0.0.1:8000");
-    requests.push({ host: url.host, body: JSON.parse(String(init?.body)) });
+    requests.push({ host: url.host, body: JSON.parse(bodyText(init)) });
     return streamResponse(
       streamVector(url.host.includes("anthropic") ? anthropicMessagesV3 : openaiResponsesV3),
     );
@@ -644,7 +644,7 @@ test("reopening under a different launcher model uses the live model and lists u
               transport: {
                 baseUrl: "https://test.invalid",
                 fetch: (async (_url, init) => {
-                  const body = JSON.parse(String(init?.body));
+                  const body = JSON.parse(bodyText(init));
                   bodies.push(body);
                   return Response.json({
                     choices: [{ message: { content: `Answer ${bodies.length}` } }],

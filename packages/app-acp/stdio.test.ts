@@ -52,7 +52,9 @@ test("Bun stdio launcher exchanges ACP JSON lines, answers a malformed line and 
     expect(buffer).toBe("");
   })();
 
-  const send = (value: unknown) => child.stdin.write(`${JSON.stringify(value)}\n`);
+  const send = (value: unknown) => {
+    void child.stdin.write(`${JSON.stringify(value)}\n`);
+  };
 
   async function waitForResponse(id: number | null) {
     const deadline = performance.now() + 5000;
@@ -73,12 +75,12 @@ test("Bun stdio launcher exchanges ACP JSON lines, answers a malformed line and 
 
   try {
     // Split a JSON frame across writes to exercise the actual stdio reader.
-    child.stdin.write('{"jsonrpc":"2.0","id":1,"method":"init');
-    child.stdin.write('ialize","params":{"protocolVersion":1,"clientCapabilities":{}}}\n');
+    void child.stdin.write('{"jsonrpc":"2.0","id":1,"method":"init');
+    void child.stdin.write('ialize","params":{"protocolVersion":1,"clientCapabilities":{}}}\n');
     await waitForResponse(1);
     expect(messages.find((m) => m.id === 1).result.protocolVersion).toBe(1);
     // A malformed line gets a parse error and the connection keeps serving.
-    child.stdin.write("{broken\n");
+    void child.stdin.write("{broken\n");
     await waitForResponse(null);
     expect(messages.find((m) => m.id === null).error.code).toBe(-32700);
     send({
@@ -103,7 +105,7 @@ test("Bun stdio launcher exchanges ACP JSON lines, answers a malformed line and 
       ).params.update.content.text,
     ).toBe(`hello 🌍 from ${directory}`);
     expect(messages.find((m) => m.id === 3).result.stopReason).toBe("end_turn");
-    child.stdin.end();
+    void child.stdin.end();
     expect(await child.exited).toBe(0);
     await reading;
     expect(await errors).toContain("Labkit diagnostics:");

@@ -2,7 +2,7 @@ import { expect, test } from "@logtape/testing-bun/autoload";
 
 import { deferred, until } from "../core-agent/agent/test-support.ts";
 import type { AcpOptions } from "./adapter.ts";
-import { answer } from "./testing/fixtures.ts";
+import { answer, bodyText } from "./testing/fixtures.ts";
 import { harness, setup } from "./testing/harness.ts";
 
 test("local resource links become session blob refs; outside paths reject before admission; remote links never fetch", async () => {
@@ -47,9 +47,9 @@ test("local resource links become session blob refs; outside paths reject before
                 transport: {
                   baseUrl: "https://provider.invalid/v1",
                   fetch: (async (url, init) => {
-                    expect(String(url)).toBe("https://provider.invalid/v1/chat/completions");
+                    expect(url).toBe("https://provider.invalid/v1/chat/completions");
                     completions++;
-                    if (completions <= 2) expect(String(init?.body)).toContain(body);
+                    if (completions <= 2) expect(bodyText(init)).toContain(body);
                     return Response.json({ choices: [{ message: { content: "Done" } }] });
                   }) as typeof fetch,
                 },
@@ -261,7 +261,7 @@ test("durable ACP reload resolves stored attachments without source files; denie
                   baseUrl: "https://test.invalid",
                   fetch: (async (_url, init) => {
                     completions++;
-                    const body = String(init?.body);
+                    const body = bodyText(init);
                     if (body.includes("WRITE_DENIED") && !deniedAsked) {
                       deniedAsked = true;
                       return Response.json({
@@ -408,7 +408,7 @@ test("ACP embedded image, PDF, and large editor text reach provider wire through
                       );
                     },
                     fetch: (async (_url, init) => {
-                      wire = JSON.parse(String(init?.body));
+                      wire = JSON.parse(bodyText(init));
                       return Response.json({
                         role: "assistant",
                         content: [{ type: "text", text: "Done" }],
@@ -519,7 +519,7 @@ test("ACP admits an additional-root resource as a blob and passes its contents t
                   baseUrl: "https://provider.invalid/v1",
                   fetch: (async (_url, init) => {
                     calls++;
-                    expect(String(init?.body)).toContain(body);
+                    expect(bodyText(init)).toContain(body);
                     return Response.json({ choices: [{ message: { content: "Done" } }] });
                   }) as typeof fetch,
                 },
@@ -601,7 +601,7 @@ test("ACP audio reaches Google as exact inline bytes, remains a journal ref, and
                   transport: {
                     baseUrl: "https://example.invalid",
                     fetch: (async (_url, init) => {
-                      wires.push(JSON.parse(String(init?.body)));
+                      wires.push(JSON.parse(bodyText(init)));
                       return Response.json({
                         candidates: [
                           {

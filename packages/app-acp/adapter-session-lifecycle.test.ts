@@ -7,7 +7,7 @@ import { deferred, until } from "../core-agent/agent/test-support.ts";
 import { withFixtureDiagnostics } from "../core-agent/logging/fixture-capture.ts";
 import type { AcpOptions } from "./adapter.ts";
 import { workspaceAgent } from "./examples/vscode-workspace.ts";
-import { answer, configurable, offline, prompt } from "./testing/fixtures.ts";
+import { answer, bodyText, configurable, offline, prompt } from "./testing/fixtures.ts";
 import { harness, setup } from "./testing/harness.ts";
 
 test("load replays committed history before response, never starts providers or permissions", async () => {
@@ -130,7 +130,7 @@ test("ACP fork copies attachment history into an independent restorable child wi
                 transport: {
                   baseUrl: "https://provider.invalid",
                   fetch: (async (_url, init) => {
-                    bodies.push(String(init?.body));
+                    bodies.push(bodyText(init));
                     return Response.json({ choices: [{ message: { content: "Done" } }] });
                   }) as typeof fetch,
                 },

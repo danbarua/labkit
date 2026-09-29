@@ -477,7 +477,7 @@ async function expectTurnFailure(
     }),
   );
   // The connection and the session both survive: the next prompt completes normally.
-  expect(await Promise.race([run.closed.then(() => "closed"), "open"])).toBe("open");
+  expect(Bun.peek.status(run.closed)).toBe("pending");
   const next = await run.prompt("Continue");
   expect(next.error).toBeUndefined();
   expect(next.result.stopReason).toBe("end_turn");

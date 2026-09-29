@@ -20,6 +20,7 @@ import { streamResponse, streamVector } from "../core-agent/providers/testing/st
 import type { AcpOptions } from "./adapter.ts";
 import { workspaceAgent } from "./examples/vscode-workspace.ts";
 import { mcpToolName } from "./mcp.ts";
+import { bodyText } from "./testing/fixtures.ts";
 import { harness, setup, type Message } from "./testing/harness.ts";
 import { mcpHttpFixture } from "./testing/mcp-http.ts";
 
@@ -534,7 +535,7 @@ test("D4: a media-capable Anthropic request carries an MCP-returned image in too
               transport: {
                 baseUrl: "https://test.invalid",
                 fetch: (async (_url, init) => {
-                  const body = JSON.parse(String(init?.body));
+                  const body = JSON.parse(bodyText(init));
                   bodies.push(body);
                   return bodies.length === 1
                     ? Response.json({
@@ -645,7 +646,7 @@ test("D4: an MCP-returned image reaches Anthropic as a tool_result image and, af
   const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input instanceof Request ? input.url : input));
     if (url.pathname.endsWith("/models")) throw new Error("connect ECONNREFUSED 127.0.0.1:8000");
-    requests.push({ host: url.host, body: JSON.parse(String(init?.body)) });
+    requests.push({ host: url.host, body: JSON.parse(bodyText(init)) });
     if (!url.host.includes("anthropic")) return streamResponse(streamVector(openaiResponsesV3));
     return streamResponse(
       requests.length === 1
