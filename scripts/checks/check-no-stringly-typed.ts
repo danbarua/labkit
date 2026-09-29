@@ -36,7 +36,7 @@
  * retire-when: the compiler can reject a bare string in these signatures on its own.
  */
 
-import ts from "typescript";
+import ts from "typescript-api";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 // Every surface file, whether a surface is one file or a directory. The

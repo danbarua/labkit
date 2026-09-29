@@ -32,7 +32,7 @@
  * retire-when: INDEXED_PROPS is derived from the property types instead of written by hand.
  */
 
-import ts from "typescript";
+import ts from "typescript-api";
 import { readFileSync } from "node:fs";
 
 const DOMAIN = "packages/core-db/domain.ts";

@@ -25,7 +25,7 @@
  * retire-when: drizzle stops printing bound parameters in its error message.
  */
 
-import ts from "typescript";
+import ts from "typescript-api";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -35,6 +35,7 @@ const FACTORY = "ormOver";
 
 function sources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
+    if (name === "node_modules") continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) sources(path, out);
     else if (path.endsWith(".ts")) out.push(path);

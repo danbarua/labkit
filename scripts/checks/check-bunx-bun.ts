@@ -30,7 +30,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /** The binaries this repo runs through `bunx` that start with `#!/usr/bin/env node`. */
-const NODE_SHEBANGED = ["depcruise", "depcruise-fmt", "tsc"];
+const NODE_SHEBANGED = ["depcruise", "depcruise-fmt", "oxlint", "tsc"];
 
 const SELF = "check-bunx-bun.ts";
 

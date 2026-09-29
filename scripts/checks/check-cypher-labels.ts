@@ -30,7 +30,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import ts from "typescript";
+import ts from "typescript-api";
 import { EDGE_LABELS, NODE_LABELS } from "@labkit/core-db/domain.ts";
 
 const ROOT = "packages";
@@ -39,6 +39,7 @@ const ROOT = "packages";
 function sources(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules") continue;
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) out.push(...sources(path));
     else if (path.endsWith(".ts")) out.push(path);
