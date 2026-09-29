@@ -15,6 +15,7 @@ import {
   Compaction,
   Notice,
   PlanView,
+  type MessageAction,
   Thought,
   UserMessage,
   WorkingIndicator,
@@ -50,22 +51,28 @@ export interface ConversationProps {
   readonly records?: RecordsConfig;
   /** What the composer's `@` can name. Without it the composer has no `@`. */
   readonly mentions?: readonly PickItem[];
+  /**
+   * Edit, answer again or fork from a message. Without it a message offers only copying its text.
+   */
+  readonly onMessageAction?: (action: MessageAction, block: Block) => void;
 }
 
 function BlockView({
   block,
   state,
   last = false,
+  onMessageAction,
 }: {
   block: Block;
   state: TranscriptState;
   last?: boolean;
+  onMessageAction?: ((action: MessageAction, block: Block) => void) | undefined;
 }) {
   switch (block.kind) {
     case "user":
-      return <UserMessage block={block} />;
+      return <UserMessage block={block} last={last} onAction={onMessageAction} />;
     case "assistant":
-      return <AssistantMessage block={block} />;
+      return <AssistantMessage block={block} last={last} onAction={onMessageAction} />;
     case "thought":
       return <Thought block={block} streaming={last && state.running} />;
     case "tool": {
@@ -115,6 +122,7 @@ export function Conversation({
   records,
   onSetConfig,
   mentions,
+  onMessageAction,
 }: ConversationProps) {
   const current = phase(state);
   const pending = pendingPermissions(state);
@@ -155,6 +163,7 @@ export function Conversation({
                       block={item.block}
                       state={state}
                       last={item.index === state.blocks.length - 1}
+                      onMessageAction={onMessageAction}
                     />
                   ) : (
                     <ToolGroup

@@ -145,9 +145,33 @@
   padding: 48px 0;
 }
 
-.lk-user {
+/* a message and the row of buttons under it */
+.lk-message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lk-message.user {
   align-self: flex-end;
+  align-items: flex-end;
   max-width: 80%;
+}
+.lk-message-toolbar {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lk-message:hover .lk-message-toolbar,
+.lk-message:focus-within .lk-message-toolbar,
+.lk-message[data-last] .lk-message-toolbar {
+  opacity: 1;
+}
+.lk-message-toolbar .lk-icon-btn {
+  font-size: 14px;
+  color: var(--lk-muted);
+}
+.lk-user {
   padding: 8px 12px;
   border: 1px solid var(--lk-line);
   border-radius: var(--lk-radius);

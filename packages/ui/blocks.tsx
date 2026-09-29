@@ -1,5 +1,13 @@
 import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { type Block, type Plan, textOf } from "@labkit/view-model";
+import {
+  ArrowClockwiseIcon,
+  CheckIcon,
+  CopyIcon,
+  GitForkIcon,
+  type Icon,
+  PencilSimpleIcon,
+} from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { type Activity, activityLabel } from "./activity";
 import { MarkdownText } from "./markdown";
@@ -24,14 +32,99 @@ function Rich({ content }: { content: readonly ContentBlock[] }) {
   );
 }
 
-export function UserMessage({ block }: { block: Kind<"user"> }) {
-  return <div className="lk-user">{textOf(block.content)}</div>;
+/** What can be done to a message beyond copying it: the host decides whether each is offered. */
+export type MessageAction = "edit" | "fork" | "regenerate";
+
+const ACTIONS: Record<MessageAction, { label: string; Glyph: Icon }> = {
+  edit: { label: "Edit and send again", Glyph: PencilSimpleIcon },
+  regenerate: { label: "Answer again", Glyph: ArrowClockwiseIcon },
+  fork: { label: "Fork the session from here", Glyph: GitForkIcon },
+};
+
+/**
+ * The small row of buttons under a message: copy its text, and whichever of edit, answer again and
+ * fork the host handles. It shows on hover or keyboard focus, and always under the last message.
+ */
+function MessageToolbar({
+  block,
+  actions,
+  onAction,
+}: {
+  block: Kind<"user"> | Kind<"assistant">;
+  actions: readonly MessageAction[];
+  onAction?: ((action: MessageAction, block: Block) => void) | undefined;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard?.writeText(textOf(block.content)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className="lk-message-toolbar">
+      <button
+        type="button"
+        className="lk-icon-btn"
+        aria-label={copied ? "Copied" : "Copy"}
+        title={copied ? "Copied" : "Copy"}
+        onClick={copy}
+      >
+        {copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
+      </button>
+      {onAction === undefined
+        ? null
+        : actions.map((action) => {
+            const { label, Glyph } = ACTIONS[action];
+            return (
+              <button
+                key={action}
+                type="button"
+                className="lk-icon-btn"
+                aria-label={label}
+                title={label}
+                onClick={() => onAction(action, block)}
+              >
+                <Glyph aria-hidden="true" />
+              </button>
+            );
+          })}
+    </div>
+  );
 }
 
-export function AssistantMessage({ block }: { block: Kind<"assistant"> }) {
+export function UserMessage({
+  block,
+  last = false,
+  onAction,
+}: {
+  block: Kind<"user">;
+  last?: boolean;
+  onAction?: ((action: MessageAction, block: Block) => void) | undefined;
+}) {
   return (
-    <div className="lk-assistant">
-      <Rich content={block.content} />
+    <div className="lk-message user" data-last={last || undefined}>
+      <div className="lk-user">{textOf(block.content)}</div>
+      <MessageToolbar block={block} actions={["edit", "fork"]} onAction={onAction} />
+    </div>
+  );
+}
+
+export function AssistantMessage({
+  block,
+  last = false,
+  onAction,
+}: {
+  block: Kind<"assistant">;
+  last?: boolean;
+  onAction?: ((action: MessageAction, block: Block) => void) | undefined;
+}) {
+  return (
+    <div className="lk-message assistant" data-last={last || undefined}>
+      <div className="lk-assistant">
+        <Rich content={block.content} />
+      </div>
+      <MessageToolbar block={block} actions={["regenerate", "fork"]} onAction={onAction} />
     </div>
   );
 }

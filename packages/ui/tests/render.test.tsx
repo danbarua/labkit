@@ -205,7 +205,7 @@ describe("records in prose", () => {
   test("without an open handler the chip is shown but is not a button", async () => {
     const html = await said("see CLM_3", { types: TYPES });
     expect(html).toContain('<span class="lk-handle" data-type="Claim" title="Claim">CLM_3</span>');
-    expect(html).not.toContain("<button");
+    expect(html).not.toMatch(/<button[^>]*lk-handle/);
   });
 
   test("with no records at all, handles stay plain text", async () => {

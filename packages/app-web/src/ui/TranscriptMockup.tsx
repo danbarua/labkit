@@ -103,6 +103,7 @@ function Replay({ slug, recording }: { slug: string; recording: Recording }) {
           onSend={inert}
           onCancel={inert}
           onAnswer={inert}
+          onMessageAction={inert}
           onSetConfig={(configId, value) => setPicked((prev) => new Map(prev).set(configId, value))}
           {...(theme === "system" ? {} : { theme })}
         />
