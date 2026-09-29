@@ -63,10 +63,12 @@ describe("a tool's input", () => {
 });
 
 describe("a tool card", () => {
+  // A tool with no view of its own (list_dir has one: tool-views.test.tsx), so the result is drawn
+  // by its shape.
   test("a serialised result is drawn once, as fields, never as an escaped string", () => {
     const html = draw(
       settled(
-        "list_dir",
+        "inventory",
         { path: "." },
         {
           path: "/workspace",
@@ -153,7 +155,7 @@ describe("a tool card", () => {
       { content: "Read the file", priority: "high", status: "completed" },
       { content: "Write the file", priority: "medium", status: "pending" },
     ];
-    const html = draw(settled("update_plan", { entries }, { entries }));
+    const html = draw(settled("record_steps", { entries }, { entries }));
     expect(html).toContain("<h4>Input</h4>");
     expect(html).toContain("<th>content</th><th>priority</th><th>status</th>");
     expect(html).not.toContain("<summary>Raw output</summary>");
