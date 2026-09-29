@@ -159,6 +159,15 @@ function StatusIcon({ status, refused }: { status: ToolCallStatus; refused: bool
   );
 }
 
+/**
+ * Scrolls the transcript just far enough that an opened row's contents are in view, or its top if
+ * the contents are taller than the view.
+ */
+function revealBody(row: HTMLElement): void {
+  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  row.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "auto" });
+}
+
 /** A result that is seen rather than read, so its card is not closed over it. */
 const isShownNotRead = (item: ToolCallContent): boolean =>
   item.type === "diff" || (item.type === "content" && item.content.type === "image");
@@ -170,7 +179,6 @@ const isShownNotRead = (item: ToolCallContent): boolean =>
  */
 export function ToolCard({ call, permission }: { call: ToolCall; permission?: PermissionEntry }) {
   const status = call.status ?? "pending";
-  const locations = call.locations ?? [];
   const content = call.content ?? [];
   const decision = permission === undefined ? undefined : decisionOf(permission);
   const args = call.rawInput === undefined ? undefined : inlineArguments(call.rawInput);
@@ -180,13 +188,22 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   const opensByDefault = waiting || content.some(isShownNotRead);
 
   return (
-    <details className="lk-tool" data-status={status} open={opensByDefault}>
-      <summary className="lk-tool-head">
+    <details
+      className="lk-tool"
+      data-status={status}
+      open={opensByDefault}
+      onToggle={(event) => {
+        if (event.currentTarget.open) revealBody(event.currentTarget);
+      }}
+    >
+      {/* The row names the tool and what it was given; the agent's title, which says the same
+          at more length, is its hover text. */}
+      <summary
+        className="lk-tool-head"
+        {...(call.name && call.title !== call.name ? { title: call.title } : {})}
+      >
         <CaretRightIcon className="lk-tool-caret" aria-hidden="true" />
-        <span className="lk-tool-title">{call.title}</span>
-        {call.name && call.name !== call.title ? (
-          <span className="lk-tool-name">{call.name}</span>
-        ) : null}
+        <span className="lk-tool-name">{call.name ?? call.title}</span>
         {preview === undefined ? null : <span className="lk-tool-preview">{preview}</span>}
         <span className="lk-tool-end">
           {decision === undefined ? null : (
@@ -196,11 +213,6 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         </span>
       </summary>
       <div className="lk-tool-body">
-        {locations.length > 0 ? (
-          <div className="lk-locations">
-            {locations.map((l) => (l.line == null ? l.path : `${l.path}:${l.line}`)).join(", ")}
-          </div>
-        ) : null}
         {call.rawInput === undefined ? null : (
           <section className="lk-tool-section">
             <h4>Input</h4>

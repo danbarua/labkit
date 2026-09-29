@@ -105,12 +105,18 @@ describe("a tool card", () => {
     expect(html).toContain('<pre class="lk-pre">{\n  &quot;a&quot;: 1\n}\n</pre>');
   });
 
-  test("a call is one closed row that names what it ran on", () => {
-    const html = draw(settled("list_dir", { path: "instruments" }, { entries: [] }));
+  test("a call is one closed row that names the tool and what it ran on, once each", () => {
+    const html = draw({
+      ...settled("list_dir", { path: "instruments" }, { entries: [] }),
+      title: 'list_dir: "/workspace/instruments"',
+      locations: [{ path: "/workspace/instruments" }],
+    });
     expect(html).toMatch(/^<details class="lk-tool" data-status="completed">/);
+    expect(html).toContain('<span class="lk-tool-name">list_dir</span>');
     expect(html).toContain('<span class="lk-tool-preview">instruments</span>');
-    // The title and the name are the same here, so the name is not said twice.
-    expect(html).not.toContain("lk-tool-name");
+    // The agent's title says the same at more length: it is the row's hover text, and nowhere else.
+    expect(html).toContain('title="list_dir: &quot;/workspace/instruments&quot;"');
+    expect(html.split("/workspace/instruments")).toHaveLength(2);
   });
 
   test("a call from a reopened session is drawn the same as the live one", () => {
