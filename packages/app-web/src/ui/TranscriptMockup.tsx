@@ -45,7 +45,9 @@ function Page({
  * short), through the same reducer a live client uses.
  */
 function Replay({ slug, recording }: { slug: string; recording: Recording }) {
-  const playback = usePlayback(recording);
+  // `?from=N` opens the session as it stood after N events, ready to play on from there.
+  const from = Number(new URLSearchParams(window.location.search).get("from") ?? Number.NaN);
+  const playback = usePlayback(recording, Number.isFinite(from) ? from : undefined);
   const [theme, setTheme] = useState<Theme>("system");
   const [picked, setPicked] = useState<ReadonlyMap<string, string | boolean>>(new Map());
   const state: TranscriptState = useMemo(

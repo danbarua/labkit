@@ -9,7 +9,16 @@ import {
 } from "@labkit/view-model";
 import { IconContext } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
-import { AssistantMessage, Compaction, Notice, PlanView, Thought, UserMessage } from "./blocks";
+import { currentActivity } from "./activity";
+import {
+  AssistantMessage,
+  Compaction,
+  Notice,
+  PlanView,
+  Thought,
+  UserMessage,
+  WorkingIndicator,
+} from "./blocks";
 import { Composer } from "./composer";
 import { fillPercent, formatCost } from "./format";
 import type { PickItem } from "./overlay/list";
@@ -43,14 +52,22 @@ export interface ConversationProps {
   readonly mentions?: readonly PickItem[];
 }
 
-function BlockView({ block, state }: { block: Block; state: TranscriptState }) {
+function BlockView({
+  block,
+  state,
+  last = false,
+}: {
+  block: Block;
+  state: TranscriptState;
+  last?: boolean;
+}) {
   switch (block.kind) {
     case "user":
       return <UserMessage block={block} />;
     case "assistant":
       return <AssistantMessage block={block} />;
     case "thought":
-      return <Thought block={block} />;
+      return <Thought block={block} streaming={last && state.running} />;
     case "tool": {
       const call = state.toolCalls[block.toolCallId];
       if (call === undefined) return null;
@@ -103,6 +120,7 @@ export function Conversation({
   const pending = pendingPermissions(state);
   const { ref, onScroll } = useStickToBottom(state);
   const usage = state.usage;
+  const activity = currentActivity(state);
 
   return (
     <RecordsContext.Provider value={records}>
@@ -132,7 +150,12 @@ export function Conversation({
                 ) : null}
                 {drawnBlocks(state).map((item) =>
                   item.kind === "block" ? (
-                    <BlockView key={item.index} block={item.block} state={state} />
+                    <BlockView
+                      key={item.index}
+                      block={item.block}
+                      state={state}
+                      last={item.index === state.blocks.length - 1}
+                    />
                   ) : (
                     <ToolGroup
                       key={item.index}
@@ -145,6 +168,7 @@ export function Conversation({
                     />
                   ),
                 )}
+                {activity === undefined ? null : <WorkingIndicator activity={activity} />}
               </div>
             </div>
 

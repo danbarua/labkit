@@ -224,6 +224,65 @@
   cursor: pointer;
   user-select: none;
 }
+.lk-thought[data-streaming] > .lk-md {
+  max-height: 12em;
+  overflow-y: auto;
+}
+
+/* what the agent is doing, under the transcript while a turn runs */
+.lk-working {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--lk-muted);
+  font-size: 13px;
+}
+.lk-working-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-working-label.lk-mono {
+  font-size: 12px;
+}
+.lk-working-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+/* A light that passes over the words, so a label that is still true still looks alive. */
+.lk-shimmer {
+  background:
+    linear-gradient(
+      90deg,
+      var(--lk-muted) 0%,
+      var(--lk-muted) 40%,
+      var(--lk-text) 50%,
+      var(--lk-muted) 60%,
+      var(--lk-muted) 100%
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lk-shimmer 2.4s linear infinite;
+}
+@keyframes lk-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lk-shimmer {
+    animation: none;
+    color: var(--lk-muted);
+    background: none;
+  }
+}
 .lk-thought .lk-md {
   margin-top: 6px;
   font-style: italic;

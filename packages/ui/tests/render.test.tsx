@@ -31,7 +31,7 @@ describe("the transcript", () => {
   test("a plain answer shows the prompt, a collapsed thought and the markdown answer", async () => {
     const html = await draw("plain-answer");
     expect(html).toContain("Does EV_4 support CLM_3?");
-    expect(html).toContain("<summary>Thinking</summary>");
+    expect(html).toContain("<summary>Thought</summary>");
     expect(html).toContain("<strong>Partly.</strong>");
     expect(html).toContain("<li>the AUC is above the control in 7 of 10 classes</li>");
     expect(html).toContain("Idle");

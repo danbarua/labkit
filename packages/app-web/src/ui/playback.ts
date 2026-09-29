@@ -34,12 +34,16 @@ function step(current: Step, action: Action): Step {
 }
 
 /**
- * A recording shown whole, or played back an event at a time through the same reducer a live
- * client uses, at its recorded pace times `speed`.
+ * A recording shown whole (or up to event `from`, so a moment can be opened directly), or played
+ * back an event at a time through the same reducer a live client uses, at its recorded pace times
+ * `speed`.
  */
-export function usePlayback(recording: Recording) {
+export function usePlayback(recording: Recording, from?: number) {
   const [{ state, applied }, dispatch] = useReducer(step, recording, (r) =>
-    step({ state: initialState, applied: 0 }, { type: "all", events: r.events }),
+    step(
+      { state: initialState, applied: 0 },
+      { type: "all", events: from === undefined ? r.events : r.events.slice(0, Math.max(0, from)) },
+    ),
   );
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
