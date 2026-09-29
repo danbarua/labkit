@@ -4,12 +4,9 @@ import { join } from "node:path";
 import { expect, mock, test } from "bun:test";
 
 import { mergeToolCall } from "./tool-call.ts";
+import { vscodeFake } from "./testing/vscode-fake.ts";
 
-mock.module("vscode", () => ({
-  Uri: { joinPath: (base: unknown, ...parts: string[]) => ({ base, parts }) },
-  window: { createOutputChannel: () => ({ appendLine() {}, dispose() {} }) },
-  workspace: { getConfiguration: () => ({ get: (_name: string, fallback: unknown) => fallback }) },
-}));
+mock.module("vscode", () => vscodeFake);
 
 const { SessionUpdateHandler } = await import("./handlers/SessionUpdateHandler.ts");
 
