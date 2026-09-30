@@ -5,21 +5,35 @@ import { Conversation } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import { initialState, reduce } from "@labkit/view-model";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { Bar } from "./Bar";
 
 type Status = "connecting" | "ready" | "failed";
 
-/** One ACP session at `url`, as a view that follows it and the calls that drive it. */
-function useAgentSession(url: string, cwd?: string) {
-  const [state, dispatch] = useReducer(reduce, initialState);
+type ViewAction = Parameters<typeof reduce>[1] | { type: "reset" };
+
+/** The view of a session, emptied when another session is opened in its place. */
+const reduceView = (state: typeof initialState, action: ViewAction) =>
+  action.type === "reset" ? initialState : reduce(state, action);
+
+/**
+ * One ACP session at `url`, as a view that follows it and the calls that drive it: the session
+ * `sessionId` names, reopened, or a new one when it names none. `started` is the id of the session
+ * this page started; being asked for that one afterwards is not a request to reopen it.
+ */
+function useAgentSession(url: string, cwd: string | undefined, sessionId: string | undefined) {
+  const [state, dispatch] = useReducer(reduceView, initialState);
   const [status, setStatus] = useState<Status>("connecting");
+  const [started, setStarted] = useState<string>();
   const client = useRef<SessionClient | null>(null);
+  const reopen = sessionId === started ? undefined : sessionId;
 
   useEffect(() => {
     let cancelled = false;
     let opened: SessionClient | undefined;
     setStatus("connecting");
+    dispatch({ type: "reset" });
     // React's development-mode double-invoke runs this effect, its cleanup, then this effect
     // again, synchronously, with no gap for a second connect to see or reuse the first's. Deferring
     // the real connect by a tick lets the first invocation's cleanup cancel it before it ever
@@ -29,7 +43,12 @@ function useAgentSession(url: string, cwd?: string) {
     // transport then treats as connection-fatal — even though the session itself was created
     // successfully — surfacing as an error the person never caused.
     const timer = setTimeout(() => {
-      connectSession({ url, cwd, onEvent: dispatch }).then(
+      connectSession({
+        url,
+        onEvent: dispatch,
+        ...(cwd === undefined ? {} : { cwd }),
+        ...(reopen === undefined ? {} : { sessionId: reopen }),
+      }).then(
         (connected) => {
           if (cancelled) {
             void connected.close();
@@ -37,6 +56,7 @@ function useAgentSession(url: string, cwd?: string) {
           }
           opened = connected;
           client.current = connected;
+          if (reopen === undefined) setStarted(connected.sessionId);
           setStatus("ready");
         },
         (err: unknown) => {
@@ -52,7 +72,7 @@ function useAgentSession(url: string, cwd?: string) {
       client.current = null;
       void opened?.close();
     };
-  }, [url, cwd]);
+  }, [url, cwd, reopen]);
 
   const send = useCallback((text: string) => void client.current?.prompt(text), []);
   const cancel = useCallback(() => void client.current?.cancel(), []);
@@ -66,7 +86,7 @@ function useAgentSession(url: string, cwd?: string) {
       void client.current?.setConfigOption(configId, value),
     [],
   );
-  return { state, status, send, cancel, answer, setConfig };
+  return { state, status, started, send, cancel, answer, setConfig };
 }
 
 /**
@@ -74,11 +94,22 @@ function useAgentSession(url: string, cwd?: string) {
  * real one when `LABKIT_ACP_AGENT_URL` names it. A real agent needs an absolute, writable `cwd`
  * for its session store; `VITE_LABKIT_ACP_CWD` (set by `dev-with-agent.ts`) supplies one, and the
  * fake agent ignores it. Without either, ACP's own default of `/` fails on a read-only root.
+ * `/agent` starts a session and `/agent/{sessionId}` reopens one the agent still has.
  */
-export default function AgentSession() {
+export default function AgentSession({ sessionId }: { sessionId?: string }) {
   const cwd = import.meta.env.VITE_LABKIT_ACP_CWD as string | undefined;
   const real = cwd !== undefined;
-  const { state, status, send, cancel, answer, setConfig } = useAgentSession("/acp", cwd);
+  const { state, status, started, send, cancel, answer, setConfig } = useAgentSession(
+    "/acp",
+    cwd,
+    sessionId,
+  );
+  // A session started here takes its own address, so reloading the page reopens it.
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (started === undefined) return;
+    void navigate({ to: "/agent/{-$sessionId}", params: { sessionId: started }, replace: true });
+  }, [started, navigate]);
   return (
     <>
       <Bar />
