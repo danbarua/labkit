@@ -100,6 +100,21 @@ describe("the agent's pattern", () => {
     expect(performance.now() - started).toBeLessThan(1000);
   });
 
+  test("where no worker can start, the pattern is unavailable and the answer stands", async () => {
+    const real = globalThis.Worker;
+    globalThis.Worker = class {
+      constructor() {
+        throw new Error("refused by the content security policy");
+      }
+    } as unknown as typeof Worker;
+    try {
+      expect(await checkPattern("^a$", "b")).toBe("unavailable");
+      expect(await patternProblems(SCHEMA, { name: "Sweep 1" })).toEqual({});
+    } finally {
+      globalThis.Worker = real;
+    }
+  });
+
   test("a pattern that does not compile is not held against the answer", async () => {
     expect(await checkPattern("(", "x")).toBe("invalid");
     const broken: ElicitationSchema = {

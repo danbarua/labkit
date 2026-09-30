@@ -76,7 +76,7 @@ function asLocalInput(value: string): string {
   return rfc3339(date).slice(0, 19);
 }
 
-type PatternVerdict = "match" | "no-match" | "invalid" | "timeout";
+type PatternVerdict = "match" | "no-match" | "invalid" | "timeout" | "unavailable";
 
 // Runs in a worker so a pattern with catastrophic backtracking can be stopped: a regular
 // expression on the page's own thread cannot be interrupted, and would freeze the page.
@@ -91,6 +91,8 @@ let patternWorkerUrl: string | undefined;
 /**
  * Whether `value` matches the agent's `pattern`, evaluated in a worker that is stopped after
  * `limitMs`. A pattern that does not compile is `invalid`; one that runs too long is `timeout`.
+ * Where the page may not start a worker from a `blob:` address (a content security policy with
+ * no `worker-src blob:`), the worker fails to load and the verdict is `unavailable`.
  */
 export function checkPattern(
   pattern: string,
@@ -98,7 +100,12 @@ export function checkPattern(
   limitMs = 250,
 ): Promise<PatternVerdict> {
   patternWorkerUrl ??= URL.createObjectURL(new Blob([PATTERN_WORKER], { type: "text/javascript" }));
-  const worker = new Worker(patternWorkerUrl);
+  let worker: Worker;
+  try {
+    worker = new Worker(patternWorkerUrl);
+  } catch {
+    return Promise.resolve("unavailable");
+  }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       worker.terminate();
@@ -109,14 +116,19 @@ export function checkPattern(
       worker.terminate();
       resolve(event.data);
     };
+    worker.onerror = () => {
+      clearTimeout(timer);
+      worker.terminate();
+      resolve("unavailable");
+    };
     worker.postMessage({ pattern, value });
   });
 }
 
 /**
  * The fields whose answers do not match the agent's `pattern`. A pattern that does not compile,
- * or runs past the time limit, cannot be held against the answer: it is logged and the answer
- * stands.
+ * runs past the time limit, or cannot be run here, cannot be held against the answer: it is
+ * logged and the answer stands.
  */
 export async function patternProblems(
   schema: ElicitationSchema,
@@ -134,7 +146,7 @@ export async function patternProblems(
       return [];
     return [
       checkPattern(pattern, value).then((verdict) => {
-        if (verdict === "invalid" || verdict === "timeout")
+        if (verdict !== "match" && verdict !== "no-match")
           console.warn("elicitation: the field's pattern could not be evaluated", {
             field: name,
             pattern,
