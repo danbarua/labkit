@@ -21,18 +21,11 @@ afterEach(async () => {
   await scenario.end();
 });
 
-/**
- * `SessionCore` defaults `events` to a fresh `inMemoryEventLog()`, and every sub-surface used to
- * take that default separately: `handling` recorded into the write surface's log while `undo`
- * read the revising group's, which was empty. Both shipped adapters pass a sink, so this never
- * reached a user — it only bit a caller who constructed a session without one.
- */
-test("a session built without a sink still has exactly one, and `undo` can see it", async () => {
+test("a session built without a sink still has exactly one", async () => {
   const session = new ResearchSession(await scenario.current());
-  const { events } = await session.writes.pose({ question: "can undo see its own event?" });
+  await session.writes.pose({ question: "can the read side see this act?" });
 
-  const undone = await session.writes.undo({ event: events[0]!.seq!, because: "a duplicate" });
-  expect(undone.retracted.length).toBeGreaterThan(0);
+  expect(await session.reads.whatHappened({})).toHaveLength(1);
 });
 
 test("the surfaces of one session share the sink, defaulted or not", async () => {

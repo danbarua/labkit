@@ -47,10 +47,8 @@ describe("S-29: the note came after the question", () => {
     const { question } = await session.writes.pose({ question: ASKS });
     const { note } = await session.writes.note({ text: PROBE, prompted: question });
 
-    const origin = await (await afterwards()).reads.originOf({ question });
-    expect(origin?.kind).toBe("noted");
-    expect(origin?.from).toBe(note);
-    expect(origin?.said).toBe(PROBE);
+    const why = await (await afterwards()).reads.why({ subject: question });
+    expect(why.because).toEqual([{ handle: note, wording: `was prompted by ${PROBE}` }]);
 
     await captureConversation(
       {
@@ -89,24 +87,6 @@ describe("S-29: the note came after the question", () => {
     const wordings = why.because.filter((c) => c.handle === note).map((c) => c.wording);
     expect(wordings.some((w) => w.includes("was prompted by"))).toBe(true);
     expect(wordings.some((w) => w.includes("has a note on it"))).toBe(true);
-  });
-
-  /**
-   * A question has one origin. Two would leave a reader with two answers to *why was this
-   * asked* and nothing saying which holds — the rule `stopWork` and `closeEnquiry` already
-   * apply to an act that has already happened.
-   */
-  test("a question that was sharpened refuses a second origin, and says what it has", async () => {
-    const { question: broad } = await session.writes.pose({ question: "does the coating hold?" });
-    const { question: sharp } = await session.writes.sharpen({
-      from: broad,
-      into: ASKS,
-      because: "at temperature is the part nobody measured",
-    });
-
-    await expect(session.writes.note({ text: PROBE, prompted: sharp })).rejects.toThrow(
-      /already came from/,
-    );
   });
 
   test("a second note prompting one question is refused", async () => {

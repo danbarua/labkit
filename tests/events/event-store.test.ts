@@ -206,37 +206,12 @@ describe("an event records the edges the act created", () => {
   test("a verb emits its own name", async () => {
     const { ctx, write } = await surfaceFor("labkit");
     const log = pgEventLog(db, ctx);
-    const { enquiry } = await write.openEnquiry("does the coating hold?");
-    const { observations } = await write.recordObservations({
-      enquiry,
-      name: "panel-a",
-      finding: "120 panels, 90 days",
-    });
-    const { analysis } = await write.recordAnalysis({
-      enquiry,
-      method: "regression",
-      from: [observations],
-    });
-    const kept = await write.conclude({
-      analysis,
-      proposition: "the coating holds",
-      finding: "no failures at 90 days",
-    });
-    await write.conclude({
-      analysis,
-      proposition: "the primer holds",
-      finding: "no failures at 60 days",
-    });
-    const { review } = await write.recordReview({ of: analysis, verdict: "wrong scale" });
+    // `openEnquiry` does what `pose` and `pursue` do, as one act.
+    await write.openEnquiry("does the coating hold?");
 
-    await write.keep({
-      keeping: [kept.claims[0]!.claim],
-      because: review,
-      method: "corrected scale",
-    });
-
-    expect(await log.select({ operation: "keep" })).toHaveLength(1);
-    expect(await log.select({ operation: "replaceAnalysis" })).toHaveLength(0);
+    expect(await log.select({ operation: "openEnquiry" })).toHaveLength(1);
+    expect(await log.select({ operation: "pose" })).toHaveLength(0);
+    expect(await log.select({ operation: "pursue" })).toHaveLength(0);
   });
 
   /**

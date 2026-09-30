@@ -37,9 +37,8 @@ const identity = () => z.string().meta({ identity: true });
 const concludedClaim = z.strictObject({
   claim: ref("claim"),
   asserts: prose(),
-  // Populated by `recordAnalysis`/`reverify`/`replaceAnalysis`, absent for a
-  // claim reached by wording (`claimsAsserting`) or one narrowing several
-  // prior findings (`reinterpret`'s `nowClaims`) — see `ConcludedClaim.finding`.
+  // Populated for a claim an analysis concluded, absent for a claim reached by
+  // wording (`claimsAsserting`) — see `ConcludedClaim.finding`.
   finding: ref("evidence").optional(),
 });
 
@@ -92,28 +91,6 @@ const listedNote = z.strictObject({
 
 export const notes = z.strictObject({
   notes: z.array(listedNote),
-});
-
-/**
- * One step on the path that produced a handle's current state. Superseded steps
- * are false starts; `successor` names what stands instead when the graph says.
- */
-export const howStep = z.strictObject({
-  handle: z.string(),
-  /** Kind label, or the record's own prose when it has any. */
-  what: prose(),
-  superseded: z.boolean(),
-  successor: z.string().optional(),
-  /** Decision reason when the superseding act carried one. */
-  because: prose().optional(),
-  /** Minting event seq when the log joins; absent when it does not. */
-  seq: z.number().optional(),
-});
-
-/** `how` — the ordered acts behind one handle, false starts marked. */
-export const how = z.strictObject({
-  subject: z.string(),
-  steps: z.array(howStep),
 });
 
 /**
@@ -268,21 +245,9 @@ const citedFinding = z.strictObject({
   states: z.string(),
 });
 
-const affectedClaim = z.strictObject({
-  claim: ref("claim"),
-  asserts: prose(),
-});
-const affectedEnquiry = z.strictObject({
-  enquiry: ref("enquiry"),
-  pursuing: prose(),
-});
 const confirmatoryResult = z.strictObject({
   claim: ref("claim"),
   asserts: prose(),
-});
-const decidedQuestion = z.strictObject({
-  question: ref("question"),
-  asks: prose(),
 });
 const replacementClaim = z.strictObject({
   claim: ref("claim"),
@@ -349,24 +314,6 @@ const checkStatus = z.strictObject({
   decidedBy: decidingEvaluation.optional(),
 });
 
-const amendmentRecord = z.strictObject({
-  amendment: ref("decision"),
-  replaced: condition,
-  nowRequires: condition,
-  reason: prose(),
-  citing: z.array(citedFinding),
-  rerun: z.array(gatedWork),
-  nature: z.enum(["mechanical", "scientific", "prespecification"]),
-});
-
-const revision = z.strictObject({
-  revision: ref("decision"),
-  previously: z.array(concludedClaim),
-  nowClaims: concludedClaim,
-  reason: prose(),
-  restingOnTheOldReading: z.array(decidedQuestion),
-});
-
 /* -- the seven tools' return shapes -------------------------------------- */
 
 export const knowledgeSurvey = z.strictObject({
@@ -376,14 +323,6 @@ export const knowledgeSurvey = z.strictObject({
   provisional: z.array(answeredQuestion),
   accepted: z.array(acceptedQuestion),
   closedPursuits: z.array(closedPursuit),
-});
-
-export const historicalSurvey = z.strictObject({
-  at: timestamp(),
-  established: z.array(questionStanding),
-  provisional: z.array(questionStanding),
-  accepted: z.array(questionStanding),
-  open: z.array(questionStanding),
 });
 
 export const supportExplanation = z.strictObject({
@@ -416,16 +355,6 @@ export const supportExplanation = z.strictObject({
   against: z.array(bearingFinding),
   withdrawn: z.boolean(),
   replacedBy: replacementClaim.optional(),
-});
-
-export const dependencyReport = z.strictObject({
-  subject: ref("observations"),
-  claims: z.array(affectedClaim),
-  enquiries: z.array(affectedEnquiry),
-  routesWalked: z.array(z.string()),
-  // Literal `false`, not `boolean`. The report is a lower bound and says so in
-  // its type; a caller must not be able to read `complete: true` from it.
-  complete: z.literal(false),
 });
 
 export const enquiryQuestion = z.strictObject({
@@ -464,60 +393,7 @@ export const enquiryInContext = z.strictObject({
     .nullable(),
 });
 
-const conditionHistory = z.strictObject({
-  originally: condition,
-  nowRequires: condition,
-  criterion: ref("criterion"),
-  amendments: z.array(amendmentRecord),
-});
-
-export const designHistory = z.strictObject({
-  gate: ref("gate"),
-  conditions: z.array(conditionHistory),
-});
-
-export const interpretationHistory = z.strictObject({
-  originally: z.array(concludedClaim),
-  nowClaims: concludedClaim,
-  revisions: z.array(revision),
-});
-
-export const reproductionReport = z.strictObject({
-  verification: ref("analysis"),
-  verificationMethod: z.string(),
-  of: ref("analysis"),
-  ofMethod: z.string(),
-  conclusion: z.enum(["agrees", "disagrees"]),
-  verificationRead: z.array(identifiedArtefact),
-  ofRead: z.array(identifiedArtefact),
-  differs: z.array(
-    z.strictObject({
-      what: identifiedArtefact,
-      standing: z.enum(["unrecorded-in-the-original", "changed", "not-used-by-the-re-run"]),
-    }),
-  ),
-  bearing: z.enum(["raises", "lowers"]),
-});
-
 /* -- the six reads exposed later than the rest ---------------------------- */
-
-/**
- * `origin_of` — `null` for a question somebody simply asked, which is most of them. Wrapped,
- * because `structuredContent` must be an object and a bare `null` is not one; `origin: null`
- * says "asked outright" rather than "no answer available".
- */
-export const questionOrigin = z.strictObject({
-  /** Which origin was found. `reason` and `knownAtTheTime` are the sharpened arm's, and empty
-   *  on the other — a note records no reason and cites nothing. */
-  kind: z.enum(["sharpened", "noted"]),
-  from: z.string() as unknown as z.ZodType<Ref<"question"> | Ref<"note">>,
-  said: z.string(),
-  reason: z.string().nullable(),
-  knownAtTheTime: z.array(citedFinding),
-});
-export const originOf = z.strictObject({
-  origin: questionOrigin.nullable(),
-});
 
 /**
  * The line of enquiry (and question) a task exists to advance -- see
@@ -542,11 +418,6 @@ export const taskContract = z.strictObject({
   enforced: z.literal(false),
   // Absent, not null, for ungated work (#91) -- see PlanWorkCommand.addressing.
   addressing: addressingSchema.optional(),
-});
-
-/** `criteria_governing` — an array, so it is wrapped like `pursuits_of`. */
-export const criteriaGoverning = z.strictObject({
-  criteria: z.array(ref("criterion")),
 });
 
 export const gateStatus = z.strictObject({
@@ -713,31 +584,6 @@ export const explanation = z.discriminatedUnion("kind", [
   }),
 ]);
 
-const conflictSide = z.strictObject({
-  claim: ref("claim"),
-  question: ref("question"),
-  proposition: prose(),
-  asks: prose(),
-  supportedBy: z.array(citedFinding),
-  challengedBy: z.array(citedFinding),
-});
-
-export const conflictVerdict = z.strictObject({
-  conflict: z.boolean(),
-  relation: z.enum(["contradiction", "dissociation", "corroboration"]),
-  differsBy: z.literal("scope").nullable(),
-  sides: z.array(conflictSide),
-});
-
-export const reproducibilityReport = z.strictObject({
-  analysis: ref("analysis"),
-  exact: z.array(identifiedArtefact),
-  differing: z.array(identifiedArtefact),
-  unverifiable: z.array(identifiedArtefact),
-  notRebuilt: z.array(identifiedArtefact),
-  reproducible: z.boolean(),
-});
-
 /* -- the write tools' return shapes --------------------------------------- */
 
 /**
@@ -791,20 +637,9 @@ export const recordedObservations = z.strictObject({
   observations: ref("observations"),
   events: z.array(domainEvent),
 });
-/** What `sharpen` returns — #161's audit: the frozen `Decision` was withheld. */
-export const sharpenedQuestion = z.strictObject({
-  question: ref("question"),
-  decision: ref("decision"),
-  events: z.array(domainEvent),
-});
 /** What `synthesise` returns — the claim drawn across the findings it rests on. */
 export const synthesised = z.strictObject({
   claim: ref("claim"),
-  events: z.array(domainEvent),
-});
-/** What `record_review` returns. */
-export const recordedReview = z.strictObject({
-  review: ref("review"),
   events: z.array(domainEvent),
 });
 /** What `close_enquiry` returns — #161's audit: this verb returned nothing. */
@@ -821,12 +656,6 @@ export const stoppedWork = z.strictObject({
   decision: ref("decision"),
   work: ref("work"),
   closure: z.literal("stopped"),
-  events: z.array(domainEvent),
-});
-/** What close_gate returns. */
-export const closedGate = z.strictObject({
-  decision: ref("decision"),
-  gate: ref("gate"),
   events: z.array(domainEvent),
 });
 /** What `plan_work` returns. */
@@ -867,13 +696,6 @@ export const restated = z.strictObject({
   events: z.array(domainEvent),
 });
 
-/** What `undo` returns — every handle the undone act created, now hidden from the ordinary read surface. */
-export const undone = z.strictObject({
-  event: z.number(),
-  retracted: z.array(z.string() as unknown as z.ZodType<Ref<Kind>>),
-  events: z.array(domainEvent),
-});
-
 const changedConclusion = z.strictObject({
   proposition: prose(),
   was: ref("claim"),
@@ -894,14 +716,6 @@ const unaffectedRecord = z.strictObject({
   why: z.string(),
 });
 
-export const verificationReport = z.strictObject({
-  at: timestamp(),
-  verification: analysisRef,
-  of: analysisRef,
-  claims: z.array(concludedClaim),
-  events: z.array(domainEvent),
-});
-
 export const amendmentReport = z.strictObject({
   at: timestamp(),
   amendment: ref("decision"),
@@ -911,33 +725,6 @@ export const amendmentReport = z.strictObject({
   confirmatoryAffected: z.array(confirmatoryResult),
   nature: z.enum(["mechanical", "scientific", "prespecification"]),
   events: z.array(domainEvent),
-});
-
-export const replacementReport = z.strictObject({
-  at: timestamp(),
-  replacement: ref("analysis"),
-  decision: ref("decision"),
-  supersedes: ref("analysis"),
-  kept: z.array(ref("claim")),
-  superseded: z.array(concludedClaim),
-  events: z.array(domainEvent),
-});
-
-export const reinterpretationReport = z.strictObject({
-  at: timestamp(),
-  previously: z.array(concludedClaim),
-  nowClaims: concludedClaim,
-  evidenceStanding: z.array(citedFinding),
-  restingOnTheOldReading: z.array(z.strictObject({ question: ref("question"), asks: z.string() })),
-  requiresRecomputation: z.boolean(),
-  events: z.array(domainEvent),
-});
-
-/** `pursuits_of` — `ReadSurface.pursuitsOf` returns an array, which is not an object. */
-export const pursuits = z.strictObject({
-  // The bare handle, not `minted("enquiry")` — the wrapper exists only so a
-  // tool whose *whole* answer is one handle has an object to return.
-  enquiries: z.array(ref("enquiry")),
 });
 
 /**
@@ -1012,8 +799,6 @@ export type ConcludedClaim = z.infer<typeof concludedClaim>;
 export type SearchMatch = z.infer<typeof searchMatch>;
 export type SearchGroup = z.infer<typeof searchGroup>;
 export type Notes = z.infer<typeof notes>;
-export type HowStep = z.infer<typeof howStep>;
-export type How = z.infer<typeof how>;
 export type ListedNote = z.infer<typeof listedNote>;
 export type ChangedConclusion = z.infer<typeof changedConclusion>;
 export type UnaffectedRecord = z.infer<typeof unaffectedRecord>;
@@ -1026,10 +811,7 @@ export type AnsweredQuestion = z.infer<typeof answeredQuestion>;
 export type ClosedPursuit = z.infer<typeof closedPursuit>;
 export type IdentifiedArtefact = z.infer<typeof identifiedArtefact>;
 export type CitedFinding = z.infer<typeof citedFinding>;
-export type AffectedClaim = z.infer<typeof affectedClaim>;
-export type AffectedEnquiry = z.infer<typeof affectedEnquiry>;
 export type ConfirmatoryResult = z.infer<typeof confirmatoryResult>;
-export type DecidedQuestion = z.infer<typeof decidedQuestion>;
 export type ReplacementClaim = z.infer<typeof replacementClaim>;
 export type Reverification = z.infer<typeof reverification>;
 export type EvaluationRecord = z.infer<typeof evaluationRecord>;
@@ -1040,9 +822,6 @@ export type UnmetCheck = z.infer<typeof unmetCheck>;
 export type Condition = z.infer<typeof condition>;
 export type DecidingEvaluation = z.infer<typeof decidingEvaluation>;
 export type CheckStatus = z.infer<typeof checkStatus>;
-export type AmendmentRecord = z.infer<typeof amendmentRecord>;
-export type Revision = z.infer<typeof revision>;
-export type ConditionHistory = z.infer<typeof conditionHistory>;
 export type RevisedFinding = z.infer<typeof revisedFinding>;
 export type GateGoverned = z.infer<typeof gateGoverned>;
 export type AnalysisRevision = z.infer<typeof analysisRevisionSchema>;
@@ -1052,50 +831,31 @@ export type ListedWork = z.infer<typeof listedWork>;
 export type Transcription = z.infer<typeof transcription>;
 export type Standing = z.infer<typeof standing>;
 export type KnowledgeSurvey = z.infer<typeof knowledgeSurvey>;
-export type HistoricalSurvey = z.infer<typeof historicalSurvey>;
 export type SupportExplanation = z.infer<typeof supportExplanation>;
-export type DependencyReport = z.infer<typeof dependencyReport>;
 export type EnquiryQuestion = z.infer<typeof enquiryQuestion>;
 export type EnquiryStatus = z.infer<typeof enquiryStatus>;
 export type EnquiryInContext = z.infer<typeof enquiryInContext>;
-export type DesignHistory = z.infer<typeof designHistory>;
-export type InterpretationHistory = z.infer<typeof interpretationHistory>;
-export type ReproductionReport = z.infer<typeof reproductionReport>;
-export type QuestionOrigin = z.infer<typeof questionOrigin>;
-export type OriginOf = z.infer<typeof originOf>;
 export type Addressing = z.infer<typeof addressingSchema>;
 export type TaskContract = z.infer<typeof taskContract>;
-export type CriteriaGoverning = z.infer<typeof criteriaGoverning>;
 export type GateStatus = z.infer<typeof gateStatus>;
 export type CriterionStanding = z.infer<typeof criterionStanding>;
 export type Explanation = z.infer<typeof explanation>;
-export type ConflictSide = z.infer<typeof conflictSide>;
-export type ConflictVerdict = z.infer<typeof conflictVerdict>;
-export type ReproducibilityReport = z.infer<typeof reproducibilityReport>;
 export type RecordedAnalysis = z.infer<typeof recordedAnalysis>;
 export type Posed = z.infer<typeof posed>;
 export type Noted = z.infer<typeof noted>;
 export type Pursued = z.infer<typeof pursued>;
 export type OpenedEnquiry = z.infer<typeof openedEnquiry>;
 export type RecordedObservations = z.infer<typeof recordedObservations>;
-export type SharpenedQuestion = z.infer<typeof sharpenedQuestion>;
 export type Synthesised = z.infer<typeof synthesised>;
-export type RecordedReview = z.infer<typeof recordedReview>;
 export type ClosedEnquiry = z.infer<typeof closedEnquiry>;
 export type StoppedWork = z.infer<typeof stoppedWork>;
-export type ClosedGate = z.infer<typeof closedGate>;
 export type PlannedWork = z.infer<typeof plannedWork>;
 export type StatedCriterion = z.infer<typeof statedCriterion>;
 export type DeclaredGate = z.infer<typeof declaredGate>;
 export type EvaluatedCriterion = z.infer<typeof evaluatedCriterion>;
 export type AcceptedAsUnresolved = z.infer<typeof acceptedAsUnresolved>;
 export type Restated = z.infer<typeof restated>;
-export type Undone = z.infer<typeof undone>;
-export type VerificationReport = z.infer<typeof verificationReport>;
 export type AmendmentReport = z.infer<typeof amendmentReport>;
-export type ReplacementReport = z.infer<typeof replacementReport>;
-export type ReinterpretationReport = z.infer<typeof reinterpretationReport>;
-export type Pursuits = z.infer<typeof pursuits>;
 export type RegisteredSession = z.infer<typeof registeredSession>;
 export type GateList = z.infer<typeof gateList>;
 export type WorkList = z.infer<typeof workList>;
@@ -1146,37 +906,8 @@ export const enquiryList = z.strictObject({ enquiries: z.array(listedEnquiry) })
 export const analysisList = z.strictObject({ analyses: z.array(listedAnalysis) });
 export const criterionList = z.strictObject({ criteria: z.array(listedCriterion) });
 
-/** One conclusion, with the finding that reached it. */
-export const learnedFinding = z.strictObject({
-  claim: ref("claim"),
-  asserts: prose(),
-  bearing: z.enum(["supports", "challenges"]),
-  /** A decision promoted it: others may build on it. */
-  confirmed: z.boolean(),
-  finding: ref("evidence"),
-  states: prose(),
-});
-export type LearnedFinding = z.infer<typeof learnedFinding>;
-
-export const learnedUnderQuestion = z.strictObject({
-  question: ref("question"),
-  asks: prose(),
-  found: z.array(learnedFinding),
-});
-export type LearnedUnderQuestion = z.infer<typeof learnedUnderQuestion>;
-
-/** `learned` — what the programme found out, under the question it was asked for. */
-export const learned = z.strictObject({
-  questions: z.array(learnedUnderQuestion),
-  found: z.number(),
-});
-export type Learned = z.infer<typeof learned>;
-
 /** Every exported schema in this module, so PROSE_FIELDS can walk them all. */
 const SCHEMAS = {
-  learned,
-  learnedUnderQuestion,
-  learnedFinding,
   claimList,
   enquiryList,
   analysisList,
@@ -1188,53 +919,33 @@ const SCHEMAS = {
   claimsAsserting,
   search,
   notes,
-  howStep,
-  how,
   whatHappened,
   domainEvent,
   knowledgeSurvey,
-  historicalSurvey,
   supportExplanation,
-  dependencyReport,
   enquiryQuestion,
   enquiryStatus,
   enquiryInContext,
-  designHistory,
-  interpretationHistory,
-  reproductionReport,
-  questionOrigin,
-  originOf,
   taskContract,
-  criteriaGoverning,
   gateStatus,
   criterionStanding,
   explanation,
-  conflictVerdict,
-  reproducibilityReport,
   recordedAnalysis,
   posed,
   noted,
   pursued,
   openedEnquiry,
   recordedObservations,
-  sharpenedQuestion,
   synthesised,
-  recordedReview,
   closedEnquiry,
   stoppedWork,
-  closedGate,
   plannedWork,
   statedCriterion,
   declaredGate,
   evaluatedCriterion,
   acceptedAsUnresolved,
   restated,
-  undone,
-  verificationReport,
   amendmentReport,
-  replacementReport,
-  reinterpretationReport,
-  pursuits,
   registeredSession,
   gateList,
   workList,

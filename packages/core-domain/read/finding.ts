@@ -1,85 +1,12 @@
 import { vertexProps } from "@labkit/core-db/cypher";
 import { NODE_LABELS, SEARCHABLE_TEXT, SEARCHABLE_TEXT_ARRAYS } from "@labkit/core-db/domain";
-import type { ClaimsAssertingQuery, OriginOfQuery, PursuitsOfQuery, SearchQuery } from "../queries";
+import type { ClaimsAssertingQuery, SearchQuery } from "../queries";
 import { SessionCore } from "../core";
-import { KIND_BY_LABEL, byHandle, ref } from "../report";
-import type {
-  ConcludedClaim,
-  EnquiryRef,
-  QuestionOrigin,
-  SearchGroup,
-  SearchMatch,
-} from "../report";
-import { dedupeById, type Identified } from "./shared";
+import { KIND_BY_LABEL, ref } from "../report";
+import type { ConcludedClaim, SearchGroup, SearchMatch } from "../report";
+import { type Identified } from "./shared";
 
 export class FindingGroup extends SessionCore {
-  /** Every line of enquiry pursuing this question. */
-  async pursuitsOf({ question }: PursuitsOfQuery): Promise<EnquiryRef[]> {
-    const rows = await this.graph.query(
-      `MATCH (:Question {natural_id: $id})-[:MOTIVATES]->(loe:LineOfEnquiry) RETURN loe`,
-      { loe: vertexProps<{ natural_id: string }>() },
-      { id: question },
-    );
-    return rows.map((r) => ref("enquiry", r.loe.natural_id) as EnquiryRef);
-  }
-
-  /**
-   * Where a question came from, if it came from sharpening an earlier one.
-   */
-  async originOf({ question }: OriginOfQuery): Promise<QuestionOrigin | null> {
-    // Its own MATCH, because AGE has no edge alternation and the two origins do
-    // not share a shape: a note gave rise to the question directly, a sharpening
-    // did it through the decision that recorded why.
-    const noted = await this.graph.query(
-      `MATCH (n:Note)-[:MOTIVATES]->(:Question {natural_id: $id}) RETURN n`,
-      { n: vertexProps<{ natural_id: string; text: string }>() },
-      { id: question },
-    );
-    if (noted.length > 0) {
-      const note = noted[0]!.n;
-      return {
-        kind: "noted",
-        from: ref("note", note.natural_id),
-        said: note.text,
-        reason: null,
-        knownAtTheTime: [],
-      };
-    }
-
-    const rows = await this.graph.query(
-      `MATCH (d:Decision)-[:MOTIVATES]->(:Question {natural_id: $id})
-       MATCH (d)-[:SHARPENS]->(from:Question)
-       RETURN d, from AS origin`,
-      {
-        d: vertexProps<{ natural_id: string; reason: string }>(),
-        origin: vertexProps<{ natural_id: string; name: string }>(),
-      },
-      { id: question },
-    );
-    if (rows.length === 0) return null;
-
-    const row = rows[0]!;
-    const knew = await this.graph.query(
-      `MATCH (:Decision {natural_id: $id})-[:BASED_ON]->(e:Evidence) RETURN e`,
-      { e: vertexProps<{ statement: string } & Identified>() },
-      { id: row.d.natural_id },
-    );
-
-    return {
-      kind: "sharpened",
-      from: ref("question", row.origin.natural_id),
-      said: row.origin.name,
-      reason: row.d.reason,
-      knownAtTheTime: dedupeById(
-        knew.map((r) => ({
-          evidence: ref("evidence", r.e.natural_id),
-          states: r.e.statement,
-        })),
-        (f) => f.evidence,
-      ).sort((a, b) => byHandle(a.evidence, b.evidence)),
-    };
-  }
-
   /**
    * Claims asserting a proposition — the **one** place wording is resolved.
    */

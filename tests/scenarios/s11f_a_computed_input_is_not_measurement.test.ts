@@ -85,37 +85,4 @@ describe("S-11f — a computed input, asked about by the reads that touch inputs
       events,
     );
   });
-
-  test("accounting for a computed input declines, and does not report it unequal", async () => {
-    const { raw, calibration, trend } = await twoStages();
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-
-    // Stage one is fully accounted for: a hash was recorded and it matches.
-    const stageOne = await later.reads.reproducibilityOf({
-      analysis: calibration.analysis,
-      rebuilt: [{ part: raw, hash: "sha256:raw" }],
-    });
-    expect(stageOne.exact.map((p) => p.name)).toEqual(["raw series"]);
-    expect(stageOne.reproducible).toBe(true);
-
-    // Stage two reads a computed artefact, which carries no hash — nothing was measured, so
-    // there is nothing to hash against. That lands in `unverifiable`, which is the record
-    // declining to answer rather than answering no, and it is the correct answer about that
-    // record.
-    const stageTwo = await later.reads.reproducibilityOf({ analysis: trend.analysis, rebuilt: [] });
-    expect(stageTwo.unverifiable.map((p) => p.name)).toEqual(["calibrate output"]);
-    // The half that makes this a real probe rather than a restatement: absence
-    // is not reported as difference. `differing` would be a wrong answer.
-    expect(stageTwo.differing).toEqual([]);
-    expect(stageTwo.reproducible).toBe(false);
-
-    // **The one real consequence, and it is a weaker answer rather than a wrong one.**
-    // `unverifiable` is right about the hash and blind to the route: this artefact was produced
-    // by a computation whose own input is accounted for exactly, one hop away, and the record
-    // holds that.
-    expect(stageOne.reproducible).toBe(true);
-  });
 });

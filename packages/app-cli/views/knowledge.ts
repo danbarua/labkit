@@ -6,13 +6,8 @@ import type {
   AcceptedQuestion,
   AnsweredQuestion,
   ConcludedClaim,
-  ConflictSide,
-  ConflictVerdict,
   Explanation,
-  How,
-  HistoricalSurvey,
   KnowledgeSurvey,
-  QuestionStanding,
   SearchGroup,
   SupportExplanation,
   Verdict,
@@ -81,27 +76,6 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
   ]
     .join("\n")
     .replace(/\n+$/, "");
-}
-
-export function renderHistorical(survey: HistoricalSurvey, p: Palette): string {
-  const list = (qs: QuestionStanding[]) => bullets(questionLines(qs), "nothing");
-  return [
-    p.heading(`As of ${survey.at}:`),
-    "",
-    p.settled("Established (resolved on a confirmed finding)"),
-    list(survey.established),
-    "",
-    p.provisional("Provisional (resolved, but on unconfirmed work)"),
-    list(survey.provisional),
-    "",
-    p.provisional("Accepted as unresolved"),
-    list(survey.accepted),
-    "",
-    p.untested("Open"),
-    list(survey.open),
-    "",
-    p.quiet("A question posed after this instant is absent, not open."),
-  ].join("\n");
 }
 
 /**
@@ -316,48 +290,4 @@ export function renderSearch(groups: SearchGroup[], text: string, p: Palette): s
   ]
     .filter(Boolean)
     .join("\n");
-}
-
-/**
- * Whether two conclusions disagree.
- */
-export function renderConflict(verdict: ConflictVerdict, p: Palette): string {
-  const side = (s: ConflictSide): string =>
-    [
-      `"${s.proposition}"  ${`(${s.claim})`}`,
-      `  asking "${s.asks}"  ${`(${s.question})`}`,
-      s.supportedBy.length
-        ? `  ${p.settled("supported by")}: ${s.supportedBy.map((f) => f.states).join("; ")}`
-        : "",
-      s.challengedBy.length
-        ? `  ${p.contested("challenged by")}: ${s.challengedBy.map((f) => f.states).join("; ")}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  const verdictLine: Record<ConflictVerdict["relation"], string> = {
-    contradiction: p.contested("Contradiction — these disagree, and about the same thing."),
-    dissociation: p.provisional(
-      "Dissociation — these are about different things, so they do not disagree" +
-        (verdict.differsBy ? `; they differ by ${verdict.differsBy}.` : "."),
-    ),
-    corroboration: p.settled("Corroboration — these agree."),
-  };
-  return [verdictLine[verdict.relation], "", verdict.sides.map(side).join("\n\n")].join("\n");
-}
-
-export function renderHow(how: How, p: Palette): string {
-  if (how.steps.length === 0) return p.untested("No steps.");
-  const lines = how.steps.map((s: How["steps"][number]) => {
-    let line = `${s.handle}  ${s.what}`;
-    if (s.superseded) {
-      line += p.contested(" (superseded");
-      if (s.successor) line += ` → ${s.successor}`;
-      line += ")";
-    }
-    if (s.because) line += ` — ${s.because}`;
-    if (s.seq !== undefined) line += ` [seq ${s.seq}]`;
-    return line;
-  });
-  return [p.heading(`How ${how.subject} — ${how.steps.length}`), ...lines].join("\n");
 }

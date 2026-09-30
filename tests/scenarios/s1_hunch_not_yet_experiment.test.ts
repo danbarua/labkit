@@ -3,16 +3,9 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import {
-  ResearchSession,
-  inMemoryEventLog,
-  type Clock,
-  type EventSink,
-  type QuestionRef,
-} from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 import { as, captureConversation } from "../helpers/conversation";
 
@@ -65,8 +58,7 @@ async function priorState() {
     // Prespecified, and separately vouched for below. Both, because they are
     // two facts: `standing` says the design was locked before the run, and the
     // `is <claim> confirmed` after this says somebody stands behind the result.
-    // `established` is the second — a promotion is an act, with a date, which
-    // is why `known --at` can answer it and cannot answer `standing`.
+    // `established` is the second — a promotion is an act, with a date.
     concludes: [
       {
         proposition: NONLINEAR,
@@ -139,10 +131,13 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
 
     // Researcher: fine. Let's pursue whether different inputs map to
     //             reproducibly different internal responses.
-    const { question: sharper } = await session.writes.sharpen({
-      from: hunch,
-      into: "do different inputs map to reproducibly different internal responses?",
-      because: "the vague form is not testable; this one names what would count as an answer",
+    const { note: why } = await session.writes.note({
+      text: "the vague form is not testable; this one names what would count as an answer",
+      on: hunch,
+    });
+    const { question: sharper } = await session.writes.pose({
+      question: "do different inputs map to reproducibly different internal responses?",
+      from: why,
     });
 
     expect(sharper).not.toBe(hunch);
@@ -216,143 +211,6 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
   });
 
   /**
-   * Afterward 2 — where did the current sharper question come from?
-   */
-  test("the sharper question is traceable to the hunch, which is neither rewritten nor closed", async () => {
-    const { question: hunch } = await session.writes.pose({
-      question: "is the learned topology doing something computationally interesting?",
-    });
-    const { question: sharper } = await session.writes.sharpen({
-      from: hunch,
-      into: "do different inputs map to reproducibly different internal responses?",
-      because: "the vague form is not testable",
-    });
-
-    const origin = await session.reads.originOf({ question: sharper });
-    expect(origin?.from).toBe(hunch);
-    expect(origin?.reason).toContain("not testable");
-
-    // From a second reader: the original still asks what it originally asked.
-    const later = new ResearchSession(await scenario.current(), { clock });
-    const durable = await later.reads.originOf({ question: sharper });
-    expect(durable?.from).toBe(hunch);
-    expect(durable?.said).toBe(
-      "is the learned topology doing something computationally interesting?",
-    );
-
-    // Narrowing is not answering. Nothing has been shown about the hunch, so
-    // it is still on the books untested -- not established, and not a failure.
-    const known = await later.reads.whatIsKnown();
-    expect(known.established.map((q) => q.question)).not.toContain(hunch);
-    expect(known.untested.map((q) => q.question)).toContain(hunch);
-    expect(known.untested.map((q) => q.asks)).toContain(
-      "is the learned topology doing something computationally interesting?",
-    );
-  });
-
-  /**
-   * Afterward 3 — what was the state of knowledge at the moment this question was sharpened,
-   * asked after later evidence has arrived?
-   */
-  test("the knowledge behind a sharpening is the knowledge that existed then", async () => {
-    const prior = await priorState();
-    const { question: hunch } = await session.writes.pose({
-      question: "is the learned topology doing something computationally interesting?",
-    });
-
-    const { question: first } = await session.writes.sharpen({
-      from: hunch,
-      into: "do different inputs map to reproducibly different internal responses?",
-      because: "the vague form is not testable",
-    });
-
-    // Later evidence arrives on the smear question -- after the first
-    // sharpening, before the second.
-    const { observations: lateObs } = await session.writes.recordObservations({
-      enquiry: prior.smearEnquiry,
-      name: "seed-controlled response maps",
-      finding: "response maps recorded with initial conditions held fixed",
-    });
-    await recordAnalysis(session.writes, {
-      enquiry: prior.smearEnquiry,
-      method: "seed-controlled-inspection",
-      from: [lateObs],
-      concludes: [
-        {
-          proposition: SMEAR,
-          finding: "family separation survives when initial conditions are held fixed",
-        },
-      ],
-    });
-
-    const { question: second } = await session.writes.sharpen({
-      from: hunch,
-      into: "does the same input map to the same internal response across seeds?",
-      because: "reproducibility is now the part in doubt",
-    });
-
-    const behindFirst = await session.reads.originOf({ question: first });
-    const behindSecond = await session.reads.originOf({ question: second });
-
-    // The finding that arrived after the first sharpening must not appear
-    // behind it, and must appear behind the second.
-    const LATE = "family separation survives when initial conditions are held fixed";
-    expect(behindSecond?.knownAtTheTime.map((f) => f.states)).toContain(LATE);
-    expect(behindFirst?.knownAtTheTime).not.toContain(LATE);
-
-    // ...and the two sharpenings are told apart at all.
-    expect(behindFirst?.knownAtTheTime).not.toEqual(behindSecond?.knownAtTheTime ?? []);
-
-    // Afterward, from a second reader with an event log of its own -- which is
-    // empty. The historical answer is reconstructed from durable scientific
-    // state, not replayed from the stream of what this session happened to do.
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-    expect(await later.events.all()).toHaveLength(0);
-    expect((await later.reads.originOf({ question: first }))?.knownAtTheTime).not.toContain(LATE);
-    expect(
-      (await later.reads.originOf({ question: second }))?.knownAtTheTime.map((f) => f.states),
-    ).toContain(LATE);
-  });
-
-  /**
-   * Sharpening validates before it writes anything.
-   */
-  test("sharpening a question that is not on the record writes nothing", async () => {
-    await priorState();
-    const before = await session.reads.whatIsKnown();
-
-    const absent: QuestionRef = ref("question", "Q_404");
-
-    // The message is the assertion. Sharpening a missing question would fail
-    // either way -- but failing on the *second* write, when the narrowing edge
-    // finds no endpoint, means a decision was already on the record. Only the
-    // up-front guard produces this wording, so a rejection that stops saying
-    // it is a rejection that started writing first.
-    await expect(
-      session.writes.sharpen({
-        from: absent,
-        into: "a sharper form of nothing",
-        because: "it should not get this far",
-      }),
-    ).rejects.toThrow(/Q_404 not found/);
-
-    const later = new ResearchSession(await scenario.current(), { clock });
-    const after = await later.reads.whatIsKnown();
-    const census = (k: Awaited<ReturnType<typeof later.reads.whatIsKnown>>) =>
-      [...k.established, ...k.unresolved, ...k.untested].map((q) => q.question).sort();
-    expect(census(after)).toEqual(census(before));
-
-    // Nothing on the record cites the sharpening that never happened.
-    for (const question of census(after)) {
-      const origin = await later.reads.originOf({ question: ref("question", question) });
-      expect(origin?.reason).not.toBe("it should not get this far");
-    }
-  });
-
-  /**
    * Afterward 4 — one question, pursued more than one way.
    */
   test("a second pursuit of one question does not mint a second question", async () => {
@@ -371,8 +229,8 @@ describe("S-1 — a hunch that is not yet an experiment", () => {
     expect(byMapping).not.toBe(byProbe);
 
     const later = new ResearchSession(await scenario.current(), { clock });
-    const pursuits = await later.reads.pursuitsOf({ question });
-    expect(pursuits.map((p) => p).sort()).toEqual([byMapping, byProbe].sort());
+    const pursuits = (await later.reads.enquiryList()).filter((e) => e.question === question);
+    expect(pursuits.map((p) => p.enquiry).sort()).toEqual([byMapping, byProbe].sort());
 
     // One question on the books, not two.
     const known = await later.reads.whatIsKnown();

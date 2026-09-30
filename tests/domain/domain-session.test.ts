@@ -8,8 +8,8 @@ import { ResearchSession } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { vertexProps } from "@labkit/core-db/cypher";
 import type { TenantGraph } from "@labkit/core-db/graph";
-import { claimNamed, claimOf } from "../helpers/claims";
-import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { claimOf } from "../helpers/claims";
+import { reanalyse, recordAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
 
 let scenario: Scenario;
@@ -54,59 +54,6 @@ function failingOn(
     },
   }) as TenantGraph;
 }
-
-/**
- * A reinterpretation interrupted after the original has been withdrawn but before the narrower
- * claim inherits its evidence retracts a finding and puts nothing in its place: the record
- * stops asserting the original sentence, and the sentence meant to replace it is supported by
- * nothing at all.
- */
-test("an interrupted reinterpret does not retract a finding it cannot replace", async () => {
-  const { enquiry } = await session.writes.openEnquiry("does T differ from rewired?");
-  const { observations } = await session.writes.recordObservations({
-    enquiry,
-    name: "per-image results",
-    finding: "per-image accuracy",
-  });
-  const { claims: analysisClaims } = await recordAnalysis(session.writes, {
-    enquiry,
-    method: "holm-pairwise",
-    from: [observations],
-    concludes: [{ proposition: "T beats rewired", finding: "p = 0.002" }],
-  });
-
-  const before = await session.reads.whySupported({
-    claim: await claimNamed(session.reads, "T beats rewired"),
-  });
-
-  // Fourth edge: MOTIVATES, EVALUATES, the SUPERSEDES that withdraws the original,
-  // and then the SUPPORTS that carries the evidence across to the narrower
-  // claim. Failing on the last one is the damaging moment.
-  const interrupted = new ResearchSession(failingOn(graph, "createEdge", 4), {
-    events: session.events,
-  });
-  await expect(
-    interrupted.writes.reinterpret({
-      of: claimOf(analysisClaims, "T beats rewired"),
-      as: "T beats rewired on the primary endpoint only",
-      because: "the secondary endpoint was never powered",
-    }),
-  ).rejects.toThrow(/injected failure/);
-
-  // Nothing moved: the finding still stands and still rests on its evidence.
-  const after = await session.reads.whySupported({
-    claim: await claimNamed(session.reads, "T beats rewired"),
-  });
-  expect(after).toEqual(before);
-  expect(after.withdrawn).toBe(false);
-  expect(after.verdict).toBe("supported");
-  // And no half-made revision is readable.
-  const history = await session.reads.interpretationHistory({
-    claim: await claimNamed(session.reads, "T beats rewired"),
-  });
-  expect(history.nowClaims.asserts).toBe("T beats rewired");
-  expect(history.revisions).toEqual([]);
-});
 
 /**
  * An amendment interrupted after the replacement condition governs the gate
@@ -218,68 +165,6 @@ test("recordObservations writes the unit and the evidence together or not at all
     finding: "no delamination after 200 cycles",
   });
   expect(again).toMatch(/^ART_/);
-});
-
-/**
- * Every write verb runs inside `inTransaction()`, because an event has to commit with the
- * writes it describes.
- */
-test("an interrupted sharpen leaves nothing at all", async () => {
-  const { enquiry } = await session.writes.openEnquiry("does the coating hold?");
-  const { observations: obs } = await session.writes.recordObservations({
-    enquiry,
-    name: "run A",
-    finding: "no delamination",
-  });
-  await recordAnalysis(session.writes, {
-    enquiry,
-    method: "cycling",
-    from: [obs],
-    concludes: [
-      {
-        proposition: "the coating survives cycling",
-        finding: "no delamination at 200 cycles",
-      },
-      {
-        proposition: "the coating survives heat",
-        finding: "no delamination at 200C",
-      },
-    ],
-  });
-  const { question: original } = await session.writes.pose({ question: "is the coating durable?" });
-
-  // Fail on the second BASED_ON edge: the decision keeps one finding of three.
-  const realCreateEdge = graph.createEdge.bind(graph);
-  let basedOn = 0;
-  graph.createEdge = (async (from: string, edge: string, to: string) => {
-    if (edge === "BASED_ON" && ++basedOn === 2) {
-      throw new Error("injected: the second BASED_ON failed");
-    }
-    return realCreateEdge(from as never, edge as never, to as never);
-  }) as typeof graph.createEdge;
-
-  await expect(
-    session.writes.sharpen({
-      from: original,
-      into: "is it durable at 200C?",
-      because: "too vague",
-    }),
-  ).rejects.toThrow(/injected/);
-  graph.createEdge = realCreateEdge;
-
-  // No decision at all: the rollback means there is nothing to reach.
-  const decisions = await graph.query(`MATCH (d:Decision) RETURN d`, {
-    d: vertexProps<{ reason: string }>(),
-  });
-  expect(decisions).toEqual([]);
-
-  // And so `originOf` answers null because the question genuinely has no
-  // origin, not because the edge it needs happened to be written last.
-  expect(await session.reads.originOf({ question: original })).toBeNull();
-
-  // The sharper question was never created, so the survey is simply correct.
-  const survey = await session.reads.whatIsKnown();
-  expect(survey.untested.map((q) => q.asks)).toEqual(["is the coating durable?"]);
 });
 
 /**
@@ -400,7 +285,7 @@ test("a close interrupted before BASED_ON writes nothing before retry", async ()
  * withdraw it: `isWithdrawn` is `cited > 0 && standing === 0`.
  */
 test("a verdict is withdrawn when the evidence it was reached against is retracted", async () => {
-  const { enquiry, obs, analysis, analysisClaims, criterion, gate } = await aGatedCheck();
+  const { enquiry, obs, analysisClaims, criterion, gate } = await aGatedCheck();
 
   await session.writes.evaluateCriterion({
     criterion,
@@ -415,17 +300,17 @@ test("a verdict is withdrawn when the evidence it was reached against is retract
   );
   expect(before.state).toBe("blocked");
 
-  const { review } = await session.writes.recordReview({
-    of: analysis,
-    verdict: "the sweep dropped the last decade",
-  });
-  await replaceAnalysis(session.writes, {
-    supersedes: analysis,
-    because: review,
+  await reanalyse(session.writes, {
     enquiry,
     method: "convergence, all decades",
     from: [obs],
-    concludes: [{ proposition: "the solver converges", finding: "residual 4e-9" }],
+    concludes: [
+      {
+        proposition: "the solver converges",
+        finding: "residual 4e-9",
+        replacing: claimOf(analysisClaims, "the solver converges"),
+      },
+    ],
   });
 
   const after = await session.reads.gateStatus({ gate });
@@ -586,51 +471,6 @@ test("stateCriterion and planWork have no interruption window to have", async ()
 });
 
 /**
- * `recordReview` writes `EVALUATES` **last**, so an interrupted review is an
- * orphan `Review` node — `pursue`'s argument, checked rather than assumed.
- */
-test("an interrupted recordReview leaves a review nothing can reach", async () => {
-  const { enquiry } = await session.writes.openEnquiry("does it hold?");
-  const { observations: obs } = await session.writes.recordObservations({
-    enquiry,
-    name: "run",
-    finding: "data",
-  });
-  const { analysis } = await recordAnalysis(session.writes, {
-    enquiry,
-    method: "m",
-    from: [obs],
-    concludes: [{ proposition: "it holds", finding: "f" }],
-  });
-
-  const realCreateEdge = graph.createEdge.bind(graph);
-  graph.createEdge = (async (from: string, edge: string, to: string) => {
-    if (edge === "EVALUATES") throw new Error("injected: EVALUATES failed");
-    return realCreateEdge(from as never, edge as never, to as never);
-  }) as typeof graph.createEdge;
-
-  await expect(
-    session.writes.recordReview({
-      of: analysis,
-      verdict: "the aggregation dropped a fold",
-    }),
-  ).rejects.toThrow(/injected/);
-  graph.createEdge = realCreateEdge;
-
-  const attached = await graph.query(`MATCH (r:Review)-[:EVALUATES]->() RETURN r`, {
-    r: vertexProps<{ natural_id: string }>(),
-  });
-  expect(attached).toEqual([]);
-
-  // The finding still stands: no review reaches it, so nothing retracts it.
-  const why = await session.reads.whySupported({
-    claim: await claimNamed(session.reads, "it holds"),
-  });
-  expect(why.verdict).toBe("supported");
-  expect(why.withdrawn).toBe(false);
-});
-
-/**
  * `declareGate` writes its edges **after** the node -- `evaluateCriterion`'s arrangement.
  */
 test("an interrupted declareGate leaves no gate at all", async () => {
@@ -727,50 +567,6 @@ test("a task planned against an enquiry reports it, with wording; one planned wi
     asks: "can this mapping reach an external task?",
   });
   expect((await session.reads.contractFor({ work: unaddressed })).addressing).toBeUndefined();
-});
-
-test("closing a blocked gate releases work without changing its failed check", async () => {
-  const { criterion } = await session.writes.stateCriterion("the error stays below 1e-6");
-  const { work } = await session.writes.planWork({
-    objective: "publish the comparison",
-    acceptance: "the comparison is in the report",
-  });
-  const { gate } = await session.writes.declareGate({
-    governedBy: [criterion],
-    consequence: "the comparison is withheld",
-    protecting: [work],
-  });
-  await session.writes.evaluateCriterion({ criterion, gate, value: "2e-5", outcome: "fail" });
-
-  expect((await session.reads.gateStatus({ gate })).state).toBe("blocked");
-  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe(
-    "blocked",
-  );
-
-  const closed = await session.writes.closeGate({
-    gate,
-    because: "the report now labels this comparison exploratory",
-  });
-  const status = await session.reads.gateStatus({ gate });
-  expect(closed).toMatchObject({ gate });
-  expect(status.state).toBe("closed");
-  expect(status.closure).toEqual({
-    decision: closed.decision,
-    because: "the report now labels this comparison exploratory",
-  });
-  expect(status.checks.map((check) => check.state)).toEqual(["failed"]);
-  expect((await session.reads.workList({})).find((row) => row.work === work)?.state).toBe(
-    "planned",
-  );
-  expect((await session.reads.now({})).blocked.work.map((row) => row.work)).not.toContain(work);
-
-  await expect(session.writes.closeGate({ gate, because: "duplicate" })).rejects.toThrow(/already/);
-  await expect(
-    session.writes.closeGate({
-      gate: "GATE_does_not_exist" as typeof gate,
-      because: "missing",
-    }),
-  ).rejects.toThrow(/not found/);
 });
 
 test("criterion report refuses an evaluation with no stored outcome", async () => {

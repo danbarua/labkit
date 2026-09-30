@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf, whyOf } from "../helpers/claims";
-import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { reanalyse, recordAnalysis } from "../helpers/analysis";
 import { evaluationsOf } from "../helpers/criteria";
 import { as, captureConversation } from "../helpers/conversation";
 
@@ -262,7 +262,7 @@ describe("S-3b: the same design with nothing downstream", () => {
    * A replaced analysis's checks are as historical as its findings.
    */
   test("a superseded analysis's failed checks do not disqualify its replacement", async () => {
-    const { median, analysis, enquiry, observations } = await aFindingHeldToAgreedChecks();
+    const { median, analysisClaims, enquiry, observations } = await aFindingHeldToAgreedChecks();
     await session.writes.evaluateCriterion({
       criterion: median,
       value: "median p = 0.21",
@@ -273,17 +273,17 @@ describe("S-3b: the same design with nothing downstream", () => {
         .verdict,
     ).toBe("standard-unmet");
 
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict: "the aggregation was the wrong one",
-    });
-    const replacement = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
+    const replacement = await reanalyse(session.writes, {
       enquiry,
       method: "holm-pairwise, mean aggregation",
       from: [observations],
-      concludes: [{ proposition: PROPOSITION, finding: "p = 0.003, Holm-corrected" }],
+      concludes: [
+        {
+          proposition: PROPOSITION,
+          finding: "p = 0.003, Holm-corrected",
+          replacing: claimOf(analysisClaims, PROPOSITION),
+        },
+      ],
     });
 
     const why = await (await afterwards()).reads.whySupported({
@@ -294,6 +294,12 @@ describe("S-3b: the same design with nothing downstream", () => {
     expect(why.standard).toEqual([]);
     expect(why.unmet.map((u) => u.requires)).toEqual([]);
     expect(why.verdict).toBe("supported");
+
+    // And the finding it replaced has fallen, rather than standing beside it unmet.
+    const replaced = await (await afterwards()).reads.whySupported({
+      claim: claimOf(analysisClaims, PROPOSITION),
+    });
+    expect(replaced.verdict).toBe("withdrawn");
   });
 
   /**

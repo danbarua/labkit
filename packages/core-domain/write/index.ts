@@ -8,7 +8,6 @@ import type {
   AcceptedAsUnresolved,
   AmendmentReport,
   ClosedEnquiry,
-  ClosedGate,
   DeclaredGate,
   EvaluatedCriterion,
   StoppedWork,
@@ -19,43 +18,28 @@ import type {
   Posed,
   Pursued,
   Ref,
-  ReinterpretationReport,
   RecordedAnalysis,
   RecordedObservations,
-  RecordedReview,
   Synthesised,
-  ReplacementReport,
   Restated,
-  Undone,
-  SharpenedQuestion,
   StatedCriterion,
-  VerificationReport,
 } from "../report";
 import type {
   Command,
   AcceptAsUnresolvedCommand,
   AmendDesignCommand,
   CloseEnquiryCommand,
-  CloseGateCommand,
   StopWorkCommand,
   PoseCommand,
   ConcludeCommand,
   DeclareGateCommand,
   EvaluateCriterionCommand,
   ClaimIsConfirmedCommand,
-  ClaimIsUndecidedCommand,
-  KeepCommand,
-  UndoCommand,
   NoteCommand,
   PlanWorkCommand,
   PursueCommand,
   RecordAnalysisCommand,
   RecordObservationsCommand,
-  RecordReviewCommand,
-  ReinterpretCommand,
-  ReplaceAnalysisCommand,
-  ReverifyCommand,
-  SharpenCommand,
   SynthesiseCommand,
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
@@ -76,11 +60,6 @@ export type ResearchWrites = Pick<WriteSurface, Methods<WriteSurface>>;
  * The verb an event records — one name per public write verb, and the same name.
  */
 export type Operation = Methods<WriteSurface>;
-
-/**
- * An operation no verb writes any more, but that recorded events still carry.
- */
-export type RetiredOperation = "promote" | "is";
 
 /** What a verb's body returns: what the act was about, and what it produced. */
 export interface Act<R> {
@@ -110,8 +89,8 @@ export class WriteSurface extends SessionCore {
     super(graph, options);
     // **`this.events`, not `options.events`.** `SessionCore` defaults an absent
     // sink to a fresh `inMemoryEventLog()` per surface, so passing `options`
-    // straight down gave each group a log of its own: `handling` recorded into
-    // this one while `undo` read the revising group's, which was empty.
+    // straight down gave each group a log of its own, and a group reading the log
+    // would read one `handling` never records into.
     const shared: ResearchSessionOptions = { ...options, events: this.events };
     const handle: Handle = (operation, command, work) => this.handling(operation, command, work);
     this.asking = new Asking(graph, shared, handle);
@@ -137,10 +116,6 @@ export class WriteSurface extends SessionCore {
     return this.asking.openEnquiry(question, from);
   }
 
-  async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.asking.sharpen(input);
-  }
-
   async recordObservations(input: RecordObservationsCommand): Promise<RecordedObservations> {
     return this.work.recordObservations(input);
   }
@@ -157,20 +132,12 @@ export class WriteSurface extends SessionCore {
     return this.work.synthesise(input);
   }
 
-  async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.work.recordReview(input);
-  }
-
   async closeEnquiry(input: CloseEnquiryCommand): Promise<ClosedEnquiry> {
     return this.stopping.closeEnquiry(input);
   }
 
   async acceptAsUnresolved(input: AcceptAsUnresolvedCommand): Promise<AcceptedAsUnresolved> {
     return this.stopping.acceptAsUnresolved(input);
-  }
-
-  async closeGate(input: CloseGateCommand): Promise<ClosedGate> {
-    return this.stopping.closeGate(input);
   }
 
   async stopWork(input: StopWorkCommand): Promise<StoppedWork> {
@@ -197,32 +164,8 @@ export class WriteSurface extends SessionCore {
     return this.counting.amendDesign(input);
   }
 
-  async reverify(input: ReverifyCommand): Promise<VerificationReport> {
-    return this.revising.reverify(input);
-  }
-
-  async isUndecided(input: ClaimIsUndecidedCommand): Promise<Restated> {
-    return this.revising.isUndecided(input);
-  }
-
   async isConfirmed(input: ClaimIsConfirmedCommand): Promise<Restated> {
     return this.revising.isConfirmed(input);
-  }
-
-  async undo(input: UndoCommand): Promise<Undone> {
-    return this.revising.undo(input);
-  }
-
-  async replaceAnalysis(input: ReplaceAnalysisCommand): Promise<ReplacementReport> {
-    return this.revising.replaceAnalysis(input);
-  }
-
-  async keep(input: KeepCommand): Promise<ReplacementReport> {
-    return this.revising.keep(input);
-  }
-
-  async reinterpret(input: ReinterpretCommand): Promise<ReinterpretationReport> {
-    return this.revising.reinterpret(input);
   }
 
   /**

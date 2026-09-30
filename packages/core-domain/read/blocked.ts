@@ -3,15 +3,9 @@ import type { TenantGraph } from "@labkit/core-db/graph";
 import { SessionCore } from "../core";
 import { byHandle, ref } from "../report";
 import type {
-  AmendmentRecord,
   BlockedWork,
   CheckStatus,
-  CitedFinding,
-  Condition,
-  ConditionHistory,
   CriterionRef,
-  DesignHistory,
-  EvidenceRef,
   GateStatus,
   GatedWork,
   ListedGate,
@@ -22,8 +16,6 @@ import type {
 } from "../report";
 import type {
   ContractForQuery,
-  CriteriaGoverningQuery,
-  DesignHistoryQuery,
   GateListQuery,
   GateStatusQuery,
   StoppedWorkQuery,
@@ -168,107 +160,6 @@ export class BlockedGroup extends SessionCore {
           }
         : {}),
     };
-  }
-
-  /**
-   * Which criterion governs this gate?
-   */
-  async criteriaGoverning({ gate }: CriteriaGoverningQuery): Promise<CriterionRef[]> {
-    const rows = await this.graph.query(
-      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
-      { c: vertexProps<{ natural_id: string }>() },
-      { id: gate },
-    );
-    return rows.map((r) => ref("criterion", r.c.natural_id));
-  }
-
-  /**
-   * A locked design and everything that has happened to it, oldest first.
-   */
-  async designHistory({ gate }: DesignHistoryQuery): Promise<DesignHistory> {
-    const governing = await this.graph.query(
-      `MATCH (c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
-      {
-        c: vertexProps<{ natural_id: string; proposition: string }>(),
-      },
-      { id: gate },
-    );
-    if (governing.length === 0) throw new Error(`${gate} is governed by no condition`);
-
-    // A condition an amendment withdrew still `GOVERNS` the gate -- that is how
-    // the original stays readable. What is in force is what nothing changed.
-    const withdrawn = await this.graph.query(
-      `MATCH (:Decision)-[:SUPERSEDES]->(c:Criterion)-[:GOVERNS]->(:Gate {natural_id: $id}) RETURN c`,
-      { c: vertexProps<{ natural_id: string }>() },
-      { id: gate },
-    );
-    const gone = new Set(withdrawn.map((r) => r.c.natural_id));
-
-    const rerun = await this.workGatedBy([gate]);
-    const confirmatory = await this.confirmatoryResultsBehind([gate]);
-    const nature = confirmatory.length > 0 ? ("scientific" as const) : ("mechanical" as const);
-
-    const conditions: ConditionHistory[] = [];
-    for (const row of governing) {
-      if (gone.has(row.c.natural_id)) continue;
-      const criterion = ref("criterion", row.c.natural_id);
-      const inForce: Condition = { criterion, requires: row.c.proposition };
-      const chain = await this.amendmentChain(inForce);
-      conditions.push({
-        originally: chain[0]?.replaced ?? inForce,
-        nowRequires: inForce,
-        criterion,
-        amendments: chain.map((step) => ({ ...step, rerun, nature })),
-      });
-    }
-    return { gate, conditions };
-  }
-
-  /**
-   * The amendments that led to one condition, oldest first.
-   */
-  private async amendmentChain(
-    condition: Condition,
-  ): Promise<Array<Omit<AmendmentRecord, "rerun" | "nature">>> {
-    const steps: Array<Omit<AmendmentRecord, "rerun" | "nature">> = [];
-    let nowRequires = condition;
-    for (;;) {
-      const rows = await this.graph.query(
-        `MATCH (d:Decision)-[:MOTIVATES]->(:Criterion {natural_id: $id})
-         MATCH (d)-[:SUPERSEDES]->(was:Criterion)
-         OPTIONAL MATCH (d)-[:BASED_ON]->(e:Evidence)
-         RETURN d, was, e`,
-        {
-          d: vertexProps<{ natural_id: string; reason: string }>(),
-          was: vertexProps<{ natural_id: string; proposition: string }>(),
-          e: optional(vertexProps<{ statement: string } & Identified>()),
-        },
-        { id: nowRequires.criterion },
-      );
-      const first = rows[0];
-      if (!first) break;
-
-      // By id: two citations can say the same sentence and be two findings.
-      const citing = new Map<EvidenceRef, CitedFinding>();
-      for (const row of rows) {
-        if (!row.e) continue;
-        const evidence = ref("evidence", row.e.natural_id);
-        citing.set(evidence, { evidence, states: row.e.statement });
-      }
-      const replaced: Condition = {
-        criterion: ref("criterion", first.was.natural_id),
-        requires: first.was.proposition,
-      };
-      steps.push({
-        amendment: ref("decision", first.d.natural_id),
-        replaced,
-        nowRequires,
-        reason: first.d.reason,
-        citing: [...citing.values()].sort((a, b) => byHandle(a.evidence, b.evidence)),
-      });
-      nowRequires = replaced;
-    }
-    return steps.reverse();
   }
 
   /**

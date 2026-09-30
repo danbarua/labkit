@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { reanalyse, recordAnalysis } from "../helpers/analysis";
 import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
@@ -102,129 +102,64 @@ const SIGN_FLIP_CONCLUSIONS = [
   { proposition: "T beats static", finding: "p = 0.006 (bootstrap)" },
 ];
 
+/**
+ * The reviewer's objection, recorded against the analysis it is about, then the replacement
+ * run: each of its conclusions names the finding it stands in place of.
+ */
+async function replacedWithASignFlipTest() {
+  const shipped = await bootstrapAnalysisAsShipped();
+  await reviewer.writes.conclude({
+    analysis: shipped.analysis,
+    proposition: "the bootstrap implements the intended null",
+    finding: "bootstrap is centred on the observed effect; it does not implement the intended null",
+    bearing: "challenges",
+  });
+  const report = await reanalyse(session.writes, {
+    enquiry: shipped.enquiry,
+    method: "sign-flip-permutation",
+    from: [shipped.observations],
+    concludes: SIGN_FLIP_CONCLUSIONS.map((c) => ({
+      ...c,
+      replacing: claimOf(shipped.analysisClaims, c.proposition),
+    })),
+  });
+  return { ...shipped, report };
+}
+
 describe("S-11: the analysis was wrong; the observations were fine", () => {
   test("the conversation runs end to end through research verbs alone", async () => {
-    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-
-    // Reviewer: your bootstrap is centred on the observed effect. It isn't a null test.
-    const { review } = await reviewer.writes.recordReview({
-      of: analysis,
-      verdict:
-        "bootstrap is centred on the observed effect; it does not implement the intended null",
-    });
-
-    // Researcher: replace the analysis, mark the prior inference superseded,
-    // and propagate whatever claims change.
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
-
-    // The act answers with what it minted: the replacement and the decision
-    // recording that it revises the earlier analysis.
+    const { analysis, analysisClaims, report } = await replacedWithASignFlipTest();
     expect(report.replacement).not.toEqual(analysis);
-    expect(report.supersedes).toEqual(analysis);
 
-    // LabKit: five pairwise conclusions remain strong. One becomes marginal —
-    // asked of the record, because six conclusions arrive as six acts and what
-    // a revision changed is therefore spread across them rather than held by
-    // any one of them.
-    const explained = await (await afterwards()).reads.why({ subject: report.replacement });
-    if (explained.kind !== "analysis")
-      throw new Error(`asked about an analysis, got ${explained.kind}`);
-    expect(explained.report.supersedes).toEqual(analysis);
-    expect(explained.report.because?.review).toEqual(review);
-    expect(explained.report.changed).toHaveLength(1);
-    expect(explained.report.changed[0]).toMatchObject({
-      proposition: "T beats rewired",
-      before: "p = 0.002 (bootstrap)",
-      after: "p = 0.049 (sign-flip permutation)",
+    // The conclusion that moved reads the new finding, and still shows the one it replaced.
+    const why = await (await afterwards()).reads.whySupported({
+      claim: claimOf(report.claims, "T beats rewired"),
     });
-    // Five re-reached unchanged, and none left unmentioned: this replacement
-    // restated every conclusion of the analysis it revises.
-    expect(explained.report.restated).toHaveLength(5);
-    expect(explained.report.kept).toEqual([]);
+    expect(why.verdict).toBe("supported");
+    expect(why.support.map((s) => s.finding)).toEqual(["p = 0.049 (sign-flip permutation)"]);
+    expect(why.superseded.map((s) => s.finding)).toEqual(["p = 0.002 (bootstrap)"]);
 
-    // Which records these are about. `restated` and `changed.claim` name the
-    // REPLACEMENT's claims; `changed.was` names the superseded one, and the two
-    // sets are disjoint even though every sentence appears in both.
-    const minted = new Set(report.claims.map((c) => c.claim));
-    for (const u of explained.report.restated) expect(minted.has(u.claim)).toBe(true);
-    expect(minted.has(explained.report.changed[0]!.claim)).toBe(true);
-    expect(minted.has(explained.report.changed[0]!.was)).toBe(false);
+    // Every original conclusion was replaced, so none of them stands.
+    for (const { claim } of analysisClaims) {
+      const old = await (await afterwards()).reads.whySupported({ claim });
+      expect(old.verdict).toBe("withdrawn");
+    }
 
     await captureConversation(
       {
         id: "S-11",
         title: "The analysis was wrong; the observations were fine",
         about:
-          "A reviewer finds the analysis does not implement the null it claims. The observations stand; the analysis is replaced, and only the conclusion that moved is marked as changed.",
+          "A reviewer finds the analysis does not implement the null it claims. The observations stand; the analysis is run again correctly, and each new conclusion names the one it replaces.",
       },
       events,
-      explained,
+      why,
     );
   });
 
-  test("Afterward 1: what is affected is enumerable, not 'everything downstream'", async () => {
-    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict: "not a null test",
-    });
+  test("the observations are not affected, and still underpin the replacement", async () => {
+    const { report } = await replacedWithASignFlipTest();
 
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
-
-    // Every finding the replacement superseded, read from the record. Matched
-    // by id, not by sentence: after a replacement both the superseded claim and
-    // the one standing in its place assert the same words.
-    const revision = await (await afterwards()).reads.why({ subject: report.replacement });
-    if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
-    const supersededHere = [
-      ...revision.report.changed.map((c) => c.was),
-      ...revision.report.restated.map((r) => r.claim),
-    ];
-    expect(supersededHere).toHaveLength(6);
-
-    // ...and the same answer from a different question. `whatDependsOn` walks
-    // the artefact; this walks the lineage. They must agree on the count.
-    const downstream = await session.reads.whatDependsOn({ subject: "bootstrap-pairwise output" });
-    expect(downstream.claims).toHaveLength(supersededHere.length);
-  });
-
-  test("Afterward 2: the observations are explicitly not affected, and still underpin the replacement", async () => {
-    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict: "not a null test",
-    });
-
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
-
-    // The observations are not superseded by this act: it revises an analysis,
-    // and what an analysis read is untouched by its being revised.
-    const stillThere = await (await afterwards()).reads.whatDependsOn({ subject: observations });
-    expect(stillThere.claims.length).toBeGreaterThan(0);
-
-    // Durable check: the replacement conclusion still rests on the same
-    // observations, and those observations were never invalidated.
     const why = await session.reads.whySupported({
       claim: claimOf(report.claims, "T beats rewired"),
     });
@@ -236,57 +171,23 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     expect(why.restingOn.map((a) => a.name)).toContain("per-image classification results");
   });
 
-  test("Afterward 4: the replacement conclusion is supported via a different inference", async () => {
-    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict: "not a null test",
-    });
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
+  test("the replacement conclusion is supported via a different inference", async () => {
+    const { report } = await replacedWithASignFlipTest();
 
     const why = await session.reads.whySupported({
       claim: claimOf(report.claims, "T beats rewired"),
     });
-    expect(
-      await (await afterwards()).reads.whySupported({
-        claim: claimOf(report.claims, "T beats rewired"),
-      }),
-    ).toEqual(why);
     expect(why.verdict).toBe("supported");
     expect(why.support.map((s) => s.method)).toEqual(["sign-flip-permutation"]);
     expect(why.support[0]!.finding).toBe("p = 0.049 (sign-flip permutation)");
   });
 
-  test("Afterward 5: what the superseded inference claimed is still readable", async () => {
-    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict: "not a null test",
-    });
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
+  test("what the superseded inference claimed is still readable", async () => {
+    const { report } = await replacedWithASignFlipTest();
 
     const why = await session.reads.whySupported({
       claim: claimOf(report.claims, "T beats rewired"),
     });
-    expect(
-      await (await afterwards()).reads.whySupported({
-        claim: claimOf(report.claims, "T beats rewired"),
-      }),
-    ).toEqual(why);
     expect(why.superseded).toHaveLength(1);
     expect(why.superseded[0]).toMatchObject({
       finding: "p = 0.002 (bootstrap)",
@@ -333,128 +234,4 @@ describe("S-11: the analysis was wrong; the observations were fine", () => {
     });
     expect(onFashion.restingOn.map((a) => a.name)).toEqual(["fashion-mnist per-image results"]);
   });
-
-  test("why support was withdrawn is answerable from the graph, not just the event log", async () => {
-    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict:
-        "bootstrap is centred on the observed effect; it does not implement the intended null",
-    });
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
-
-    // A fresh session over the same graph -- nothing carried in memory.
-    const reader = new ResearchSession(await scenario.current(), { clock });
-    const why = await reader.reads.whySupported({
-      claim: claimOf(report.claims, "T beats rewired"),
-    });
-    expect(why.superseded[0]!.reason).toBe(
-      "bootstrap is centred on the observed effect; it does not implement the intended null",
-    );
-  });
-
-  /**
-   * The review relationship constrains a research action, not just an explanatory query: a
-   * replacement has to be justified by a review OF the analysis being replaced.
-   */
-  test("a replacement cannot cite a review of some other analysis", async () => {
-    const { enquiry } = await session.writes.openEnquiry("which construction classifies best?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "obs",
-      finding: "raw",
-    });
-
-    const { analysis: target, claims: targetClaims } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "bootstrap-pairwise",
-      from: [observations],
-      concludes: [{ proposition: "T beats rewired", finding: "p = 0.002 (bootstrap)" }],
-    });
-    const { analysis: unrelated } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "unrelated-analysis",
-      from: [observations],
-      concludes: [{ proposition: "something else entirely", finding: "n/a" }],
-    });
-    const { review: reviewOfUnrelated } = await session.writes.recordReview({
-      of: unrelated,
-      verdict: "a verdict about other work",
-    });
-
-    await expect(
-      replaceAnalysis(session.writes, {
-        supersedes: target,
-        because: reviewOfUnrelated,
-        enquiry,
-        method: "sign-flip-permutation",
-        from: [observations],
-        concludes: [{ proposition: "T beats rewired", finding: "p = 0.049" }],
-      }),
-    ).rejects.toThrow(/does not review/);
-
-    // ...and nothing was invalidated on the way to failing.
-    // The replacement was refused, so the original claim is the only one.
-    const why = await session.reads.whySupported({
-      claim: claimOf(targetClaims, "T beats rewired"),
-    });
-    expect(
-      await (await afterwards()).reads.whySupported({
-        claim: claimOf(targetClaims, "T beats rewired"),
-      }),
-    ).toEqual(why);
-    expect(why.verdict).toBe("supported");
-    expect(why.superseded).toHaveLength(0);
-  });
-
-  test("the temporal seam records the invalidation, with its time and what it moved", async () => {
-    const { enquiry, observations, analysis } = await bootstrapAnalysisAsShipped();
-    const { review } = await session.writes.recordReview({
-      of: analysis,
-      verdict: "not a null test",
-    });
-    const _report = await replaceAnalysis(session.writes, {
-      supersedes: analysis,
-      because: review,
-      enquiry,
-      method: "sign-flip-permutation",
-      from: [observations],
-      concludes: SIGN_FLIP_CONCLUSIONS,
-    });
-
-    const replacement = (await events.all()).filter((e) => e.operation === "replaceAnalysis");
-    expect(replacement).toHaveLength(1);
-    expect(replacement[0]!.at).toBe(FIXED_NOW);
-    // Nothing kept: this replacement supersedes every conclusion of the
-    // analysis it revises, which is what `replace` means.
-    expect(replacement[0]!.command).toMatchObject({ supersedes: analysis, keeping: [] });
-
-    // Every research action left a trace, in order — one per action, not one per write. **The
-    // `conclude` entries are actions**: this run drew six conclusions and the record says so
-    // six times, as it would had a person typed `labkit conclude` six times. The count is the
-    // caller's, not the graph's.
-    const concluded = (n: number) => Array.from({ length: n }, () => "conclude" as const);
-    expect((await events.all()).map((e) => e.operation)).toEqual([
-      "openEnquiry",
-      "recordObservations",
-      "recordAnalysis",
-      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
-      "recordReview",
-      // The revision first, then its findings: superseding happens when the
-      // successor is recorded, and each new conclusion is an act after it.
-      "replaceAnalysis",
-      ...concluded(SIGN_FLIP_CONCLUSIONS.length),
-    ]);
-  });
-  /**
-   * **Researcher:** I superseded that analysis. Then I noticed one more thing in its output and
-   * went to record it against it.
-   */
 });

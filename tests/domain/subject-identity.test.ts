@@ -192,101 +192,10 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
   const WIDTH = "width matters";
 });
 
-describe("2. an artefact id does not say what kind of artefact it is", () => {
-  test("observations and an analysis's output share one identity space", async () => {
-    const s = await session();
-    try {
-      const { enquiry } = await s.writes.openEnquiry("does it hold?");
-      const { observations } = await s.writes.recordObservations({
-        enquiry,
-        name: "raw readings",
-        finding: "twelve runs",
-      });
-      const { analysis } = await recordAnalysis(s.writes, {
-        enquiry,
-        method: "stage one",
-        from: [observations],
-        concludes: [{ proposition: HOLDS, finding: "it holds" }],
-      });
-
-      const later = new ReadSurface(await scenario.current());
-      const parts = await later.reproducibilityOf({ analysis, rebuilt: [] });
-      const consumed = [
-        ...parts.exact,
-        ...parts.differing,
-        ...parts.unverifiable,
-        ...parts.notRebuilt,
-      ];
-
-      // Raw measurement is an artefact.
-      expect(observations.startsWith("ART_")).toBe(true);
-      // So is what the analysis produced -- same prefix, same space.
-      const output = consumed.map((p) => p.part);
-      expect(output.every((id) => id.startsWith("ART_"))).toBe(true);
-
-      // So the two are **indistinguishable by handle**, which is the finding.
-      // Handles are branded strings, with no separate `kind` field that could
-      // disagree with the id -- an id whose prefix is shared with outputs --
-      // so the ambiguity is in the open where a scenario can decide it.
-      expect(output).toContain(observations);
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("an analysis ref used as an input means that analysis's output artefact", async () => {
-    // Both routes write the same edge. The reference denotes a computation; the
-    // verb takes it to mean the artefact the computation produced.
-    const s = await session();
-    try {
-      const { enquiry } = await s.writes.openEnquiry("two stage?");
-      const { observations: raw } = await s.writes.recordObservations({
-        enquiry,
-        name: "raw",
-        finding: "f",
-      });
-      const { analysis: stageOne } = await recordAnalysis(s.writes, {
-        enquiry,
-        method: "stage one",
-        from: [raw],
-        concludes: [{ proposition: "p1", finding: "f1" }],
-      });
-      const { analysis: viaAnalysis } = await recordAnalysis(s.writes, {
-        enquiry,
-        method: "stage two, by analysis ref",
-        from: [stageOne],
-        concludes: [{ proposition: "p2a", finding: "f2" }],
-      });
-
-      const read = new ReadSurface(await scenario.current());
-      const consumedByA = await read.reproducibilityOf({ analysis: viaAnalysis, rebuilt: [] });
-      const outputOfStageOne = [...consumedByA.unverifiable, ...consumedByA.notRebuilt][0]?.part;
-      expect(outputOfStageOne?.startsWith("ART_")).toBe(true);
-
-      const { analysis: viaArtefact } = await recordAnalysis(s.writes, {
-        enquiry,
-        method: "stage two, by artefact id",
-        from: [outputOfStageOne!],
-        concludes: [{ proposition: "p2b", finding: "f2" }],
-      });
-      const consumedByB = await read.reproducibilityOf({ analysis: viaArtefact, rebuilt: [] });
-
-      // Indistinguishable. The `kind` on the second was a lie and cost nothing,
-      // which is why this is an ambiguity rather than a defect.
-      expect(consumedByB.unverifiable).toEqual(consumedByA.unverifiable);
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  const HOLDS = "it holds";
-});
-
 describe("4. the read models drop identifiers the graph already minted", () => {
   /**
-   * Every entity here has a natural id, minted in the same round trip that created it. Three
-   * reports carry one **beside** the wording, which is the template; the rest emit wording
-   * alone and the caller cannot follow it anywhere.
+   * Every entity here has a natural id, minted in the same round trip that created it. A report
+   * carries it **beside** the wording, so the caller can follow it.
    */
   const looksLikeAnId = (v: string) =>
     /^(Q|LOE|EU|EV|CLM|DEC|CRIT|CEVAL|GATE|REV|ART|COMP|TASK)_\d+$/.test(v);
@@ -346,27 +255,15 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     };
   }
 
-  test("the template: an id beside the wording, in the three reports that do it", async () => {
+  test("the template: an id beside the wording", async () => {
     try {
-      const { read, analysis } = await programme();
+      const { read } = await programme();
 
       // whatIsKnown: `question` is the id, `asks` is the text.
       const known = await read.whatIsKnown();
       const standing = [...known.established, ...known.provisional][0]!;
       expect(looksLikeAnId(standing.question)).toBe(true);
       expect(looksLikeAnId(standing.asks)).toBe(false);
-
-      // reproducibilityOf: `part` is the id, `name` is the text.
-      const parts = await read.reproducibilityOf({ analysis, rebuilt: [] });
-      const inputs = [
-        ...parts.exact,
-        ...parts.differing,
-        ...parts.unverifiable,
-        ...parts.notRebuilt,
-      ];
-      expect(inputs.length).toBeGreaterThan(0);
-      expect(inputs.every((p) => looksLikeAnId(p.part))).toBe(true);
-      expect(inputs.every((p) => looksLikeAnId(p.name))).toBe(false);
     } finally {
       await scenario.end();
     }
@@ -387,23 +284,6 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       expect(status.evidence.length).toBeGreaterThan(0);
       expect(status.evidence.every((e) => looksLikeAnId(e.evidence))).toBe(true);
       expect(status.evidence.every((e) => looksLikeAnId(e.states))).toBe(false);
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("whatDependsOn now identifies what is affected — FIXED, step 2", async () => {
-    // Was: claims:["depth moves convergence"], enquiries:["seed sweep"] -- prose
-    // no follow-up verb accepts. Now both, in the shape the other reports use.
-    try {
-      const { read } = await programme();
-      const affected = await read.whatDependsOn({ subject: "sweep readings" });
-
-      expect(affected.claims.length + affected.enquiries.length).toBeGreaterThan(0);
-      expect(affected.claims.every((c) => looksLikeAnId(c.claim))).toBe(true);
-      expect(affected.claims.every((c) => looksLikeAnId(c.asserts))).toBe(false);
-      expect(affected.enquiries.every((e) => looksLikeAnId(e.enquiry))).toBe(true);
-      expect(affected.enquiries.every((e) => looksLikeAnId(e.pursuing))).toBe(false);
     } finally {
       await scenario.end();
     }
@@ -458,14 +338,6 @@ describe("4. the read models drop identifiers the graph already minted", () => {
       expect((await read.whySupported({ claim })).claim).toEqual(claim);
       expect((await read.gateStatus({ gate })).gate).toEqual(gate);
       expect((await read.enquiryStatus({ enquiry })).enquiry).toEqual(enquiry);
-      expect((await read.designHistory({ gate })).gate).toEqual(gate);
-
-      // whatDependsOn also accepts a logical NAME, and its echo is the record
-      // that name resolved to -- the one thing a caller passing a name cannot
-      // otherwise learn about the answer they got back.
-      const byName = await read.whatDependsOn({ subject: "sweep readings" });
-      expect(looksLikeAnId(byName.subject)).toBe(true);
-      expect(await read.whatDependsOn({ subject: byName.subject })).toEqual(byName);
     } finally {
       await scenario.end();
     }

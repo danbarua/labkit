@@ -4,36 +4,19 @@
 
 import { vertexProps } from "@labkit/core-db/cypher";
 import { createdIn, edgesIn } from "../events";
-import type {
-  EnquiryRef,
-  Learned,
-  ListedAnalysis,
-  ListedClaim,
-  ListedCriterion,
-  ListedEnquiry,
-} from "../report";
+import type { ListedAnalysis, ListedClaim, ListedCriterion, ListedEnquiry } from "../report";
 import type {
   AnalysisRevision,
   AnyRef,
   ConcludedClaim,
-  ConflictVerdict,
-  CriterionRef,
   CriterionStanding,
-  DependencyReport,
-  DesignHistory,
   EnquiryInContext,
   EnquiryStatus,
   Explanation,
-  How,
   GateStatus,
-  HistoricalSurvey,
-  InterpretationHistory,
   KnowledgeSurvey,
   ListedGate,
   ListedWork,
-  QuestionOrigin,
-  ReproducibilityReport,
-  ReproductionReport,
   SearchGroup,
   EventPage,
   ListedNote,
@@ -52,30 +35,19 @@ import type {
   AnalysisRevisionQuery,
   ClaimsAssertingQuery,
   ContractForQuery,
-  CriteriaGoverningQuery,
   CriterionStandingQuery,
-  DesignHistoryQuery,
-  DoTheseConflictQuery,
   EnquiryInContextQuery,
   EnquiryStatusQuery,
   GateListQuery,
   GateStatusQuery,
-  InterpretationHistoryQuery,
-  KnownAtQuery,
   NeighboursOfQuery,
   NotesQuery,
   NowQuery,
-  OriginOfQuery,
   ProseForQuery,
-  PursuitsOfQuery,
   ReachableQuery,
-  ReproducibilityOfQuery,
-  ReproductionOfQuery,
   SearchQuery,
   StoppedWorkQuery,
-  WhatDependsOnQuery,
   WhyQuery,
-  HowQuery,
   WhySupportedQuery,
   ResourceQuery,
   WorkListQuery,
@@ -85,7 +57,6 @@ import { FindingGroup } from "./finding";
 import { StandingGroup } from "./standing";
 import { BlockedGroup } from "./blocked";
 import { InventoryGroup } from "./inventory";
-import { LearnedGroup } from "./learned";
 import { StoryGroup } from "./story";
 import { ExplainGroup, EXPLAINERS, enquiryInContext as enquiryInContextOf } from "./explain";
 
@@ -104,7 +75,6 @@ export class ReadSurface extends SessionCore {
   readonly #standing: StandingGroup;
   readonly #blocked: BlockedGroup;
   readonly #inventory: InventoryGroup;
-  readonly #learned: LearnedGroup;
   readonly #story: StoryGroup;
   readonly #explain: ExplainGroup;
 
@@ -122,7 +92,6 @@ export class ReadSurface extends SessionCore {
     this.#standing = new StandingGroup(...shared);
     this.#blocked = new BlockedGroup(...shared);
     this.#inventory = new InventoryGroup(...shared);
-    this.#learned = new LearnedGroup(...shared);
     this.#story = new StoryGroup(...shared);
     this.#explain = new ExplainGroup(...shared);
   }
@@ -150,16 +119,6 @@ export class ReadSurface extends SessionCore {
     return this.#happened.howMuchWasTranscribed();
   }
 
-  /** Every line of enquiry pursuing this question. */
-  async pursuitsOf(query: PursuitsOfQuery): Promise<EnquiryRef[]> {
-    return this.#finding.pursuitsOf(query);
-  }
-
-  /** Where a question came from, if it came from sharpening an earlier one. */
-  async originOf(query: OriginOfQuery): Promise<QuestionOrigin | null> {
-    return this.#finding.originOf(query);
-  }
-
   /** Claims asserting a proposition — the one place wording is resolved. */
   async claimsAsserting(query: ClaimsAssertingQuery): Promise<ConcludedClaim[]> {
     return this.#finding.claimsAsserting(query);
@@ -168,11 +127,6 @@ export class ReadSurface extends SessionCore {
   /** Every record containing the text, as `{handle, wording}` pairs grouped by label. */
   async search(query: SearchQuery): Promise<SearchGroup[]> {
     return this.#finding.search(query);
-  }
-
-  /** What the record held at a stated moment. */
-  async whatWasKnown(query: KnownAtQuery): Promise<HistoricalSurvey> {
-    return this.#standing.whatWasKnown(query);
   }
 
   /** What the programme knows: settled, unsettled, and never looked at. */
@@ -190,16 +144,6 @@ export class ReadSurface extends SessionCore {
     return this.#blocked.contractFor(query);
   }
 
-  /** Which criterion governs this gate? */
-  async criteriaGoverning(query: CriteriaGoverningQuery): Promise<CriterionRef[]> {
-    return this.#blocked.criteriaGoverning(query);
-  }
-
-  /** A locked design and everything that has happened to it, oldest first. */
-  async designHistory(query: DesignHistoryQuery): Promise<DesignHistory> {
-    return this.#blocked.designHistory(query);
-  }
-
   /** May this gate be relied on, and on what evidence? */
   async gateStatus(query: GateStatusQuery): Promise<GateStatus> {
     return this.#blocked.gateStatus(query);
@@ -213,10 +157,6 @@ export class ReadSurface extends SessionCore {
   /** Every planned piece of work, with the state a reader is filtering on. */
   async workList(query: WorkListQuery): Promise<ListedWork[]> {
     return this.#blocked.workList(query);
-  }
-  /** What the programme found out, under the question it was asked for. */
-  async learned(): Promise<Learned> {
-    return this.#learned.learned();
   }
 
   /** Every claim on the record, with what bears on it. */
@@ -244,21 +184,6 @@ export class ReadSurface extends SessionCore {
     return this.#story.enquiryStatus(query);
   }
 
-  /** What a re-run did and did not establish. */
-  async reproductionOf(query: ReproductionOfQuery): Promise<ReproductionReport> {
-    return this.#story.reproductionOf(query);
-  }
-
-  /** An interpretation and every narrowing behind it, oldest first. */
-  async interpretationHistory(query: InterpretationHistoryQuery): Promise<InterpretationHistory> {
-    return this.#story.interpretationHistory(query);
-  }
-
-  /** Whether two findings actually conflict. */
-  async doTheseConflict(query: DoTheseConflictQuery): Promise<ConflictVerdict> {
-    return this.#story.doTheseConflict(query);
-  }
-
   /**
    * One record and its neighbours within `depth` hops, as the resource the HTTP API serves.
    *
@@ -273,16 +198,6 @@ export class ReadSurface extends SessionCore {
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */
   async whySupported(query: WhySupportedQuery): Promise<SupportExplanation> {
     return this.#story.whySupported(query);
-  }
-
-  /** How much of a past construction can be rebuilt. */
-  async reproducibilityOf(query: ReproducibilityOfQuery): Promise<ReproducibilityReport> {
-    return this.#story.reproducibilityOf(query);
-  }
-
-  /** What is affected if this artefact turns out to be wrong? */
-  async whatDependsOn(query: WhatDependsOnQuery): Promise<DependencyReport> {
-    return this.#story.whatDependsOn(query);
   }
 
   /** One condition: what it requires, what has been said about it, and what it holds up. */
@@ -448,22 +363,6 @@ export class ReadSurface extends SessionCore {
           .join(", ")}`,
       });
     return EXPLAINERS.claim(this, found[0]!.claim);
-  }
-  /**
-   * `how <handle>` — ordered steps behind the current state of any handle.
-   * Refuses unknown like `why`. Walks SUPERSEDES/SUPERSEDES (Notes and Decisions) and
-   * MOTIVATES pairings in StoryGroup; marks superseded with successor when present.
-   */
-  async how(query: HowQuery): Promise<How> {
-    const subject = query.subject;
-    const asHandle = subject.toUpperCase() as AnyRef;
-    if (!(await this.reachable({ subject: asHandle })))
-      throw new DomainRefusal({
-        kind: "not-found",
-        message: `${subject} not found`,
-        subject: asHandle,
-      });
-    return this.#story.how(query);
   }
 }
 

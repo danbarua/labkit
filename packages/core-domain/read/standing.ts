@@ -1,99 +1,12 @@
 import { optional, vertexProps } from "@labkit/core-db/cypher";
 import { SessionCore } from "../core";
-import type { ClaimRef, HistoricalSurvey, KnowledgeSurvey, QuestionStanding } from "../report";
+import type { ClaimRef, KnowledgeSurvey, QuestionStanding } from "../report";
 import { byHandle, ref } from "../report";
-import type { KnownAtQuery } from "../queries";
 
 /** The two ways a finding bears on a claim; a closure is read for each. */
 const BEARINGS = ["SUPPORTS", "CHALLENGES"] as const;
 
 export class StandingGroup extends SessionCore {
-  /**
-   * What the record held at a stated moment. Row Z.
-   */
-  async whatWasKnown({ at }: KnownAtQuery): Promise<HistoricalSurvey> {
-    const parsed = Date.parse(at);
-    if (Number.isNaN(parsed))
-      throw new Error(
-        `whatWasKnown expected an ISO instant like 2026-07-15T12:34:56.000Z, got "${at}"`,
-      );
-    const asOf = new Date(parsed).toISOString();
-
-    const standings = new Map<string, { resolved: boolean; promoted: boolean; open: boolean }>();
-    const asked = new Map<string, { asks: string; accepted: boolean }>();
-
-    // Two passes, one per bearing: AGE has no edge alternation, and the cited finding may
-    // support or challenge the answering claim.
-    for (const bearing of BEARINGS) {
-      const rows = await this.graph.query(
-        `MATCH (q:Question)
-         WHERE q.posed_at <= $at
-         OPTIONAL MATCH (accepting:Decision)-[:ACCEPTS]->(q)
-         OPTIONAL MATCH (q)-[:MOTIVATES]->(loe:LineOfEnquiry)
-         OPTIONAL MATCH (resolving:Decision)-[:CLOSES]->(loe)
-         OPTIONAL MATCH (resolving)-[:ANSWERS]->(answering:Claim)
-         OPTIONAL MATCH (answering)-[:BASED_ON]->(part:Claim)
-         OPTIONAL MATCH (resolving)-[:BASED_ON]->(cited:Evidence)
-         OPTIONAL MATCH (cited)-[:${bearing}]->(borne:Claim)
-         OPTIONAL MATCH (vouching:Decision)-[:CONFIRMED]->(answering)
-         RETURN q, accepting, loe, resolving, answering, part, borne, vouching`,
-        {
-          q: vertexProps<{ natural_id: string; name: string }>(),
-          accepting: optional(vertexProps<{ decided_at: string }>()),
-          loe: optional(vertexProps<{ natural_id: string; started_at?: string }>()),
-          resolving: optional(vertexProps<{ decided_at: string }>()),
-          answering: optional(vertexProps<{ natural_id: string }>()),
-          part: optional(vertexProps<{ natural_id: string }>()),
-          borne: optional(vertexProps<{ natural_id: string }>()),
-          vouching: optional(vertexProps<{ decided_at: string }>()),
-        },
-        { at: asOf },
-      );
-
-      for (const row of rows) {
-        const question = row.q.natural_id;
-        const entry = asked.get(question) ?? { asks: row.q.name, accepted: false };
-        entry.accepted ||= row.accepting !== null && row.accepting.decided_at <= asOf;
-        asked.set(question, entry);
-
-        const was = standings.get(question) ?? { resolved: false, promoted: false, open: false };
-        const existed =
-          row.loe !== null && (row.loe.started_at === undefined || row.loe.started_at <= asOf);
-        const closed = existed && row.resolving !== null && row.resolving.decided_at <= asOf;
-        const bearsOnAnswer =
-          row.answering !== null &&
-          row.borne !== null &&
-          (row.borne.natural_id === row.answering.natural_id ||
-            row.part?.natural_id === row.borne.natural_id);
-        const answered = closed && bearsOnAnswer;
-        standings.set(question, {
-          resolved: was.resolved || answered,
-          promoted:
-            was.promoted || (answered && row.vouching !== null && row.vouching.decided_at <= asOf),
-          open: was.open || (existed && !closed),
-        });
-      }
-    }
-
-    const survey: HistoricalSurvey = {
-      at: asOf,
-      established: [],
-      provisional: [],
-      accepted: [],
-      open: [],
-    };
-    for (const [question, e] of asked) {
-      const entry: QuestionStanding = { question: ref("question", question), asks: e.asks };
-      const was = standings.get(question) ?? { resolved: false, promoted: false, open: false };
-      if (was.open && e.accepted) survey.accepted.push(entry);
-      else if (was.open) survey.open.push(entry);
-      else if (was.resolved && was.promoted) survey.established.push(entry);
-      else if (was.resolved) survey.provisional.push(entry);
-      else survey.open.push(entry);
-    }
-    return survey;
-  }
-
   /** What the programme knows, folded over each question's pursuits. */
   async whatIsKnown(): Promise<KnowledgeSurvey> {
     const anchor = `MATCH (q:Question)

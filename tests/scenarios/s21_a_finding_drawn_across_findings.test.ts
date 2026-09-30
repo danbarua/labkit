@@ -184,56 +184,6 @@ describe("S-21: a finding drawn across findings", () => {
       session.writes.synthesise({ proposition: HEADLINE, restingOn: [] }),
     ).rejects.toThrow(/at least one finding to rest on/);
   });
-  test("reinterpret narrows exactly the named synthesis and preserves its parts", async () => {
-    const { claims } = await fourComparisons();
-    const restingOn = [claims[0]!, claims[1]!, claims[0]!];
-    const { claim: synthesis } = await session.writes.synthesise({
-      proposition: HEADLINE,
-      restingOn,
-    });
-
-    const report = await session.writes.reinterpret({
-      of: synthesis,
-      as: "T shows no advantage in the measured controls",
-      because: "the headline overstates what the comparisons establish",
-    });
-    const edges = report.events[0]!.changes.filter(
-      (change): change is import("@labkit/core-domain").EdgeCreated =>
-        change.change === "EdgeCreated",
-    );
-    const expectedParts = [...new Set(restingOn)].sort();
-
-    expect(report.previously).toEqual([{ claim: synthesis, asserts: HEADLINE }]);
-    expect(edges.filter((edge) => edge.label === "SUPERSEDES").map((edge) => edge.to)).toEqual([
-      synthesis,
-    ]);
-    expect(edges.filter((edge) => edge.label === "MOTIVATES").map((edge) => edge.to)).toEqual([
-      report.nowClaims.claim,
-    ]);
-    expect(
-      edges
-        .filter((edge) => edge.label === "BASED_ON")
-        .map((edge) => edge.to)
-        .sort(),
-    ).toEqual(expectedParts);
-    expect(
-      edges.filter((edge) => edge.label === "SUPPORTS" || edge.label === "CHALLENGES"),
-    ).toEqual([]);
-
-    const narrowed = await (await afterwards()).reads.whySupported({
-      claim: report.nowClaims.claim,
-    });
-    expect(narrowed.drawnAcross.map((part) => part.claim).sort()).toEqual(expectedParts);
-    expect(narrowed.support).toEqual([]);
-
-    await expect(
-      session.writes.reinterpret({
-        of: synthesis,
-        as: "T has no measured advantage",
-        because: "trying to reinterpret the superseded synthesis",
-      }),
-    ).rejects.toThrow(new RegExp(`no longer stands.*${report.nowClaims.claim}`, "s"));
-  });
 
   test("accepting a synthesis keeps its identity and cites every component finding", async () => {
     const { enquiry } = await session.writes.openEnquiry("does the measured effect hold?");
@@ -334,9 +284,12 @@ describe("S-21: a finding drawn across findings", () => {
       citing: synthesis,
     });
     expect(amendment.nature).toBe("mechanical");
-    const history = await (await afterwards()).reads.designHistory({ gate });
-    expect(
-      history.conditions[0]!.amendments[0]!.citing.map((finding) => finding.states).sort(),
-    ).toEqual(expectedFindings);
+    const why = await (await afterwards()).reads.why({ subject: amendment.amendment });
+    const cited = why.because
+      .map((cause) => cause.wording)
+      .filter((wording) => wording.startsWith("rests on "))
+      .map((wording) => wording.slice("rests on ".length))
+      .sort();
+    expect(cited).toEqual(expectedFindings);
   });
 });

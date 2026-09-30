@@ -12,65 +12,14 @@ import {
   renderWhy,
   renderWhyDispatch,
   renderClaims,
-  renderConflict,
 } from "@labkit/app-cli/views/knowledge";
-import { renderEnquiry, renderOrigin } from "@labkit/app-cli/views/enquiry";
-import { renderContract, renderGate } from "@labkit/app-cli/views/gates";
-import { renderReproducibility, renderReproduction } from "@labkit/app-cli/views/analysis";
 import { renderHappened } from "@labkit/app-cli/views/events";
 import type {
-  ConflictVerdict,
   RecordedEvent,
   Explanation,
-  EnquiryStatus,
-  GateStatus,
   KnowledgeSurvey,
-  ReproducibilityReport,
-  ReproductionReport,
   SupportExplanation,
-  TaskContract,
 } from "@labkit/core-domain";
-
-test("an enquiry accepted as unresolved does not render as merely open", () => {
-  const status: EnquiryStatus = {
-    enquiry: ref("enquiry", "LOE_1"),
-    pursuing: "response-curvature sweep",
-    contributed: [],
-    open: true,
-    closure: null,
-    bearing: null,
-    evidence: [],
-    question: {
-      question: ref("question", "Q_1"),
-      asks: "does the pruning schedule move convergence?",
-      acceptedBecause: "the confirmatory set is spent",
-      reopensIf: "a genuinely new design, or a data source other than the spent set",
-    },
-  };
-  const out = renderEnquiry(status, PLAIN);
-  expect(out).toContain("accepted as unresolved");
-  expect(out).toContain("the confirmatory set is spent");
-  expect(out).toContain("a genuinely new design");
-});
-
-test("an answered enquiry says whether its closure rests on promoted work", () => {
-  const q = {
-    question: ref("question", "Q_2"),
-    asks: "does depth move convergence?",
-  };
-  const base: EnquiryStatus = {
-    enquiry: ref("enquiry", "LOE_2"),
-    pursuing: "depth sweep",
-    contributed: [],
-    open: false,
-    closure: "answered",
-    bearing: "supports",
-    evidence: [{ evidence: ref("evidence", "EV_1"), states: "a result" }],
-    question: q,
-  };
-  expect(renderEnquiry({ ...base, restsOn: "exploratory" }, PLAIN)).toContain("exploratory");
-  expect(renderEnquiry({ ...base, restsOn: "confirmatory" }, PLAIN)).toContain("confirmatory");
-});
 
 test("withdrawn, challenged and never-examined render apart", () => {
   const base: SupportExplanation = {
@@ -264,204 +213,6 @@ test("every question in the survey carries its handle", () => {
   expect(out).toContain("(Q_3)  does depth matter?");
 });
 
-test("a gate that failed and was re-checked does not read as though it never failed", () => {
-  const base: GateStatus = {
-    gate: ref("gate", "GATE_1"),
-    consequence: "the release is blocked",
-    state: "satisfied",
-    checks: [
-      {
-        criterion: ref("criterion", "CRIT_1"),
-        proposition: "the effect holds at n=20",
-        state: "passed",
-      },
-    ],
-    unmet: [],
-    gating: [],
-    counts: { passed: 0, failed: 0, "never-run": 0, "no-standing-verdict": 0 },
-    everFailed: true,
-  };
-  expect(renderGate(base, PLAIN)).toContain("failed at least once");
-  // The flag is a separate fact from the state, so the state still prints.
-  expect(renderGate(base, PLAIN)).toContain("satisfied");
-  expect(renderGate({ ...base, everFailed: false }, PLAIN)).not.toContain("failed at least once");
-});
-
-test("never-run and no-standing-verdict are printed apart, not as one 'not passed'", () => {
-  const status: GateStatus = {
-    gate: ref("gate", "GATE_2"),
-    consequence: "the release is blocked",
-    state: "incomplete",
-    checks: [
-      {
-        criterion: ref("criterion", "CRIT_1"),
-        proposition: "nobody has run this",
-        state: "never-run",
-      },
-      {
-        criterion: ref("criterion", "CRIT_2"),
-        proposition: "this was decided and then withdrawn",
-        state: "no-standing-verdict",
-      },
-    ],
-    unmet: [],
-    gating: [],
-    counts: { passed: 0, failed: 0, "never-run": 0, "no-standing-verdict": 0 },
-    everFailed: false,
-  };
-  const out = renderGate(status, PLAIN);
-  expect(out).toContain("never-run");
-  expect(out).toContain("no-standing-verdict");
-  // A withdrawn evaluation is listed and marked, not dropped: a check decided
-  // and then withdrawn is not a check nobody ran.
-  expect(out).toContain("withdrawn");
-});
-
-test("a dissociation is not reported as a disagreement", () => {
-  const verdict: ConflictVerdict = {
-    conflict: false,
-    relation: "dissociation",
-    differsBy: "scope",
-    sides: [
-      {
-        claim: ref("claim", "CLM_1"),
-        question: ref("question", "Q_1"),
-        proposition: "the schedule moves convergence",
-        asks: "does it move convergence at depth 4?",
-        supportedBy: [{ evidence: ref("evidence", "EV_1"), states: "moves by ~3 steps" }],
-        challengedBy: [],
-      },
-      {
-        claim: ref("claim", "CLM_2"),
-        question: ref("question", "Q_2"),
-        proposition: "the schedule moves convergence",
-        asks: "does it move convergence at depth 12?",
-        supportedBy: [],
-        challengedBy: [
-          {
-            evidence: ref("evidence", "EV_2"),
-            states: "no effect at depth 12",
-          },
-        ],
-      },
-    ],
-  };
-  const out = renderConflict(verdict, PLAIN);
-  expect(out).toContain("do not disagree");
-  expect(out).not.toContain("Contradiction");
-  expect(out).toContain("scope");
-  // Identically worded, so the questions are what tell the two sides apart.
-  expect(out).toContain("depth 4");
-  expect(out).toContain("depth 12");
-
-  const contradiction = renderConflict(
-    {
-      ...verdict,
-      conflict: true,
-      relation: "contradiction",
-      differsBy: null,
-    },
-    PLAIN,
-  );
-  expect(contradiction).toContain("Contradiction");
-  expect(contradiction).not.toContain("do not disagree");
-});
-
-test("a re-run's report never claims the original was reproduced", () => {
-  const report: ReproductionReport = {
-    verification: ref("analysis", "COMP_2"),
-    verificationMethod: "replication at n=20",
-    of: ref("analysis", "COMP_1"),
-    ofMethod: "paired comparison",
-    conclusion: "agrees",
-    verificationRead: [{ part: ref("observations", "ART_1"), name: "sweep-a" }],
-    ofRead: [{ part: ref("observations", "ART_1"), name: "sweep-a" }],
-    differs: [],
-    bearing: "raises",
-  };
-  const out = renderReproduction(report, PLAIN);
-  expect(out).toContain("agrees");
-  expect(out).not.toContain("reproduced the");
-  expect(out).toContain("does not say the original was reproduced");
-});
-
-test("unverifiable inputs render apart from ones that differ", () => {
-  const report: ReproducibilityReport = {
-    analysis: ref("analysis", "COMP_1"),
-    exact: [{ part: ref("observations", "ART_1"), name: "sweep-a" }],
-    differing: [{ part: ref("observations", "ART_2"), name: "sweep-b" }],
-    unverifiable: [{ part: ref("observations", "ART_3"), name: "sweep-c" }],
-    notRebuilt: [{ part: ref("observations", "ART_4"), name: "sweep-d" }],
-    reproducible: false,
-  };
-  const out = renderReproducibility(report, PLAIN);
-  // Four buckets, four headings -- and the unverifiable one says why it is not
-  // a failure, since the record kept no hash to compare against.
-  expect(out).toContain("kept no hash");
-  const positions = ["sweep-a", "sweep-b", "sweep-c", "sweep-d"].map((n) => out.indexOf(n));
-  expect(positions.every((i) => i >= 0)).toBe(true);
-  expect(positions).toEqual([...positions].sort((a, b) => a - b));
-});
-
-test("a question nobody sharpened says so, in one line", () => {
-  const out = renderOrigin(null, ref("question", "Q_1"), PLAIN);
-  expect(out).toBe("Q_1 was posed directly.");
-  // No paragraph defending the answer. It was two lines explaining that an
-  // absent origin is not a gap, printed every time the answer was "directly".
-  expect(out.split("\n")).toHaveLength(1);
-
-  const sharpened = renderOrigin(
-    {
-      kind: "sharpened",
-      from: ref("question", "Q_0"),
-      said: "does the schedule matter?",
-      reason: "the first sweep only moved at depth 4",
-      knownAtTheTime: [{ evidence: ref("evidence", "EV_1"), states: "moves by ~3 steps" }],
-    },
-    ref("question", "Q_1"),
-    PLAIN,
-  );
-  const noted = renderOrigin(
-    {
-      kind: "noted",
-      from: ref("note", "NOTE_2"),
-      said: "something about how the edge is handled matters",
-      reason: null,
-      knownAtTheTime: [],
-    },
-    ref("question", "Q_2"),
-    PLAIN,
-  );
-  // A note's own words, and no "because" line — there is no reason to print,
-  // and an empty one would read as a reason nobody gave.
-  expect(noted).toContain("came out of a note");
-  expect(noted).toContain("something about how the edge is handled matters");
-  expect(noted).not.toContain("because:");
-  expect(noted).not.toContain("Known at that moment");
-
-  expect(sharpened).toContain("does the schedule matter?");
-  expect(sharpened).toContain("moves by ~3 steps");
-  // The frozen-at-the-time caveat, without which a reader takes the list for
-  // what is known now.
-  expect(sharpened).toContain("As it stood at the sharpening");
-});
-
-test("a work contract says, once, that it is not enforced", () => {
-  const contract: TaskContract = {
-    work: ref("work", "TASK_1"),
-    objective: "sweep depth 4 through 20",
-    acceptance: "a curve with n>=20 at each depth",
-    mayRead: ["sweep-a", "sweep-b"],
-    enforced: false,
-  };
-  const out = renderContract(contract, PLAIN);
-  expect(out).toContain("sweep-a");
-  // In the heading, not a paragraph under it. It was two lines explaining that
-  // nothing stops a computation reading elsewhere, on every contract.
-  expect(out).toContain("May read (not enforced)");
-  expect(out).not.toContain("nothing stops");
-});
-
 test("two claims asserting one sentence are not rendered as a duplicate", () => {
   const one = renderClaims(
     [
@@ -590,7 +341,6 @@ test("an uncaptured commit is not printed as a hash", () => {
 // palette.
 
 const COLOUR = palette(true);
-const ESC = "\u001b";
 
 /**
  * Strips every SGR sequence, so a coloured page can be compared to a plain one.
@@ -598,37 +348,11 @@ const ESC = "\u001b";
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI is the point
 const stripped = (s: string): string => s.replace(/\u001b\[[0-9;]*m/g, "");
 
-const gateFixture: GateStatus = {
-  gate: ref("gate", "GATE_9"),
-  consequence: "the release is blocked",
-  state: "blocked",
-  checks: [
-    {
-      criterion: ref("criterion", "CRIT_1"),
-      proposition: "the effect holds at n>=20",
-      state: "failed",
-    },
-    {
-      criterion: ref("criterion", "CRIT_2"),
-      proposition: "nobody has run this",
-      state: "never-run",
-    },
-  ],
-  unmet: [
-    { criterion: ref("criterion", "CRIT_1"), requires: "the effect holds at n>=20", blocks: [] },
-  ],
-  gating: [],
-  counts: { passed: 0, failed: 0, "never-run": 0, "no-standing-verdict": 0 },
-  everFailed: true,
-};
-
 test("colouring changes nothing a reader would read", () => {
   // The strongest property here, and the cheapest to lose: turning colour on
   // must not move, reword or reorder anything. If this fails, the two
   // renderings have diverged and every plain-mode assertion above has stopped
   // covering what people actually see.
-  expect(stripped(renderGate(gateFixture, COLOUR))).toBe(renderGate(gateFixture, PLAIN));
-
   const survey: KnowledgeSurvey = {
     established: [
       {
@@ -646,41 +370,6 @@ test("colouring changes nothing a reader would read", () => {
     closedPursuits: [],
   };
   expect(stripped(renderKnown(survey, COLOUR))).toBe(renderKnown(survey, PLAIN));
-});
-
-test("a gate's states are coloured apart, not as pass and not-pass", () => {
-  const out = renderGate(gateFixture, COLOUR);
-  expect(out).toContain(ESC);
-  // `failed` and `never-run` are different findings and must not share a code.
-  const codeFor = (word: string) =>
-    out.match(new RegExp(`\\u001b\\[([0-9;]+)m${word}`))?.[1] ?? `uncoloured:${word}`;
-  expect(codeFor("failed")).not.toBe(codeFor("never-run"));
-});
-
-test("colour lands on the state word, not the whole line", () => {
-  const line = renderGate(gateFixture, COLOUR)
-    .split("\n")
-    .find((l) => l.includes("the effect holds at n>=20"));
-  // An escape immediately before the proposition would mean the whole row had
-  // been painted, which carries no information a reader can use.
-  expect(line).toBeDefined();
-  expect(line).not.toContain(`${ESC}[31mthe effect holds`);
-  expect(stripped(line as string)).toContain("the effect holds at n>=20");
-});
-
-test("padding is applied before colour, so columns still line up", () => {
-  // An escape sequence has length. Padding a coloured string pads the bytes
-  // nobody can see, and the column then lands short by exactly that much.
-  const columns = renderGate(gateFixture, COLOUR)
-    .split("\n")
-    // The condition rows only: `Not currently met` also carries a CRIT_ handle,
-    // and its rows are not in this column at all.
-    // Condition rows only. `Not currently met` also carries a CRIT_ handle and
-    // is not in this column; the header line contains the word "failed".
-    .filter((l) => /^ {2}- (failed|never-run|passed|no-standing-verdict)\b/.test(stripped(l)))
-    .map((l) => stripped(l).search(/the effect holds|nobody has run/));
-  expect(columns.length).toBe(2);
-  expect(new Set(columns).size).toBe(1);
 });
 
 test("PLAIN is the identity function, so no view has a second code path", () => {

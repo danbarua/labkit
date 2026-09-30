@@ -39,11 +39,6 @@ export const workListQuery = z.object({
 });
 export type WorkListQuery = z.infer<typeof workListQuery>;
 
-export const knownAtQuery = z.object({
-  at: z.iso.datetime({ offset: true }),
-});
-export type KnownAtQuery = z.infer<typeof knownAtQuery>;
-
 export const searchQuery = z.object({
   text: z.string(),
 });
@@ -54,30 +49,10 @@ export const claimsAssertingQuery = z.object({
 });
 export type ClaimsAssertingQuery = z.infer<typeof claimsAssertingQuery>;
 
-export const pursuitsOfQuery = z.object({
-  question: refString("question"),
-});
-export type PursuitsOfQuery = z.infer<typeof pursuitsOfQuery>;
-
-export const originOfQuery = z.object({
-  question: refString("question"),
-});
-export type OriginOfQuery = z.infer<typeof originOfQuery>;
-
 export const gateStatusQuery = z.object({
   gate: refString("gate"),
 });
 export type GateStatusQuery = z.infer<typeof gateStatusQuery>;
-
-export const criteriaGoverningQuery = z.object({
-  gate: refString("gate"),
-});
-export type CriteriaGoverningQuery = z.infer<typeof criteriaGoverningQuery>;
-
-export const designHistoryQuery = z.object({
-  gate: refString("gate"),
-});
-export type DesignHistoryQuery = z.infer<typeof designHistoryQuery>;
 
 export const contractForQuery = z.object({
   work: refString("work"),
@@ -104,32 +79,10 @@ export const whySupportedQuery = z.object({
 });
 export type WhySupportedQuery = z.infer<typeof whySupportedQuery>;
 
-export const interpretationHistoryQuery = z.object({
-  claim: refString("claim"),
-});
-export type InterpretationHistoryQuery = z.infer<typeof interpretationHistoryQuery>;
-
-export const doTheseConflictQuery = z.object({
-  a: refString("claim"),
-  b: refString("claim"),
-});
-export type DoTheseConflictQuery = z.infer<typeof doTheseConflictQuery>;
-
-export const reproductionOfQuery = z.object({
-  verification: refString("analysis"),
-});
-export type ReproductionOfQuery = z.infer<typeof reproductionOfQuery>;
-
 export const analysisRevisionQuery = z.object({
   analysis: refString("analysis"),
 });
 export type AnalysisRevisionQuery = z.infer<typeof analysisRevisionQuery>;
-
-export const reproducibilityOfQuery = z.object({
-  analysis: refString("analysis"),
-  rebuilt: z.array(z.object({ part: refString("observations"), hash: z.string() })),
-});
-export type ReproducibilityOfQuery = z.infer<typeof reproducibilityOfQuery>;
 
 export const criterionStandingQuery = z.object({
   criterion: refString("criterion"),
@@ -147,17 +100,6 @@ export const resourceQuery = z.object({
   depth: z.number().int().min(0).max(6).default(1),
 });
 export type ResourceQuery = z.infer<typeof resourceQuery>;
-
-export const howQuery = z.object({
-  subject: z.string(),
-  since: z.number().int().optional(),
-});
-export type HowQuery = z.infer<typeof howQuery>;
-
-export const whatDependsOnQuery = z.object({
-  subject: z.string(),
-});
-export type WhatDependsOnQuery = z.infer<typeof whatDependsOnQuery>;
 
 export const neighboursOfQuery = z.object({
   subject: anyRefString(),

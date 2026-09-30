@@ -7,7 +7,7 @@ import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
-import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { reanalyse, recordAnalysis } from "../helpers/analysis";
 import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
@@ -370,23 +370,20 @@ describe("S-4: a negative result that closes the question", () => {
    * Overlap regression, per review: making CHALLENGES live exposed
    * SUPPORTS-only assumptions in query paths written before it existed.
    */
-  test("a withdrawn challenge is historical, and propagates as an affected claim", async () => {
+  test("a withdrawn challenge is historical", async () => {
     const { specificity, observations } = await aProgrammeWithOneOpenQuestion();
-    const { analysis: refutation, claims: refutationClaims } = await recordAnalysis(
-      session.writes,
-      {
-        enquiry: specificity,
-        method: "cluster-comparison",
-        from: [observations],
-        concludes: [
-          {
-            proposition: SPECIFICITY,
-            finding: "no separation detectable",
-            bearing: "challenges",
-          },
-        ],
-      },
-    );
+    const { claims: refutationClaims } = await recordAnalysis(session.writes, {
+      enquiry: specificity,
+      method: "cluster-comparison",
+      from: [observations],
+      concludes: [
+        {
+          proposition: SPECIFICITY,
+          finding: "no separation detectable",
+          bearing: "challenges",
+        },
+      ],
+    });
 
     const before = await session.reads.whySupported({
       claim: claimOf(refutationClaims, SPECIFICITY),
@@ -394,13 +391,7 @@ describe("S-4: a negative result that closes the question", () => {
     expect(before.challenged).toBe(true);
     expect(before.against).toHaveLength(1);
 
-    const { review } = await session.writes.recordReview({
-      of: refutation,
-      verdict: "the clustering metric was misapplied",
-    });
-    const report = await replaceAnalysis(session.writes, {
-      supersedes: refutation,
-      because: review,
+    await reanalyse(session.writes, {
       enquiry: specificity,
       method: "corrected-cluster-comparison",
       from: [observations],
@@ -417,15 +408,6 @@ describe("S-4: a negative result that closes the question", () => {
       ],
     });
 
-    // A challenging finding is superseded exactly as a supporting one is — reading only the
-    // supporting side saw nothing here at all. By handle, not by sentence: after the
-    // replacement two records assert these words, and this names the refutation's own claim,
-    // the one that was withdrawn.
-    const revision = await (await afterwards()).reads.why({ subject: report.replacement });
-    if (revision.kind !== "analysis") throw new Error(`expected an analysis, got ${revision.kind}`);
-    expect(revision.report.changed).toHaveLength(1);
-    expect(revision.report.changed[0]!.was).toEqual(claimOf(refutationClaims, SPECIFICITY));
-
     // After the replacement the sentence is claimed twice; this asks about
     // the original, which is the one that was withdrawn.
     const after = await session.reads.whySupported({
@@ -437,12 +419,7 @@ describe("S-4: a negative result that closes the question", () => {
     expect(after.superseded[0]).toMatchObject({
       finding: "no separation detectable",
       bearing: "challenges",
-      reason: "the clustering metric was misapplied",
     });
-
-    // ...and invalidating the record enumerates the challenged claim.
-    const downstream = await session.reads.whatDependsOn({ subject: "cluster-comparison output" });
-    expect(downstream.claims.map((c) => c.asserts)).toContain(SPECIFICITY);
   });
 
   test("an enquiry nobody has closed is open, and that is not a kind of closure", async () => {

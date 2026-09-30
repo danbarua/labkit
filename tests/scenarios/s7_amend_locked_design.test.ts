@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { ref, type DesignHistory } from "@labkit/core-domain/report";
+import { ref } from "@labkit/core-domain/report";
 import { recordAnalysis } from "../helpers/analysis";
 import { as, captureConversation } from "../helpers/conversation";
 
@@ -138,16 +138,6 @@ async function diagnose(
   };
 }
 
-/**
- * The one condition on a single-condition gate. Every scenario below but the
- * last locks exactly one setting; asserting that here keeps the reads that
- * follow about the amendment rather than about which condition they picked.
- */
-function theCondition(history: DesignHistory) {
-  expect(history.conditions).toHaveLength(1);
-  return history.conditions[0]!;
-}
-
 describe("S-7 — locked design, then feasibility finds a mechanical defect", () => {
   test("the conversation runs end to end through research verbs alone", async () => {
     const programme = await lockedProgramme();
@@ -191,24 +181,31 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
   test("the original setting survives the amendment verbatim", async () => {
     const programme = await lockedProgramme();
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
-    await session.writes.amendDesign({
+    const report = await session.writes.amendDesign({
       criterion: programme.iterationLimit,
       nowRequires: RAISED_LIMIT,
       because: "the locked limit is unreachable",
       citing: cites,
     });
 
-    const history = await session.reads.designHistory({ gate: programme.feasibilityBoundary });
-    expect(theCondition(history).originally.requires).toBe(LOCKED_LIMIT);
-    expect(theCondition(history).nowRequires.requires).toBe(RAISED_LIMIT);
-
     const later = new ResearchSession(await scenario.current(), {
       clock,
       events: inMemoryEventLog(),
     });
-    const durable = await later.reads.designHistory({ gate: programme.feasibilityBoundary });
-    expect(theCondition(durable).originally.requires).toBe(LOCKED_LIMIT);
-    expect(theCondition(durable).nowRequires.requires).toBe(RAISED_LIMIT);
+    const amendment = await later.reads.why({ subject: report.amendment });
+    expect(amendment.because).toContainEqual({
+      handle: programme.iterationLimit,
+      wording: `replaced ${LOCKED_LIMIT}`,
+    });
+    expect(amendment.because).toContainEqual({
+      handle: report.nowRequires.criterion,
+      wording: `led to ${RAISED_LIMIT}`,
+    });
+
+    const original = await later.reads.why({ subject: programme.iterationLimit });
+    if (original.kind !== "criterion")
+      throw new Error(`expected a criterion, got ${original.kind}`);
+    expect(original.report.requires).toBe(LOCKED_LIMIT);
   });
 
   /**
@@ -217,7 +214,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
   test("the amendment cites its diagnosis, and the diagnosis has provenance of its own", async () => {
     const programme = await lockedProgramme();
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
-    await session.writes.amendDesign({
+    const report = await session.writes.amendDesign({
       criterion: programme.iterationLimit,
       nowRequires: RAISED_LIMIT,
       because: "the locked limit is unreachable for reasons unrelated to the effect under test",
@@ -228,14 +225,11 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.reads.designHistory({ gate: programme.feasibilityBoundary });
-    expect(theCondition(history).amendments).toHaveLength(1);
-    expect(theCondition(history).amendments[0]!.reason).toContain(
-      "unrelated to the effect under test",
+    const amendment = await later.reads.why({ subject: report.amendment });
+    expect(amendment.is).toContain("unrelated to the effect under test");
+    expect(amendment.because.map((c) => c.wording)).toContain(
+      "rests on condition number rises with feature count; enlarging the sample does not reduce it",
     );
-    expect(theCondition(history).amendments[0]!.citing.map((f) => f.states)).toEqual([
-      "condition number rises with feature count; enlarging the sample does not reduce it",
-    ]);
 
     // ...and the cited diagnosis is a finding with a chain behind it, not an
     // assertion attached to the amendment.
@@ -302,15 +296,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
     expect(scientific.nature).toBe("scientific");
     expect(scientific.confirmatoryAffected.map((c) => c.asserts)).toEqual([BEATS_CONTROL]);
-
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-    const feasibility = await later.reads.designHistory({ gate: programme.feasibilityBoundary });
-    const confirmatory = await later.reads.designHistory({ gate: programme.confirmatoryBoundary });
-    expect(theCondition(feasibility).amendments[0]!.nature).toBe("mechanical");
-    expect(theCondition(confirmatory).amendments[0]!.nature).toBe("scientific");
   });
 
   /**
@@ -320,33 +305,17 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     const programme = await lockedProgramme();
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
 
-    await session.writes.amendDesign({
+    const first = await session.writes.amendDesign({
       criterion: programme.iterationLimit,
       nowRequires: RAISED_LIMIT,
       because: "the locked limit is unreachable",
       citing: cites,
     });
-
-    const current = await session.reads.designHistory({ gate: programme.feasibilityBoundary });
-    const raised = theCondition(current).nowRequires.requires;
-    expect(raised).toBe(RAISED_LIMIT);
-
-    await session.writes.amendDesign({
-      criterion: theCondition(current).criterion,
+    const second = await session.writes.amendDesign({
+      criterion: first.nowRequires.criterion,
       nowRequires: "the solver converges within 50,000 iterations",
       because: "10,000 still caps on the widest sweeps",
       citing: cites,
-    });
-
-    // An unrelated decision elsewhere in the programme, to show what this can
-    // and cannot order.
-    const { question: aside } = await session.writes.pose({
-      question: "should the sweep width be capped at all?",
-    });
-    await session.writes.sharpen({
-      from: aside,
-      into: "does sweep width interact with convergence?",
-      because: "worth separating",
     });
 
     const later = new ResearchSession(await scenario.current(), {
@@ -355,25 +324,19 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     });
     expect(await later.events.all()).toHaveLength(0);
 
-    const history = await later.reads.designHistory({ gate: programme.feasibilityBoundary });
-    expect(theCondition(history).originally.requires).toBe(LOCKED_LIMIT);
-    expect(theCondition(history).nowRequires.requires).toBe(
+    const gate = await later.reads.gateStatus({ gate: programme.feasibilityBoundary });
+    expect(gate.checks.map((c) => c.proposition)).toEqual([
       "the solver converges within 50,000 iterations",
-    );
-    expect(theCondition(history).amendments.map((a) => a.nowRequires.requires)).toEqual([
-      RAISED_LIMIT,
-      "the solver converges within 50,000 iterations",
-    ]);
-    expect(theCondition(history).amendments.map((a) => a.replaced.requires)).toEqual([
-      LOCKED_LIMIT,
-      RAISED_LIMIT,
     ]);
 
     // The second amendment stands instead of the first, and says so on the
-    // record rather than only in the order this report happens to render.
-    const [first, second] = theCondition(history).amendments;
-    const stands = await later.reads.why({ subject: second!.amendment });
-    expect(stands.because.map((c) => c.handle)).toContain(first!.amendment);
+    // record rather than only in the order the acts were taken.
+    const stands = await later.reads.why({ subject: second.amendment });
+    expect(stands.because.map((c) => c.handle)).toContain(first.amendment);
+    expect(stands.because).toContainEqual({
+      handle: first.nowRequires.criterion,
+      wording: `replaced ${RAISED_LIMIT}`,
+    });
   });
 
   /**
@@ -394,15 +357,6 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       "feasibility sweep of the evolved condition",
     ]);
     expect(report.rerun).not.toContain("the prespecified comparison against the rewired control");
-
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-    const history = await later.reads.designHistory({ gate: programme.feasibilityBoundary });
-    expect(theCondition(history).amendments[0]!.rerun.map((w) => w.objective)).toEqual([
-      "feasibility sweep of the evolved condition",
-    ]);
   });
 
   /**
@@ -453,13 +407,14 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
     // a re-run or from an amendment.
     expect(after.everFailed).toBe(true);
 
-    // The retired condition is still readable where it belongs.
-    const history = await new ResearchSession(await scenario.current(), {
-      clock,
-    }).reads.designHistory({
-      gate: programme.feasibilityBoundary,
+    // The amended-away condition is still readable where it belongs.
+    const original = await new ResearchSession(await scenario.current(), { clock }).reads.why({
+      subject: programme.iterationLimit,
     });
-    expect(theCondition(history).originally.criterion).toBe(programme.iterationLimit);
+    if (original.kind !== "criterion")
+      throw new Error(`expected a criterion, got ${original.kind}`);
+    expect(original.report.requires).toBe(LOCKED_LIMIT);
+    expect(original.report.state).toBe("failed");
   });
 
   test("a setting that has already been amended cannot be amended again", async () => {
@@ -472,7 +427,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       because: "the locked limit is unreachable",
       citing: cites,
     });
-    const afterFirst = await session.reads.designHistory({ gate: programme.feasibilityBoundary });
+    const afterFirst = await session.reads.gateStatus({ gate: programme.feasibilityBoundary });
 
     await expect(
       session.writes.amendDesign({
@@ -483,12 +438,12 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       }),
     ).rejects.toThrow(/has already been amended/);
 
-    // The history still reads, and reads exactly as it did before.
+    // The gate still reads, and reads exactly as it did before.
     const later = new ResearchSession(await scenario.current(), {
       clock,
       events: inMemoryEventLog(),
     });
-    expect(await later.reads.designHistory({ gate: programme.feasibilityBoundary })).toEqual(
+    expect(await later.reads.gateStatus({ gate: programme.feasibilityBoundary })).toEqual(
       afterFirst,
     );
   });
@@ -497,7 +452,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
   test("amending a criterion that is not on the record writes nothing", async () => {
     const programme = await lockedProgramme();
     const { cites } = await diagnose(programme.enquiry, programme.feasibilityWork);
-    const before = await session.reads.designHistory({ gate: programme.feasibilityBoundary });
+    const before = await session.reads.gateStatus({ gate: programme.feasibilityBoundary });
 
     await expect(
       session.writes.amendDesign({
@@ -512,9 +467,7 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    expect(await later.reads.designHistory({ gate: programme.feasibilityBoundary })).toEqual(
-      before,
-    );
+    expect(await later.reads.gateStatus({ gate: programme.feasibilityBoundary })).toEqual(before);
   });
 
   /**
@@ -538,13 +491,13 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       protecting: [work],
     });
 
-    await session.writes.amendDesign({
+    const capAmended = await session.writes.amendDesign({
       criterion: cap,
       nowRequires: RAISED_LIMIT,
       because: "the locked limit is unreachable",
       citing: cites,
     });
-    await session.writes.amendDesign({
+    const tolAmended = await session.writes.amendDesign({
       criterion: tolerance,
       nowRequires: RELAXED_TOLERANCE,
       because: "the locked tolerance is below the solver's own noise floor",
@@ -555,26 +508,24 @@ describe("S-7 — locked design, then feasibility finds a mechanical defect", ()
       clock,
       events: inMemoryEventLog(),
     });
-    const history = await later.reads.designHistory({ gate });
+    const status = await later.reads.gateStatus({ gate });
+    expect(status.checks.map((c) => c.proposition).sort()).toEqual(
+      [RAISED_LIMIT, RELAXED_TOLERANCE].sort(),
+    );
 
-    const byOriginal = new Map(history.conditions.map((c) => [c.originally.requires, c]));
-    expect([...byOriginal.keys()].sort()).toEqual([LOCKED_LIMIT, LOCKED_TOLERANCE].sort());
-
-    const capHistory = byOriginal.get(LOCKED_LIMIT)!;
-    expect(capHistory.nowRequires.requires).toBe(RAISED_LIMIT);
-    expect(capHistory.amendments.map((a) => a.nowRequires.requires)).toEqual([RAISED_LIMIT]);
-
-    const tol = byOriginal.get(LOCKED_TOLERANCE)!;
-    expect(tol.nowRequires.requires).toBe(RELAXED_TOLERANCE);
-    expect(tol.amendments.map((a) => a.nowRequires.requires)).toEqual([RELAXED_TOLERANCE]);
+    // Each amendment replaced its own setting and nothing else.
+    const capWhy = await later.reads.why({ subject: capAmended.amendment });
+    expect(capWhy.because).toContainEqual({ handle: cap, wording: `replaced ${LOCKED_LIMIT}` });
+    const tolWhy = await later.reads.why({ subject: tolAmended.amendment });
+    expect(tolWhy.because).toContainEqual({
+      handle: tolerance,
+      wording: `replaced ${LOCKED_TOLERANCE}`,
+    });
 
     // The two amendments are unrelated acts. If the tolerance amendment
     // superseded the cap amendment, this record would say one setting was
     // replaced by a change to a different setting.
-    expect(capHistory.amendments[0]!.amendment).not.toBe(tol.amendments[0]!.amendment);
-    const withdrawal = await later.reads.why({ subject: tol.amendments[0]!.amendment });
-    expect(withdrawal.because.map((c) => c.handle)).not.toContain(
-      capHistory.amendments[0]!.amendment,
-    );
+    expect(capAmended.amendment).not.toBe(tolAmended.amendment);
+    expect(tolWhy.because.map((c) => c.handle)).not.toContain(capAmended.amendment);
   });
 });

@@ -200,7 +200,7 @@ export const touchedIn = (event: DomainEvent): string[] => [
   ),
 ];
 
-/** Every handle an act retracted. `undo` writes these and nothing else. */
+/** Every handle an act retracted. Only an `undo` event carries these. */
 export const retractedIn = (event: DomainEvent): string[] =>
   event.changes.flatMap((c) =>
     c.change === "NodePropsChanged" && (c.after as { retracted?: boolean }).retracted === true

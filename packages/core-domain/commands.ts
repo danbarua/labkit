@@ -47,13 +47,6 @@ function citedBasisString() {
 const bearing = z.enum(["supports", "challenges"]);
 const standing = z.enum(["exploratory", "confirmatory"]);
 
-const conclusion = z.object({
-  proposition: z.string(),
-  finding: z.string(),
-  bearing: bearing.optional(),
-  standing: standing.optional(),
-});
-
 /**
  * `synthesise` — one finding drawn across others, running nothing new.
  */
@@ -106,14 +99,6 @@ export const noteSupersedesCommand = z.object({
 export const noteCommand = z.union([noteSupersedesCommand, noteMintCommand]);
 export type NoteCommand = z.infer<typeof noteCommand>;
 
-/** `sharpen` — narrow a question into a more precise one, recording why. */
-export const sharpenCommand = z.object({
-  from: refString("question"),
-  into: z.string(),
-  because: z.string(),
-});
-export type SharpenCommand = z.infer<typeof sharpenCommand>;
-
 /** `recordObservations` — put measurement on the record, without analysing it. */
 export const recordObservationsCommand = z.object({
   enquiry: refString("enquiry"),
@@ -135,26 +120,12 @@ export const recordAnalysisCommand = z.object({
 });
 export type RecordAnalysisCommand = z.infer<typeof recordAnalysisCommand>;
 
-/** `recordReview` — a verdict on an analysis, which a later retraction can rest on. */
-export const recordReviewCommand = z.object({
-  of: refString("analysis"),
-  verdict: z.string(),
-});
-export type RecordReviewCommand = z.infer<typeof recordReviewCommand>;
-
 /** `closeEnquiry` — answered, or abandoned when `answeredBy` is absent. */
 export const closeEnquiryCommand = z.object({
   enquiry: refString("enquiry"),
   answeredBy: refString("claim").optional(),
 });
 export type CloseEnquiryCommand = z.infer<typeof closeEnquiryCommand>;
-
-/** Close one gate without pretending its checks passed. */
-export const closeGateCommand = z.object({
-  gate: refString("gate"),
-  because: z.string(),
-});
-export type CloseGateCommand = z.infer<typeof closeGateCommand>;
 
 /** Planned work somebody decided not to do. */
 export const stopWorkCommand = z.object({
@@ -199,16 +170,6 @@ export const evaluateCriterionCommand = z.object({
 });
 export type EvaluateCriterionCommand = z.infer<typeof evaluateCriterionCommand>;
 
-/** `reverify` — re-run a historical analysis under current observations. Not reproduction (S-10). */
-export const reverifyCommand = z.object({
-  historical: refString("analysis"),
-  enquiry: refString("enquiry").optional(),
-  method: z.string(),
-  under: z.array(inputRefString()),
-  concludes: conclusion,
-});
-export type ReverifyCommand = z.infer<typeof reverifyCommand>;
-
 /** `acceptAsUnresolved` — leave a question open on purpose, with the condition that reopens it (S-14). */
 export const acceptAsUnresolvedCommand = z.object({
   enquiry: refString("enquiry"),
@@ -241,61 +202,6 @@ export const concludeCommand = z.object({
 export type ConcludeCommand = z.infer<typeof concludeCommand>;
 
 /**
- * One of a replacement's conclusions, and which earlier finding it stands in for.
- */
-export const replacementConclusion = conclusion.extend({
-  replacing: supersededRefString().optional(),
-});
-export type ReplacementConclusion = z.infer<typeof replacementConclusion>;
-
-/**
- * `keep` — revise an analysis by naming the conclusions that survive.
- */
-export const keepCommand = z.object({
-  keeping: z.array(refString("claim")),
-  because: refString("review"),
-  method: z.string(),
-  from: z.array(inputRefString()).optional(),
-});
-export type KeepCommand = z.infer<typeof keepCommand>;
-
-/**
- * `replaceAnalysis` — record a corrected analysis in place of a defective one, and the lineage
- * between them.
- */
-export const replaceAnalysisCommand = z.object({
-  supersedes: refString("analysis"),
-  because: refString("review"),
-  method: z.string(),
-  from: z.array(inputRefString()).optional(),
-});
-export type ReplaceAnalysisCommand = z.infer<typeof replaceAnalysisCommand>;
-
-/** `reinterpret` — narrow what a claim is taken to mean, without re-running anything. */
-export const reinterpretCommand = z.object({
-  of: refString("claim"),
-  as: z.string(),
-  because: z.string(),
-});
-export type ReinterpretCommand = z.infer<typeof reinterpretCommand>;
-
-/** `promote` — move a finding from scratch to citable (S-18). */
-export const promoteCommand = z.object({
-  claim: refString("claim"),
-  because: z.string(),
-});
-export type PromoteCommand = z.infer<typeof promoteCommand>;
-
-/**
- * `isUndecided` — a finding that settles the proposition neither way.
- */
-export const claimIsUndecidedCommand = z.object({
-  claim: refString("claim"),
-  because: refString("evidence"),
-});
-export type ClaimIsUndecidedCommand = z.infer<typeof claimIsUndecidedCommand>;
-
-/**
  * `isConfirmed` — a finding others may build on.
  */
 export const claimIsConfirmedCommand = z.object({
@@ -304,41 +210,22 @@ export const claimIsConfirmedCommand = z.object({
 });
 export type ClaimIsConfirmedCommand = z.infer<typeof claimIsConfirmedCommand>;
 
-/**
- * `undo` — takes back a mistaken act by naming the event it recorded.
- */
-export const undoCommand = z.object({
-  event: z.number(),
-  because: z.string(),
-});
-export type UndoCommand = z.infer<typeof undoCommand>;
-
 /** Every command the write surface takes. What an act was asked to do. */
 export type Command =
   | AcceptAsUnresolvedCommand
   | AmendDesignCommand
   | CloseEnquiryCommand
-  | CloseGateCommand
   | ConcludeCommand
   | DeclareGateCommand
   | EvaluateCriterionCommand
   | ClaimIsConfirmedCommand
-  | ClaimIsUndecidedCommand
-  | KeepCommand
   | NoteCommand
   | OpenEnquiryCommand
   | PlanWorkCommand
   | PoseCommand
-  | PromoteCommand
   | PursueCommand
   | RecordAnalysisCommand
   | RecordObservationsCommand
   | StopWorkCommand
-  | RecordReviewCommand
-  | ReinterpretCommand
-  | ReplaceAnalysisCommand
-  | ReverifyCommand
-  | SharpenCommand
   | StateCriterionCommand
-  | SynthesiseCommand
-  | UndoCommand;
+  | SynthesiseCommand;
