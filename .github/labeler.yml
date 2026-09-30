@@ -1,0 +1,31 @@
+# Which area a pull request touches, by path. The `label-areas` job in ci.yml applies
+# these on every push to a pull request, and removes one the pull request no longer earns.
+# A change outside packages/ gets no area.
+
+"area:record":
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/core-domain/**
+          - packages/core-db/**
+          - packages/app-cli/**
+          - packages/app-mcp/**
+
+"area:web":
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/app-web/**
+          - packages/ui/**
+          - packages/design/**
+          - packages/records/**
+          - packages/view-model/**
+          - packages/acp-client/**
+
+"area:agent":
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages/core-agent/**
+          - packages/app-acp/**
+          - packages/app-vscode/**
+          - packages/acp-fake/**
+          - packages/acp-scenarios/**
+          - packages/acp-transcripts/**
