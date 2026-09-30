@@ -41,8 +41,9 @@ points; where code or other docs disagree with it, the code is the divergence.
 Use `docs/agent/core-runtime.md` and `docs/agent/agent-flow-diagrams.md` for the underlying agent
 runtime. Use `docs/agent/session-runtime.md` for persistence and session flows.
 `docs/agent/host-protocol.md` is a design document with explicit implementation gaps; do not
-treat every protocol feature in it as shipped. `docs/agent/acp-conformance.md` tracks ACP
-conformance.
+treat every protocol feature in it as shipped. `docs/agent/acp-language.md` says what ACP's
+messages mean and oblige, as the specification states them; `docs/agent/acp-conformance.md`
+tracks how far the agent conforms.
 
 When documentation and implementation differ, source and tests describe current
 behavior. Update the relevant module README for a local contract change and the
