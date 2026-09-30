@@ -5,7 +5,6 @@ import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   AcceptedAsUnresolved,
   ClosedEnquiry,
-  ClosedGate,
   EnquiryRef,
   EvidenceRef,
   QuestionRef,
@@ -13,12 +12,7 @@ import type {
 } from "../report";
 import { ref, stagedRef } from "../report";
 import { DomainRefusal } from "../refusal";
-import type {
-  AcceptAsUnresolvedCommand,
-  CloseEnquiryCommand,
-  CloseGateCommand,
-  StopWorkCommand,
-} from "../commands";
+import type { AcceptAsUnresolvedCommand, CloseEnquiryCommand, StopWorkCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 
@@ -186,48 +180,6 @@ export class Stopping extends SessionCore {
       return {
         subject: input.enquiry,
         result: { decision },
-      };
-    });
-  }
-
-  /** Close one gate without changing what any criterion verdict says. */
-  async closeGate(input: CloseGateCommand): Promise<ClosedGate> {
-    return this.handle("closeGate", input, async (unitOfWork) => {
-      const [target] = await this.graph.query(
-        `MATCH (g:Gate {natural_id: $id})
-         OPTIONAL MATCH (d:Decision)-[:CLOSES]->(g)
-         RETURN g, d`,
-        {
-          g: vertexProps<{ natural_id: string; consequence: string }>(),
-          d: optional(vertexProps<{ natural_id: string; reason: string }>()),
-        },
-        { id: input.gate },
-      );
-      if (!target)
-        throw new DomainRefusal({
-          kind: "not-found",
-          message: `${input.gate} not found`,
-          subject: input.gate,
-        });
-      if (target.d)
-        throw new DomainRefusal({
-          kind: "invariant",
-          message: `${input.gate} is already closed by ${target.d.natural_id}: ${target.d.reason}`,
-          subject: input.gate,
-        });
-
-      const decision = stagedRef(
-        "decision",
-        unitOfWork.node("Decision", {
-          decided_at: this.clock.now(),
-          reason: input.because,
-          invalidation_check: "a reason for this gate to govern work again",
-        }),
-      );
-      unitOfWork.edge(decision, "CLOSES", input.gate);
-      return {
-        subject: input.gate,
-        result: { decision, gate: input.gate },
       };
     });
   }

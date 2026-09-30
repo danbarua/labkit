@@ -1,20 +1,14 @@
-/** Measuring, analysing, concluding, reviewing. */
+/** Measuring, analysing, concluding. */
 
 import { vertexProps } from "@labkit/core-db/cypher";
 import type { TenantGraph } from "@labkit/core-db/graph";
-import type {
-  RecordedAnalysis,
-  RecordedObservations,
-  RecordedReview,
-  Synthesised,
-} from "../report";
+import type { RecordedAnalysis, RecordedObservations, Synthesised } from "../report";
 import { stagedRef } from "../report";
 import type {
   ConcludeCommand,
   SynthesiseCommand,
   RecordAnalysisCommand,
   RecordObservationsCommand,
-  RecordReviewCommand,
 } from "../commands";
 import type { ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
@@ -129,23 +123,6 @@ export class Work extends Shared {
       return {
         subject: input.analysis,
         result: { analysis: input.analysis, heldTo, claims: [asConcludedClaim(concluded)] },
-      };
-    });
-  }
-
-  /**
-   * Records a reviewer's finding about an analysis.
-   */
-  async recordReview(input: RecordReviewCommand): Promise<RecordedReview> {
-    return this.handle("recordReview", input, async (unitOfWork) => {
-      const unit = await this.unitOf(input.of);
-
-      const review = stagedRef("review", unitOfWork.node("Review", { verdict: input.verdict }));
-      unitOfWork.edge(review, "EVALUATES", unit);
-
-      return {
-        subject: review,
-        result: { review },
       };
     });
   }

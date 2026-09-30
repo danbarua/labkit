@@ -2,7 +2,7 @@
  * The shared shapes every view is built out of.
  */
 
-import type { IdentifiedArtefact, QuestionStanding } from "@labkit/core-domain";
+import type { QuestionStanding } from "@labkit/core-domain";
 import type { Palette } from "../palette";
 
 export function bullets(items: string[], empty: string): string {
@@ -14,13 +14,6 @@ export function bullets(items: string[], empty: string): string {
  */
 export function questionLines(questions: QuestionStanding[]): string[] {
   return questions.map((q) => `${`(${q.question})`}  ${q.asks}`);
-}
-
-export function partLine(a: IdentifiedArtefact, p: Palette): string {
-  // `invalidated` is contested rather than quiet: the record has actively
-  // withdrawn this part, which is a finding and not an absence.
-  const flag = a.invalidated ? `  ${p.contested("invalidated")}` : "";
-  return `${`(${a.part})`}  ${a.name}${flag}`;
 }
 
 /**

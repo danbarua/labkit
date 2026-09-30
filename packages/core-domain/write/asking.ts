@@ -5,7 +5,6 @@ import { labelForNaturalId, type Prose } from "@labkit/core-db/domain";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   EnquiryRef,
-  EvidenceRef,
   OpenedEnquiry,
   AnyRef,
   Noted,
@@ -13,10 +12,9 @@ import type {
   Posed,
   Pursued,
   QuestionRef,
-  SharpenedQuestion,
 } from "../report";
 import { KIND_BY_LABEL, ref, stagedRef } from "../report";
-import type { NoteCommand, PoseCommand, PursueCommand, SharpenCommand } from "../commands";
+import type { NoteCommand, PoseCommand, PursueCommand } from "../commands";
 import { SessionCore, type ResearchSessionOptions } from "../core";
 import type { Handle } from "./index";
 import type { UnitOfWork } from "../projection";
@@ -203,47 +201,5 @@ export class Asking extends SessionCore {
         return { subject: enquiry, result: { enquiry, question: asked } };
       },
     );
-  }
-
-  /**
-   * Sharpens a question into a more precise one, recording the act rather than editing the
-   * original.
-   */
-  async sharpen(input: SharpenCommand): Promise<SharpenedQuestion> {
-    return this.handle("sharpen", input, async (unitOfWork) => {
-      const original = await this.graph.query(
-        `MATCH (q:Question {natural_id: $id}) RETURN q`,
-        { q: vertexProps<{ name: string }>() },
-        { id: input.from },
-      );
-      if (original.length === 0) throw new Error(`${input.from} not found`);
-
-      const standing = await this.standingFindings();
-
-      const decision = unitOfWork.node("Decision", {
-        decided_at: this.clock.now(),
-        reason: input.because,
-        invalidation_check: "evidence that the sharper question was the wrong one to ask",
-      });
-      unitOfWork.edge(decision, "SHARPENS", input.from);
-      for (const finding of standing) unitOfWork.edge(decision, "BASED_ON", finding);
-
-      const sharper = await this.posed(input.into, unitOfWork);
-      unitOfWork.edge(decision, "MOTIVATES", sharper);
-
-      return {
-        subject: sharper,
-        result: { question: sharper, decision: stagedRef("decision", decision) },
-      };
-    });
-  }
-
-  /** Every finding currently on the record — what "we knew at the time" means when an act is recorded. */
-  private async standingFindings(): Promise<EvidenceRef[]> {
-    const rows = await this.graph.query(
-      `MATCH (:EvidenceUnit)-[:PRODUCES]->(e:Evidence) RETURN e`,
-      { e: vertexProps<{ natural_id: string }>() },
-    );
-    return rows.map((r) => ref("evidence", r.e.natural_id));
   }
 }

@@ -99,27 +99,6 @@ export class Shared extends SessionCore {
   }
 
   /**
-   * Why a claim no longer stands, or `undefined` if it does.
-   */
-  protected async supersessionOf(claim: ClaimRef): Promise<Ref<"decision"> | undefined> {
-    const rows = await this.graph.query(
-      `MATCH (c:Claim {natural_id: $id})
-       OPTIONAL MATCH (narrowed:Decision)-[:SUPERSEDES]->(c)
-       OPTIONAL MATCH (replaced:Decision)-[:SUPERSEDES]->(c)
-       RETURN narrowed, replaced`,
-      {
-        narrowed: optional(vertexProps<{ natural_id: string }>()),
-        replaced: optional(vertexProps<{ natural_id: string }>()),
-      },
-      { id: claim },
-    );
-    const found = rows
-      .map((r) => r.narrowed?.natural_id ?? r.replaced?.natural_id)
-      .find((r) => r !== undefined);
-    return found === undefined ? undefined : ref("decision", found);
-  }
-
-  /**
    * The finding this conclusion stands in place of, when the act determines it.
    */
   private async impliedSupersession(
@@ -129,7 +108,7 @@ export class Shared extends SessionCore {
     const revision = await this.revisedBy(analysis);
     if (revision === undefined) return undefined;
     // **Scoped to what this revision superseded, not to everything the old
-    // analysis concluded.** `keep` carries conclusions forward, and a kept
+    // analysis concluded.** A recorded `keep` carries conclusions forward, and a kept
     // finding still stands; pairing to one would say a live finding was
     // replaced.
     const fell = await this.graph.query(
@@ -226,18 +205,6 @@ export class Shared extends SessionCore {
     const found = rows[0];
     if (!found) throw new Error(`${analysis} has no output record`);
     return ref("observations", found.a.natural_id);
-  }
-
-  /** The enquiry an analysis was recorded under, for the withdrawal guard's scope. */
-  protected async enquiryOf(analysis: AnalysisRef): Promise<EnquiryRef | undefined> {
-    const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:ADDRESSES]->(l:LineOfEnquiry)
-       RETURN l`,
-      { l: vertexProps<{ natural_id: string }>() },
-      { id: analysis },
-    );
-    const found = rows[0];
-    return found ? ref("enquiry", found.l.natural_id) : undefined;
   }
 
   /** The criteria whose `QUALIFIES` edges hold an analysis's unit to them. */
@@ -399,19 +366,5 @@ export class Shared extends SessionCore {
         };
       }
     }
-  }
-
-  /** `{claim, finding, proposition}` per conclusion — the event's own record of the pairing, independent of the typed report. */
-  protected conclusionEvents(claims: ConcludedWithStanding[]): Record<string, unknown>[] {
-    return claims.map((c) => ({
-      claim: c.claim,
-      finding: c.finding,
-      proposition: c.asserts,
-      // **Per conclusion, because the array is the record of what was
-      // concluded.** Without it the log cannot say whether a claim now reading
-      // `confirmatory` was recorded that way or promoted afterwards, and a
-      // reader has to infer it from whether a `promote` happens to follow.
-      standing: c.standing,
-    }));
   }
 }

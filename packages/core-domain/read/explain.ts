@@ -570,10 +570,9 @@ async function explainEnquiry(self: ReadSurface, subject: string): Promise<Enqui
 }
 
 /**
- * One governing condition's cause, worded by its own state — the same `CheckStatus.state` four-
- * way split `renderGate` colours, turned into prose instead: `blocked` and `incomplete` both
- * cite whichever of these are not `passed`, so the wording (not just `when`) is what tells a
- * failed check apart from one nobody has run.
+ * One governing condition's cause, worded by its own state — the `CheckStatus.state` four-way
+ * split, as prose: `blocked` and `incomplete` both cite whichever of these are not `passed`, so
+ * the wording (not just `when`) is what tells a failed check apart from one nobody has run.
  */
 function causeForCheck(c: CheckStatus): Cause {
   switch (c.state) {
@@ -585,8 +584,7 @@ function causeForCheck(c: CheckStatus): Cause {
       return { handle: c.criterion, wording: `${c.proposition} — has never been run` };
     case "no-standing-verdict":
       // Evaluated, and every evaluation has since been withdrawn -- not the
-      // same fact as never-run, and `renderGate` keeps the two apart under this
-      // exact name.
+      // same fact as never-run.
       return { handle: c.criterion, wording: `${c.proposition} — no standing verdict` };
     default: {
       const check: never = c.state;

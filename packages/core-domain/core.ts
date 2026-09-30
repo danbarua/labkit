@@ -20,15 +20,12 @@ import type {
   ClaimRef,
   ClaimStanding,
   DecisionRef,
-  AnalysisRef,
   EnquiryRef,
   EvidenceRef,
   GateRef,
-  QuestionRef,
   WorkRef,
   ConfirmatoryResult,
   ReplacementClaim,
-  DecidedQuestion,
   GatedWork,
   Ref,
 } from "./report";
@@ -144,37 +141,6 @@ export class SessionCore {
 
     const found = await this.findingOn(claim);
     return found ? { kind: "direct", ...found } : undefined;
-  }
-
-  /** What a claim asserts. */
-  protected async assertedBy(claim: ClaimRef): Promise<Prose | undefined> {
-    const rows = await this.graph.query(
-      `MATCH (c:Claim {natural_id: $id}) RETURN c`,
-      { c: vertexProps<{ name: string }>() },
-      { id: claim },
-    );
-    return rows[0]?.c.name;
-  }
-
-  /** The single finding by which an analysis concluded something about one proposition. */
-  protected async findingFor(
-    analysis: AnalysisRef,
-    proposition: IndexedString,
-  ): Promise<EvidenceRef | undefined> {
-    const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $analysis})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-       OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim {name: $proposition})
-       OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim {name: $proposition})
-       RETURN e, sc, cc`,
-      {
-        e: vertexProps<{ natural_id: string }>(),
-        sc: optional(vertexProps<{ name: string }>()),
-        cc: optional(vertexProps<{ name: string }>()),
-      },
-      { analysis: analysis, proposition },
-    );
-    const found = rows.find((r) => r.sc !== null || r.cc !== null);
-    return found ? ref("evidence", found.e.natural_id) : undefined;
   }
 
   /**
@@ -376,8 +342,8 @@ export class SessionCore {
       const acted = ref("decision", row.replaced.natural_id);
       if (!entry.by.includes(acted)) entry.by.push(acted);
       // By handle: two successors phrased alike are two records, and this list is what a
-      // refusal names. **It can be empty on a withdrawn claim.** `replaceAnalysis` supersedes a
-      // claim and mints the replacement's conclusions without pairing them, so the decision
+      // refusal names. **It can be empty on a withdrawn claim.** A recorded `replaceAnalysis`
+      // supersedes a claim without pairing it to the replacement's conclusions, so the decision
       // `MOTIVATES` the new *analysis* and no new claim.
       const next = row.successor;
       if (!next) continue;
@@ -446,34 +412,6 @@ export class SessionCore {
   }
 
   /** Questions closed on the strength of a proposition — what a reinterpretation puts at risk. */
-
-  protected async decidedOnTheStrengthOf(scope: {
-    proposition: IndexedString;
-    enquiry?: EnquiryRef;
-  }): Promise<DecidedQuestion[]> {
-    // Keyed by id. Two identically-worded questions are two questions, and
-    // neither is resolvable by comparing text.
-    const asked = new Map<QuestionRef, DecidedQuestion>();
-    // Both bearings: a question can be settled "no" on a finding that
-    // challenges the proposition, and that closure rests on this reading just
-    // as much as a supporting one does.
-    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const rows = await this.graph.query(
-        `MATCH (d:Decision)-[:BASED_ON]->(e:Evidence)-[:${bearing}]->(:Claim {name: $name})
-         MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
-         ${this.withinScope(scope)}
-         MATCH (d)-[:CLOSES]->(loe:LineOfEnquiry)<-[:MOTIVATES]-(q:Question)
-         RETURN q`,
-        { q: vertexProps<{ name: string; natural_id: string }>() },
-        { name: scope.proposition, ...this.scopeParams(scope) },
-      );
-      for (const row of rows) {
-        const question = ref("question", row.q.natural_id);
-        asked.set(question, { question, asks: row.q.name });
-      }
-    }
-    return [...asked.values()].sort((a, b) => byHandle(a.question, b.question));
-  }
 
   protected async scopeOf(
     claim: ClaimRef,
