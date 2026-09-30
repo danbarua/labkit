@@ -3,7 +3,14 @@
 import { describe, expect, test } from "bun:test";
 import type { CreateElicitationRequest, ElicitationSchema } from "@agentclientprotocol/sdk";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ElicitationForm, problemsWith } from "../elicitation";
+import {
+  checkPattern,
+  ElicitationForm,
+  hostParts,
+  patternProblems,
+  problemsWith,
+  rfc3339,
+} from "../elicitation";
 
 const SCHEMA: ElicitationSchema = {
   type: "object",
@@ -50,13 +57,23 @@ describe("checking answers against the schema", () => {
     });
   });
 
-  test("lengths, patterns and formats", () => {
+  test("lengths and formats", () => {
     expect(problemsWith(SCHEMA, { name: "ab", seeds: 1 }).name).toBe("At least 3 characters");
-    expect(problemsWith(SCHEMA, { name: "Sweep 1", seeds: 1 }).name).toBe(
-      "Not in the expected form",
-    );
     expect(problemsWith(SCHEMA, { name: "abc", seeds: 1, contact: "nope" }).contact).toBe(
       "Should be an email address",
+    );
+  });
+
+  test("a date-time is RFC 3339: seconds and an offset", () => {
+    const at: ElicitationSchema = {
+      type: "object",
+      properties: { at: { type: "string", format: "date-time" } },
+    };
+    expect(problemsWith(at, { at: "2026-09-30T10:00" }).at).toBe("Should be a date and time");
+    expect(problemsWith(at, { at: "2026-09-30T10:00:00+01:00" })).toEqual({});
+    expect(problemsWith(at, { at: "2026-09-30T09:00:00Z" })).toEqual({});
+    expect(rfc3339(new Date(2026, 8, 30, 10, 0, 5))).toMatch(
+      /^2026-09-30T10:00:05[+-]\d{2}:\d{2}$/,
     );
   });
 
@@ -66,6 +83,30 @@ describe("checking answers against the schema", () => {
     expect(problemsWith(SCHEMA, { name: "abc", seeds: 1, datasets: ["a", "b", "c"] })).toEqual({
       datasets: "Choose at most 2",
     });
+  });
+});
+
+describe("the agent's pattern", () => {
+  test("an answer that does not match is a problem", async () => {
+    expect(await patternProblems(SCHEMA, { name: "Sweep 1" })).toEqual({
+      name: "Not in the expected form",
+    });
+    expect(await patternProblems(SCHEMA, { name: "sweep" })).toEqual({});
+  });
+
+  test("a pattern that backtracks without end is stopped, and the page goes on", async () => {
+    const started = performance.now();
+    expect(await checkPattern("^(a+)+$", `${"a".repeat(40)}!`, 100)).toBe("timeout");
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
+  test("a pattern that does not compile is not held against the answer", async () => {
+    expect(await checkPattern("(", "x")).toBe("invalid");
+    const broken: ElicitationSchema = {
+      type: "object",
+      properties: { x: { type: "string", pattern: "(" } },
+    };
+    expect(await patternProblems(broken, { x: "anything" })).toEqual({});
   });
 });
 
@@ -98,23 +139,75 @@ describe("the form", () => {
   });
 });
 
+const urlRequest = (url: string): CreateElicitationRequest => ({
+  sessionId: "s",
+  mode: "url",
+  elicitationId: "e",
+  message: "Sign in",
+  url,
+});
+
 describe("a page to open", () => {
-  test("names the site it opens before you open it", () => {
+  test("shows the full address, with its host marked, before anything opens", () => {
     const html = renderToStaticMarkup(
       <ElicitationForm
-        request={{
-          sessionId: "s",
-          mode: "url",
-          elicitationId: "e",
-          message: "Sign in",
-          url: "https://wandb.ai/authorize?x=1",
-        }}
+        request={urlRequest("https://wandb.ai/authorize?x=1")}
         onRespond={() => {}}
       />,
     );
-    expect(html).toContain("Opens wandb.ai in your browser.");
-    expect(html).toContain('href="https://wandb.ai/authorize?x=1" target="_blank"');
-    expect(html).toContain("I&#x27;m done");
+    expect(html).toContain("https://<strong>wandb.ai</strong>/authorize?x=1");
+    expect(html).toContain(">Open</button>");
+    expect(html).not.toContain("I&#x27;m done");
+  });
+
+  test("the host marked is the real one, not a lookalike before an @", () => {
+    expect(hostParts(new URL("https://good.example@evil.example/x"))).toEqual([
+      "https://good.example@",
+      "/x",
+    ]);
+  });
+
+  test("only web addresses can be opened", () => {
+    const html = renderToStaticMarkup(
+      <ElicitationForm request={urlRequest("javascript:alert(1)")} onRespond={() => {}} />,
+    );
+    expect(html).toContain("not a web address this can open");
+    expect(html).toMatch(/<button type="button" class="lk-btn primary" disabled="">Open/);
+  });
+
+  test("once the agent says it has finished, that is all it shows", () => {
+    const html = renderToStaticMarkup(
+      <ElicitationForm request={urlRequest("https://wandb.ai/")} completed onRespond={() => {}} />,
+    );
+    expect(html).toContain("Finished.");
+    expect(html).not.toContain("<button");
+  });
+});
+
+describe("multi-select items", () => {
+  test("items of a type this does not know are not offered as strings", () => {
+    const odd: ElicitationSchema = {
+      type: "object",
+      properties: {
+        picks: { type: "array", items: { type: "_colour", enum: ["red", "blue"] } },
+      },
+    };
+    const html = renderToStaticMarkup(<ElicitationForm request={form(odd)} onRespond={() => {}} />);
+    expect(html).not.toContain('type="checkbox"');
+    expect(html).toContain("cannot be answered here");
+  });
+
+  test("titled items are offered by title", () => {
+    const titled: ElicitationSchema = {
+      type: "object",
+      properties: {
+        picks: { type: "array", items: { anyOf: [{ const: "r", title: "Red" }] } },
+      },
+    };
+    const html = renderToStaticMarkup(
+      <ElicitationForm request={form(titled)} onRespond={() => {}} />,
+    );
+    expect(html).toContain('type="checkbox"/>Red');
   });
 });
 

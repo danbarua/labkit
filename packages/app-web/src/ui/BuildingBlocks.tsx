@@ -371,7 +371,7 @@ const RUN_QUESTION: CreateElicitationRequest = {
         pattern: "^[a-z0-9-]+$",
       },
       contact: { type: "string", title: "Email me the result", format: "email" },
-      deadline: { type: "string", title: "Finish by", format: "date" },
+      deadline: { type: "string", title: "Finish by", format: "date-time" },
       optimiser: {
         type: "string",
         title: "Optimiser",
@@ -406,10 +406,16 @@ const SIGN_IN: CreateElicitationRequest = {
 /** Two questions from the agent, and what answering each would send back. */
 function ElicitationDemo() {
   const [sent, setSent] = useState<CreateElicitationResponse | undefined>(undefined);
+  const [signedIn, setSignedIn] = useState(false);
   return (
     <div style={{ ...pad, overflow: "auto" }}>
       <ElicitationForm request={RUN_QUESTION} onRespond={setSent} />
-      <ElicitationForm request={SIGN_IN} onRespond={setSent} />
+      <ElicitationForm request={SIGN_IN} onRespond={setSent} completed={signedIn} />
+      <div style={row}>
+        <button type="button" className="lk-btn" onClick={() => setSignedIn(true)}>
+          Pretend the agent reports the sign-in finished
+        </button>
+      </div>
       <p style={note}>
         {sent === undefined ? "Nothing sent yet." : `Would send: ${JSON.stringify(sent)}`}
       </p>
