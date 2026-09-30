@@ -538,7 +538,10 @@
 .lk-raw > summary {
   cursor: pointer;
   color: var(--lk-muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   user-select: none;
 }
 .lk-raw > :not(summary) {
@@ -671,6 +674,83 @@
 }
 .lk-diff-line.remove {
   background: var(--lk-danger-soft);
+}
+
+/* a whole file as code */
+.lk-code {
+  margin: 0;
+}
+.lk-code-frame {
+  margin-top: 4px;
+  padding: 6px 0;
+  border: 1px solid var(--lk-line);
+  border-radius: 6px;
+  background: var(--lk-bg);
+  overflow-x: auto;
+}
+/* Cut by height when it is not open, so no padding of its own: a cut line would show in it. */
+.lk-code-text {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+.lk-code-text code {
+  padding: 0 12px;
+  font: inherit;
+}
+.lk-code-gutter {
+  min-width: 4ch;
+  padding: 0 8px;
+  border-right: 1px solid var(--lk-line);
+  color: var(--lk-muted);
+  text-align: right;
+  user-select: none;
+}
+.lk-code-more {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lk-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lk-code-more:hover {
+  color: var(--lk-text);
+}
+.hljs-keyword,
+.hljs-literal,
+.hljs-built_in,
+.hljs-type,
+.hljs-selector-tag {
+  color: var(--lk-accent-text);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-attr,
+.hljs-symbol {
+  color: var(--lk-warn);
+}
+.hljs-number {
+  color: var(--lk-danger);
+}
+.hljs-comment,
+.hljs-meta,
+.hljs-quote {
+  color: var(--lk-muted);
+  font-style: italic;
+}
+.hljs-title,
+.hljs-section {
+  font-weight: 600;
 }
 
 /* plan, notice, compaction */

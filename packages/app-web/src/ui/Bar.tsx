@@ -21,7 +21,8 @@ export function Bar({ workspace, children }: { workspace?: string; children?: Re
           <Link to="/gallery" className="crumb">
             gallery
           </Link>
-          <Link to="/agent" className="crumb">
+          {/* A full page load: the agent page keeps the session it has open, and this starts one. */}
+          <Link to="/agent/{-$sessionId}" reloadDocument className="crumb">
             agent
           </Link>
         </>
