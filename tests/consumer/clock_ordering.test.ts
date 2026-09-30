@@ -67,7 +67,7 @@ describe("Probe 5 — what a wound clock reaches, and what it does not", () => {
       winding.wind(days(30));
       await s.writes.closeEnquiry({
         enquiry,
-        answeredBy: claimOf(analysisClaims, CONVERGES),
+        answeredBy: [claimOf(analysisClaims, CONVERGES)],
       });
 
       const reader = new ResearchSession(await scenario.current(), {
@@ -156,7 +156,7 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
       c.wind(days(40));
       await s.writes.closeEnquiry({
         enquiry,
-        answeredBy: claimOf(analysisClaims, FIRST.prop),
+        answeredBy: [claimOf(analysisClaims, FIRST.prop)],
       });
 
       const reader = new ResearchSession(await scenario.current(), {
@@ -223,12 +223,12 @@ describe("Probe 6 — rung 1: ordering derived from evidence times alone", () =>
         const [early, late] = closeFirstThenSecond ? [a, b] : [b, a];
         await s.writes.closeEnquiry({
           enquiry: early.enquiry,
-          answeredBy: await claimNamed(s.reads, early.prop),
+          answeredBy: [await claimNamed(s.reads, early.prop)],
         });
         c.wind(days(60));
         await s.writes.closeEnquiry({
           enquiry: late.enquiry,
-          answeredBy: await claimNamed(s.reads, late.prop),
+          answeredBy: [await claimNamed(s.reads, late.prop)],
         });
 
         const reader = new ResearchSession(await scenario.current(), {

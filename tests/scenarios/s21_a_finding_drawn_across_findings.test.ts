@@ -118,7 +118,7 @@ describe("S-21: a finding drawn across findings", () => {
       restingOn: claims,
     });
 
-    await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
+    await session.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
 
     // Afterward: the question is answered, and answered on the headline —
     // not on whichever of the four was cited to stand in for it.
@@ -156,7 +156,7 @@ describe("S-21: a finding drawn across findings", () => {
       restingOn: CONTROLS.map(([, proposition]) => claimOf(claims, proposition)),
     });
 
-    await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
+    await session.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
 
     const status = await (await afterwards()).reads.enquiryStatus({ enquiry });
     expect(status.closure).toBe("answered");

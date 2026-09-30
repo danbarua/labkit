@@ -308,7 +308,7 @@ export class ReadSurface extends SessionCore {
       touched.has(pursuit.question) ||
       touched.has(pursuit.enquiry) ||
       touched.has(pursuit.decision) ||
-      (pursuit.answered !== undefined && touched.has(pursuit.answered.claim));
+      pursuit.answered.some((answer) => touched.has(answer.claim));
 
     return {
       blocked: {

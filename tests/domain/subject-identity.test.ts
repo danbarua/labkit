@@ -98,7 +98,7 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       });
       await s.writes.closeEnquiry({
         enquiry: anasSweep,
-        answeredBy: claimOf(analysisClaims, MOVES),
+        answeredBy: [claimOf(analysisClaims, MOVES)],
       });
 
       const later = new ResearchSession(await scenario.current(), { clock });
@@ -159,7 +159,7 @@ describe("1. an enquiry's status was the question's status — FIXED,", () => {
       });
       await s.writes.closeEnquiry({
         enquiry: worked,
-        answeredBy: claimOf(analysisClaims, WIDTH),
+        answeredBy: [claimOf(analysisClaims, WIDTH)],
       });
 
       const later = new ResearchSession(await scenario.current(), { clock });
@@ -237,7 +237,7 @@ describe("4. the read models drop identifiers the graph already minted", () => {
     });
     await s.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(analysisClaims, MOVES),
+      answeredBy: [claimOf(analysisClaims, MOVES)],
     });
     return {
       read: new ReadSurface(await scenario.current()),

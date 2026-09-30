@@ -232,7 +232,7 @@ describe("every tool answers when an agent actually calls it", () => {
         finding: "rate down 40%",
       });
       // A wire handle is a string; the domain verb wants the branded ref.
-      await seed.closeEnquiry({ enquiry, answeredBy: claimIn(concluded, COATING) as ClaimRef });
+      await seed.closeEnquiry({ enquiry, answeredBy: [claimIn(concluded, COATING) as ClaimRef] });
 
       // `why`'s `LineOfEnquiry` case reports where this enquiry's own
       // question sits in the overall survey, one bucket rather than the

@@ -177,7 +177,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     });
     await session.writes.closeEnquiry({
       enquiry: work,
-      answeredBy: claimOf(settledClaims, IMMATERIAL),
+      answeredBy: [claimOf(settledClaims, IMMATERIAL)],
     });
 
     await narrowEarlierReading(programme);

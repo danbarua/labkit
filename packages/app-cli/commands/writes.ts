@@ -428,8 +428,8 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Stopping")
     .summary("close a line of enquiry, answered or abandoned")
     .argument("<enquiry-id>", "the line of enquiry")
-    .option("--answered-by <claim-id>", "the claim that answers it")
-    .action(async (enquiry, { answeredBy }: { answeredBy?: string }) =>
+    .option("--answered-by <claim-id>", "a claim that answers it (repeatable)", collect(String))
+    .action(async (enquiry, { answeredBy }: { answeredBy?: string[] }) =>
       parsed(
         closeEnquiryCommand,
         {

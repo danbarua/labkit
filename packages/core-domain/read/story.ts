@@ -85,7 +85,14 @@ export class StoryGroup extends SessionCore {
 
     const behind = rows[0]?.q ?? null;
     const resolving = rows.find((r) => r.resolving)?.resolving ?? null;
-    const answered = rows.find((r) => r.answered)?.answered ?? null;
+    const answered = dedupeById(
+      rows.flatMap((r) =>
+        r.answered
+          ? [{ claim: ref("claim", r.answered.natural_id), asserts: r.answered.name }]
+          : [],
+      ),
+      (a) => a.claim,
+    );
     const accepting = rows.find((r) => r.deferring)?.deferring ?? null;
     const acceptedBasis = accepting
       ? await this.graph.query(
@@ -121,12 +128,13 @@ export class StoryGroup extends SessionCore {
         open: true,
         closure: null,
         bearing: null,
+        answered: [],
         evidence: [],
         question,
       };
 
     // Abandoned is a closing decision that names no answer.
-    if (!answered)
+    if (answered.length === 0)
       return {
         enquiry,
         pursuing: loe.loe.name,
@@ -134,6 +142,7 @@ export class StoryGroup extends SessionCore {
         open: false,
         closure: "abandoned",
         bearing: null,
+        answered: [],
         evidence: [],
         question,
       };
@@ -160,7 +169,7 @@ export class StoryGroup extends SessionCore {
       open: false,
       closure: "answered",
       bearing: cited.some((r) => r.against !== null) ? "challenges" : "supports",
-      answered: { claim: ref("claim", answered.natural_id), asserts: answered.name },
+      answered,
       evidence: dedupeById(
         cited.map((r) => ({
           evidence: ref("evidence", r.e.natural_id),
@@ -168,23 +177,22 @@ export class StoryGroup extends SessionCore {
         })),
         (f) => f.evidence,
       ),
-      restsOn: await this.restsOnFor(ref("claim", answered.natural_id)),
+      restsOn: await this.restsOnFor(answered.map((a) => a.claim)),
       question,
     };
   }
 
   /**
-   * Confirmatory only when the answering claim is confirmatory *and* its checks passed —
-   * the same pair `whatIsKnown` uses for established.
+   * Confirmatory only when every answering claim is confirmatory *and* its checks passed —
+   * the rule `whatIsKnown` uses for established.
    */
-  private async restsOnFor(claim: ClaimRef): Promise<"exploratory" | "confirmatory"> {
-    const [row] = await this.graph.query(
-      `MATCH (c:Claim {natural_id: $id}) RETURN c`,
-      { c: vertexProps<{ kind?: string }>() },
-      { id: claim },
-    );
-    if (!(await this.confirmatoryOf([claim])).has(claim)) return "exploratory";
-    return (await this.checksMet(claim)) ? "confirmatory" : "exploratory";
+  private async restsOnFor(claims: ClaimRef[]): Promise<"exploratory" | "confirmatory"> {
+    const confirmatory = await this.confirmatoryOf(claims);
+    for (const claim of claims) {
+      if (!confirmatory.has(claim)) return "exploratory";
+      if (!(await this.checksMet(claim))) return "exploratory";
+    }
+    return "confirmatory";
   }
 
   /**

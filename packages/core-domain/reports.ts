@@ -229,9 +229,10 @@ const closedPursuit = z.strictObject({
   question: ref("question"),
   decision: ref("decision"),
   closure: z.enum(["answered", "abandoned"]),
-  answered: z
-    .strictObject({ claim: ref("claim"), bearing: z.enum(["supports", "challenges"]) })
-    .optional(),
+  /** Every claim the closing decision named as an answer. Empty when it was abandoned. */
+  answered: z.array(
+    z.strictObject({ claim: ref("claim"), bearing: z.enum(["supports", "challenges"]) }),
+  ),
 });
 
 const identifiedArtefact = z.strictObject({
@@ -373,7 +374,9 @@ export const enquiryStatus = z.strictObject({
   closure: z.enum(["answered", "abandoned"]).nullable(),
   /** The bearing of the findings the closure cited. Null when it is not answered. */
   bearing: z.enum(["supports", "challenges"]).nullable(),
-  answered: concludedClaim.optional(),
+  /** Every claim the closing decision named as an answer. Empty unless it was answered. */
+  answered: z.array(concludedClaim),
+  /** Confirmatory only when every answering claim is. */
   restsOn: z.enum(["exploratory", "confirmatory"]).optional(),
   evidence: z.array(citedFinding),
   question: enquiryQuestion.nullable(),
@@ -648,7 +651,8 @@ export const closedEnquiry = z.strictObject({
   enquiry: ref("enquiry"),
   question: ref("question"),
   closure: z.enum(["answered", "abandoned"]),
-  answered: concludedClaim.optional(),
+  /** Every claim named as an answer. Empty when the enquiry was abandoned. */
+  answered: z.array(concludedClaim),
   events: z.array(domainEvent),
 });
 /** What stop_work returns. */

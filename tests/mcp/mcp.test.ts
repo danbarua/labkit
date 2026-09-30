@@ -388,7 +388,7 @@ describe("behaviour — the same answers, over the wire", () => {
     });
     await s.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(analysisClaims, PROP),
+      answeredBy: [claimOf(analysisClaims, PROP)],
     });
     await s.writes.planWork({
       objective: "publish the convergence result",

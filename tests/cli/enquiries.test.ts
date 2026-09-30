@@ -78,3 +78,23 @@ test("`analyse` without --from records an analysis that read nothing", () => {
   const printed = labkit("analyse", enquiry, "--method", "worked it out on paper");
   expect(handle(printed, "COMP_")).toMatch(/^COMP_\d+$/);
 });
+
+test("`close enquiry --answered-by` keeps every claim it is given", () => {
+  const enquiry = handle(labkit("open", "what does the coating do?"), "LOE_");
+  const readings = handle(labkit("observe", enquiry, "--name", "r", "--finding", "f"), "ART_");
+  const analysis = handle(labkit("analyse", enquiry, "--method", "m", "--from", readings), "COMP_");
+  const first = handle(
+    labkit("conclude", analysis, "--finding", "fewer pits", "--proposition", "it slows pitting"),
+    "CLM_",
+  );
+  const second = handle(
+    labkit("conclude", analysis, "--finding", "less creep", "--proposition", "it slows creep"),
+    "CLM_",
+  );
+  labkit("close", "enquiry", enquiry, "--answered-by", first, "--answered-by", second);
+
+  const why = JSON.parse(labkit("--json", "why", enquiry)) as {
+    report: { enquiry: { answered: { claim: string }[] } };
+  };
+  expect(why.report.enquiry.answered.map((a) => a.claim).sort()).toEqual([first, second].sort());
+});

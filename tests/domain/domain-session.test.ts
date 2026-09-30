@@ -252,7 +252,7 @@ test("a close interrupted before BASED_ON writes nothing before retry", async ()
       },
     ],
   });
-  const answeredBy = claimOf(analysisClaims, "the coating survives load");
+  const answeredBy = [claimOf(analysisClaims, "the coating survives load")];
 
   const realCreateEdge = graph.createEdge.bind(graph);
   graph.createEdge = (async (from: string, edge: string, to: string) => {
@@ -349,7 +349,7 @@ test("an enquiry cannot be closed twice, and the refusal names the existing clos
   await expect(
     s.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(analysisClaims, "pruning moves convergence"),
+      answeredBy: [claimOf(analysisClaims, "pruning moves convergence")],
     }),
   ).rejects.toThrow(/already closed by DEC_\d+/);
 
@@ -396,7 +396,7 @@ test("a question accepted as unresolved can still be closed when evidence arrive
   // Evidence arrives. This must be allowed -- ACCEPTS is not CLOSES.
   await s.writes.closeEnquiry({
     enquiry,
-    answeredBy: claimOf(analysisClaims, "depth moves convergence"),
+    answeredBy: [claimOf(analysisClaims, "depth moves convergence")],
   });
   const closed = await s.reads.enquiryStatus({ enquiry });
   expect(closed.closure).toBe("answered");
@@ -610,7 +610,7 @@ test("knowledge survey refuses an evaluation with a malformed outcome", async ()
   });
   const claim = claims[0]!.claim;
   await session.writes.isConfirmed({ claim, because: "the answer is being relied on" });
-  await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
 
   const evaluation = await graph.reserveId("CriterionEvaluation");
   await graph.query(
@@ -655,7 +655,7 @@ test("knowledge standing preserves valid pass and fail outcomes", async () => {
     citing: [claim],
   });
   await session.writes.isConfirmed({ claim, because: "the checked answer is being relied on" });
-  await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
 
   expect((await session.reads.criterionStanding({ criterion })).state).toBe("passed");
   let known = await session.reads.whatIsKnown();

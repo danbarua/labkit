@@ -220,7 +220,7 @@ describe("S-14: deliberately leaving something unresolved", () => {
     });
     await session.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(settledClaims, PROPOSITION),
+      answeredBy: [claimOf(settledClaims, PROPOSITION)],
     });
 
     const status = await (await afterwards()).reads.enquiryStatus({ enquiry });
