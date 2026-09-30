@@ -8,6 +8,59 @@ const buttonClass = (kind: PermissionOption["kind"]): string => {
   return "lk-btn";
 };
 
+/** The option of `kind` a request offers, if it offers one. */
+const optionOfKind = (entry: PermissionEntry, kind: PermissionOption["kind"]) =>
+  entry.request.options.find((option) => option.kind === kind);
+
+/**
+ * Several requests waiting at once, answered together: allow each once, or deny each. A choice is
+ * offered only when every request has an option of that kind, and it answers each request with
+ * that request's own option.
+ */
+export function PermissionBatch({
+  entries,
+  onAnswer,
+}: {
+  entries: readonly PermissionEntry[];
+  onAnswer?: ((requestId: string, outcome: RequestPermissionOutcome) => void) | undefined;
+}) {
+  const answerAll = (kind: PermissionOption["kind"]) => {
+    for (const entry of entries) {
+      const option = optionOfKind(entry, kind);
+      if (option) onAnswer?.(entry.requestId, { outcome: "selected", optionId: option.optionId });
+    }
+  };
+  const offered = (kind: PermissionOption["kind"]) =>
+    entries.every((entry) => optionOfKind(entry, kind) !== undefined);
+  return (
+    <section className="lk-permission-batch" aria-label="Answer every request">
+      <span>{entries.length} requests are waiting</span>
+      <span className="lk-actions">
+        {offered("allow_once") ? (
+          <button
+            type="button"
+            className="lk-btn primary"
+            disabled={onAnswer === undefined}
+            onClick={() => answerAll("allow_once")}
+          >
+            Allow all once
+          </button>
+        ) : null}
+        {offered("reject_once") ? (
+          <button
+            type="button"
+            className="lk-btn danger"
+            disabled={onAnswer === undefined}
+            onClick={() => answerAll("reject_once")}
+          >
+            Deny all
+          </button>
+        ) : null}
+      </span>
+    </section>
+  );
+}
+
 /**
  * A request the agent's turn is waiting on. The person's choice is the only thing that lets the
  * turn go on, so every option the agent offered is a button and there is always a way to cancel.

@@ -19,5 +19,6 @@ export {
   sessionReplay,
   toolFails,
   toolImageResult,
+  toolPlot,
   toolSucceeds,
 } from "./scenarios";

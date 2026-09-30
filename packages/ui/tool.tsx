@@ -10,11 +10,15 @@ import {
   CheckCircleIcon,
   CircleDashedIcon,
   CircleNotchIcon,
+  MinusCircleIcon,
   type Icon,
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
 import { diffLines, STATUS_LABEL } from "./format";
+import { toolTally } from "./grouping";
+import { isVegaLite, VegaLitePlot } from "./plot";
+import { toolView } from "./tool-views";
 import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
@@ -47,6 +51,8 @@ export function ContentView({ block }: { block: ContentBlock }) {
       );
     case "resource": {
       const { resource } = block;
+      if ("text" in resource && isVegaLite(resource.mimeType))
+        return <VegaLitePlot spec={resource.text} />;
       return "text" in resource ? (
         <>
           <div className="lk-caption">{resource.uri}</div>
@@ -110,14 +116,28 @@ function ToolContentView({ item }: { item: ToolCallContent }) {
   }
 }
 
-/** What the person decided about a call, in the words of the option they chose. */
-function decisionOf(entry: PermissionEntry): { label: string; tone: string } {
+/** A receipt's words for each kind of option, whatever the agent named the option itself. */
+const RECEIPT: Record<string, string> = {
+  allow_once: "Allowed once",
+  allow_always: "Allowed always",
+  reject_once: "Denied",
+  reject_always: "Denied always",
+};
+
+/**
+ * What the person decided about a call, as a receipt: past tense from the kind of option they
+ * chose ("Allowed once", "Denied"), with the agent's own name for the option as the hover text.
+ * A request cancelled before anyone answered is its own case, never a denial.
+ */
+function decisionOf(entry: PermissionEntry): { label: string; tone: string; option?: string } {
   const { outcome } = entry;
   if (outcome === undefined) return { label: "Waiting for you", tone: "waiting" };
-  if (outcome.outcome === "cancelled") return { label: "Cancelled", tone: "" };
+  if (outcome.outcome === "cancelled")
+    return { label: "Cancelled before a decision", tone: "cancelled" };
   const option = entry.request.options.find((o) => o.optionId === outcome.optionId);
   const tone = option?.kind.startsWith("allow") ? "allow" : "reject";
-  return { label: option?.name ?? outcome.optionId, tone };
+  const label = (option && RECEIPT[option.kind]) ?? option?.name ?? outcome.optionId;
+  return { label, tone, ...(option ? { option: option.name } : {}) };
 }
 
 /**
@@ -140,6 +160,7 @@ const wasRefused = (call: ToolCall, decision: { tone: string } | undefined): boo
     (call.rawOutput as { refused?: unknown }).refused === true);
 
 const STATUS_ICON: Record<string, Icon> = {
+  cancelled: MinusCircleIcon,
   pending: CircleDashedIcon,
   in_progress: CircleNotchIcon,
   completed: CheckCircleIcon,
@@ -147,10 +168,21 @@ const STATUS_ICON: Record<string, Icon> = {
   refused: ProhibitIcon,
 };
 
-/** The call's status as a coloured icon, its word as the label a screen reader or a hover shows. */
-function StatusIcon({ status, refused }: { status: ToolCallStatus; refused: boolean }) {
-  const shown = refused ? "refused" : status;
-  const label = refused ? "Refused" : STATUS_LABEL[status];
+/**
+ * The call's status as a coloured icon, its word as the label a screen reader or a hover shows. A
+ * call whose permission request was cancelled did not fail and was not refused: it has its own.
+ */
+function StatusIcon({
+  status,
+  refused,
+  cancelled = false,
+}: {
+  status: ToolCallStatus;
+  refused: boolean;
+  cancelled?: boolean;
+}) {
+  const shown = cancelled ? "cancelled" : refused ? "refused" : status;
+  const label = cancelled ? "Cancelled" : refused ? "Refused" : STATUS_LABEL[status];
   const Glyph = STATUS_ICON[shown] ?? CircleDashedIcon;
   return (
     <span className={`lk-status ${shown}`} role="img" aria-label={label} title={label}>
@@ -170,7 +202,10 @@ function revealBody(row: HTMLElement): void {
 
 /** A result that is seen rather than read, so its card is not closed over it. */
 const isShownNotRead = (item: ToolCallContent): boolean =>
-  item.type === "diff" || (item.type === "content" && item.content.type === "image");
+  item.type === "diff" ||
+  (item.type === "content" &&
+    (item.content.type === "image" ||
+      (item.content.type === "resource" && isVegaLite(item.content.resource.mimeType))));
 
 /**
  * One tool call as a row that opens: what ran and on what, then its status. Opened, it shows the
@@ -186,6 +221,18 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
   const waiting = permission !== undefined && permission.outcome === undefined;
   const opensByDefault = waiting || content.some(isShownNotRead);
+  // The tool's own view of its result, when it has one; else the result is drawn by its shape.
+  const view = toolView(call);
+  // A result to look at (a chart, an image, a diff) comes before the input that made it, so a
+  // plot is not pushed out of view by its own data.
+  const seenFirst = content.some(isShownNotRead);
+  const inputSection =
+    call.rawInput === undefined ? null : (
+      <section className="lk-tool-section">
+        <h4>Input</h4>
+        {args === undefined ? <ValueView value={call.rawInput} /> : <ArgumentsLine args={args} />}
+      </section>
+    );
 
   return (
     <details
@@ -207,23 +254,35 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         {preview === undefined ? null : <span className="lk-tool-preview">{preview}</span>}
         <span className="lk-tool-end">
           {decision === undefined ? null : (
-            <span className={`lk-decision ${decision.tone}`}>{decision.label}</span>
+            <span
+              className={`lk-decision ${decision.tone}`}
+              {...(decision.option ? { title: decision.option } : {})}
+            >
+              {decision.label}
+            </span>
           )}
-          <StatusIcon status={status} refused={wasRefused(call, decision)} />
+          <StatusIcon
+            status={status}
+            refused={wasRefused(call, decision)}
+            cancelled={decision?.tone === "cancelled"}
+          />
         </span>
       </summary>
       <div className="lk-tool-body">
-        {call.rawInput === undefined ? null : (
+        {seenFirst ? null : inputSection}
+        {view !== undefined ? (
           <section className="lk-tool-section">
-            <h4>Input</h4>
-            {args === undefined ? (
-              <ValueView value={call.rawInput} />
-            ) : (
-              <ArgumentsLine args={args} />
-            )}
+            <h4>Result</h4>
+            {view}
+            {/* A diff the agent sent still draws: the view says what was done, the diff shows it. */}
+            {content
+              .filter((item) => item.type === "diff")
+              .map((item, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
+                <ToolContentView key={i} item={item} />
+              ))}
           </section>
-        )}
-        {content.length === 0 ? null : (
+        ) : content.length === 0 ? null : (
           <section className="lk-tool-section">
             <h4>Result</h4>
             {content.map((item, i) => (
@@ -232,12 +291,69 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
             ))}
           </section>
         )}
-        {showOutput ? (
+        {seenFirst ? inputSection : null}
+        {showOutput || (view !== undefined && call.rawOutput !== undefined) ? (
           <details className="lk-raw">
             <summary>Raw output</summary>
             <ValueView value={call.rawOutput} />
           </details>
         ) : null}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * A run of consecutive tool calls as one row: how many, which tools, and how they went. Opened, it
+ * is the calls' own rows. It shows the spinner while any call is still going.
+ */
+export function ToolGroup({
+  calls,
+}: {
+  calls: readonly { call: ToolCall; permission?: PermissionEntry | undefined }[];
+}) {
+  const outcomes = calls.map(({ call, permission }) => {
+    const status = call.status ?? "pending";
+    const decision = permission === undefined ? undefined : decisionOf(permission);
+    if (decision?.tone === "cancelled") return "cancelled";
+    return wasRefused(call, decision) ? "refused" : status;
+  });
+  const count = (what: string) => outcomes.filter((o) => o === what).length;
+  const running = count("in_progress") + count("pending");
+  const failed = count("failed");
+  const refused = count("refused");
+  const cancelled = count("cancelled");
+  // The icon says how the run went as a whole: done if any call completed. The tallies beside it
+  // name the calls that did not.
+  const overall: ToolCallStatus =
+    running > 0 ? "in_progress" : count("completed") === 0 ? "failed" : "completed";
+  return (
+    <details
+      className="lk-tool lk-tool-group"
+      data-status={overall}
+      onToggle={(event) => {
+        if (event.currentTarget.open) revealBody(event.currentTarget);
+      }}
+    >
+      <summary className="lk-tool-head">
+        <CaretRightIcon className="lk-tool-caret" aria-hidden="true" />
+        <span className="lk-tool-count">{calls.length} tool calls</span>
+        <span className="lk-tool-preview">
+          {toolTally(calls.map(({ call }) => call.name ?? call.title))}
+        </span>
+        <span className="lk-tool-end">
+          {failed > 0 ? <span className="lk-tool-tally failed">{failed} failed</span> : null}
+          {refused > 0 ? <span className="lk-tool-tally refused">{refused} refused</span> : null}
+          {cancelled > 0 ? (
+            <span className="lk-tool-tally cancelled">{cancelled} cancelled</span>
+          ) : null}
+          <StatusIcon status={overall} refused={false} />
+        </span>
+      </summary>
+      <div className="lk-tool-group-body">
+        {calls.map(({ call, permission }) => (
+          <ToolCard key={call.toolCallId} call={call} {...(permission ? { permission } : {})} />
+        ))}
       </div>
     </details>
   );

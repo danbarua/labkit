@@ -9,16 +9,28 @@ import {
 } from "@labkit/view-model";
 import { IconContext } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
-import { AssistantMessage, Compaction, Notice, PlanView, Thought, UserMessage } from "./blocks";
+import { currentActivity } from "./activity";
+import type { AttachLimits } from "./attachments";
+import {
+  AssistantMessage,
+  Compaction,
+  Notice,
+  PlanView,
+  type MessageAction,
+  Thought,
+  UserMessage,
+  WorkingIndicator,
+} from "./blocks";
 import { Composer } from "./composer";
 import { fillPercent, formatCost } from "./format";
 import type { PickItem } from "./overlay/list";
 import { ToastProvider } from "./overlay/toast";
-import { PermissionPrompt } from "./permission";
+import { PermissionBatch, PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
 import { ICONS } from "./surface";
-import { ToolCard } from "./tool";
+import { drawnBlocks } from "./grouping";
+import { ToolCard, ToolGroup } from "./tool";
 
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Idle",
@@ -29,7 +41,9 @@ const PHASE_LABEL: Record<Phase, string> = {
 export interface ConversationProps {
   readonly state: TranscriptState;
   /** Without this the conversation is read-only and has no composer. */
-  readonly onSend?: (text: string) => void;
+  readonly onSend?: (text: string, files: readonly File[]) => void;
+  /** The files the composer takes. Without this it takes none. */
+  readonly attach?: AttachLimits;
   readonly onCancel?: () => void;
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
   /** Leave unset to follow the system's light or dark setting. */
@@ -40,16 +54,30 @@ export interface ConversationProps {
   readonly records?: RecordsConfig;
   /** What the composer's `@` can name. Without it the composer has no `@`. */
   readonly mentions?: readonly PickItem[];
+  /**
+   * Edit, answer again or fork from a message. Without it a message offers only copying its text.
+   */
+  readonly onMessageAction?: (action: MessageAction, block: Block) => void;
 }
 
-function BlockView({ block, state }: { block: Block; state: TranscriptState }) {
+function BlockView({
+  block,
+  state,
+  last = false,
+  onMessageAction,
+}: {
+  block: Block;
+  state: TranscriptState;
+  last?: boolean;
+  onMessageAction?: ((action: MessageAction, block: Block) => void) | undefined;
+}) {
   switch (block.kind) {
     case "user":
-      return <UserMessage block={block} />;
+      return <UserMessage block={block} last={last} onAction={onMessageAction} />;
     case "assistant":
-      return <AssistantMessage block={block} />;
+      return <AssistantMessage block={block} last={last} onAction={onMessageAction} />;
     case "thought":
-      return <Thought block={block} />;
+      return <Thought block={block} streaming={last && state.running} />;
     case "tool": {
       const call = state.toolCalls[block.toolCallId];
       if (call === undefined) return null;
@@ -97,11 +125,14 @@ export function Conversation({
   records,
   onSetConfig,
   mentions,
+  onMessageAction,
+  attach,
 }: ConversationProps) {
   const current = phase(state);
   const pending = pendingPermissions(state);
   const { ref, onScroll } = useStickToBottom(state);
   const usage = state.usage;
+  const activity = currentActivity(state);
 
   return (
     <RecordsContext.Provider value={records}>
@@ -129,15 +160,36 @@ export function Conversation({
                 {state.blocks.length === 0 ? (
                   <div className="lk-empty">Nothing here yet.</div>
                 ) : null}
-                {state.blocks.map((block, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: blocks are appended, never reordered
-                  <BlockView key={i} block={block} state={state} />
-                ))}
+                {drawnBlocks(state).map((item) =>
+                  item.kind === "block" ? (
+                    <BlockView
+                      key={item.index}
+                      block={item.block}
+                      state={state}
+                      last={item.index === state.blocks.length - 1}
+                      onMessageAction={onMessageAction}
+                    />
+                  ) : (
+                    <ToolGroup
+                      key={item.index}
+                      calls={item.blocks.flatMap((block) => {
+                        const call = state.toolCalls[block.toolCallId];
+                        return call === undefined
+                          ? []
+                          : [{ call, permission: permissionFor(state, block.toolCallId) }];
+                      })}
+                    />
+                  ),
+                )}
+                {activity === undefined ? null : <WorkingIndicator activity={activity} />}
               </div>
             </div>
 
             {pending.length > 0 ? (
               <div className="lk-permissions">
+                {pending.length > 1 ? (
+                  <PermissionBatch entries={pending} onAnswer={onAnswer} />
+                ) : null}
                 {pending.map((entry) => (
                   <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
                 ))}
@@ -153,6 +205,7 @@ export function Conversation({
                 onCancel={onCancel}
                 onSetConfig={onSetConfig}
                 mentions={mentions}
+                attach={attach}
               />
             ) : state.configOptions && state.configOptions.length > 0 ? (
               <div className="lk-session-summary">

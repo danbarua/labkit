@@ -31,7 +31,7 @@ describe("the transcript", () => {
   test("a plain answer shows the prompt, a collapsed thought and the markdown answer", async () => {
     const html = await draw("plain-answer");
     expect(html).toContain("Does EV_4 support CLM_3?");
-    expect(html).toContain("<summary>Thinking</summary>");
+    expect(html).toContain("<summary>Thought</summary>");
     expect(html).toContain("<strong>Partly.</strong>");
     expect(html).toContain("<li>the AUC is above the control in 7 of 10 classes</li>");
     expect(html).toContain("Idle");
@@ -108,11 +108,19 @@ describe("permission", () => {
   test("once answered the prompt is gone and the card records the choice", async () => {
     const html = await draw("permission-granted", true);
     expect(html).not.toContain("Permission needed");
-    expect(html).toContain('lk-decision allow">Allow once</span>');
+    // A receipt in the past tense, from the kind of option; the agent's name for it on hover.
+    expect(html).toContain('lk-decision allow" title="Allow once">Allowed once</span>');
     expect(html).not.toMatch(/<details class="lk-tool"[^>]* open="">/);
     const refused = await draw("permission-refused", true);
-    expect(refused).toContain('lk-decision reject">Reject</span>');
+    expect(refused).toContain('lk-decision reject" title="Reject">Denied</span>');
     expect(refused).toContain('class="lk-status refused" role="img" aria-label="Refused"');
+  });
+
+  test("a request cancelled before an answer is recorded as that, not as a denial", async () => {
+    const html = await draw("permission-cancelled", true);
+    expect(html).toContain('lk-decision cancelled">Cancelled before a decision</span>');
+    expect(html).toContain('class="lk-status cancelled" role="img" aria-label="Cancelled"');
+    expect(html).not.toContain("Denied");
   });
 });
 
@@ -197,7 +205,7 @@ describe("records in prose", () => {
   test("without an open handler the chip is shown but is not a button", async () => {
     const html = await said("see CLM_3", { types: TYPES });
     expect(html).toContain('<span class="lk-handle" data-type="Claim" title="Claim">CLM_3</span>');
-    expect(html).not.toContain("<button");
+    expect(html).not.toMatch(/<button[^>]*lk-handle/);
   });
 
   test("with no records at all, handles stay plain text", async () => {

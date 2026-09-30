@@ -145,9 +145,33 @@
   padding: 48px 0;
 }
 
-.lk-user {
+/* a message and the row of buttons under it */
+.lk-message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lk-message.user {
   align-self: flex-end;
+  align-items: flex-end;
   max-width: 80%;
+}
+.lk-message-toolbar {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lk-message:hover .lk-message-toolbar,
+.lk-message:focus-within .lk-message-toolbar,
+.lk-message[data-last] .lk-message-toolbar {
+  opacity: 1;
+}
+.lk-message-toolbar .lk-icon-btn {
+  font-size: 14px;
+  color: var(--lk-muted);
+}
+.lk-user {
   padding: 8px 12px;
   border: 1px solid var(--lk-line);
   border-radius: var(--lk-radius);
@@ -224,6 +248,65 @@
   cursor: pointer;
   user-select: none;
 }
+.lk-thought[data-streaming] > .lk-md {
+  max-height: 12em;
+  overflow-y: auto;
+}
+
+/* what the agent is doing, under the transcript while a turn runs */
+.lk-working {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--lk-muted);
+  font-size: 13px;
+}
+.lk-working-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-working-label.lk-mono {
+  font-size: 12px;
+}
+.lk-working-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+/* A light that passes over the words, so a label that is still true still looks alive. */
+.lk-shimmer {
+  background:
+    linear-gradient(
+      90deg,
+      var(--lk-muted) 0%,
+      var(--lk-muted) 40%,
+      var(--lk-text) 50%,
+      var(--lk-muted) 60%,
+      var(--lk-muted) 100%
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lk-shimmer 2.4s linear infinite;
+}
+@keyframes lk-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lk-shimmer {
+    animation: none;
+    color: var(--lk-muted);
+    background: none;
+  }
+}
 .lk-thought .lk-md {
   margin-top: 6px;
   font-style: italic;
@@ -275,6 +358,103 @@
   font-size: 12px;
   color: var(--lk-muted);
 }
+/* a chart the agent described */
+.lk-plot {
+  width: 100%;
+  min-height: 120px;
+  color: var(--lk-text);
+}
+.lk-plot svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* tools' own views of their results */
+.lk-file,
+.lk-listing {
+  margin: 0;
+}
+.lk-file-text {
+  max-height: 24em;
+  overflow: auto;
+  margin: 4px 0 0;
+  padding: 8px 0;
+  border-radius: 6px;
+  background: var(--lk-bg);
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  counter-reset: none;
+}
+.lk-file-text code {
+  display: block;
+  padding: 0 12px 0 0;
+  white-space: pre;
+}
+.lk-file-text code::before {
+  content: attr(data-line);
+  display: inline-block;
+  width: 4ch;
+  margin-right: 12px;
+  padding-right: 8px;
+  text-align: right;
+  color: var(--lk-muted);
+  border-right: 1px solid var(--lk-line);
+  user-select: none;
+}
+.lk-listing ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2px 16px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+}
+.lk-listing li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-listing li.dir {
+  color: var(--lk-accent-text);
+}
+.lk-written {
+  margin: 0;
+  font-size: 13px;
+}
+.lk-plan-inline {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.lk-tool-count {
+  flex: none;
+  font-size: 13px;
+}
+.lk-tool-tally {
+  font-size: 12px;
+}
+.lk-tool-tally.failed,
+.lk-tool-tally.refused {
+  color: var(--lk-danger);
+}
+.lk-tool-tally.cancelled {
+  color: var(--lk-muted);
+}
+.lk-tool-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--lk-line);
+  background: var(--lk-bg);
+}
 .lk-tool-end {
   flex: none;
   margin-left: auto;
@@ -322,6 +502,10 @@
 }
 .lk-decision.waiting {
   color: var(--lk-warn);
+}
+.lk-decision.cancelled {
+  color: var(--lk-muted);
+  font-style: italic;
 }
 .lk-tool-body {
   display: flex;
@@ -574,6 +758,16 @@
   margin: 0 auto;
   padding: 0 16px 8px;
 }
+.lk-permission-batch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px dashed var(--lk-warn);
+  border-radius: var(--lk-radius);
+  font-size: 13px;
+}
 .lk-permission {
   padding: 12px;
   border: 1px solid var(--lk-warn);
@@ -616,6 +810,100 @@
   border-color: var(--lk-primary);
   color: var(--lk-primary-text);
   font-weight: 600;
+}
+/* a question from the agent, answered in a form drawn from its schema */
+.lk-elicitation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--lk-accent);
+  border-radius: var(--lk-radius);
+  background: var(--lk-surface);
+}
+.lk-elicitation-message {
+  margin: 0;
+  font-weight: 600;
+}
+.lk-elicitation-url {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--lk-muted);
+}
+.lk-elicitation-url strong {
+  color: var(--lk-text);
+}
+.lk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lk-field-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: baseline;
+}
+.lk-field-check .lk-field-hint {
+  grid-column: 2;
+}
+.lk-field-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.lk-field-required {
+  color: var(--lk-muted);
+  font-weight: 400;
+}
+.lk-field-hint {
+  margin: 0;
+  color: var(--lk-muted);
+  font-size: 12px;
+}
+.lk-field input:not([type="checkbox"]),
+.lk-field select {
+  max-width: 28em;
+  padding: 5px 8px;
+  border: 1px solid var(--lk-line);
+  border-radius: 6px;
+  background: var(--lk-bg);
+  color: var(--lk-text);
+  font: inherit;
+}
+.lk-field input:focus-visible,
+.lk-field select:focus-visible {
+  outline: none;
+  border-color: var(--lk-accent);
+  box-shadow: 0 0 0 3px var(--lk-accent-soft);
+}
+.lk-field[data-invalid] input,
+.lk-field[data-invalid] select {
+  border-color: var(--lk-danger);
+}
+.lk-field-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.lk-choice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.lk-field-problem {
+  margin: 0;
+  color: var(--lk-danger);
+  font-size: 12px;
+}
+.lk-elicitation .lk-actions {
+  margin-top: 0;
+}
+a.lk-btn {
+  text-decoration: none;
 }
 .lk-btn.danger {
   color: var(--lk-danger);
@@ -755,6 +1043,61 @@ button.lk-handle:hover {
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease;
+}
+.lk-composer-box[data-dragging] {
+  border-color: var(--lk-accent);
+  border-style: dashed;
+}
+/* files waiting to go with the next message */
+.lk-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px 0;
+}
+.lk-attachments ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lk-attachment {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 4px 3px 6px;
+  border: 1px solid var(--lk-line);
+  border-radius: 8px;
+  background: var(--lk-bg);
+  font-size: 12px;
+}
+.lk-attachment-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.lk-attachment-icon {
+  flex: none;
+  color: var(--lk-muted);
+}
+.lk-attachment-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-attachment-size {
+  flex: none;
+  color: var(--lk-muted);
+}
+.lk-attachment-refused {
+  margin: 0;
+  color: var(--lk-danger);
+  font-size: 12px;
 }
 .lk-composer-box:focus-within {
   border-color: var(--lk-accent);

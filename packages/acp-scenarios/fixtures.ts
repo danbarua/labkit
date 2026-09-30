@@ -7,6 +7,7 @@ import {
   sessionReplay,
   toolFails,
   toolImageResult,
+  toolPlot,
   toolSucceeds,
 } from "./scenarios";
 
@@ -34,6 +35,7 @@ export const FIXTURES: readonly Fixture[] = [
   fixture(toolSucceeds),
   fixture(toolFails),
   fixture(toolImageResult),
+  fixture(toolPlot),
   fixture(planAndDiff),
   fixture(sessionReplay),
   fixture(noticesAndUsage),

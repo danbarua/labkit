@@ -1,5 +1,15 @@
 import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { type Block, type Plan, textOf } from "@labkit/view-model";
+import {
+  ArrowClockwiseIcon,
+  CheckIcon,
+  CopyIcon,
+  GitForkIcon,
+  type Icon,
+  PencilSimpleIcon,
+} from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
+import { type Activity, activityLabel } from "./activity";
 import { MarkdownText } from "./markdown";
 import { ContentView } from "./tool";
 
@@ -22,24 +32,173 @@ function Rich({ content }: { content: readonly ContentBlock[] }) {
   );
 }
 
-export function UserMessage({ block }: { block: Kind<"user"> }) {
-  return <div className="lk-user">{textOf(block.content)}</div>;
-}
+/** What can be done to a message beyond copying it: the host decides whether each is offered. */
+export type MessageAction = "edit" | "fork" | "regenerate";
 
-export function AssistantMessage({ block }: { block: Kind<"assistant"> }) {
+const ACTIONS: Record<MessageAction, { label: string; Glyph: Icon }> = {
+  edit: { label: "Edit and send again", Glyph: PencilSimpleIcon },
+  regenerate: { label: "Answer again", Glyph: ArrowClockwiseIcon },
+  fork: { label: "Fork the session from here", Glyph: GitForkIcon },
+};
+
+/**
+ * The small row of buttons under a message: copy its text, and whichever of edit, answer again and
+ * fork the host handles. It shows on hover or keyboard focus, and always under the last message.
+ */
+function MessageToolbar({
+  block,
+  actions,
+  onAction,
+}: {
+  block: Kind<"user"> | Kind<"assistant">;
+  actions: readonly MessageAction[];
+  onAction?: ((action: MessageAction, block: Block) => void) | undefined;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard?.writeText(textOf(block.content)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
   return (
-    <div className="lk-assistant">
-      <Rich content={block.content} />
+    <div className="lk-message-toolbar">
+      <button
+        type="button"
+        className="lk-icon-btn"
+        aria-label={copied ? "Copied" : "Copy"}
+        title={copied ? "Copied" : "Copy"}
+        onClick={copy}
+      >
+        {copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
+      </button>
+      {onAction === undefined
+        ? null
+        : actions.map((action) => {
+            const { label, Glyph } = ACTIONS[action];
+            return (
+              <button
+                key={action}
+                type="button"
+                className="lk-icon-btn"
+                aria-label={label}
+                title={label}
+                onClick={() => onAction(action, block)}
+              >
+                <Glyph aria-hidden="true" />
+              </button>
+            );
+          })}
     </div>
   );
 }
 
-export function Thought({ block }: { block: Kind<"thought"> }) {
+export function UserMessage({
+  block,
+  last = false,
+  onAction,
+}: {
+  block: Kind<"user">;
+  last?: boolean;
+  onAction?: ((action: MessageAction, block: Block) => void) | undefined;
+}) {
   return (
-    <details className="lk-thought">
-      <summary>Thinking</summary>
+    <div className="lk-message user" data-last={last || undefined}>
+      <div className="lk-user">{textOf(block.content)}</div>
+      <MessageToolbar block={block} actions={["edit", "fork"]} onAction={onAction} />
+    </div>
+  );
+}
+
+export function AssistantMessage({
+  block,
+  last = false,
+  onAction,
+}: {
+  block: Kind<"assistant">;
+  last?: boolean;
+  onAction?: ((action: MessageAction, block: Block) => void) | undefined;
+}) {
+  return (
+    <div className="lk-message assistant" data-last={last || undefined}>
+      <div className="lk-assistant">
+        <Rich content={block.content} />
+      </div>
+      <MessageToolbar block={block} actions={["regenerate", "fork"]} onAction={onAction} />
+    </div>
+  );
+}
+
+/**
+ * The agent's thinking. Open while it streams ("Thinking…"), folded once it is done ("Thought for
+ * Ns", timed from when it started to arrive; "Thought" when it was loaded whole). Once the person
+ * opens or closes it, it stays as they left it.
+ */
+export function Thought({
+  block,
+  streaming = false,
+}: {
+  block: Kind<"thought">;
+  streaming?: boolean;
+}) {
+  const [chosen, setChosen] = useState<boolean | undefined>(undefined);
+  const started = useRef(streaming ? Date.now() : undefined);
+  const [took, setTook] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (!streaming && started.current !== undefined && took === undefined)
+      setTook(Date.now() - started.current);
+  }, [streaming, took]);
+  const open = chosen ?? streaming;
+  return (
+    <details
+      className="lk-thought"
+      data-streaming={streaming || undefined}
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open) setChosen(event.currentTarget.open);
+      }}
+    >
+      <summary>
+        {streaming ? (
+          <span className="lk-shimmer">Thinking…</span>
+        ) : took === undefined ? (
+          "Thought"
+        ) : (
+          `Thought for ${Math.max(1, Math.round(took / 1000))}s`
+        )}
+      </summary>
       <Rich content={block.content} />
     </details>
+  );
+}
+
+/** Seconds since `key` last changed, counting up once a second. */
+function useElapsed(key: string): number {
+  const [since, setSince] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restarts when the activity changes
+  useEffect(() => {
+    setSince(Date.now());
+    setNow(Date.now());
+  }, [key]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return Math.max(0, Math.floor((now - since) / 1000));
+}
+
+/** Under the transcript while a turn runs: what the agent is doing, and for how long. */
+export function WorkingIndicator({ activity }: { activity: Activity }) {
+  const label = activityLabel(activity);
+  const seconds = useElapsed(label);
+  return (
+    <div className="lk-working" role="status">
+      <span className={activity.kind === "tool" ? "lk-working-label lk-mono" : "lk-working-label"}>
+        <span className="lk-shimmer">{label}</span>
+      </span>
+      <span className="lk-working-time">{seconds}s</span>
+    </div>
   );
 }
 
