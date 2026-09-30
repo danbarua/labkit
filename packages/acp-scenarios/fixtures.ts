@@ -1,5 +1,6 @@
 import type { Answer, PermissionRequest, Scenario } from "./scenario";
 import {
+  newFile,
   noticesAndUsage,
   permissionRequired,
   planAndDiff,
@@ -37,6 +38,7 @@ export const FIXTURES: readonly Fixture[] = [
   fixture(toolImageResult),
   fixture(toolPlot),
   fixture(planAndDiff),
+  fixture(newFile),
   fixture(sessionReplay),
   fixture(noticesAndUsage),
   fixture(permissionRequired, never, "permission-pending", "Waiting for a permission answer"),

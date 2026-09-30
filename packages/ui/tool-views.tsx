@@ -66,8 +66,12 @@ function Listing({ output }: { output: unknown }) {
   );
 }
 
-/** `write_file`: what was written where. A diff, when the agent sent one, draws beside it. */
-function Written({ output }: { output: unknown }) {
+/**
+ * `write_file`: what was written where, when the agent sent no diff. A diff says the same and
+ * shows it, so the call is then drawn by its content.
+ */
+function Written({ call, output }: { call: ToolCall; output: unknown }) {
+  if (call.content?.some((item) => item.type === "diff")) return undefined;
   if (!isRecord(output) || typeof output.path !== "string") return undefined;
   const bytes = typeof output.bytes === "number" ? `${output.bytes} bytes` : "the file";
   return (

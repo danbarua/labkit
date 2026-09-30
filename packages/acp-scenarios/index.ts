@@ -11,6 +11,7 @@ export {
   type Step,
 } from "./scenario";
 export {
+  newFile,
   noticesAndUsage,
   permissionRequired,
   plainAnswer,

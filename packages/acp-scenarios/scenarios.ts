@@ -329,6 +329,57 @@ export const planAndDiff: Scenario = {
   ],
 };
 
+const NEW_FILE = [
+  '"""Score each class against the rewired control."""',
+  "",
+  "import json",
+  "from pathlib import Path",
+  "",
+  "SEEDS = 25",
+  "",
+  "",
+  "def auc(scores: list[float], control: list[float]) -> float:",
+  "    # The share of pairs in which the run beats the control.",
+  "    wins = sum(s > c for s in scores for c in control)",
+  "    return wins / (len(scores) * len(control))",
+  "",
+  "",
+  'if __name__ == "__main__":',
+  '    runs = json.loads(Path("runs/scores.json").read_text())',
+  "    for name, run in runs.items():",
+  "        print(f\"{name}: {auc(run['scores'], run['control']):.3f}\")",
+  "",
+].join("\n");
+
+export const newFile: Scenario = {
+  id: "new-file",
+  title: "A new file",
+  prompt: "Write the script that scores each class against the control.",
+  stopReason: "end_turn",
+  steps: [
+    update({
+      sessionUpdate: "tool_call",
+      toolCallId: "call_write",
+      title: "write analysis/score.py",
+      name: "write_file",
+      kind: "edit",
+      status: "completed",
+      locations: [{ path: "/workspace/analysis/score.py" }],
+      rawInput: { path: "analysis/score.py", text: NEW_FILE },
+      rawOutput: JSON.stringify({
+        path: "/workspace/analysis/score.py",
+        bytes: NEW_FILE.length,
+        before: { kind: "absent", source: "filesystem" },
+        newText: NEW_FILE,
+      }),
+      content: [
+        { type: "diff", path: "/workspace/analysis/score.py", oldText: null, newText: NEW_FILE },
+      ],
+    }),
+    say("Wrote `analysis/score.py`. It prints one AUC per class.", "m1"),
+  ],
+};
+
 export const sessionReplay: Scenario = {
   id: "session-replay",
   title: "A reopened session",
@@ -388,6 +439,7 @@ export const SCENARIOS: readonly Scenario[] = [
   toolImageResult,
   toolPlot,
   planAndDiff,
+  newFile,
   sessionReplay,
   noticesAndUsage,
 ];

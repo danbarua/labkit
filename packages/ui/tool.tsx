@@ -16,10 +16,18 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import { diffLines, STATUS_LABEL } from "./format";
+import { CodeView } from "./code";
 import { toolTally } from "./grouping";
 import { isVegaLite, VegaLitePlot } from "./plot";
 import { toolView } from "./tool-views";
-import { ArgumentsLine, inlineArguments, inputPreview, sameValue, ValueView } from "./value";
+import {
+  ArgumentsLine,
+  decode,
+  inlineArguments,
+  inputPreview,
+  sameValue,
+  ValueView,
+} from "./value";
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
 
@@ -105,7 +113,13 @@ function ToolContentView({ item }: { item: ToolCallContent }) {
         <ContentView block={item.content} />
       );
     case "diff":
-      return <DiffView path={item.path} before={item.oldText} after={item.newText} />;
+      // A diff from nothing is a new file: every line of it is an added one, so it is drawn as
+      // the file it is.
+      return item.oldText == null ? (
+        <CodeView path={item.path} text={item.newText} note="new file" />
+      ) : (
+        <DiffView path={item.path} before={item.oldText} after={item.newText} />
+      );
     case "terminal":
       return <div className="lk-caption">terminal {item.terminalId}</div>;
     default: {
@@ -140,16 +154,43 @@ function decisionOf(entry: PermissionEntry): { label: string; tone: string; opti
   return { label, tone, ...(option ? { option: option.name } : {}) };
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+type Diff = Extract<ToolCallContent, { type: "diff" }>;
+
+const diffsIn = (content: readonly ToolCallContent[]): Diff[] =>
+  content.filter((item): item is Diff => item.type === "diff");
+
 /**
  * Whether `rawOutput` says only what the drawn content already says. Tools commonly report one
- * result twice, as a text block and as the raw output; drawing both repeats it.
+ * result twice: as a text block and as the raw output, or as a diff and as a raw output that
+ * carries the text the diff was made from.
  */
 function outputRepeatsContent(content: readonly ToolCallContent[], rawOutput: unknown): boolean {
+  const output = decode(rawOutput);
+  if (isRecord(output) && diffsIn(content).some((d) => Object.values(output).includes(d.newText)))
+    return true;
   if (content.length !== 1) return false;
   const [only] = content;
   return only?.type === "content" && only.content.type === "text"
     ? sameValue(only.content.text, rawOutput)
     : false;
+}
+
+/**
+ * A call's input without the arguments its result already draws: the text a diff shows, and the
+ * path the diff is for. `undefined` when nothing else was given.
+ */
+function inputNotDrawn(content: readonly ToolCallContent[], rawInput: unknown): unknown {
+  const input = decode(rawInput);
+  const diffs = diffsIn(content);
+  if (!isRecord(input) || diffs.length === 0) return rawInput;
+  const drawn = (value: unknown): boolean =>
+    typeof value === "string" &&
+    diffs.some((d) => value === d.newText || d.path === value || d.path.endsWith(`/${value}`));
+  const rest = Object.entries(input).filter(([, value]) => !drawn(value));
+  return rest.length === 0 ? undefined : Object.fromEntries(rest);
 }
 
 /** Whether the call did not run because the person refused it. */
@@ -216,7 +257,8 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   const status = call.status ?? "pending";
   const content = call.content ?? [];
   const decision = permission === undefined ? undefined : decisionOf(permission);
-  const args = call.rawInput === undefined ? undefined : inlineArguments(call.rawInput);
+  const input = inputNotDrawn(content, call.rawInput);
+  const args = input === undefined ? undefined : inlineArguments(input);
   const preview = call.rawInput === undefined ? undefined : inputPreview(call.rawInput);
   const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
   const waiting = permission !== undefined && permission.outcome === undefined;
@@ -227,10 +269,10 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   // plot is not pushed out of view by its own data.
   const seenFirst = content.some(isShownNotRead);
   const inputSection =
-    call.rawInput === undefined ? null : (
+    input === undefined ? null : (
       <section className="lk-tool-section">
         <h4>Input</h4>
-        {args === undefined ? <ValueView value={call.rawInput} /> : <ArgumentsLine args={args} />}
+        {args === undefined ? <ValueView value={input} /> : <ArgumentsLine args={args} />}
       </section>
     );
 
