@@ -30,5 +30,3 @@ export const TRANSCRIPTS: readonly Transcript[] = [
   terms_of_reference_live as Transcript,
   tool_permutations_live as Transcript,
 ];
-
-// label-areas probe: reverted in the next commit.
