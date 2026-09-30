@@ -9,6 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ReadSurface, WriteSurface, openRecord } from "@labkit/core-domain";
+import type { RecordLocation } from "@labkit/core-db/connect";
 import { pgEventLog } from "@labkit/core-domain/event-store";
 import {
   commandContext,
@@ -206,12 +207,16 @@ let inFlight = 0;
  * The composition every surface is built through: connect, resolve the tenant, step down, hand
  * a tool both halves, close.
  */
-export function surfacesOver(tenant: string, session: SessionRegistry): WithSurfaces {
+export function surfacesOver(
+  { record, tenant }: { record?: RecordLocation; tenant: string },
+  session: SessionRegistry,
+): WithSurfaces {
   return async (work) => {
     // Providers are sampled per call, so a long-running server records the commit each piece
     // of work was actually done against — and the agent registered at that moment rather than
     // at server start.
-    const record = await openRecord({
+    const opened = await openRecord({
+      ...(record === undefined ? {} : { record }),
       tenant,
       context: commandContext(
         mockGitContext,
@@ -221,20 +226,26 @@ export function surfacesOver(tenant: string, session: SessionRegistry): WithSurf
       ),
     });
     try {
-      return await work({ read: record.read, write: record.write });
+      return await work({ read: opened.read, write: opened.write });
     } finally {
-      await record.close();
+      await opened.close();
     }
   };
 }
 
 /**
- * Serves over stdio, opening and releasing the database around each tool call.
+ * Serves over stdio, opening and releasing the database around each tool call. `record` is where
+ * the CLI located the record; the server does not locate one of its own.
  */
-export async function main(
-  tenant = process.env.LABKIT_TENANT ?? "labkit",
-  { readOnly = false }: { readOnly?: boolean } = {},
-): Promise<void> {
+export async function main({
+  record,
+  tenant,
+  readOnly = false,
+}: {
+  record: RecordLocation;
+  tenant: string;
+  readOnly?: boolean;
+}): Promise<void> {
   // One registry for the life of the process, which over stdio is the life of
   // one client's connection. Built here rather than defaulted inside
   // `buildServer` for the same reason `pgEventLog` is: the tool that writes to
@@ -242,7 +253,7 @@ export async function main(
   // component that defaults its own would hand them two.
   const session = sessionRegistry();
 
-  const withSurfaces = surfacesOver(tenant, session);
+  const withSurfaces = surfacesOver({ record, tenant }, session);
 
   const server = buildServer(withSurfaces, session, { readOnly });
 
@@ -272,5 +283,3 @@ async function drainThenExit(server: McpServer): Promise<void> {
   await server.close().catch(() => {});
   process.exit(0);
 }
-
-if (import.meta.main) await main();

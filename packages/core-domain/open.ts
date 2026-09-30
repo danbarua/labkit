@@ -5,7 +5,7 @@
  * build one themselves. This is how an adapter gets a graph at all.
  */
 
-import { connectDb } from "@labkit/core-db/connect";
+import { connectTo, locateRecord, type RecordLocation } from "@labkit/core-db/connect";
 import { resolveTenantContext } from "@labkit/core-db/tenant";
 import { scopeToTenant } from "@labkit/core-db/scoped";
 import { TenantGraph } from "@labkit/core-db/graph";
@@ -16,8 +16,8 @@ import { WriteSurface } from "./write";
 
 /** Which record, whose graph, and who is asking. */
 export interface OpenOptions {
-  /** Where the record is. Absent means this project's own. */
-  db?: string;
+  /** Which record, from `locateRecord`. Absent means this project's own, located on each open. */
+  record?: RecordLocation;
   /** Whose graph. Absent means `labkit`. */
   tenant?: string;
   /** Who is acting and when. Adapters differ: a CLI observes git, an agent claims a session. */
@@ -40,7 +40,7 @@ export interface OpenRecord {
  * `packages/core-db/scoped.ts`.
  */
 export async function openRecord(options: OpenOptions): Promise<OpenRecord> {
-  const connection = await connectDb(options.db);
+  const connection = await connectTo(options.record ?? locateRecord());
   try {
     const ctx = await resolveTenantContext(
       connection.db,

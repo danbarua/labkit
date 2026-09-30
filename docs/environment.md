@@ -7,12 +7,10 @@ Every variable the code reads, what it does, and its default.
 | variable | effect | default |
 | --- | --- | --- |
 | `LABKIT_DB_URL` | Postgres connection string. **Read before `--db` and before `LABKIT_HOME`, so setting it makes both void.** | unset: embedded PGlite |
-| `LABKIT_HOME` | Directory holding `.labkit/`. Refuses to start if it does not exist. | the nearest `.labkit/` at or above the working directory |
+| `LABKIT_HOME` | Directory holding `.labkit/`. Refuses to start if it does not exist. `--db` is read before it, by every command, `mcp` included. | the root of the git repository the working directory is in (the main checkout, for a worktree), else the nearest `.labkit/` at or above the working directory, else the working directory |
 | `LABKIT_DAEMON` | `0` opens an embedded record in the command's own process, holding its lock for the length of the work, instead of through the record's daemon. | unset: through the daemon |
 | `LABKIT_DAEMON_IDLE_MS` | How long a record's daemon waits with no client connected before it exits. | `900000` (15 minutes) |
 | `LABKIT_DAEMON_IDLE_HOLD_MS` | How long a client may hold the record's one session, mid-exchange or in an open transaction, while sending nothing, before the daemon disconnects it and rolls back. | `60000` |
-| `LABKIT_TENANT` | Tenant slug the web seeder ingests into. | `overlap-bench` |
-| `LABKIT_SOURCE` | Record the web seeder reads from. | `../../../../08_overlap_bench/.labkit` |
 
 ## Attribution
 

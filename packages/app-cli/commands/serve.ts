@@ -3,13 +3,14 @@
  */
 
 import type { Command } from "commander";
+import type { RecordLocation } from "@labkit/core-db/connect";
 import { main as serveMcp } from "@labkit/app-mcp/server";
 import type { Globals } from "../session";
 
 /**
- * Registers `labkit mcp`.
+ * Registers `labkit mcp`, serving the record every other command opens.
  */
-export function registerServe(program: Command): void {
+export function registerServe(program: Command, located: () => RecordLocation): void {
   program
     .command("mcp")
     .helpGroup("Operating LabKit")
@@ -19,10 +20,12 @@ export function registerServe(program: Command): void {
       "expose only the tools that answer questions, never the ones that change the record",
     )
     .action(async (opts: { readOnly?: boolean }) => {
-      // `optsWithGlobals` rather than `opts`: `--tenant` is declared on the
-      // root, so `labkit --tenant x mcp` and `labkit mcp` must read the same
-      // place. The default is applied there, so this is never undefined.
+      // `--tenant` and `--db` are declared on the root, so they are read from the root's options.
       const globals = program.opts<Globals>();
-      await serveMcp(globals.tenant, { readOnly: opts.readOnly ?? false });
+      await serveMcp({
+        record: located(),
+        tenant: globals.tenant ?? "labkit",
+        readOnly: opts.readOnly ?? false,
+      });
     });
 }

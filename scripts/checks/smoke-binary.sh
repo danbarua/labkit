@@ -82,15 +82,13 @@ copied="$("$root/bin/labkit" --db "$copy" search 'does the packaged binary work?
 # One JSON-RPC round trip over stdio is enough: it proves the subcommand does
 # not exit early, that the protocol channel is clean (nothing from the CLI's
 # printer reaches stdout), and that `initialize` gets a reply. The tool calls
-# themselves are covered by `tests/mcp-stdio.test.ts` against the source.
+# themselves are covered by `tests/mcp/mcp-stdio.test.ts` against the source.
 mcp_dir="$(mktemp -d "${TMPDIR:-/tmp}/labkit-binary-mcp.XXXXXX")"
 trap 'rm -rf "$db" "$copy" "$mcp_dir"' EXIT
 
 init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"check:binary","version":"0"}}}'
 
-# `LABKIT_HOME` rather than `--db`: the server takes no such flag, which is the
-# documented way to point it at a record.
-mcp_out="$(printf '%s\n' "$init" | LABKIT_HOME="$mcp_dir" "$root/bin/labkit" mcp 2>/dev/null || true)"
+mcp_out="$(printf '%s\n' "$init" | "$root/bin/labkit" --db "$mcp_dir" mcp 2>/dev/null || true)"
 
 [[ -n "$mcp_out" ]] || fail "labkit mcp answered nothing" \
   "it exited without writing to stdout -- the subcommand returned instead of serving"

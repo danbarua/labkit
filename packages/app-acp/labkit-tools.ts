@@ -25,7 +25,8 @@ export function labkitTools(options: {
   readonly surfaces?: (session: SessionRegistry) => WithSurfaces;
 }): ReadonlyMap<string, Tool> {
   const registry = sessionRegistry();
-  const withSurfaces = options.surfaces?.(registry) ?? surfacesOver(options.tenant, registry);
+  const withSurfaces =
+    options.surfaces?.(registry) ?? surfacesOver({ tenant: options.tenant }, registry);
 
   /** Names the ACP session as the author of whatever this call writes. */
   const attribute = (sessionId: string | undefined, tool: string): void => {

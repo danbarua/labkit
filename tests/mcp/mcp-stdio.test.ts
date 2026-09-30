@@ -6,7 +6,7 @@ import pkg from "../../package.json" with { type: "json" };
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,17 +19,25 @@ const id = (v: unknown): string =>
   // layers from the mistake.
   typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
-const SERVER = join(import.meta.dir, "..", "..", "packages", "app-mcp", "server.ts");
+const CLI = join(import.meta.dir, "..", "..", "packages", "app-cli", "cli.ts");
 
 /**
- * This process's environment with `LABKIT_DB_URL` removed.
+ * This process's environment without the variables that choose a record, so `--db` is the only
+ * thing that does.
  */
 function childEnv(): Record<string, string> {
-  const { LABKIT_DB_URL: _dropped, ...rest } = process.env as Record<string, string>;
+  const {
+    LABKIT_DB_URL: _url,
+    LABKIT_HOME: _home,
+    ...rest
+  } = process.env as Record<string, string>;
   return rest;
 }
 
+/** Where the server is started, which is not where its record is. */
 let workdir: string;
+/** The directory `--db` names. */
+let dbdir: string;
 let client: Client;
 
 // Generous, and deliberately not left to bun's 5000ms default: a cold start
@@ -38,16 +46,14 @@ let client: Client;
 const COLD_START = 60_000;
 
 beforeAll(async () => {
-  workdir = mkdtempSync(join(tmpdir(), "labkit-stdio-"));
+  workdir = mkdtempSync(join(tmpdir(), "labkit-stdio-cwd-"));
+  dbdir = mkdtempSync(join(tmpdir(), "labkit-stdio-db-"));
   const transport = new StdioClientTransport({
     // `process.execPath` is bun itself, so this does not depend on PATH.
     command: process.execPath,
-    args: [SERVER],
+    args: [CLI, "--db", dbdir, "--tenant", "stdio-probe", "mcp"],
     cwd: workdir,
-    env: {
-      ...childEnv(),
-      LABKIT_TENANT: "stdio-probe",
-    },
+    env: childEnv(),
   });
   client = new Client({ name: "stdio-probe", version: "0" });
   await client.connect(transport);
@@ -56,6 +62,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await client.close().catch(() => {});
   rmSync(workdir, { recursive: true, force: true });
+  rmSync(dbdir, { recursive: true, force: true });
 });
 
 /**
@@ -132,6 +139,20 @@ test(
 );
 
 test(
+  "`labkit --db <dir> mcp` serves the record in that directory, not the working directory's",
+  async () => {
+    const noted = await client.callTool({
+      name: "note",
+      arguments: { text: "which record is this?" },
+    });
+    expect(noted.isError ?? false).toBe(false);
+    expect(existsSync(join(dbdir, ".labkit", "pglite", "PG_VERSION"))).toBe(true);
+    expect(readdirSync(workdir)).toEqual([]);
+  },
+  COLD_START,
+);
+
+test(
   "it serves the tool documentation as a resource",
   async () => {
     const { contents } = await client.readResource({
@@ -152,12 +173,9 @@ test(
   async () => {
     const dir = mkdtempSync(join(tmpdir(), "labkit-stdout-"));
     try {
-      const child = Bun.spawn([process.execPath, SERVER], {
+      const child = Bun.spawn([process.execPath, CLI, "--db", dir, "mcp"], {
         cwd: dir,
-        env: {
-          ...childEnv(),
-          LABKIT_TENANT: "stdout-probe",
-        },
+        env: childEnv(),
         stdin: "pipe",
         stdout: "pipe",
         stderr: "ignore",

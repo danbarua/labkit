@@ -3,6 +3,7 @@
  */
 
 import { openRecord } from "@labkit/core-domain";
+import { locateRecord, type RecordLocation } from "@labkit/core-db/connect";
 import type { ReadSurface, WriteSurface } from "@labkit/core-domain";
 import { commandContext, gitContext, personContext } from "@labkit/core-domain/context";
 import type { Clock } from "@labkit/core-domain";
@@ -56,14 +57,30 @@ export interface Surfaces {
 export type Run = (work: (surfaces: Surfaces) => Promise<Answer>) => Promise<void>;
 
 /**
+ * Which record this invocation opens, located the first time a command asks and the same answer
+ * every time after. Every command, `mcp` included, reads the record through this.
+ */
+export function recordLocator(globals: () => Globals): () => RecordLocation {
+  let located: RecordLocation | undefined;
+  return () => {
+    located ??= locateRecord(globals().db);
+    return located;
+  };
+}
+
+/**
  * The wrap: connect, resolve, build, run, print, close.
  */
-export function runner(globals: () => Globals, write: (line: string) => void): Run {
+export function runner(
+  globals: () => Globals,
+  write: (line: string) => void,
+  located: () => RecordLocation = recordLocator(globals),
+): Run {
   return async (work) => {
     const opts = globals();
     const clock: Clock | undefined = opts.date ? { now: () => opts.date! } : undefined;
     const record = await openRecord({
-      ...(opts.db === undefined ? {} : { db: opts.db }),
+      record: located(),
       ...(opts.tenant === undefined ? {} : { tenant: opts.tenant }),
       context: commandContext(
         gitContext,

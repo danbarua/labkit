@@ -6,7 +6,7 @@
 import { buildProgram } from "./program";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
 import { DomainRefusal } from "@labkit/core-domain";
-import { runner } from "./session";
+import { recordLocator, runner, type Globals } from "./session";
 import { writeOut } from "./stdout";
 import { staleInstall } from "./installed";
 
@@ -32,11 +32,11 @@ function reasonOf(error: Error): string {
  */
 
 export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> {
+  const globals = () => program.opts<Globals>();
+  const located = recordLocator(globals);
   const program = buildProgram(
-    runner(
-      () => program.opts(),
-      (line) => writeOut(`${line}\n`),
-    ),
+    runner(globals, (line) => writeOut(`${line}\n`), located),
+    located,
   );
   program.exitOverride();
   try {
