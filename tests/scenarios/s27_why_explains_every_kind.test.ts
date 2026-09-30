@@ -72,10 +72,6 @@ async function anArcOfWork() {
     on: question,
     text: "the locked parameters live here",
   });
-  const { review } = await session.writes.recordReview({
-    of: analysis,
-    verdict: "the method is sound",
-  });
   const { decision } = await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
   return {
     question,
@@ -87,7 +83,6 @@ async function anArcOfWork() {
     work,
     gate,
     note,
-    review,
     decision,
   };
 }
@@ -118,7 +113,7 @@ describe("S-27: why explains every kind", () => {
         id: "S-27",
         title: "Why explains every kind",
         about:
-          "One ordinary arc of work — a question, observations, an analysis, a check, a gate, a note, a review and a decision — and asking why of each of them gets an answer rather than a refusal.",
+          "One ordinary arc of work — a question, observations, an analysis, a check, a gate, a note and a decision — and asking why of each of them gets an answer rather than a refusal.",
       },
       events,
     );

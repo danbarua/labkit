@@ -22,8 +22,6 @@ export const READING: Readonly<Record<string, Reading>> = {
   answered: "settled",
   supported: "settled",
   supports: "settled",
-  agrees: "settled",
-  corroboration: "settled",
   confirmatory: "settled",
   "carried-out": "settled",
   observed: "settled",
@@ -34,8 +32,6 @@ export const READING: Readonly<Record<string, Reading>> = {
   blocked: "contested",
   challenged: "contested",
   challenges: "contested",
-  disagrees: "contested",
-  contradiction: "contested",
   "standard-unmet": "contested",
 
   // Nothing has looked.
@@ -50,8 +46,6 @@ export const READING: Readonly<Record<string, Reading>> = {
   incomplete: "untested",
   planned: "untested",
   waiting: "untested",
-  "unrecorded-in-the-original": "untested",
-  "not-used-by-the-re-run": "untested",
 
   // Answered, but qualified.
   provisional: "provisional",
@@ -62,21 +56,15 @@ export const READING: Readonly<Record<string, Reading>> = {
   exploratory: "provisional",
   "drawn-across": "provisional",
   claimed: "provisional",
-  changed: "provisional",
-  sharpened: "provisional",
-  noted: "provisional",
   mechanical: "provisional",
   scientific: "provisional",
   prespecification: "provisional",
-  dissociation: "provisional",
-  raises: "provisional",
-  lowers: "provisional",
 };
 
 /**
  * The words safe to colour wherever they appear.
  *
- * The rest have a reading but are left alone: `no`, `pass`, `changed`,
+ * The rest have a reading but are left alone: `no`, `pass`,
  * `supports` and their like turn up in ordinary sentences, and painting one
  * red told the reader a gate's description was a verdict.
  */

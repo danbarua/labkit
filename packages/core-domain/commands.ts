@@ -201,13 +201,6 @@ export const concludeCommand = z.object({
 });
 export type ConcludeCommand = z.infer<typeof concludeCommand>;
 
-/** `promote` — move a finding from scratch to citable (S-18). */
-export const promoteCommand = z.object({
-  claim: refString("claim"),
-  because: z.string(),
-});
-export type PromoteCommand = z.infer<typeof promoteCommand>;
-
 /**
  * `isConfirmed` — a finding others may build on.
  */
@@ -230,7 +223,6 @@ export type Command =
   | OpenEnquiryCommand
   | PlanWorkCommand
   | PoseCommand
-  | PromoteCommand
   | PursueCommand
   | RecordAnalysisCommand
   | RecordObservationsCommand

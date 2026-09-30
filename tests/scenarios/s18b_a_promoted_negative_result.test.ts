@@ -100,20 +100,6 @@ describe("S-18b — a negative result that somebody vouched for", () => {
     expect(known.provisional.map((q) => q.asks)).not.toContain(ASKS);
   });
 
-  test("and the historical survey agrees with the current one", async () => {
-    await aVouchedForNo();
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-
-    // Same SUPPORTS-only shape, one query over. Asked at an instant after the
-    // promotion and the closure.
-    const then = await later.reads.whatWasKnown({ at: NOW });
-    expect(then.established.map((q) => q.asks)).toContain(ASKS);
-    expect(then.provisional.map((q) => q.asks)).not.toContain(ASKS);
-  });
-
   /**
    * The control. A negative result nobody promoted must still read as scratch,
    * or the fix above would have made every closure look vouched-for.

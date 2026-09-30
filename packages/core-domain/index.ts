@@ -7,7 +7,6 @@ export {
   WriteSurface,
   type ResearchWrites,
   type Operation,
-  type RetiredOperation,
 } from "./write";
 export { SessionCore } from "./core";
 export { openRecord } from "./open";
@@ -211,5 +210,4 @@ export type {
   AcceptAsUnresolvedCommand,
   AmendDesignCommand,
   ClaimIsConfirmedCommand,
-  PromoteCommand,
 } from "./commands";

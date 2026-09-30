@@ -103,127 +103,27 @@ async function twoStages() {
   };
 }
 
+/**
+ * The earlier stage's reading narrowed: its own analysis concludes the narrower proposition in
+ * place of the claim it drew, naming that claim by handle.
+ */
+async function narrowEarlierReading(programme: Awaited<ReturnType<typeof twoStages>>) {
+  return session.writes.conclude({
+    analysis: programme.earlier,
+    proposition: "graph construction does not affect mapping strength within 0.02",
+    finding: "all five constructions within 0.02 of each other on mapping strength",
+    replacing: claimOf(programme.earlierClaims, IMMATERIAL),
+  });
+}
+
 describe("S-5 — contradiction or dissociation?", () => {
-  test("the conversation runs end to end through research verbs alone", async () => {
-    const programme = await twoStages();
-
-    // Researcher: didn't the earlier stage prove the graph choice doesn't
-    //             matter? Why does this one rank them?
-    const verdict = await session.reads.doTheseConflict({
-      a: claimOf(programme.earlierClaims, IMMATERIAL),
-      b: claimOf(programme.laterClaims, IMMATERIAL),
-    });
-
-    // LabKit:     the earlier stage tested internal mapping strength; this one
-    //             tested external classification utility. Those are distinct
-    //             claims.
-    expect(verdict.sides.map((s) => s.asks)).toEqual([INTERNAL, EXTERNAL]);
-
-    // Researcher: so this is a dissociation, not a contradiction.
-    // LabKit:     correct. Support for equivalence on one endpoint does not
-    //             imply equivalence on another.
-    expect(verdict.conflict).toBe(false);
-    expect(verdict.relation).toBe("dissociation");
-    expect(verdict.differsBy).toBe("scope");
-
-    await captureConversation(
-      {
-        id: "S-5",
-        title: "contradiction or dissociation?",
-        about:
-          "Two stages of one programme assert the same sentence with opposite evidence. They turn out to be answering different questions, so this is a dissociation rather than a contradiction.",
-      },
-      events,
-    );
-  });
-
-  /**
-   * Afterward 1 — which question does each claim answer, and what bears on it?
-   */
-  test("each claim carries its own question and its own evidence", async () => {
-    const programme = await twoStages();
-
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-    const verdict = await later.reads.doTheseConflict({
-      a: claimOf(programme.earlierClaims, IMMATERIAL),
-      b: claimOf(programme.laterClaims, IMMATERIAL),
-    });
-
-    const [first, second] = verdict.sides;
-    expect(first!.proposition).toBe(IMMATERIAL);
-    expect(second!.proposition).toBe(IMMATERIAL);
-    expect(first!.asks).toBe(INTERNAL);
-    expect(second!.asks).toBe(EXTERNAL);
-
-    expect(first!.supportedBy.map((f) => f.states)).toEqual([
-      "all five constructions within 0.02 of each other on mapping strength",
-    ]);
-    expect(first!.challengedBy).toEqual([]);
-    expect(second!.supportedBy).toEqual([]);
-    expect(second!.challengedBy.map((f) => f.states)).toEqual([
-      "constructions separate by 11 points of held-out accuracy",
-    ]);
-  });
-
-  /**
-   * Afterward 2 — what would a genuine contradiction look like here?
-   */
-  test("two opposing findings within one question are a contradiction", async () => {
-    const programme = await twoStages();
-
-    const { observations: rerun } = await session.writes.recordObservations({
-      enquiry: programme.internalWork,
-      name: "mapping-strength readings, wider construction set",
-      finding: "mapping strength measured for twelve graph constructions",
-    });
-    const { claims: dissentingClaims } = await recordAnalysis(session.writes, {
-      enquiry: programme.internalWork,
-      method: "mapping-strength-comparison",
-      from: [rerun],
-      concludes: [
-        {
-          proposition: IMMATERIAL,
-          finding: "two of the twelve constructions fall 0.3 below the rest on mapping strength",
-          bearing: "challenges",
-        },
-      ],
-    });
-
-    const verdict = await session.reads.doTheseConflict({
-      a: claimOf(programme.earlierClaims, IMMATERIAL),
-      b: claimOf(dissentingClaims, IMMATERIAL),
-    });
-
-    expect(verdict.conflict).toBe(true);
-    expect(verdict.relation).toBe("contradiction");
-    expect(verdict.differsBy).toBeNull();
-    expect(verdict.sides.map((s) => s.asks)).toEqual([INTERNAL, INTERNAL]);
-
-    const later = new ResearchSession(await scenario.current(), {
-      clock,
-      events: inMemoryEventLog(),
-    });
-    const durable = await later.reads.doTheseConflict({
-      a: claimOf(programme.earlierClaims, IMMATERIAL),
-      b: claimOf(dissentingClaims, IMMATERIAL),
-    });
-    expect(durable.relation).toBe("contradiction");
-  });
-
   /**
    * Afterward 3 — does revising or withdrawing one interpretation affect the other?
    */
   test("withdrawing one reading leaves the identically worded one alone", async () => {
     const programme = await twoStages();
 
-    await session.writes.reinterpret({
-      of: claimOf(programme.earlierClaims, IMMATERIAL),
-      as: "graph construction does not affect mapping strength within 0.02",
-      because: "immaterial overstates it; the measurement was of mapping strength alone",
-    });
+    await narrowEarlierReading(programme);
 
     const later = new ResearchSession(await scenario.current(), {
       clock,
@@ -280,16 +180,10 @@ describe("S-5 — contradiction or dissociation?", () => {
       answeredBy: claimOf(settledClaims, IMMATERIAL),
     });
 
-    const report = await session.writes.reinterpret({
-      of: claimOf(programme.earlierClaims, IMMATERIAL),
-      as: "graph construction does not affect mapping strength within 0.02",
-      because: "immaterial overstates it",
-    });
+    await narrowEarlierReading(programme);
 
     // The reconstruction-error question was settled on its own reading, not
     // on this one.
-    expect(report.restingOnTheOldReading).toEqual([]);
-
     const later = new ResearchSession(await scenario.current(), {
       clock,
       events: inMemoryEventLog(),
@@ -306,11 +200,7 @@ describe("S-5 — contradiction or dissociation?", () => {
    */
   test("withdrawing a sentence here does not block concluding it elsewhere", async () => {
     const programme = await twoStages();
-    await session.writes.reinterpret({
-      of: claimOf(programme.earlierClaims, IMMATERIAL),
-      as: "graph construction does not affect mapping strength within 0.02",
-      because: "immaterial overstates it",
-    });
+    await narrowEarlierReading(programme);
 
     const { question: elsewhere } = await session.writes.pose({
       question: "does the graph construction matter for reconstruction error?",
@@ -351,17 +241,18 @@ describe("S-5 — contradiction or dissociation?", () => {
 
   /** A citation must be one the cited analysis actually made. */
   test("naming a claim that does not exist is refused", async () => {
-    const _programme = await twoStages();
+    const programme = await twoStages();
 
     await expect(session.reads.whySupported({ claim: ref("claim", "CLM_9999") })).rejects.toThrow(
       /CLM_9999 not found/,
     );
 
     await expect(
-      session.writes.reinterpret({
-        of: ref("claim", "CLM_9999"),
-        as: "narrower still",
-        because: "it should not get this far",
+      session.writes.conclude({
+        analysis: programme.earlier,
+        proposition: "narrower still",
+        finding: "it should not get this far",
+        replacing: ref("claim", "CLM_9999"),
       }),
     ).rejects.toThrow(/CLM_9999 not found/);
   });
@@ -373,7 +264,7 @@ describe("S-5 — contradiction or dissociation?", () => {
     const programme = await twoStages();
 
     // **The refusal lives in one place, and that is the point.** Both
-    // `whySupported` and `reinterpret` take a handle, so neither has to guess
+    // `whySupported` and `conclude --replacing` take a handle, so neither has to guess
     // which claim was meant -- `claimsAsserting` is the single seam where
     // text becomes a handle. It reports every match rather than choosing.
     const found = await session.reads.claimsAsserting({ proposition: IMMATERIAL });
@@ -397,6 +288,16 @@ describe("S-5 — contradiction or dissociation?", () => {
     });
     expect(earlier.proposition).toBe(later.proposition);
     expect(earlier.support).not.toEqual(later.support);
+
+    await captureConversation(
+      {
+        id: "S-5",
+        title: "contradiction or dissociation?",
+        about:
+          "Two stages of one programme assert the same sentence with opposite evidence. Asked by its words, the sentence names two claims, and each answers about its own question.",
+      },
+      events,
+    );
   });
 
   /** One sentence in one scope still reads by text — every earlier scenario depends on it. */

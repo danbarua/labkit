@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimOf } from "../helpers/claims";
-import { recordAnalysis } from "../helpers/analysis";
+import { reanalyse, recordAnalysis } from "../helpers/analysis";
 import { as, captureConversation } from "../helpers/conversation";
 
 let scenario: Scenario;
@@ -35,7 +35,6 @@ afterEach(async () => {
 
 /** Two of Bonsai's four comparisons: one the re-analysis revisits, one it excludes. */
 const REVISITED = "T differs from the current-random control";
-const SURVIVES = "T differs from the lattice control";
 const EXCLUDED = "T differs from the lattice control";
 const AGGREGATION = "the aggregation is done on the correct scale";
 
@@ -78,25 +77,18 @@ async function aRunPartlyReAnalysed(holdTo = false) {
   };
 }
 
-/** The re-analysis, naming the one finding that survives it and no other. */
+/** The re-analysis, replacing the one finding it revisits and naming no other. */
 async function theLogScaleReAnalysis(w: Awaited<ReturnType<typeof aRunPartlyReAnalysed>>) {
-  const { review } = await reviewer.writes.recordReview({
-    of: w.v1,
-    verdict: "raw-scale aggregation is untrustworthy for the stochastic-control comparisons",
+  await reviewer.writes.note({
+    text: "raw-scale aggregation is untrustworthy for the stochastic-control comparisons",
+    on: w.v1,
   });
-  // The lattice comparison is what survives, matching the re-analysis's own
-  // scope: everything else the run concluded is superseded here.
-  const report = await session.writes.keep({
-    keeping: [w.stands],
-    because: review,
+  return reanalyse(session.writes, {
+    enquiry: w.enquiry,
     method: "log-scale re-aggregation",
+    from: [w.observations],
+    concludes: [{ proposition: REVISITED, finding: "p = 0.007 log", replacing: w.revisited }],
   });
-  const { claims } = await session.writes.conclude({
-    analysis: report.replacement,
-    proposition: REVISITED,
-    finding: "p = 0.007 log",
-  });
-  return { ...report, claims };
 }
 
 async function afterwards(): Promise<ResearchSession> {
@@ -141,106 +133,14 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
    * The other side of the same act, which is what makes the test above a
    * discriminator rather than a fix that switched everything off.
    */
-  test("the finding it did name falls, and names the review that caused it", async () => {
+  test("the finding it did name falls, and names what replaced it", async () => {
     const w = await aRunPartlyReAnalysed();
     await theLogScaleReAnalysis(w);
 
     const why = await (await afterwards()).reads.whySupported({ claim: w.revisited });
+    expect(why.verdict).toBe("withdrawn");
     expect(why.superseded.map((s) => s.finding)).toEqual(["p = 0.03 raw"]);
-    expect(why.superseded[0]!.reason).toContain("raw-scale aggregation is untrustworthy");
-  });
-
-  /**
-   * The read has to be able to say "I cannot tell", or it is guessing.
-   */
-  test("a superseded finding whose wording matches two is reported unpaired, not guessed", async () => {
-    const { enquiry } = await session.writes.openEnquiry("does T differ from its controls?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "per-image results",
-      finding: "two independent batches",
-    });
-    // One sentence, two findings: the same claim about two batches.
-    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "raw-scale aggregation",
-      from: [observations],
-      concludes: [
-        { proposition: REVISITED, finding: "p = 0.03 raw, batch one" },
-        { proposition: REVISITED, finding: "p = 0.04 raw, batch two" },
-      ],
-    });
-    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
-
-    // Nothing kept — both fall — and one successor finding asserting the same
-    // sentence as each of them.
-    const report = await session.writes.replaceAnalysis({
-      supersedes: v1,
-      because: review,
-      method: "log-scale re-aggregation",
-    });
-    await session.writes.conclude({
-      analysis: report.replacement,
-      proposition: REVISITED,
-      finding: "p = 0.007 log",
-    });
-
-    const why = await (await afterwards()).reads.why({ subject: report.replacement });
-    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
-    // The superseded one is reported, and not paired with the successor: the
-    // wording matched more than one finding of the revised analysis.
-    expect(why.report.unpaired.map((u) => u.claim).sort()).toEqual(
-      v1Claims.map((c) => c.claim).sort(),
-    );
-    expect(why.report.changed).toEqual([]);
-  });
-
-  /**
-   * The other half of the test above: named, so not a guess.
-   */
-  test("a successor that names what it replaces is paired on the handle, not the wording", async () => {
-    const { enquiry } = await session.writes.openEnquiry("does T differ from its controls?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "per-image results",
-      finding: "two independent batches",
-    });
-    // One sentence, two findings: the same claim about two batches.
-    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "raw-scale aggregation",
-      from: [observations],
-      concludes: [
-        { proposition: REVISITED, finding: "p = 0.03 raw, batch one" },
-        { proposition: REVISITED, finding: "p = 0.04 raw, batch two" },
-      ],
-    });
-    const batchTwo = v1Claims[1]!.claim;
-    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
-    const report = await session.writes.replaceAnalysis({
-      supersedes: v1,
-      because: review,
-      method: "log-scale re-aggregation",
-    });
-
-    // The successor names which of the two it stands in place of.
-    const { claims } = await session.writes.conclude({
-      analysis: report.replacement,
-      proposition: REVISITED,
-      finding: "p = 0.007 log, batch two",
-      replacing: batchTwo,
-    });
-
-    const why = await (await afterwards()).reads.why({ subject: report.replacement });
-    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
-
-    // Paired, and to the one that was named.
-    expect(why.report.changed.map((c) => c.was)).toEqual([batchTwo]);
-    expect(why.report.changed[0]!.claim).toBe(claims[0]!.claim);
-    expect(why.report.changed[0]!.before).toBe("p = 0.04 raw, batch two");
-    expect(why.report.changed[0]!.after).toBe("p = 0.007 log, batch two");
-    // The one nothing named is still unpaired -- naming one does not pair both.
-    expect(why.report.unpaired.map((u) => u.claim)).toEqual([v1Claims[0]!.claim]);
+    expect(why.superseded[0]!.reason).toContain("p = 0.007 log");
   });
 
   /**
@@ -322,96 +222,5 @@ describe("S-11g — a replacement that addresses only some of a run's conclusion
     expect(status.checks.map((c) => `${c.about} ${c.state}`).sort()).toEqual(
       [`${w.stands} passed`, `${successor} never-run`].sort(),
     );
-  });
-
-  /**
-   * **The pairing the act implies is recorded by the act.**
-   */
-  test("a successor is paired to the finding it replaces, with nothing named", async () => {
-    const { enquiry } = await session.writes.openEnquiry("does T differ from its controls?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "per-image results",
-      finding: "one batch",
-    });
-    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "raw-scale aggregation",
-      from: [observations],
-      concludes: [{ proposition: REVISITED, finding: "p = 0.03 raw" }],
-    });
-    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
-    const report = await session.writes.replaceAnalysis({
-      supersedes: v1,
-      because: review,
-      method: "log-scale re-aggregation",
-    });
-    const { claims } = await session.writes.conclude({
-      analysis: report.replacement,
-      proposition: REVISITED,
-      finding: "p = 0.007 log",
-    });
-
-    const why = await (await afterwards()).reads.why({ subject: report.replacement });
-    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
-    expect(why.report.unpaired).toEqual([]);
-    expect(why.report.changed.map((c) => c.was)).toEqual([v1Claims[0]!.claim]);
-    expect(why.report.changed[0]!.claim).toBe(claims[0]!.claim);
-    expect(why.report.changed[0]!.before).toBe("p = 0.03 raw");
-    expect(why.report.changed[0]!.after).toBe("p = 0.007 log");
-  });
-
-  /**
-   * **A kept finding still stands, so nothing replaces it.**
-   */
-  test("a conclusion is never paired to a finding the revision kept", async () => {
-    const events = inMemoryEventLog();
-    const graph = await scenario.current();
-    session = new ResearchSession(graph, { clock, events, attribution: as("Researcher") });
-    reviewer = new ResearchSession(graph, { clock, events, attribution: as("Reviewer") });
-    const { enquiry } = await session.writes.openEnquiry("does T differ from its controls?");
-    const { observations } = await session.writes.recordObservations({
-      enquiry,
-      name: "per-image results",
-      finding: "one batch",
-    });
-    const { analysis: v1, claims: v1Claims } = await recordAnalysis(session.writes, {
-      enquiry,
-      method: "raw-scale aggregation",
-      from: [observations],
-      concludes: [
-        { proposition: REVISITED, finding: "p = 0.03 raw" },
-        { proposition: SURVIVES, finding: "the lattice comparison, unaffected by scale" },
-      ],
-    });
-    const { review } = await reviewer.writes.recordReview({ of: v1, verdict: "wrong scale" });
-    const report = await session.writes.keep({
-      keeping: [claimOf(v1Claims, SURVIVES)],
-      because: review,
-      method: "log-scale re-aggregation",
-    });
-
-    // On the proposition that was KEPT, not the one that fell.
-    await session.writes.conclude({
-      analysis: report.replacement,
-      proposition: SURVIVES,
-      finding: "the lattice comparison again, on the log scale",
-    });
-
-    // **Asserted on what the act wrote, not on a report.** No read shows this:
-    // `analysisRevision` iterates the claims the LINEAGE decision superseded, and
-    // `withdrawalOf` needs every claim asserting a proposition to have fallen -- the
-    // successor's own conclusion keeps it standing.
-    const superseding = (await events.all())
-      .flatMap((e) => e.changes)
-      .filter((c) => c.change === "EdgeCreated" && c.label === "SUPERSEDES")
-      .map((c) => (c as { to: string }).to);
-    expect(superseding).not.toContain(claimOf(v1Claims, SURVIVES));
-
-    const later = await afterwards();
-    const why = await later.reads.why({ subject: report.replacement });
-    if (why.kind !== "analysis") throw new Error(`expected an analysis, got ${why.kind}`);
-    // What did fall is the other conclusion, and this act did not answer it.
-    expect(why.report.unpaired.map((u) => u.claim)).toEqual([claimOf(v1Claims, REVISITED)]);
   });
 });

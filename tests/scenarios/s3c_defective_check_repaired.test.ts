@@ -14,7 +14,7 @@ import {
 } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
-import { recordAnalysis, replaceAnalysis } from "../helpers/analysis";
+import { reanalyse, recordAnalysis } from "../helpers/analysis";
 import { decidedOn, evaluationsOf } from "../helpers/criteria";
 import { as, captureConversation } from "../helpers/conversation";
 
@@ -182,7 +182,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
 
-    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(
+    const { claims: defectiveClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -201,16 +201,10 @@ describe("S-3c: the check was wrong, not the result", () => {
       (await session.reads.whySupported({ claim: claimOf(analysisClaims, PROPOSITION) })).verdict,
     ).toBe("standard-unmet");
 
-    // The fault is found in the check, and the check is replaced -- the same
-    // act used for an analysis that was wrong, aimed here at a piece of work
-    // that happens to be a check.
-    const { review } = await session.writes.recordReview({
-      of: defective,
-      verdict: "the aggregation dropped the last fold",
-    });
-    const _corrected = await replaceAnalysis(session.writes, {
-      supersedes: defective,
-      because: review,
+    // The fault is found in the check, and the check is re-run with its
+    // finding named as the one it replaces -- the same act used for an
+    // analysis that was wrong, aimed here at a piece of work that is a check.
+    await reanalyse(session.writes, {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
@@ -267,7 +261,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       protecting: [tertiary],
     });
 
-    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(
+    const { claims: defectiveClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -285,13 +279,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
     expect((await session.reads.gateStatus({ gate })).state).toBe("blocked");
 
-    const { review } = await session.writes.recordReview({
-      of: defective,
-      verdict: "the aggregation dropped the last fold",
-    });
-    const _corrected = await replaceAnalysis(session.writes, {
-      supersedes: defective,
-      because: review,
+    await reanalyse(session.writes, {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
@@ -330,7 +318,7 @@ describe("S-3c: the check was wrong, not the result", () => {
   test("what separates the two cases is whether the failed verdict's basis was withdrawn", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
-    const { analysis: failed, claims: failedClaims } = await theCheckIsRun(
+    const { claims: failedClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -368,13 +356,7 @@ describe("S-3c: the check was wrong, not the result", () => {
 
     // Now, and only now, is the first run found to have been faulty. Nothing
     // else about the record changes -- no new evaluation, no new check.
-    const { review } = await session.writes.recordReview({
-      of: failed,
-      verdict: "the aggregation dropped the last fold",
-    });
-    await replaceAnalysis(session.writes, {
-      supersedes: failed,
-      because: review,
+    await reanalyse(session.writes, {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
@@ -412,7 +394,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       outcome: "fail",
     });
 
-    const { analysis: unrelated } = await theCheckIsRun(
+    const { claims: unrelatedClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -421,17 +403,17 @@ describe("S-3c: the check was wrong, not the result", () => {
         finding: "median p = 0.04",
       },
     );
-    const { review } = await session.writes.recordReview({
-      of: unrelated,
-      verdict: "the aggregation dropped the last fold",
-    });
-    await replaceAnalysis(session.writes, {
-      supersedes: unrelated,
-      because: review,
+    await reanalyse(session.writes, {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{ proposition: AGREES, finding: "median p = 0.05" }],
+      concludes: [
+        {
+          proposition: AGREES,
+          finding: "median p = 0.05",
+          replacing: claimOf(unrelatedClaims, AGREES),
+        },
+      ],
     });
 
     const why = await (await afterwards()).reads.whySupported({
@@ -448,7 +430,7 @@ describe("S-3c: the check was wrong, not the result", () => {
   test("a check whose every verdict has been withdrawn has no standing verdict, and did not never-run", async () => {
     const { robustness, enquiry, observations, analysisClaims } =
       await aResultHeldToARobustnessCheck();
-    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(
+    const { claims: defectiveClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -465,13 +447,7 @@ describe("S-3c: the check was wrong, not the result", () => {
     });
 
     // The check is found faulty and retired. Nobody has re-run it yet.
-    const { review } = await session.writes.recordReview({
-      of: defective,
-      verdict: "the aggregation dropped the last fold",
-    });
-    await replaceAnalysis(session.writes, {
-      supersedes: defective,
-      because: review,
+    await reanalyse(session.writes, {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
@@ -502,61 +478,6 @@ describe("S-3c: the check was wrong, not the result", () => {
   });
 
   /**
-   * A replacement that cannot be completed must leave nothing behind.
-   */
-  test("a replacement that cannot be completed leaves the earlier failure standing", async () => {
-    const { robustness, enquiry, observations, analysisClaims } =
-      await aResultHeldToARobustnessCheck();
-    const { analysis: defective, claims: defectiveClaims } = await theCheckIsRun(
-      enquiry,
-      observations,
-      "median-aggregation",
-      {
-        proposition: DISAGREES,
-        finding: "median p = 0.21",
-      },
-    );
-    await session.writes.evaluateCriterion({
-      criterion: robustness,
-      value: "median p = 0.21",
-      outcome: "fail",
-      citing: [claimOf(defectiveClaims, DISAGREES)],
-    });
-
-    // Retire the proposition the replacement is going to try to re-assert, so
-    // the second half of the compound action is guaranteed to be refused.
-    await session.writes.reinterpret({
-      of: claimOf(defectiveClaims, DISAGREES),
-      as: "the median aggregation was never computed correctly",
-      because: "the fold handling was wrong throughout",
-    });
-
-    const before = await (await afterwards()).reads.whySupported({
-      claim: claimOf(analysisClaims, PROPOSITION),
-    });
-    const { review } = await session.writes.recordReview({
-      of: defective,
-      verdict: "the aggregation dropped the last fold",
-    });
-    await expect(
-      replaceAnalysis(session.writes, {
-        supersedes: defective,
-        because: review,
-        enquiry,
-        method: "median-aggregation, all folds",
-        from: [observations],
-        concludes: [{ proposition: DISAGREES, finding: "median p = 0.04" }],
-      }),
-    ).rejects.toThrow();
-
-    // Nothing moved. The command failed whole.
-    const after = await (await afterwards()).reads.whySupported({
-      claim: claimOf(analysisClaims, PROPOSITION),
-    });
-    expect(after).toEqual(before);
-  });
-
-  /**
    * The itemised check above is right — `no-standing-verdict` is exactly what "a check whose
    * every verdict has been withdrawn" test asserts.
    */
@@ -573,7 +494,7 @@ describe("S-3c: the check was wrong, not the result", () => {
       protecting: [tertiary],
     });
 
-    const { analysis: passing, claims: passingClaims } = await theCheckIsRun(
+    const { claims: passingClaims } = await theCheckIsRun(
       enquiry,
       observations,
       "median-aggregation",
@@ -591,17 +512,17 @@ describe("S-3c: the check was wrong, not the result", () => {
     // The passing check turns out to have been defective and is replaced.
     // Nobody has re-run it yet: the only evaluation of `robustness` now cites
     // withdrawn evidence, so the criterion has no standing verdict at all.
-    const { review } = await session.writes.recordReview({
-      of: passing,
-      verdict: "the aggregation dropped the last fold",
-    });
-    await replaceAnalysis(session.writes, {
-      supersedes: passing,
-      because: review,
+    await reanalyse(session.writes, {
       enquiry,
       method: "median-aggregation, all folds",
       from: [observations],
-      concludes: [{ proposition: AGREES, finding: "median p = 0.05" }],
+      concludes: [
+        {
+          proposition: AGREES,
+          finding: "median p = 0.05",
+          replacing: claimOf(passingClaims, AGREES),
+        },
+      ],
     });
 
     const reader = await afterwards();

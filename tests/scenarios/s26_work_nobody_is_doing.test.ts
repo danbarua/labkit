@@ -215,11 +215,5 @@ describe("S-26: work nobody is doing", () => {
       check.blocks.flatMap((block) => block.gating.map((work) => work.work)),
     );
     expect(afterBlocked).toEqual([active]);
-
-    await session.writes.closeGate({ gate, because: "the sampler is no longer released" });
-    const closed = await (await afterwards()).reads.gateStatus({ gate });
-    expect(closed.state).toBe("closed");
-    expect(closed.gating.map((w) => w.work)).toEqual([active]);
-    expect(closed.unmet.flatMap((check) => check.blocks)).toEqual([]);
   });
 });

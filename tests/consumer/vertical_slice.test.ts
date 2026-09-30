@@ -1,9 +1,9 @@
 /**
- * The consumer vertical slice — four reads, paired worlds, real durable state.
+ * The consumer vertical slice — three reads, paired worlds, real durable state.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ReadSurface, ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
+import { ResearchSession, inMemoryEventLog, type Clock } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
@@ -140,12 +140,8 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     return (await s.reads.whatIsKnown()).established;
   };
 
-  /**
-   * The as-of answer is a separate read, not a timestamp smuggled onto a present-tense row:
-   * `whatWasKnown(at)` exists as its own capability (`known --at` on the CLI, exposed on the
-   * MCP server too), distinct from scanning a present-tense survey row for a hint.
-   */
-  test("the as-of answer is a separate read, not a field on a present-tense row", async () => {
+  /** A present-tense survey row carries no timestamp a caller could read an as-of answer off. */
+  test("a present-tense survey row carries no time", async () => {
     const { a, b } = await inTwoWorlds(inOrder(FIRST, SECOND), inOrder(SECOND, FIRST));
 
     // Both worlds hold both beliefs. Correct in both -- what is missing is the
@@ -154,8 +150,7 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     expect(b.map((q) => q.asks).sort()).toEqual(a.map((q) => q.asks).sort());
 
     // A survey row carries identity and words, and no time. Adding one here
-    // would mean a caller could read an as-of answer off a present-tense
-    // result, which is the leak `whatWasKnown()`'s own docstring refuses.
+    // would mean a caller could read an as-of answer off a present-tense result.
     const temporalFields = Object.keys(a[0]!).filter((k) =>
       /as_?of|believ|assert(ed)?_?at|recorded_?at|effective|when|timestamp|version/i.test(k),
     );
@@ -163,9 +158,6 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     // `answers` names every answering pursuit, claim and polarity, not time. Still no time
     // on the row -- the assertion above is the one that would catch that.
     expect(Object.keys(a[0]!).sort()).toEqual(["answers", "asks", "question"]);
-
-    // And the other half: the capability exists, as a read of its own.
-    expect(typeof ReadSurface.prototype.whatWasKnown).toBe("function");
   });
 
   test("the ordering survives only as a natural-id artefact, which is not a modelled read", async () => {
@@ -184,65 +176,6 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     // And it must not be relied on: the sequence is global, shared across
     // entity types, and not reset between tests. A consumer keying on it
     // would be reading a generator artefact as scientific chronology.
-  });
-});
-
-// ---------------------------------------------------------------------------
-
-describe("Probe 3 — reconstruction provenance: what was this reconstructing?", () => {
-  /**
-   * A durable reconstruction attempt whose remembered fields include its historical target --
-   * required by the contract's Designer 2.
-   */
-  test("reproducibility is a read the caller must already know the answer to", async () => {
-    const graph = await scenario.begin();
-    try {
-      const s = new ResearchSession(graph, {
-        clock,
-        events: inMemoryEventLog(),
-      });
-      const { enquiry } = await s.writes.openEnquiry(
-        "does the encoding beat the historical control?",
-      );
-
-      // The historical control, as it survives: recorded, hashed.
-      const { observations: historical } = await s.writes.recordObservations({
-        enquiry,
-        name: "random control",
-        finding: "the 2024 control, as archived",
-        contentHash: "sha256:1111",
-      });
-      const { analysis } = await recordAnalysis(s.writes, {
-        enquiry,
-        method: "paired-comparison",
-        from: [historical],
-        concludes: [
-          {
-            proposition: "the encoding beats the control",
-            finding: "difference 2.1%",
-          },
-        ],
-      });
-
-      // A regeneration that does NOT match -- coherent, unlike the first draft.
-      const report = await s.reads.reproducibilityOf({
-        analysis,
-        rebuilt: [{ part: historical, hash: "sha256:2222" }],
-      });
-      expect(report.differing.map((p) => p.name)).toEqual(["random control"]);
-      expect(report.reproducible).toBe(false);
-
-      // The finding, in two parts. One: the caller had to *pass in* the historical part. The
-      // direction of the reconstruction is an argument, supplied by someone who already knew
-      // it, and nothing is written down as a result -- reproducibilityOf is a read that
-      // persists nothing.
-      const provenanceFields = Object.keys(report).filter((k) =>
-        /target|reconstruct|attempt|of_?artefact|predecessor|derived_?from|lineage/i.test(k),
-      );
-      expect(provenanceFields).toEqual([]);
-    } finally {
-      await scenario.end();
-    }
   });
 });
 

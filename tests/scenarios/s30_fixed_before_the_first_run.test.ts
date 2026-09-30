@@ -73,11 +73,12 @@ describe("S-30: fixed before the first run", () => {
     expect(amended.confirmatoryAffected).toEqual([]);
 
     // And it is a real amendment, not a note beside the condition.
-    const history = await (await afterwards()).reads.designHistory({ gate });
-    const wordings = history.conditions.flatMap((c) =>
-      c.amendments.map((a) => a.replaced.requires),
+    const why = await (await afterwards()).reads.why({ subject: amended.amendment });
+    expect(why.because).toContainEqual(
+      expect.objectContaining({ handle: criterion, wording: `replaced ${VAGUE}` }),
     );
-    expect(wordings).toContain(VAGUE);
+    const status = await (await afterwards()).reads.gateStatus({ gate });
+    expect(status.checks.map((c) => c.proposition)).toEqual([PRECISE]);
 
     await captureConversation(
       {

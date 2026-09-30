@@ -5,7 +5,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ResearchSession, inMemoryEventLog, type Clock, type EventSink } from "@labkit/core-domain";
 import { openScenario, type Scenario } from "../helpers/scenario";
-import { claimNamed, whyOf } from "../helpers/claims";
+import { whyOf } from "../helpers/claims";
 import { recordAnalysis } from "../helpers/analysis";
 import { as, captureConversation } from "../helpers/conversation";
 
@@ -72,23 +72,19 @@ async function anAnalysisRestingOnBothControls(s: ResearchSession) {
 
 describe("S-9d: resting on one thing, or two?", () => {
   /**
-   * The control, and it does real work: it establishes that the two inputs are genuinely
-   * distinct in the record, so the collapse below is a fact about the read rather than about
-   * the fixture.
+   * The question a researcher actually asks: *why does this conclusion count as supported?* —
+   * and the answer names both inputs, from a second reader, so it is durable state.
    */
-  test("the record holds two distinct inputs under the one name", async () => {
-    const { surviving, regenerated, analysis } = await anAnalysisRestingOnBothControls(session);
+  test("two inputs sharing a name are reported as two", async () => {
+    const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
+    expect(surviving).not.toEqual(regenerated);
 
-    const parts = await (await afterwards()).reads.reproducibilityOf({
-      analysis,
-      rebuilt: [
-        { part: surviving, hash: "sha256:surviving" },
-        { part: regenerated, hash: "sha256:regenerated" },
-      ],
-    });
+    const why = await whyOf((await afterwards()).reads, DIVERGE);
 
-    expect(parts.exact.map((p) => p.part).sort()).toEqual([surviving, regenerated].sort());
-    expect(parts.exact.map((p) => p.name)).toEqual([NAME, NAME]);
+    expect(why.restingOn).toHaveLength(2);
+    expect(why.restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
+    expect(why.restingOn.map((a) => a.name)).toEqual([NAME, NAME]);
+    expect(why.verdict).toBe("supported");
 
     await captureConversation(
       {
@@ -99,44 +95,5 @@ describe("S-9d: resting on one thing, or two?", () => {
       },
       events,
     );
-  });
-
-  /**
-   * The question a researcher actually asks: *why does this conclusion count as supported?* —
-   * and the answer now names both inputs.
-   */
-  test("two inputs sharing a name are reported as two", async () => {
-    const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
-
-    const why = await whyOf((await afterwards()).reads, DIVERGE);
-
-    expect(why.restingOn).toHaveLength(2);
-    expect(why.restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
-    expect(why.restingOn.map((a) => a.name)).toEqual([NAME, NAME]);
-    expect(why.verdict).toBe("supported");
-  });
-
-  /**
-   * The same claim from a second reader, so this is a statement about durable state rather than
-   * about a value the first call happened to return.
-   */
-  test("the collapse is in the read, not in what was recorded", async () => {
-    const { surviving, regenerated } = await anAnalysisRestingOnBothControls(session);
-    const reader = await afterwards();
-
-    for (const part of [surviving, regenerated]) {
-      const rests = await reader.reads.whatDependsOn({ subject: part });
-      expect(rests.claims.map((c) => c.asserts)).toEqual([DIVERGE]);
-    }
-    expect(surviving).not.toEqual(regenerated);
-
-    await expect(reader.reads.whatDependsOn({ subject: NAME })).rejects.toThrow(
-      /2 artefacts are named/,
-    );
-
-    const restingOn = (
-      await reader.reads.whySupported({ claim: await claimNamed(reader.reads, DIVERGE) })
-    ).restingOn;
-    expect(restingOn.map((a) => a.part).sort()).toEqual([surviving, regenerated].sort());
   });
 });
