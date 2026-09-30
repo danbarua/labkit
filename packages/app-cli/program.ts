@@ -39,9 +39,9 @@ export function globalOptions(program: Command): Command {
         whole,
       )
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only
-      // subtracts: colour is off already when stdout is not a terminal or
-      // `NO_COLOR` is set, and `--json` is never coloured at all.
-      .option("--no-ansi", "never colour the output")
+      // subtracts: see `colourWanted` for the rest of the decision. `--json` is
+      // never coloured at all.
+      .option("--no-ansi", "never colour the output, on stdout or stderr")
       // Hidden from `--help` deliberately -- a `sudo` for the clock, not a
       // documented feature. It exists for backfilling real historical work
       // (bonsai-2026: a record whose events predate labkit's own existence),
