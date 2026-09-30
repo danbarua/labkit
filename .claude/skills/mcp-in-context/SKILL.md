@@ -8,13 +8,12 @@ description: This skill should be used when asked to "debug the MCP server", "se
 The CLI and the MCP server are two adapters over one domain, and they do not
 answer alike: the CLI renders a page for a person, the server returns a
 document for an agent. A finding about the agent surface is not established by
-running `labkit gate GATE_3` — that shows what a **person** gets.
+running `labkit why GATE_3` — that shows what a **person** gets.
 
-Drive the server itself:
+Drive the server itself, with `scripts/mcp-call.sh`:
 
 ```sh
-npx -y @modelcontextprotocol/inspector --cli <binary> mcp \
-  --method tools/call --tool-name now | jq .
+LABKIT_RECORD=<project dir> scripts/mcp-call.sh tools/call work_list | jq .
 ```
 
 ## The four things that go wrong
@@ -26,18 +25,23 @@ the shell's. A wrong or missing name fails as
 a server fault and is not one. `scripts/mcp-call.sh` resolves the binary and
 refuses if it cannot.
 
-**The working directory chooses the record.** The server resolves its database
-the same way every LabKit process does — `--db`, then `LABKIT_HOME`, then the
-project root of the directory it started in. Running the inspector inside a
-project answers about that project. Running it in the wrong place answers about
-a different record, or silently creates an empty one.
+**The inspector keeps the server's flags.** In
+`npx @modelcontextprotocol/inspector --cli <binary> --db <dir> mcp …`, the
+inspector takes `--db` for itself and labkit starts with no command, which
+closes the connection. `mcp --read-only` loses `--read-only` the same way, and
+the server starts with its write tools. `scripts/mcp-call.sh` puts the flags in
+a wrapper script and hands the inspector that.
 
-**Writes are unreachable this way, by construction.** Every invocation opens a
-connection, runs one method and exits, so `register_session` cannot persist
-into a second call — and every write tool refuses until a session is
-registered. A write attempt returns the refusal, not a write. That makes the
-inspector a **read-only** instrument here, which is why it is safe against a
-live record. Do not try to defeat it.
+**The record is `--db`, or else the working directory's.** The server resolves
+its record the way every LabKit command does: `--db`, then `LABKIT_HOME`, then
+the root of the git repository it started in, then the nearest `.labkit/`.
+Pointed at the wrong place it answers about a different record, or creates an
+empty one.
+
+**Writes go through.** Every write tool is live over the inspector, and a
+write lands in the record the server opened. `scripts/mcp-call.sh` starts the
+server with `--read-only` unless `MCP_CALL_WRITE=1`; a read-only server
+registers no write tool, and a call to one fails as `tool_not_found`.
 
 **A refusal is not a crash.** An erroring tool returns `isError: true` with the
 message in `content[0].text`, and the CLI exits non-zero with
@@ -50,42 +54,40 @@ is the operator's half of the diagnosis and does not reach the agent.
 List the surface, when the question is what exists:
 
 ```sh
-npx -y @modelcontextprotocol/inspector --cli <binary> mcp --method tools/list \
-  | jq -r '.tools[].name'
+scripts/mcp-call.sh tools/list | jq -r '.tools[].name'
 ```
 
 Call one tool, with arguments:
 
 ```sh
-npx -y @modelcontextprotocol/inspector --cli <binary> mcp \
-  --method tools/call --tool-name gate_status --tool-arg gate=GATE_3
+scripts/mcp-call.sh tools/call why subject=GATE_3
 ```
 
 Read the **document**, not the rendering — `.structuredContent` is the object
 an agent's schema-aware client consumes:
 
 ```sh
-… --tool-name now | jq '.structuredContent'
+scripts/mcp-call.sh tools/call why subject=GATE_3 | jq '.structuredContent'
 ```
 
 Measure what a call costs, which is the question a size complaint turns on:
 
 ```sh
-… --tool-name gate_status --tool-arg gate=GATE_3 \
+scripts/mcp-call.sh tools/call why subject=GATE_3 \
   | jq '{text: (.content[0].text|length), structured: (.structuredContent|tostring|length)}'
 ```
 
 ## What to look for in a response
 
 **Every result ships twice**, deliberately — as `content[0].text` (a JSON
-string) and as `structuredContent` (the object). Both are the same answer.
-So the bytes an agent's transport carries are roughly **double** what the
-report itself weighs, and a payload measured from `--json` on the CLI is about
-half the real cost. Measured 2026-09-03 on `gate_status GATE_3`: 63,505 +
-51,185 = 135,022 bytes for a 63KB report.
+string, indented) and as `structuredContent` (the object). Both are the same
+answer. So the bytes an agent's transport carries are more than **double** what
+the compact report weighs, and a payload measured from `--json` on the CLI is
+less than half the real cost. Measured 2026-10-01 on one `note` write: 666
+characters of text and 418 of compact structured content.
 
-**An empty list is an answer.** `"unresolved": []` means nothing is
-unresolved, not that the tool failed to look. Read a report's own wording for
+**An empty list is an answer.** `"work": []` means no planned work is on the
+record, not that the tool failed to look. Read a report's own wording for
 whether it claims more than it examined.
 
 **Compare against the CLI when a difference is suspected**, and expect the
@@ -96,10 +98,9 @@ distinction with no renderer was found on 2026-09-03.
 
 ## Rules against a live record
 
-Read-only, always, and prefer a scratch database when a write is genuinely
-needed: `--db` into a temporary directory, driven through the CLI rather than
-through the inspector. Never point a write at a record someone is working in;
-never `rm -rf` a `.labkit` directory that is not yours.
+Read-only against a record someone is working in: leave `MCP_CALL_WRITE`
+unset. A write goes to a scratch record — `LABKIT_RECORD` set to a temporary
+directory. Never `rm -rf` a `.labkit` directory that is not yours.
 
 ## SDK traps (`@modelcontextprotocol/sdk` 1.30.0)
 
@@ -118,8 +119,9 @@ Each was found by debugging. Each is a behaviour, not a design rule.
 
 ## Additional resources
 
-- **`scripts/mcp-call.sh`** — resolves the binary, runs one method against a
-  named record, pipes through `jq`. Use it rather than retyping the invocation.
+- **`scripts/mcp-call.sh`** — resolves the binary and runs one method against a
+  named record, read-only unless `MCP_CALL_WRITE=1`. Use it rather than
+  retyping the invocation.
 - **`references/response-anatomy.md`** — the full shape of a success, a
   refusal and the stderr request log, with real payloads; read it when a
   response looks wrong rather than merely unexpected.

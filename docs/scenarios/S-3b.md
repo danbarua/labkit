@@ -19,7 +19,7 @@ sequenceDiagram
 
 ## What moved
 
-`labkit why-supported CLM_7` answers:
+`labkit why CLM_7` answers:
 
 **T differs from rewired** — standard-unmet, held as exploratory.
 

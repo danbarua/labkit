@@ -151,7 +151,7 @@ function fromSupport(outcome: SupportOutcome): string[] {
   const findings = (rows: Array<{ finding: string }> | undefined) =>
     (rows ?? []).map((r) => r.finding).join("; ");
   const out = [
-    `\`labkit why-supported ${outcome.claim}\` answers:`,
+    `\`labkit why ${outcome.claim}\` answers:`,
     "",
     `**${outcome.proposition}** — ${outcome.verdict}, held as ${outcome.standing}.`,
     "",
