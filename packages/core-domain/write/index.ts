@@ -79,8 +79,23 @@ export type Operation = Methods<WriteSurface>;
 
 /**
  * An operation no verb writes any more, but that recorded events still carry.
+ *
+ * An event's `operation` and `command` are stored as text and JSON and read back as they
+ * are: nothing decodes them by operation, and the graph is projected from `changes` alone.
+ * So an event under one of these names loads, lists and projects like any other.
  */
-export type RetiredOperation = "promote" | "is";
+export type RetiredOperation =
+  | "promote"
+  | "is"
+  | "sharpen"
+  | "recordReview"
+  | "closeGate"
+  | "reverify"
+  | "isUndecided"
+  | "undo"
+  | "replaceAnalysis"
+  | "keep"
+  | "reinterpret";
 
 /** What a verb's body returns: what the act was about, and what it produced. */
 export interface Act<R> {
