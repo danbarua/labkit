@@ -811,6 +811,91 @@
   color: var(--lk-primary-text);
   font-weight: 600;
 }
+/* a question from the agent, answered in a form drawn from its schema */
+.lk-elicitation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--lk-accent);
+  border-radius: var(--lk-radius);
+  background: var(--lk-surface);
+}
+.lk-elicitation-message {
+  margin: 0;
+  font-weight: 600;
+}
+.lk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lk-field-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: baseline;
+}
+.lk-field-check .lk-field-hint {
+  grid-column: 2;
+}
+.lk-field-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.lk-field-required {
+  color: var(--lk-muted);
+  font-weight: 400;
+}
+.lk-field-hint {
+  margin: 0;
+  color: var(--lk-muted);
+  font-size: 12px;
+}
+.lk-field input:not([type="checkbox"]),
+.lk-field select {
+  max-width: 28em;
+  padding: 5px 8px;
+  border: 1px solid var(--lk-line);
+  border-radius: 6px;
+  background: var(--lk-bg);
+  color: var(--lk-text);
+  font: inherit;
+}
+.lk-field input:focus-visible,
+.lk-field select:focus-visible {
+  outline: none;
+  border-color: var(--lk-accent);
+  box-shadow: 0 0 0 3px var(--lk-accent-soft);
+}
+.lk-field[data-invalid] input,
+.lk-field[data-invalid] select {
+  border-color: var(--lk-danger);
+}
+.lk-field-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.lk-choice {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.lk-field-problem {
+  margin: 0;
+  color: var(--lk-danger);
+  font-size: 12px;
+}
+.lk-elicitation .lk-actions {
+  margin-top: 0;
+}
+a.lk-btn {
+  text-decoration: none;
+}
 .lk-btn.danger {
   color: var(--lk-danger);
   border-color: var(--lk-danger);

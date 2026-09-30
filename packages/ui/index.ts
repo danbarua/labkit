@@ -1,6 +1,7 @@
 export { Composer, type ComposerProps } from "./composer";
 export { Conversation, type ConversationProps } from "./conversation";
 export { diffLines } from "./format";
+export { ElicitationForm, problemsWith } from "./elicitation";
 export { MarkdownText } from "./markdown";
 export { focusableIn, useFocusTrap } from "./overlay/focus-trap";
 export { filterItems, OptionList, type PickItem, useListNavigation } from "./overlay/list";

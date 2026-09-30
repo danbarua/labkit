@@ -1,7 +1,13 @@
-import type { AvailableCommand, SessionConfigOption } from "@agentclientprotocol/sdk";
+import type {
+  AvailableCommand,
+  CreateElicitationRequest,
+  CreateElicitationResponse,
+  SessionConfigOption,
+} from "@agentclientprotocol/sdk";
 import {
   CommandPalette,
   Composer,
+  ElicitationForm,
   Modal,
   PalettePanel,
   type PickItem,
@@ -347,6 +353,70 @@ function PaletteDemo() {
   );
 }
 
+// One field of every kind the protocol allows, as an agent would ask before a run.
+const RUN_QUESTION: CreateElicitationRequest = {
+  sessionId: "demo",
+  mode: "form",
+  message: "Before I start the sweep, a few settings.",
+  requestedSchema: {
+    type: "object",
+    required: ["name", "seeds", "optimiser"],
+    properties: {
+      name: {
+        type: "string",
+        title: "Run name",
+        description: "Letters, digits and dashes.",
+        minLength: 3,
+        maxLength: 40,
+        pattern: "^[a-z0-9-]+$",
+      },
+      contact: { type: "string", title: "Email me the result", format: "email" },
+      deadline: { type: "string", title: "Finish by", format: "date" },
+      optimiser: {
+        type: "string",
+        title: "Optimiser",
+        oneOf: [
+          { const: "adamw", title: "AdamW" },
+          { const: "sgd", title: "SGD with momentum" },
+          { const: "lion", title: "Lion" },
+        ],
+      },
+      seeds: { type: "integer", title: "Seeds", minimum: 1, maximum: 10, default: 3 },
+      lr: { type: "number", title: "Learning rate", minimum: 0, maximum: 1 },
+      datasets: {
+        type: "array",
+        title: "Datasets",
+        minItems: 1,
+        maxItems: 2,
+        items: { type: "string", enum: ["cifar10", "cifar100", "svhn"] },
+      },
+      dryRun: { type: "boolean", title: "Dry run first", default: true },
+    },
+  },
+};
+
+const SIGN_IN: CreateElicitationRequest = {
+  sessionId: "demo",
+  mode: "url",
+  elicitationId: "demo-sign-in",
+  message: "Sign in to Weights & Biases so I can read the sweep.",
+  url: "https://wandb.ai/authorize?request=demo",
+};
+
+/** Two questions from the agent, and what answering each would send back. */
+function ElicitationDemo() {
+  const [sent, setSent] = useState<CreateElicitationResponse | undefined>(undefined);
+  return (
+    <div style={{ ...pad, overflow: "auto" }}>
+      <ElicitationForm request={RUN_QUESTION} onRespond={setSent} />
+      <ElicitationForm request={SIGN_IN} onRespond={setSent} />
+      <p style={note}>
+        {sent === undefined ? "Nothing sent yet." : `Would send: ${JSON.stringify(sent)}`}
+      </p>
+    </div>
+  );
+}
+
 /** The shared overlay pieces and the composer, each in a tile of its own. */
 export function BuildingBlocks({ theme }: { theme: Theme }) {
   return (
@@ -359,6 +429,9 @@ export function BuildingBlocks({ theme }: { theme: Theme }) {
       </Tile>
       <Tile id="composer-mention" title="Composer, typing a mention" theme={theme}>
         <ComposerDemo initialText="Does @" />
+      </Tile>
+      <Tile id="elicitation" title="A question from the agent" theme={theme}>
+        <ElicitationDemo />
       </Tile>
       <Tile id="command-palette" title="Command palette" theme={theme}>
         <PaletteDemo />
