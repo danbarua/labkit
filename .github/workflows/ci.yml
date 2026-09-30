@@ -61,6 +61,21 @@ jobs:
           git push origin "$tag"
           echo "tagged $tag"
 
+  # Labels a pull request with the areas its changed files are in (.github/labeler.yml),
+  # and removes an area it no longer touches. A job here rather than its own workflow:
+  # each workflow run is a separate check suite, and a separate suite would announce
+  # itself on every push.
+  label-areas:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          sync-labels: true
+
   # The suite, split five ways: root tests/ and every package's own tests. Round-robin
   # over the sorted file list, so a new test file joins a shard without anyone updating one. Measured 34.6s-42.7s
   # a shard, against 192s in one run.
