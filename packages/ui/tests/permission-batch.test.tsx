@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import type { RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PermissionBatch } from "../permission";
+import { PermissionBatch, PermissionPrompt } from "../permission";
 
 const entry = (id: string, kinds: string[]): PermissionEntry => ({
   requestId: id,
@@ -61,5 +61,31 @@ describe("answering every waiting request", () => {
       ["a", { outcome: "selected", optionId: "a-reject_once" }],
       ["b", { outcome: "selected", optionId: "b-reject_once" }],
     ]);
+  });
+});
+
+describe("one waiting request", () => {
+  test("names in full every file it acts on, whatever its input calls them", () => {
+    const html = renderToStaticMarkup(
+      <PermissionPrompt
+        entry={{
+          requestId: "a",
+          request: {
+            toolCall: {
+              toolCallId: "call-a",
+              title: "write_file",
+              rawInput: { path: "settings.json", text: "{}" },
+              locations: [
+                { path: "/Users/dan/.vscode/settings.json" },
+                { path: "/w/a.py", line: 3 },
+              ],
+            },
+            options: [{ optionId: "ok", name: "Allow once", kind: "allow_once" }],
+          },
+        }}
+      />,
+    );
+    expect(html).toContain("<code>/Users/dan/.vscode/settings.json</code>");
+    expect(html).toContain("<code>/w/a.py:3</code>");
   });
 });

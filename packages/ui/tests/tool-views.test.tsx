@@ -162,6 +162,23 @@ describe("a file a tool wrote", () => {
     expect(html).toContain("0644");
   });
 
+  test("while the person is deciding, the file is shown by its full path", () => {
+    const call = { ...wrote(null, null), status: "pending" } as ToolCall;
+    const html = renderToStaticMarkup(
+      <ToolCard
+        call={call}
+        permission={{
+          requestId: "p1",
+          request: {
+            toolCall: { toolCallId: "t1", title: "write_file" },
+            options: [{ optionId: "ok", name: "Allow once", kind: "allow_once" }],
+          },
+        }}
+      />,
+    );
+    expect(html).toContain(">/workspace/score.py · new file · 11 lines");
+  });
+
   test("a decorator is drawn as code, not as a comment", () => {
     const decorated = draw({
       ...wrote(null, null),

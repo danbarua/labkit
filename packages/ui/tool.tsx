@@ -293,6 +293,8 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
   const waiting = permission !== undefined && permission.outcome === undefined;
   const opensByDefault = waiting || content.some(isShownNotRead);
+  // While the person is deciding, a file is shown by its full path, not by the agent's name for it.
+  const namedBy = waiting ? undefined : call.rawInput;
   // The tool's own view of its result, when it has one; else the result is drawn by its shape.
   const view = toolView(call);
   // A result to look at (a chart, an image, a diff) comes before the input that made it, so a
@@ -351,7 +353,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
               .filter((item) => item.type === "diff")
               .map((item, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
-                <ToolContentView key={i} item={item} input={call.rawInput} />
+                <ToolContentView key={i} item={item} input={namedBy} />
               ))}
           </section>
         ) : content.length === 0 ? null : (
@@ -359,7 +361,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
             <h4>Result</h4>
             {content.map((item, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
-              <ToolContentView key={i} item={item} input={call.rawInput} />
+              <ToolContentView key={i} item={item} input={namedBy} />
             ))}
           </section>
         )}

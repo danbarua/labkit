@@ -861,6 +861,14 @@
   margin: 0 0 2px;
   font-weight: 600;
 }
+.lk-permission-paths {
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .lk-permission-sub {
   margin: 0 0 8px;
   color: var(--lk-muted);
