@@ -2,7 +2,11 @@ import { defineTool } from "@labkit/core-agent";
 import type { Tool } from "@labkit/core-agent/host";
 import { surfacesOver, type WithSurfaces } from "@labkit/app-mcp/server";
 import { TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
-import { type SessionRegistry, sessionRegistry } from "@labkit/core-domain/context";
+import {
+  registeredSession,
+  type SessionRegistry,
+  sessionRegistry,
+} from "@labkit/core-domain/context";
 import { z } from "zod";
 
 /** The prefix a research verb carries in the agent's tool list, so it cannot collide with a workspace tool. */
@@ -13,8 +17,8 @@ export const LABKIT_TOOL_PREFIX = "labkit_";
  * server registers: the names, descriptions and input schemas are those. Reads are offered as
  * `read` tools; every write is `other`, which the session's permission policy asks about.
  *
- * The session is the ACP session, whose id the runtime supplies with each call, so the writes are
- * attributed to it without a `register_session` call, and that tool is not offered. Build one set
+ * The session is the ACP session, whose id the runtime supplies with each call, and the writes are
+ * attributed to it. Build one set
  * per session: the attribution is held in a registry the set owns. `surfaces` defaults to the
  * record of `tenant`; a test passes its own.
  */
@@ -26,7 +30,8 @@ export function labkitTools(options: {
 }): ReadonlyMap<string, Tool> {
   const registry = sessionRegistry();
   const withSurfaces =
-    options.surfaces?.(registry) ?? surfacesOver({ tenant: options.tenant }, registry);
+    options.surfaces?.(registry) ??
+    surfacesOver({ tenant: options.tenant }, registeredSession(registry));
 
   /** Names the ACP session as the author of whatever this call writes. */
   const attribute = (sessionId: string | undefined, tool: string): void => {

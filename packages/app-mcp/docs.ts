@@ -1,18 +1,17 @@
 /**
- * The tool surface, as prose, generated from the tools.
+ * The tool surface, as prose, generated from the tools one server registers.
  */
 
-import {
-  SESSION_TOOLS,
-  TOOLS,
-  WRITE_TOOLS,
-  type SessionToolDefinition,
-  type ToolDefinition,
-  type WriteToolDefinition,
-} from "./tools";
+import type { ToolDefinition, WriteToolDefinition } from "./tools";
 
 /** The URI this document is served at. */
 export const DOCS_URI = "labkit://docs/tools";
+
+/** The tools one server registers, reads and writes apart. A read-only server has no writes. */
+export interface Registered {
+  readonly reads: readonly ToolDefinition[];
+  readonly writes: readonly WriteToolDefinition[];
+}
 
 /**
  * The same document as a tool.
@@ -25,48 +24,61 @@ export interface MetaToolDefinition {
   readonly handler: () => string;
 }
 
-export const DOCS_TOOL: MetaToolDefinition = {
-  name: "docs",
-  title: "How to use this server",
-  description:
-    "What this server is for and what each tool does, in prose, for a person reading it. " +
-    "Tool arguments are already in every caller's tool list, so this does not repeat them.",
-  handler: () => renderToolDocs(),
-};
+/** The name the documentation tool is registered under. */
+export const DOCS_TOOL_NAME = "docs";
+
+/** The documentation tool, describing the tools in `registered`. */
+export function docsTool(registered: Registered): MetaToolDefinition {
+  return {
+    name: DOCS_TOOL_NAME,
+    title: "How to use this server",
+    description:
+      "What this server is for and what each of its tools does, in prose, for a person reading " +
+      "it. Tool arguments are already in every caller's tool list, so this does not repeat them.",
+    handler: () => renderToolDocs(registered),
+  };
+}
 
 /** Tools about the server itself, not the record. Registered first, on every server. */
-export const META_TOOLS: readonly MetaToolDefinition[] = [DOCS_TOOL];
+export function metaTools(registered: Registered): readonly MetaToolDefinition[] {
+  return [docsTool(registered)];
+}
+
+/** `a`, `a and b`, `a, b and c` — tool names in backticks. */
+function named(tools: readonly { name: string }[]): string {
+  const names = tools.map((t) => `\`${t.name}\``);
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
 
 /**
- * What every client is told in the `initialize` handshake — before `tools/list`,
- * before any call, whether or not it implements resources. A paragraph, not the
- * page: enough to know what this is and where the rest is.
+ * What every client is told in the `initialize` handshake, before `tools/list`: what the record
+ * is, and the tools this server registers.
  */
-export const INSTRUCTIONS =
-  "LabKit is a research record: questions, the lines of enquiry pursuing them, what was " +
-  "measured, what was concluded, the conditions results are held to, and what any of it is " +
-  "holding up. Call `now` to see what stands. Every write tool refuses until " +
-  "`register_session` has said who you are.";
+export function instructionsFor(registered: Registered): string {
+  const reads = registered.reads.length === 0 ? "" : ` ${named(registered.reads)} read it.`;
+  const writes =
+    registered.writes.length === 0
+      ? " This server does not change the record."
+      : ` ${named(registered.writes)} change it.`;
+  return (
+    "LabKit is a research record: questions, the lines of enquiry pursuing them, what was " +
+    "measured, what was concluded, and the conditions results are held to." +
+    reads +
+    writes +
+    ` \`${DOCS_TOOL_NAME}\` describes each tool.`
+  );
+}
 
 /** Either kind. The renderer only reads the declaration, never the handler. */
-type AnyTool = ToolDefinition | WriteToolDefinition | SessionToolDefinition;
+type AnyTool = ToolDefinition | WriteToolDefinition;
 
 /**
- * The whole document.
+ * The whole document, for the tools in `registered`.
  */
-export function renderToolDocs(
-  reads: readonly ToolDefinition[] = TOOLS,
-  writes: readonly WriteToolDefinition[] = WRITE_TOOLS,
-  sessions: readonly SessionToolDefinition[] = SESSION_TOOLS,
-): string {
-  // Sessions first in the body, because the answer to "which do I call first"
-  // should not be found by scrolling. They are listed under their own heading
-  // rather than folded into the writes: a reader deciding what a tool costs
-  // wants "changes the record" to mean the graph, and this one changes only who
-  // the next write is signed by.
-  const all: AnyTool[] = [...sessions, ...reads, ...writes];
+export function renderToolDocs({ reads, writes }: Registered): string {
+  const all: AnyTool[] = [...reads, ...writes];
   const writeNames = new Set(writes.map((t) => t.name));
-  const sessionNames = new Set(sessions.map((t) => t.name));
   const anchor = (t: AnyTool) => `#${t.name.replace(/_/g, "-")}`;
   const entry = (t: AnyTool) => `- [\`${t.name}\`](${anchor(t)}) — ${t.title}`;
   /**
@@ -93,18 +105,9 @@ export function renderToolDocs(
     "questions, the lines of enquiry pursuing them, what was measured, what was",
     "concluded, and what any of it is holding up.",
     "",
-    "## Before you write",
-    "",
-    "`register_session` first. The write tools refuse until it has run.",
-    "",
-    ...index(sessions),
-    "",
-    "## Recording work",
-    "",
-    "These change the record.",
-    "",
-    ...index(writes),
-    "",
+    ...(writes.length === 0
+      ? []
+      : ["## Recording work", "", "These change the record.", "", ...index(writes), ""]),
     "## Asking about the record",
     "",
     "These change nothing.",
@@ -119,13 +122,7 @@ export function renderToolDocs(
       "",
       `## ${tool.name}`,
       "",
-      `*${tool.title}* — ${
-        sessionNames.has(tool.name)
-          ? "**changes nothing in the record, and is what lets you change it**"
-          : writeNames.has(tool.name)
-            ? "**changes the record**"
-            : "read-only"
-      }`,
+      `*${tool.title}* — ${writeNames.has(tool.name) ? "**changes the record**" : "read-only"}`,
       "",
       tool.description,
       "",

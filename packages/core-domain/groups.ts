@@ -20,8 +20,6 @@ export const READ_GROUPS = [
 
 /** The write groups, in the order a reader meets them. */
 export const WRITE_GROUPS = [
-  /** The one call that must come first: every write below refuses without it. */
-  "Before anything",
   /** Putting a question, and opening work against it. */
   "Asking",
   /** Measuring, analysing, concluding, reviewing. */

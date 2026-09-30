@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 /**
  * The MCP server — the door an agent works through.
  */
@@ -10,16 +9,14 @@ import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ReadSurface, WriteSurface, openRecord } from "@labkit/core-domain";
 import type { RecordLocation } from "@labkit/core-db/connect";
-import { pgEventLog } from "@labkit/core-domain/event-store";
 import {
   commandContext,
   mockGitContext,
-  registeredSession,
-  sessionRegistry,
-  type SessionRegistry,
+  mockSessionContext,
+  type SessionContextProvider,
 } from "@labkit/core-domain/context";
-import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "./tools";
-import { DOCS_URI, INSTRUCTIONS, META_TOOLS, renderToolDocs } from "./docs";
+import { TOOLS, WRITE_TOOLS } from "./tools";
+import { DOCS_URI, instructionsFor, metaTools, renderToolDocs, type Registered } from "./docs";
 
 /**
  * Everything a tool call needs, for the duration of that call and no longer.
@@ -48,42 +45,39 @@ function declaredOutput(schema: z.ZodType | undefined): { outputSchema?: z.ZodTy
  */
 export function buildServer(
   withSurfaces: WithSurfaces,
-  session: SessionRegistry,
   { readOnly = false }: { readOnly?: boolean } = {},
 ): McpServer {
+  // What this server registers, decided before anything is registered: the handshake's
+  // instructions and the documentation both describe this list and no other.
+  const registered: Registered = { reads: TOOLS, writes: readOnly ? [] : WRITE_TOOLS };
+
   // The package's version, not a constant: `serverInfo.version` is what the MCP spec has for
-  // "which build am I talking to", and a client displaying a hardcoded one reads as sourced
-  // while being wrong. It said `0.0.1` from before the first release until 2026-09-05, while
-  // `labkit --version` was right — one binary, two surfaces, disagreeing about what they were.
+  // "which build am I talking to".
   const server = new McpServer(
     { name: "labkit", version: labkitVersion() },
-    { instructions: INSTRUCTIONS },
+    { instructions: instructionsFor(registered) },
   );
 
-  // The tool surface as prose, rendered on each read from the same `TOOLS` the loops below
-  // register. Served twice — as a resource, and as a tool — because not every client implements
-  // resources, and one that does not sees the resource in no list.
+  // The tool surface as prose, rendered on each read from `registered`. Served twice — as a
+  // resource, and as a tool — because not every client implements resources, and one that does
+  // not sees the resource in no list.
   server.registerResource(
     "tool-docs",
     DOCS_URI,
     {
       title: "LabKit tools",
       description:
-        "Human-readable documentation of every tool that touches the record -- what each " +
-        "answers, what it takes and what it returns -- generated from the tool " +
-        "declarations themselves, so it cannot fall behind them.",
+        "What each tool on this server does, in prose, generated from the tool declarations.",
       mimeType: "text/markdown",
     },
     (uri) => ({
-      contents: [{ uri: uri.href, mimeType: "text/markdown", text: renderToolDocs() }],
+      contents: [{ uri: uri.href, mimeType: "text/markdown", text: renderToolDocs(registered) }],
     }),
   );
 
-  // **First in the list, deliberately.** `tools/list` is served in registration
-  // order; a client that cannot see resources meets the documentation before
-  // the tools it documents. On every server, read-only included, because it
-  // describes whichever list this one serves.
-  for (const definition of META_TOOLS) {
+  // First in the list: `tools/list` is served in registration order, so a client that cannot
+  // see resources meets the documentation before the tools it documents.
+  for (const definition of metaTools(registered)) {
     server.registerTool(
       definition.name,
       {
@@ -97,28 +91,7 @@ export function buildServer(
     );
   }
 
-  // **Second, before the reads.** This is the only tool whose absence makes every write refuse
-  // — an agent scanning the list meets it before the verbs it gates rather than two thirds of
-  // the way down.
-  if (!readOnly) {
-    for (const definition of SESSION_TOOLS) {
-      server.registerTool(
-        definition.name,
-        {
-          title: definition.title,
-          description: definition.description,
-          inputSchema: definition.inputSchema,
-          ...declaredOutput(definition.outputSchema),
-          // No `readOnlyHint`, matching the writes. It changes nothing in the
-          // record and is not a read either; an absent hint is the honest thing
-          // to say about a tool that is neither.
-        },
-        respond(definition.name, (args) => definition.handler(session, args)),
-      );
-    }
-  }
-
-  for (const definition of TOOLS) {
+  for (const definition of registered.reads) {
     server.registerTool(
       definition.name,
       {
@@ -136,16 +109,7 @@ export function buildServer(
     );
   }
 
-  // **Nothing below this line is registered on a read-only server**, and the
-  // early return is why the reads are registered above rather than in one loop
-  // with a filter: a filter would leave a reader wondering which list a tool
-  // came from, and this way the shape of the function is the answer.
-  if (readOnly) return server;
-
-  // Registered before the writes, and reachable when they are not: this is the
-  // one tool whose whole job is to open the gate below.
-
-  for (const definition of WRITE_TOOLS) {
+  for (const definition of registered.writes) {
     server.registerTool(
       definition.name,
       {
@@ -154,26 +118,15 @@ export function buildServer(
         inputSchema: definition.inputSchema,
         ...declaredOutput(definition.outputSchema),
       },
-      // A surface per call, so each write records the attribution and commit in force at the
-      // moment it ran rather than at server start.
-      respond(definition.name, (args) => {
-        requireRegistered(session, definition.name);
-        return withSurfaces(({ write }) => definition.handler(write, args));
-      }),
+      // A surface per call, so each write records the commit in force at the moment it ran
+      // rather than at server start.
+      respond(definition.name, (args) =>
+        withSurfaces(({ write }) => definition.handler(write, args)),
+      ),
     );
   }
 
   return server;
-}
-
-/**
- * Refuses a write from a caller who has not said who they are.
- */
-function requireRegistered(session: SessionRegistry, tool: string): void {
-  if (session.registered()) return;
-  throw new Error(
-    `${tool} needs a session: call register_session with your harness's id, then retry.`,
-  );
 }
 
 /**
@@ -205,25 +158,19 @@ let inFlight = 0;
 
 /**
  * The composition every surface is built through: connect, resolve the tenant, step down, hand
- * a tool both halves, close.
+ * a tool both halves, close. `session` names who each write is attributed to.
  */
 export function surfacesOver(
   { record, tenant }: { record?: RecordLocation; tenant: string },
-  session: SessionRegistry,
+  session: SessionContextProvider,
 ): WithSurfaces {
   return async (work) => {
     // Providers are sampled per call, so a long-running server records the commit each piece
-    // of work was actually done against — and the agent registered at that moment rather than
-    // at server start.
+    // of work was actually done against, and the session named at that moment.
     const opened = await openRecord({
       ...(record === undefined ? {} : { record }),
       tenant,
-      context: commandContext(
-        mockGitContext,
-        registeredSession(session),
-        undefined,
-        session.registered()?.reconstructedFrom ?? undefined,
-      ),
+      context: commandContext(mockGitContext, session),
     });
     try {
       return await work({ read: opened.read, write: opened.write });
@@ -246,16 +193,8 @@ export async function main({
   tenant: string;
   readOnly?: boolean;
 }): Promise<void> {
-  // One registry for the life of the process, which over stdio is the life of
-  // one client's connection. Built here rather than defaulted inside
-  // `buildServer` for the same reason `pgEventLog` is: the tool that writes to
-  // it and the surface that reads from it must be looking at one object, and a
-  // component that defaults its own would hand them two.
-  const session = sessionRegistry();
-
-  const withSurfaces = surfacesOver({ record, tenant }, session);
-
-  const server = buildServer(withSurfaces, session, { readOnly });
+  // Nothing on stdio says who the caller is, so writes carry the stand-in session.
+  const server = buildServer(surfacesOver({ record, tenant }, mockSessionContext), { readOnly });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

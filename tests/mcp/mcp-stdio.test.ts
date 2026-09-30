@@ -89,17 +89,20 @@ test(
 );
 
 test(
-  "the launched server refuses a write until it is told who is calling",
+  "a write is attributed to the stand-in session, since nothing on stdio names the caller",
   async () => {
-    // **This is the gate's only test against a real process.** Everything else drives
-    // `buildServer` in-process over `InMemoryTransport`; here the server was spawned, and the
-    // registry it consults is the one `main()` built.
-    const refused = await client.callTool({
+    const noted = await client.callTool({
       name: "note",
       arguments: { text: "who is asking?" },
     });
-    expect(refused.isError).toBe(true);
-    expect(JSON.stringify(refused.content)).toContain("register_session");
+    expect(noted.isError ?? false).toBe(false);
+    const events = (
+      noted.structuredContent as {
+        events: { attribution: { attribution_label: string; attribution_id: string } }[];
+      }
+    ).events;
+    expect(events.map((e) => e.attribution.attribution_label)).toEqual(["mock-session"]);
+    expect(events.map((e) => e.attribution.attribution_id)).toEqual(["mock-session-0"]);
   },
   COLD_START,
 );
@@ -107,14 +110,6 @@ test(
 test(
   "it writes, and then reads back what it wrote",
   async () => {
-    // Signing on, exactly as an agent would: `agent-bus whoami` gives the id,
-    // this hands it to LabKit. Nothing verifies it and nothing is meant to.
-    const registered = await client.callTool({
-      name: "register_session",
-      arguments: { id: "stdio-test-0", label: "mcp-stdio test" },
-    });
-    expect(registered.isError ?? false).toBe(false);
-
     const noted = await client.callTool({
       name: "note",
       arguments: { text: "does the launched server write?" },
@@ -204,47 +199,6 @@ test(
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  },
-  COLD_START,
-);
-
-test(
-  "a session that says what it is reading off stamps every act it writes",
-  async () => {
-    // The launched process, so this exercises `surfacesOver` -- the in-memory
-    // harness in `tests/mcp.test.ts` builds its own surfaces and would pass
-    // even if the server never sampled the registry for a source.
-    const source = "Ito et al. 2024, fig. 3";
-    await client.callTool({
-      name: "register_session",
-      arguments: { id: "stdio-test-0", label: "mcp-stdio test", reconstructed_from: source },
-    });
-    const noted = await client.callTool({
-      name: "note",
-      arguments: { text: "was this act read off something?" },
-    });
-    expect(noted.isError ?? false).toBe(false);
-
-    // Off the write's own reply: every write returns the events it recorded,
-    // and the stamp rides on the event.
-    const stamps = (r: typeof noted) =>
-      (r.structuredContent as { events: { reconstructedFrom: string | null }[] }).events.map(
-        (e) => e.reconstructedFrom,
-      );
-    expect(stamps(noted).length).toBeGreaterThan(0);
-    expect(stamps(noted)).toEqual(stamps(noted).map(() => source));
-
-    // Registering again is a fresh statement of who is on the line, so the
-    // source does not carry over onto work nobody said was reconstructed.
-    await client.callTool({
-      name: "register_session",
-      arguments: { id: "stdio-test-0", label: "mcp-stdio test" },
-    });
-    const live = await client.callTool({
-      name: "note",
-      arguments: { text: "and this one, written with no source?" },
-    });
-    expect(stamps(live)).toEqual([null]);
   },
   COLD_START,
 );

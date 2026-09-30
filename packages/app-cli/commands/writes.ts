@@ -107,12 +107,12 @@ export function registerWrites(program: Command, run: Run): void {
   program
     .command("note")
     .helpGroup("Asking")
-    .summary("put a note on the record -- the one write with no prerequisites")
+    .summary("put a note on the record, on anything or on nothing")
     .description(
-      "A dated, attributed record with nothing else required. `search` reaches it like anything " +
-        "else with prose on it. --on attaches it to anything already on the record; skipping it " +
-        "costs nothing, since attaching is the part this verb exists to make optional. " +
-        "An existing note id with --supersedes records that it supersedes those notes, without writing a new note.",
+      "A dated, attributed note, on anything already on the record (--on) or on nothing. " +
+        "`search` finds it by its text. --supersedes names earlier notes it supersedes; both " +
+        "stay readable. An existing note id with --supersedes records that it supersedes those " +
+        "notes, without writing a new note.",
     )
     .argument("<text>", "the note, in your own words, or an existing note id with --supersedes")
     .option("--on <handle>", "what this note concerns, if anything")
@@ -210,8 +210,10 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Doing the work")
     .summary("assert one thing an analysis found")
     .description(
-      "One conclusion per call. --replacing supersedes exactly one earlier finding and " +
-        "inherits its proposition and bearing; a finding nothing names goes on standing.",
+      "One conclusion per call. --replacing names one earlier finding that this conclusion " +
+        "supersedes; --proposition and --bearing default to that finding's. On an analysis " +
+        "that revises an earlier one, a conclusion restating a proposition the revision " +
+        "superseded supersedes that finding without --replacing.",
     )
     .argument("<analysis-id>", "the analysis this conclusion belongs to")
     .requiredOption("--finding <text>", "what was found, in this analysis's own words")

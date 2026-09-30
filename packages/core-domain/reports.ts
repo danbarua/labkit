@@ -727,21 +727,6 @@ export const amendmentReport = z.strictObject({
   events: z.array(domainEvent),
 });
 
-/**
- * What `register_session` recorded.
- */
-const registration = z.strictObject({
-  id: z.string(),
-  label: z.string(),
-  /** What this connection's writes were read off, or `null` if nobody said. */
-  reconstructed_from: z.string().nullable(),
-});
-
-export const registeredSession = z.strictObject({
-  registered: registration,
-  replaced: registration.optional(),
-});
-
 /** One gate in a list of them. */
 const listedGate = z.strictObject({
   gate: ref("gate"),
@@ -825,7 +810,6 @@ export type CheckStatus = z.infer<typeof checkStatus>;
 export type RevisedFinding = z.infer<typeof revisedFinding>;
 export type GateGoverned = z.infer<typeof gateGoverned>;
 export type AnalysisRevision = z.infer<typeof analysisRevisionSchema>;
-export type Registration = z.infer<typeof registration>;
 export type ListedGate = z.infer<typeof listedGate>;
 export type ListedWork = z.infer<typeof listedWork>;
 export type Transcription = z.infer<typeof transcription>;
@@ -856,7 +840,6 @@ export type EvaluatedCriterion = z.infer<typeof evaluatedCriterion>;
 export type AcceptedAsUnresolved = z.infer<typeof acceptedAsUnresolved>;
 export type Restated = z.infer<typeof restated>;
 export type AmendmentReport = z.infer<typeof amendmentReport>;
-export type RegisteredSession = z.infer<typeof registeredSession>;
 export type GateList = z.infer<typeof gateList>;
 export type WorkList = z.infer<typeof workList>;
 
@@ -946,7 +929,6 @@ const SCHEMAS = {
   acceptedAsUnresolved,
   restated,
   amendmentReport,
-  registeredSession,
   gateList,
   workList,
   transcription,

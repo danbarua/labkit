@@ -12,16 +12,11 @@ import {
   WriteSurface,
   inMemoryEventLog,
 } from "@labkit/core-domain";
-import {
-  commandContext,
-  mockGitContext,
-  mockSessionContext,
-  sessionRegistry,
-} from "@labkit/core-domain/context";
+import { commandContext, mockGitContext, mockSessionContext } from "@labkit/core-domain/context";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import { buildServer } from "@labkit/app-mcp/server";
-import { DOCS_TOOL, META_TOOLS } from "@labkit/app-mcp/docs";
-import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
+import { DOCS_TOOL_NAME, metaTools } from "@labkit/app-mcp/docs";
+import { TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
 let scenario: Scenario;
@@ -44,21 +39,14 @@ async function connectServer(
   transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0],
 ): Promise<EventSink> {
   const events = inMemoryEventLog();
-  // Deliberately *not* pre-registered. Each session below calls
-  // `register_session` over the wire, which is what an agent actually does —
-  // and it means the write gate is exercised implicitly by every write in this
-  // file rather than only by the one test that names it.
-  const session = sessionRegistry();
-  await buildServer(
-    (work) =>
-      work({
-        read: new ReadSurface(graph, { events }),
-        write: new WriteSurface(graph, {
-          ...commandContext(mockGitContext, mockSessionContext),
-          events,
-        }),
+  await buildServer((work) =>
+    work({
+      read: new ReadSurface(graph, { events }),
+      write: new WriteSurface(graph, {
+        ...commandContext(mockGitContext, mockSessionContext),
+        events,
       }),
-    session,
+    }),
   ).connect(transport);
   return events;
 }
@@ -75,12 +63,8 @@ async function client(): Promise<{ client: Client; events: EventSink; seed: Writ
   const events = await connectServer(graph, serverSide);
   const c = new Client({ name: "smoke", version: "0" });
   await c.connect(clientSide);
-  // The first two things an agent does, and the first two this file does: read
-  // what the server is for, then say who it is. Every write below would be
-  // refused without the second, so a broken handshake fails these tests loudly
-  // rather than leaving one assertion red somewhere else.
-  await call(c, DOCS_TOOL.name, {});
-  await call(c, "register_session", { id: "smoke-agent-0", label: "smoke agent" });
+  // The first thing an agent does: read what the server is for.
+  await call(c, DOCS_TOOL_NAME, {});
   return { client: c, events, seed };
 }
 
@@ -269,7 +253,7 @@ describe("every tool answers when an agent actually calls it", () => {
    * The gate. It runs last because it reads what the tests above recorded.
    */
   test("no tool goes unexercised", () => {
-    const all = [...META_TOOLS, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS]
+    const all = [...metaTools({ reads: TOOLS, writes: WRITE_TOOLS }), ...TOOLS, ...WRITE_TOOLS]
       .map((t) => t.name)
       .sort();
     expect([...called].sort()).toEqual(all);

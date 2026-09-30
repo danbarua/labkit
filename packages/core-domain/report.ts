@@ -150,7 +150,6 @@ export type {
   RevisedFinding,
   GateGoverned,
   AnalysisRevision,
-  Registration,
   ListedAnalysis,
   ListedClaim,
   ListedCriterion,
@@ -188,7 +187,6 @@ export type {
   AcceptedAsUnresolved,
   Restated,
   AmendmentReport,
-  RegisteredSession,
   GateList,
   WorkList,
 } from "./reports";

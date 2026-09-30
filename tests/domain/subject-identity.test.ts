@@ -13,7 +13,6 @@ import {
   type Clock,
 } from "@labkit/core-domain";
 import { buildServer } from "@labkit/app-mcp/server";
-import { sessionRegistry } from "@labkit/core-domain/context";
 import { openScenario, type Scenario } from "../helpers/scenario";
 import { claimNamed, claimOf } from "../helpers/claims";
 import { ref } from "@labkit/core-domain/report";
@@ -54,15 +53,11 @@ async function overTheWire() {
   const graph = await scenario.begin();
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const events = inMemoryEventLog();
-  const session = sessionRegistry();
-  session.register("subject-identity", "subject-identity-0");
-  await buildServer(
-    (work) =>
-      work({
-        read: new ReadSurface(graph, { events }),
-        write: new WriteSurface(graph, { clock, events }),
-      }),
-    session,
+  await buildServer((work) =>
+    work({
+      read: new ReadSurface(graph, { events }),
+      write: new WriteSurface(graph, { clock, events }),
+    }),
   ).connect(serverSide);
   const client = new Client({ name: "subject-identity", version: "0" });
   await client.connect(clientSide);

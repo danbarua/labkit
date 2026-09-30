@@ -1,11 +1,9 @@
 /**
- * The tools, as data — reads in `TOOLS`, writes in `WRITE_TOOLS`, and the one that is neither
- * in `SESSION_TOOLS`.
+ * The tools, as data — reads in `TOOLS`, writes in `WRITE_TOOLS`.
  */
 
 import { z } from "zod";
 import type { ReadGroup, ReadSurface, WriteGroup, WriteSurface } from "@labkit/core-domain";
-import type { SessionRegistry } from "@labkit/core-domain/context";
 import { searchQuery, whyQuery, workListQuery } from "@labkit/core-domain/queries";
 import {
   concludeCommand,
@@ -20,7 +18,6 @@ import {
   noted,
   recordedAnalysis,
   recordedObservations,
-  registeredSession,
   search,
   workList,
 } from "@labkit/core-domain/reports";
@@ -90,13 +87,17 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
     title: "Why a record is in the state it's in",
     group: "What stands",
     description:
-      "Dispatches on the handle's own kind, in one uniform envelope every kind returns: a claim " +
-      "(the findings resting under it and bearing against it, the prespecified standard it is " +
-      "held to, and its verdict), a task (the line of enquiry and question it exists to " +
-      "advance), or a line of enquiry (its status, and where its own question now stands: " +
-      "established, provisional, accepted as unresolved, unresolved, untested). Also takes a " +
-      "proposition, resolved to every claim asserting that exact sentence. Every other kind " +
-      "this record does not explain yet is refused, naming the kinds it does.",
+      "Explains one record, in one envelope every kind returns: what it is and what makes it so. " +
+      "A claim: the findings under it and against it, the standard it is held to, its verdict. " +
+      "Planned work: its state and what decides it, and the line of enquiry and question it " +
+      "exists to advance. A line of enquiry: its status, and where its question stands. A gate: blocked, " +
+      "incomplete, satisfied, closed or never evaluated, and the checks behind it. A " +
+      "condition: its evaluations. An analysis: what it revised, or what it read and " +
+      "produced. Any other handle (a question, note, finding, observations, decision, " +
+      "evaluation, review): its own words and every record joined to it. Also takes a " +
+      "proposition, which resolves only when exactly one claim asserts that sentence; none or " +
+      "several is refused, naming the claims. `get` on the CLI shows what is stored under a " +
+      "handle rather than an explanation of it.",
     inputSchema: {
       subject: z.string().describe("a handle of any kind, or a claim's proposition"),
     },
@@ -157,12 +158,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Put a note on the record",
     group: "Asking",
     description:
-      "A dated, attributed record with nothing else required -- the one write with no " +
-      "prerequisites. `search` reaches it like anything else with prose on it. " +
-      "`on` attaches it to anything already on the record; omitting it costs nothing, since " +
-      "attaching is the part this verb exists to make optional. `supersedes` names earlier " +
-      "notes this one supersedes: both stay readable. With `note` and `supersedes` and no `text`, " +
-      "records that an existing note supersedes another, without writing a new note.",
+      "A dated, attributed note, on anything already on the record (`on`) or on nothing. " +
+      "`search` finds it by its text. `supersedes` names earlier notes this one supersedes; " +
+      "both stay readable. With `note` and `supersedes` and no `text`, records that an existing " +
+      "note supersedes others, without writing a new note.",
     inputSchema: {
       text: z.string().optional().describe("the note, in your own words"),
       note: z
@@ -282,10 +281,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     title: "Assert one thing an analysis found",
     group: "Doing the work",
     description:
-      "One conclusion per call. `replacing` supersedes exactly one earlier finding, named by " +
-      "its claim or evidence id, and inherits its `proposition` and `bearing`; a conclusion " +
-      "nothing names goes on standing. `replacing` is accepted only on an analysis recorded " +
-      "as superseding the one that concluded the named finding.",
+      "One conclusion per call. `replacing` names one earlier finding, by its claim or evidence " +
+      "id, that this conclusion supersedes; `proposition` and `bearing` default to that " +
+      "finding's. On an analysis that revises an earlier one, a conclusion restating a " +
+      "proposition the revision superseded supersedes that finding without `replacing`.",
     inputSchema: {
       analysis: z
         .string()
@@ -379,87 +378,3 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
       ),
   }),
 ] as ReadonlyArray<WriteToolDefinition<z.ZodRawShape>>;
-
-/**
- * One session tool. A third kind, and the third kind exists because the other two are defined
- * by the surface their handler is handed — and this handler is handed neither.
- */
-export interface SessionToolDefinition<Shape extends z.ZodRawShape = z.ZodRawShape> {
-  readonly name: string;
-  readonly title: string;
-  /** What a caller is doing when they reach for this — see `ToolDefinition.group`. */
-  readonly group: WriteGroup;
-  readonly description: string;
-  readonly inputSchema: Shape;
-  readonly outputSchema: z.ZodType;
-  handler(registry: SessionRegistry, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
-}
-
-/** The same pinning trick as {@link tool}, for the session half. */
-function sessionTool<Shape extends z.ZodRawShape>(
-  def: SessionToolDefinition<Shape>,
-): SessionToolDefinition<Shape> {
-  return def;
-}
-
-export const SESSION_TOOLS: readonly SessionToolDefinition<z.ZodRawShape>[] = [
-  sessionTool({
-    name: "register_session",
-    title: "Say who you are",
-    group: "Before anything",
-    description:
-      "Call this first: every write tool refuses until you have. It records which agent " +
-      "is on the other end of this connection, so every write that follows is stamped " +
-      "with it — an entry nobody signed is worse than no entry, because it looks " +
-      "attributed and is not. LabKit does not check the id and cannot: " +
-      "it records what you tell it. Pass the session id your harness gives you, if it gives " +
-      "you one, so the same session is nameable in every tool that logs about it; otherwise " +
-      "choose a stable one and keep using it. Registering again replaces the previous answer.",
-    inputSchema: {
-      id: z
-        .string()
-        .min(1)
-        .describe(
-          "stable id, for comparing two events — a cross-harness session id where you have one",
-        ),
-      label: z
-        .string()
-        .min(1)
-        .optional()
-        .describe("human-readable name a person scans in a report (default: the id)"),
-      reconstructed_from: z
-        .string()
-        .min(1)
-        .optional()
-        .describe(
-          "what the writes on this connection were read off — a paper, a document, a commit history. " +
-            "For work you did not perform. Not for your own results recorded afterwards: those were " +
-            "performed, however long ago, and take nothing here",
-        ),
-    },
-    outputSchema: registeredSession,
-    // Returns what it recorded, which is the rule for a verb that mints
-    // something: a caller who cannot read back what LabKit understood cannot
-    // tell a typo from a success. `replaced` is the previous registration, so
-    // registering twice is visible rather than silent.
-    handler: async (registry, { id, label, reconstructed_from }) => {
-      const was = registry.registered();
-      registry.register(label ?? id, id, reconstructed_from);
-      const now = registry.registered();
-      // Both sides built field by field rather than handed the registry's own
-      // object, so a field added to the registration cannot reach a strict
-      // output schema that does not declare it.
-      const said = (who: NonNullable<typeof was>) => ({
-        id: who.id,
-        label: who.label,
-        reconstructed_from: who.reconstructedFrom,
-      });
-      return {
-        registered: now
-          ? said(now)
-          : { id, label: label ?? id, reconstructed_from: reconstructed_from ?? null },
-        replaced: was ? said(was) : undefined,
-      };
-    },
-  }),
-] as ReadonlyArray<SessionToolDefinition<z.ZodRawShape>>;
