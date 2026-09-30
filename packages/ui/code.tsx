@@ -46,7 +46,18 @@ export function previewLength(lines: readonly string[], count = PREVIEW_LINES): 
  * opening lines until the rest is asked for. The whole file is highlighted and the cut is one of
  * height, so a string or a comment that runs past the cut is still coloured as what it is.
  */
-export function CodeView({ path, text, note }: { path: string; text: string; note?: string }) {
+export function CodeView({
+  path,
+  title,
+  text,
+  note,
+}: {
+  path: string;
+  /** The hover text of the caption: the file's full path, when `path` is a shorter name for it. */
+  title?: string;
+  text: string;
+  note?: string;
+}) {
   const [open, setOpen] = useState(false);
   const source = text.replace(/\n$/, "");
   const lines = useMemo(() => source.split("\n"), [source]);
@@ -60,7 +71,7 @@ export function CodeView({ path, text, note }: { path: string; text: string; not
   const hidden = lines.length - shown;
   return (
     <figure className="lk-code">
-      <figcaption className="lk-caption">
+      <figcaption className="lk-caption" {...(title === undefined ? {} : { title })}>
         {[path, note, `${lines.length} ${lines.length === 1 ? "line" : "lines"}`]
           .filter((part) => part !== undefined)
           .join(" · ")}

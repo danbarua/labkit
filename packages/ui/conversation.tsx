@@ -133,6 +133,7 @@ export function Conversation({
   const { ref, onScroll } = useStickToBottom(state);
   const usage = state.usage;
   const activity = currentActivity(state);
+  const drawn = drawnBlocks(state);
 
   return (
     <RecordsContext.Provider value={records}>
@@ -160,13 +161,13 @@ export function Conversation({
                 {state.blocks.length === 0 ? (
                   <div className="lk-empty">Nothing here yet.</div>
                 ) : null}
-                {drawnBlocks(state).map((item) =>
+                {drawn.map((item) =>
                   item.kind === "block" ? (
                     <BlockView
                       key={item.index}
                       block={item.block}
                       state={state}
-                      last={item.index === state.blocks.length - 1}
+                      last={item === drawn.at(-1)}
                       onMessageAction={onMessageAction}
                     />
                   ) : (

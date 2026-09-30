@@ -25,6 +25,11 @@ describe("folding runs of tool calls", () => {
     expect(drawn[0]?.kind === "tools" && drawn[0].blocks.length).toBe(2);
   });
 
+  test("a message that is only whitespace is not drawn, and does not break a run", () => {
+    const drawn = drawnBlocks(state(call("a", "read_file"), text("\n\n"), call("b", "read_file")));
+    expect(drawn.map((d) => d.kind)).toEqual(["tools"]);
+  });
+
   test("a call waiting on the person breaks the run and stands alone", () => {
     const asked: ViewEvent = {
       type: "permission_requested",

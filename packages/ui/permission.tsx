@@ -81,6 +81,19 @@ export function PermissionPrompt({
         {toolCall.name ? <span className="lk-mono">{toolCall.name} · </span> : null}
         it asks before it runs
       </p>
+      {/* Where it acts, in full: the agent's own wording in its input may name only a file. */}
+      {toolCall.locations && toolCall.locations.length > 0 ? (
+        <ul className="lk-permission-paths" aria-label="Files it acts on">
+          {toolCall.locations.map((location, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: one path can appear at several lines
+            <li key={i}>
+              <code>
+                {location.line == null ? location.path : `${location.path}:${location.line}`}
+              </code>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {toolCall.rawInput === undefined ? null : <ValueView value={toolCall.rawInput} />}
       <div className="lk-actions">
         {options.map((option) => (

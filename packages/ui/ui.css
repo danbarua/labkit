@@ -743,10 +743,13 @@
   color: var(--lk-danger);
 }
 .hljs-comment,
-.hljs-meta,
 .hljs-quote {
   color: var(--lk-muted);
   font-style: italic;
+}
+/* A decorator, a shebang, a preprocessor line: code that is read, not a comment. */
+.hljs-meta {
+  color: var(--lk-accent-text);
 }
 .hljs-title,
 .hljs-section {
@@ -857,6 +860,14 @@
 .lk-permission-title {
   margin: 0 0 2px;
   font-weight: 600;
+}
+.lk-permission-paths {
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .lk-permission-sub {
   margin: 0 0 8px;

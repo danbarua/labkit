@@ -80,10 +80,12 @@ export function ContentView({ block }: { block: ContentBlock }) {
 
 function DiffView({
   path,
+  title,
   before,
   after,
 }: {
   path: string;
+  title: string;
   before?: string | null;
   after: string;
 }) {
@@ -91,7 +93,9 @@ function DiffView({
   const marker = { same: "  ", add: "+ ", remove: "- " } as const;
   return (
     <div className="lk-diff">
-      <div className="lk-diff-path">{path}</div>
+      <div className="lk-diff-path" title={title}>
+        {path}
+      </div>
       {lines.map((line, i) => (
         // A diff has no stable ids: the same text can appear on many lines.
         // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
@@ -103,7 +107,24 @@ function DiffView({
   );
 }
 
-function ToolContentView({ item }: { item: ToolCallContent }) {
+/** Whether an argument names the file at `path`: the same path, or one relative to where it is. */
+const namesPath = (path: string, value: string): boolean =>
+  value === path || path.endsWith(`/${value}`);
+
+/**
+ * `path` as the call's input named it, when an argument does: what the agent wrote, and without
+ * the workspace's directories in front of it.
+ */
+function asNamed(path: string, input: unknown): string {
+  const args = decode(input);
+  if (!isRecord(args)) return path;
+  const named = Object.values(args).find(
+    (value): value is string => typeof value === "string" && namesPath(path, value),
+  );
+  return named ?? path;
+}
+
+function ToolContentView({ item, input }: { item: ToolCallContent; input: unknown }) {
   switch (item.type) {
     case "content":
       // A tool's text is often its result serialised: drawn by shape, not as an escaped string.
@@ -116,9 +137,19 @@ function ToolContentView({ item }: { item: ToolCallContent }) {
       // A diff from nothing is a new file: every line of it is an added one, so it is drawn as
       // the file it is.
       return item.oldText == null ? (
-        <CodeView path={item.path} text={item.newText} note="new file" />
+        <CodeView
+          path={asNamed(item.path, input)}
+          title={item.path}
+          text={item.newText}
+          note="new file"
+        />
       ) : (
-        <DiffView path={item.path} before={item.oldText} after={item.newText} />
+        <DiffView
+          path={asNamed(item.path, input)}
+          title={item.path}
+          before={item.oldText}
+          after={item.newText}
+        />
       );
     case "terminal":
       return <div className="lk-caption">terminal {item.terminalId}</div>;
@@ -187,8 +218,7 @@ function inputNotDrawn(content: readonly ToolCallContent[], rawInput: unknown): 
   const diffs = diffsIn(content);
   if (!isRecord(input) || diffs.length === 0) return rawInput;
   const drawn = (value: unknown): boolean =>
-    typeof value === "string" &&
-    diffs.some((d) => value === d.newText || d.path === value || d.path.endsWith(`/${value}`));
+    typeof value === "string" && diffs.some((d) => value === d.newText || namesPath(d.path, value));
   const rest = Object.entries(input).filter(([, value]) => !drawn(value));
   return rest.length === 0 ? undefined : Object.fromEntries(rest);
 }
@@ -263,6 +293,8 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   const showOutput = call.rawOutput !== undefined && !outputRepeatsContent(content, call.rawOutput);
   const waiting = permission !== undefined && permission.outcome === undefined;
   const opensByDefault = waiting || content.some(isShownNotRead);
+  // While the person is deciding, a file is shown by its full path, not by the agent's name for it.
+  const namedBy = waiting ? undefined : call.rawInput;
   // The tool's own view of its result, when it has one; else the result is drawn by its shape.
   const view = toolView(call);
   // A result to look at (a chart, an image, a diff) comes before the input that made it, so a
@@ -321,7 +353,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
               .filter((item) => item.type === "diff")
               .map((item, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
-                <ToolContentView key={i} item={item} />
+                <ToolContentView key={i} item={item} input={namedBy} />
               ))}
           </section>
         ) : content.length === 0 ? null : (
@@ -329,7 +361,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
             <h4>Result</h4>
             {content.map((item, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
-              <ToolContentView key={i} item={item} />
+              <ToolContentView key={i} item={item} input={namedBy} />
             ))}
           </section>
         )}
