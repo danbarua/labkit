@@ -8,8 +8,13 @@ export type Drawn =
   | { readonly kind: "block"; readonly block: Block; readonly index: number }
   | { readonly kind: "tools"; readonly blocks: readonly ToolBlock[]; readonly index: number };
 
+/** Whether a block would draw as nothing: a message whose text is only whitespace. */
+const isBlank = (block: Block): boolean =>
+  (block.kind === "assistant" || block.kind === "user") &&
+  block.content.every((part) => part.type === "text" && part.text.trim() === "");
+
 /**
- * The conversation's blocks with every run of two or more consecutive tool calls folded into one
+ * The conversation's blocks, less the ones that would draw as nothing, with every run of two or more consecutive tool calls folded into one
  * item. A call waiting on the person's answer is never folded in: it breaks the run and stands
  * alone, so the question is always in view.
  */
@@ -25,6 +30,7 @@ export function drawnBlocks(state: TranscriptState): Drawn[] {
     run = undefined;
   };
   state.blocks.forEach((block, index) => {
+    if (isBlank(block)) return;
     if (block.kind === "tool" && !waiting.has(block.toolCallId)) {
       if (run === undefined) run = { blocks: [], index };
       run.blocks.push(block);

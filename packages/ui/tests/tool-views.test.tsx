@@ -107,7 +107,9 @@ describe("a file a tool wrote", () => {
   );
 
   test("a new file is drawn as code in its language, not as a diff of added lines", () => {
-    expect(created).toContain("/workspace/score.py · new file · 11 lines");
+    expect(created).toContain(
+      '<figcaption class="lk-caption" title="/workspace/score.py">score.py · new file · 11 lines',
+    );
     expect(created).toContain('data-language="py"');
     expect(created).toContain('<span class="hljs-keyword">import</span> json');
     expect(created).not.toContain("lk-diff");
@@ -127,7 +129,7 @@ describe("a file a tool wrote", () => {
       ...wrote(null, null),
       content: [{ type: "diff", path: "/workspace/a.py", oldText: null, newText: "x = 1\n" }],
     } as ToolCall);
-    expect(short).toContain("/workspace/a.py · new file · 1 line");
+    expect(short).toContain(">/workspace/a.py · new file · 1 line");
     expect(short).not.toContain("max-height");
     expect(short).not.toContain("<button");
   });
@@ -160,7 +162,26 @@ describe("a file a tool wrote", () => {
     expect(html).toContain("0644");
   });
 
-  test("a changed file is still a diff", () => {
+  test("a decorator is drawn as code, not as a comment", () => {
+    const decorated = draw({
+      ...wrote(null, null),
+      content: [
+        {
+          type: "diff",
+          path: "/workspace/app.py",
+          oldText: null,
+          newText: "@app.route('/')\ndef index():\n    # home\n    pass\n",
+        },
+      ],
+    } as ToolCall);
+    expect(decorated).toContain('<span class="hljs-meta">@app.route(');
+    expect(decorated).toContain('<span class="hljs-comment"># home</span>');
+  });
+
+  test("a changed file is still a diff, under the path the call named", () => {
+    expect(changed).toContain(
+      '<div class="lk-diff-path" title="/workspace/score.py">score.py</div>',
+    );
     expect(changed).toContain("lk-diff-line add");
     expect(changed).toContain("+ SEEDS = 25");
     expect(changed).not.toContain("lk-code");

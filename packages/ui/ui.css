@@ -743,10 +743,13 @@
   color: var(--lk-danger);
 }
 .hljs-comment,
-.hljs-meta,
 .hljs-quote {
   color: var(--lk-muted);
   font-style: italic;
+}
+/* A decorator, a shebang, a preprocessor line: code that is read, not a comment. */
+.hljs-meta {
+  color: var(--lk-accent-text);
 }
 .hljs-title,
 .hljs-section {
