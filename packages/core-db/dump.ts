@@ -20,9 +20,11 @@ import { APP_ROLE } from "./schema";
 function restorable(dump: string): string {
   // `pg_dump` brackets its output in `\restrict` / `\unrestrict`, which only psql reads.
   const sql = dump.replace(/^\\(?:un)?restrict\b.*\r?\n?/gm, "");
+  // The body stops at the statement's `;`. A body that may run on would let a table with no
+  // `INHERITS` (`_ag_label_vertex` itself) match through to the next table's clause and hide it.
   const arity = new Map<string, number>();
   for (const m of sql.matchAll(
-    /^CREATE TABLE (\S+) \([\s\S]*?\)\nINHERITS \(\S+\._ag_label_(vertex|edge)\);/gm,
+    /^CREATE TABLE (\S+) \([^;]*\)\nINHERITS \(\S+\._ag_label_(vertex|edge)\);/gm,
   ))
     arity.set(m[1]!, m[2] === "vertex" ? 1 : 3);
   const graphid = (literal: string): string => {

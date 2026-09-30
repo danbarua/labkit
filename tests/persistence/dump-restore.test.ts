@@ -68,3 +68,54 @@ test("dump then restore gives back the graph, and the restored graph takes a wri
     rmSync(target, { recursive: true, force: true });
   }
 }, 60_000);
+
+test("every graph label comes back, including the first vertex and edge label in the dump", async () => {
+  // `pg_dump` orders tables by name, so `Artefact` directly follows `_ag_label_vertex` and
+  // `ABOUT` directly follows `_ag_label_edge`: the two tables whose rows were left unrewritten.
+  const source = mkdtempSync(join(tmpdir(), "labkit-dump-src-"));
+  const target = mkdtempSync(join(tmpdir(), "labkit-dump-dst-"));
+  try {
+    let sql: string;
+    const handles: string[] = [];
+    const before = new Map<string, unknown>();
+    const from = await connectScratch(source);
+    try {
+      const ctx = await resolveTenantContext(from.db, from.tx, "labkit");
+      const graph = new TenantGraph(ctx, from.db, from.tx);
+      const artefact = await graph.createNode("Artefact", {
+        kind: "observations",
+        logical_name: "runs.parquet",
+      });
+      const claim = await graph.createNode("Claim", { name: "the dump comes back" });
+      const verdict = await graph.createNode("CriterionEvaluation", {
+        value: "it does",
+        outcome: "pass",
+        evaluated_at: "2026-09-22T00:00:00.000Z",
+      });
+      await graph.createEdge(verdict.natural_id, "ABOUT", claim.natural_id);
+      handles.push(artefact.natural_id, claim.natural_id, verdict.natural_id);
+      for (const id of handles) before.set(id, await graph.entityAsHal(id, 1));
+      sql = await dumpSql(from);
+    } finally {
+      await from.close();
+    }
+
+    expect(sql).toContain('INSERT INTO labkit_t1."Artefact" VALUES (ag_catalog._graphid(');
+    expect(sql).toContain('INSERT INTO labkit_t1."ABOUT" VALUES (ag_catalog._graphid(');
+    expect(sql).not.toMatch(/^INSERT INTO labkit_t1\."[^"]+" VALUES \('\d+'/m);
+
+    await restoreInto(join(target, "pglite"), sql);
+
+    const to = await connectScratch(target);
+    try {
+      const ctx = await resolveTenantContext(to.db, to.tx, "labkit");
+      const graph = new TenantGraph(ctx, to.db, to.tx);
+      for (const id of handles) expect(await graph.entityAsHal(id, 1)).toEqual(before.get(id));
+    } finally {
+      await to.close();
+    }
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+}, 60_000);
