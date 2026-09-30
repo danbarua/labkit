@@ -68,8 +68,8 @@ export function buildProgram(run: Run, located?: () => RecordLocation): Command 
       "A research record, from the command line.\n\n" +
         "Start with:\n" +
         "  labkit now              what is blocked, and what is ready to start\n" +
-        "  labkit known            every question, and how well each is answered\n" +
         "  labkit claims           every conclusion on the record\n" +
+        "  labkit enquiries        every line of enquiry\n" +
         "  labkit search <text>    find a handle by its wording\n\n" +
         "Most other commands take a handle. The lists above are where handles come from.",
     )

@@ -181,7 +181,7 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<enquiry-id>", "the line of enquiry this belongs to")
     .requiredOption("--method <text>", "what was done")
-    .requiredOption(
+    .option(
       "--from <id>",
       "an input: ART_… observations or an earlier COMP_… analysis (repeatable)",
       collect(String),
@@ -198,7 +198,7 @@ export function registerWrites(program: Command, run: Run): void {
         {
           enquiry,
           method: opts.method,
-          from: opts.from,
+          from: opts.from ?? [],
           ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
           ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
         },
@@ -389,10 +389,7 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<criterion-id>", "the condition being amended")
     .requiredOption("--now-requires <text>", "the replacement condition")
     .requiredOption("--because <text>", "what prompted the amendment")
-    .option(
-      "--citing <claim-id>",
-      "the diagnosis it rests on — required once the condition has been evaluated, omitted for a fix made before the first run",
-    )
+    .option("--citing <claim-id>", "the claim the amendment rests on")
     .action(async (criterion, opts: { nowRequires: string; because: string; citing?: string }) =>
       parsed(
         amendDesignCommand,
@@ -410,7 +407,7 @@ export function registerWrites(program: Command, run: Run): void {
     .command("is")
     .helpGroup("Revising")
     .description(
-      "**The claim's standing changed; its wording did not.** `confirmed` is one others may build on.",
+      "The claim's standing changed; its wording did not. `confirmed` is one others may build on.",
     );
   is.command("confirmed")
     .helpGroup("Revising")
@@ -454,11 +451,12 @@ export function registerWrites(program: Command, run: Run): void {
   program
     .command("accept")
     .helpGroup("Stopping")
-    .summary("leave a question open, and say what would reopen it")
+    .summary("accept the question an enquiry pursues as unresolved, and say what would reopen it")
     .description(
-      "Not the same as abandoning it, and not the same as nobody having got round to it. The " +
-        "enquiry still reports itself open — deliberately — with the reason and the reopening " +
-        "condition beside it.",
+      "Takes a line of enquiry and records a decision on the question it pursues. Not the same " +
+        "as abandoning it, and not the same as nobody having got round to it. The enquiry is " +
+        "not closed: `labkit enquiries` lists it as accepted, and `labkit why` on it gives the " +
+        "reason and the reopening condition.",
     )
     .argument("<enquiry-id>", "the line of enquiry")
     .requiredOption("--because <text>", "why it is being left open")

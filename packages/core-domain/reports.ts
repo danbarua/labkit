@@ -863,6 +863,8 @@ export const listedEnquiry = z.strictObject({
   /** Evidence units addressing it — how much has actually been run. */
   runs: z.number(),
   closed: z.boolean(),
+  /** The question it pursues was accepted as unresolved. */
+  accepted: z.boolean(),
 });
 export type ListedEnquiry = z.infer<typeof listedEnquiry>;
 

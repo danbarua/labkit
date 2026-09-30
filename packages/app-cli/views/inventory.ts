@@ -29,7 +29,8 @@ export function renderClaimList(claims: ListedClaim[], p: Palette): string {
 }
 
 export function renderEnquiryList(enquiries: ListedEnquiry[], p: Palette): string {
-  const state = (e: ListedEnquiry) => (e.closed ? "closed" : e.runs > 0 ? "running" : "untested");
+  const state = (e: ListedEnquiry) =>
+    e.closed ? "closed" : e.accepted ? "accepted" : e.runs > 0 ? "running" : "untested";
   return listed("Enquiries", rows(enquiries.map((e) => [state(e), e.enquiry, e.approach])), p);
 }
 
