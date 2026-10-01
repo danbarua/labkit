@@ -8,8 +8,8 @@ import {
   type TranscriptState,
 } from "@labkit/view-model";
 import { IconContext } from "@phosphor-icons/react";
-import { useEffect, useRef } from "react";
-import { currentActivity } from "./activity";
+import { useEffect, useRef, useState } from "react";
+import { afterPause, currentActivity, PAUSE_MS } from "./activity";
 import type { AttachLimits } from "./attachments";
 import {
   AssistantMessage,
@@ -100,6 +100,18 @@ function BlockView({
   }
 }
 
+/** Whether `value` has stayed the same for `ms` milliseconds. */
+function useQuiet(value: unknown, ms: number): boolean {
+  const [quiet, setQuiet] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restarts whenever the value changes
+  useEffect(() => {
+    setQuiet(false);
+    const timer = setTimeout(() => setQuiet(true), ms);
+    return () => clearTimeout(timer);
+  }, [value, ms]);
+  return quiet;
+}
+
 /** Keeps the newest content in view while the reader has not scrolled away from the end. */
 function useStickToBottom(dependency: unknown) {
   const ref = useRef<HTMLDivElement>(null);
@@ -132,7 +144,7 @@ export function Conversation({
   const pending = pendingPermissions(state);
   const { ref, onScroll } = useStickToBottom(state);
   const usage = state.usage;
-  const activity = currentActivity(state);
+  const activity = afterPause(currentActivity(state), useQuiet(state.blocks, PAUSE_MS));
   const drawn = drawnBlocks(state);
 
   return (

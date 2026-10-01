@@ -35,6 +35,19 @@ export function currentActivity(state: TranscriptState): Activity | undefined {
   return last?.kind === "thought" ? { kind: "thinking" } : { kind: "working" };
 }
 
+/** How long the stream may stay quiet before the indicator says it is waiting again. */
+export const PAUSE_MS = 1500;
+
+/**
+ * An activity seen after the stream has gone quiet. Thinking or speaking that has paused is waiting
+ * on the model's provider again, until more arrives. A running tool, or work between steps, is
+ * left as it is: no stream is expected while a tool runs.
+ */
+export const afterPause = (activity: Activity | undefined, quiet: boolean): Activity | undefined =>
+  quiet && (activity?.kind === "thinking" || activity?.kind === "speaking")
+    ? { kind: "waiting" }
+    : activity;
+
 /** The indicator's words for an activity. While the agent speaks, its words say so. */
 export function activityLabel(activity: Activity): string | undefined {
   switch (activity.kind) {

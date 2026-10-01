@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { activityMood, currentActivity } from "../activity";
+import { activityMood, afterPause, currentActivity } from "../activity";
 import { Conversation } from "../conversation";
 
 const started: ViewEvent = { type: "prompt_started", content: [{ type: "text", text: "Go" }] };
@@ -57,6 +57,15 @@ describe("what a running turn is doing", () => {
         state(started, chunk("agent_thought_chunk", "hmm"), chunk("agent_message_chunk", "So")),
       ),
     ).toEqual({ kind: "speaking" });
+  });
+
+  test("thinking or speaking that has gone quiet is waiting on the provider again", () => {
+    expect(afterPause({ kind: "speaking" }, true)).toEqual({ kind: "waiting" });
+    expect(afterPause({ kind: "thinking" }, true)).toEqual({ kind: "waiting" });
+    expect(afterPause({ kind: "speaking" }, false)).toEqual({ kind: "speaking" });
+    expect(afterPause({ kind: "tool", label: "x" }, true)).toEqual({ kind: "tool", label: "x" });
+    expect(afterPause({ kind: "working" }, true)).toEqual({ kind: "working" });
+    expect(afterPause(undefined, true)).toBeUndefined();
   });
 
   test("the loader's pace and colour follow the activity", () => {
