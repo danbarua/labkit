@@ -148,6 +148,20 @@
       "when": 1790817386046,
       "tag": "0020_hal_reads_drop_review_and_retracted",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790819853193,
+      "tag": "0021_snapshot_drops_public_labkit_event",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790819863041,
+      "tag": "0022_drop_per_label_natural_id_sequences",
+      "breakpoints": true
     }
   ]
 }

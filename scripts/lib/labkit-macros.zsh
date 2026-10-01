@@ -10,7 +10,7 @@
 # `$LK` is the command they call, and it names the record: a directory through `--db`, or a
 # tenant on the Postgres `LABKIT_DB_URL` names.
 #   export LK="bin/labkit --db ~/somewhere"
-#   export LK="bun packages/app-cli/cli.ts --tenant museum"
+#   export LK="bun packages/app-cli/cli.ts --tenant <name>"
 
 : ${LK:="bun packages/app-cli/cli.ts"}
 
