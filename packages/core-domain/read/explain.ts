@@ -6,7 +6,6 @@ import { byHandle, kindOf, ref } from "../report";
 import type {
   AnalysisExplanation,
   AnalysisRef,
-  AnalysisRevision,
   Cause,
   CheckStatus,
   ClaimExplanation,
@@ -28,12 +27,10 @@ import type {
   QuestionBucket,
   QuestionStanding,
   Ref,
-  RevisedFinding,
   WalkedKind,
   WorkExplanation,
 } from "../report";
 import type {
-  AnalysisRevisionQuery,
   CriterionStandingQuery,
   NeighboursOfQuery,
   ProseForQuery,
@@ -142,10 +139,6 @@ export class ExplainGroup extends SessionCore {
     // The gates it governs, and what each protects. A separate read because
     // it is a different grain -- per gate, not per criterion.
     const governed = await this.graph.query(
-      // `GATES`, and the target is deliberately unlabelled: a gate reaches a
-      // Task or a Computation, and `gateStatus` reads the same edge the same
-      // way. Naming a label a gate does not use binds nothing and reports it
-      // as nothing protected.
       `MATCH (c:Criterion {natural_id: $id})-[:GOVERNS]->(g:Gate)
        OPTIONAL MATCH (g)-[:GATES]->(w)
        RETURN g, w`,
@@ -177,138 +170,6 @@ export class ExplainGroup extends SessionCore {
       evaluations: detail.evaluations,
       governs: [...byGate.values()],
     };
-  }
-
-  /**
-   * What an analysis revised, and which findings moved — {@link AnalysisRevision}.
-   */
-  async analysisRevision({ analysis }: AnalysisRevisionQuery): Promise<AnalysisRevision> {
-    const lineage = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
-       RETURN old, d`,
-      {
-        old: vertexProps<{ natural_id: string }>(),
-        d: vertexProps<{ natural_id: string }>(),
-      },
-      { id: analysis },
-    );
-    const revises = lineage[0];
-    if (!revises) return { analysis, changed: [], restated: [], kept: [], unpaired: [] };
-
-    // What the successor concluded, and what the revision superseded and kept.
-    // Both bearings throughout: a finding that challenges a claim is superseded
-    // and carried forward exactly as a supporting one is, and reading one side
-    // is silent.
-    const now = await this.conclusionsIn(analysis);
-    const decision = ref("decision", revises.d.natural_id);
-    const fell = await this.claimsFrom(decision, "SUPERSEDES");
-    const kept = await this.claimsFrom(decision, "KEEPS");
-
-    // **The pairing the act recorded, and no other.** `conclude --replacing` mints a decision
-    // per finding carrying `SUPERSEDES` to what fell and `MOTIVATES` to what stands in its
-    // place, so which claim replaced which is on the record at write time. A successor that
-    // named nothing is reported `unpaired`.
-    const named = await this.namedSuccessors(fell.map((c) => c.claim));
-
-    const changed: RevisedFinding[] = [];
-    const restated: ConcludedClaim[] = [];
-    const unpaired: ConcludedClaim[] = [];
-    for (const was of fell) {
-      const stated = named.get(was.claim);
-      const successor = stated && now.find((c) => c.claim === stated);
-      if (!successor) {
-        unpaired.push({ claim: was.claim, asserts: was.asserts });
-        continue;
-      }
-      const before = await this.findingText(was.claim);
-      const after = await this.findingText(successor.claim);
-      if (before === after) restated.push({ claim: successor.claim, asserts: successor.asserts });
-      else
-        changed.push({
-          proposition: was.asserts,
-          was: was.claim,
-          before,
-          claim: successor.claim,
-          after,
-        });
-    }
-
-    const byClaim = (a: { claim: string }, b: { claim: string }) => byHandle(a.claim, b.claim);
-    return {
-      analysis,
-      supersedes: ref("analysis", revises.old.natural_id),
-      changed: changed.sort((a, b) => a.was.localeCompare(b.was)),
-      restated: restated.sort(byClaim),
-      kept: kept.sort(byClaim),
-      unpaired: unpaired.sort(byClaim),
-    };
-  }
-
-  /** The claims an analysis concluded, both bearings. */
-  private async conclusionsIn(analysis: AnalysisRef): Promise<ConcludedClaim[]> {
-    const out: ConcludedClaim[] = [];
-    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const rows = await this.graph.query(
-        `MATCH (:Computation {natural_id: $id})<-[:USES]-(:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-         MATCH (e)-[:${bearing}]->(c:Claim)
-         RETURN c`,
-        { c: vertexProps<{ natural_id: string; name: string }>() },
-        { id: analysis },
-      );
-      for (const row of rows)
-        if (!out.some((o) => o.claim === row.c.natural_id))
-          out.push({ claim: ref("claim", row.c.natural_id), asserts: row.c.name });
-    }
-    return out;
-  }
-
-  /**
-   * Which claim was recorded as standing in place of each fallen one.
-   */
-  private async namedSuccessors(fallen: ClaimRef[]): Promise<Map<ClaimRef, ClaimRef>> {
-    if (fallen.length === 0) return new Map();
-    const rows = await this.graph.query(
-      `MATCH (d:Decision)-[:SUPERSEDES]->(was:Claim)
-       MATCH (d)-[:MOTIVATES]->(now:Claim)
-       WHERE was.natural_id IN $fallen
-       RETURN was, now`,
-      {
-        was: vertexProps<{ natural_id: string }>(),
-        now: vertexProps<{ natural_id: string }>(),
-      },
-      { fallen: [...fallen] },
-    );
-    return new Map(
-      rows.map((r) => [ref("claim", r.was.natural_id), ref("claim", r.now.natural_id)]),
-    );
-  }
-
-  /** The claims one decision points at over one edge. */
-  private async claimsFrom(
-    decision: Ref<"decision">,
-    edge: "SUPERSEDES" | "KEEPS",
-  ): Promise<ConcludedClaim[]> {
-    const rows = await this.graph.query(
-      `MATCH (:Decision {natural_id: $id})-[:${edge}]->(c:Claim)
-       RETURN c`,
-      { c: vertexProps<{ natural_id: string; name: string }>() },
-      { id: decision },
-    );
-    return rows.map((r) => ({ claim: ref("claim", r.c.natural_id), asserts: r.c.name }));
-  }
-
-  /** The wording of the finding bearing on a claim. */
-  private async findingText(claim: ClaimRef): Promise<Prose> {
-    for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-      const rows = await this.graph.query(
-        `MATCH (e:Evidence)-[:${bearing}]->(:Claim {natural_id: $id})
-         RETURN e`,
-        { e: vertexProps<{ statement: string }>() },
-        { id: claim },
-      );
-      if (rows[0]) return rows[0].e.statement;
-    }
-    return "";
   }
 }
 
@@ -567,18 +428,15 @@ function causeForCheck(c: CheckStatus): Cause {
 }
 
 /**
- * What an analysis addressed, read, produced and is held to.
+ * The `Computation` case: what an analysis addressed, read, produced and is held to.
  *
- * The same walk the generic `why` does, reused rather than re-queried: an
- * analysis is a first run until something revises it, and reporting nothing
- * for that case sent the reader to `happened` for edges the graph already has.
+ * The same walk the generic `why` does, carried one hop further: the enquiry, the work, the
+ * conditions and the conclusions hang off the inferential unit, not off the computation, so
+ * the analysis's own edges reach what it read and produced and nothing it was run for.
  */
-async function liveEdgesOf(self: ReadSurface, subject: string): Promise<Cause[]> {
+async function explainAnalysis(self: ReadSurface, subject: string): Promise<AnalysisExplanation> {
   const analysis = ref("analysis", subject);
   const direct = await self.neighboursOf({ subject: analysis });
-  // The enquiry, the work, the conditions and the conclusions hang off the
-  // inferential unit, not off the computation — so the analysis's own edges
-  // reach what it read and produced and nothing it was run for.
   const units = direct.filter((n) => n.via === "USES").map((n) => n.handle);
   const through = (
     await Promise.all(units.map((unit) => self.neighboursOf({ subject: unit })))
@@ -594,50 +452,7 @@ async function liveEdgesOf(self: ReadSurface, subject: string): Promise<Cause[]>
       wording: `${phraseFor(n.via, n.direction)} ${n.wording ?? describe(n.handle)}`,
     });
   }
-  return because;
-}
-
-/**
- * The `Computation` case: what this analysis revised, and which findings moved.
- */
-async function explainAnalysis(self: ReadSurface, subject: string): Promise<AnalysisExplanation> {
-  const analysis = ref("analysis", subject);
-  const report = await self.analysisRevision({ analysis });
-  if (report.supersedes === undefined)
-    return {
-      kind: "analysis",
-      subject: analysis,
-      is: "a first run",
-      // The live edges, not an empty list. Every analysis is a first run until
-      // something revises it, and the graph already holds what it addressed,
-      // read, produced and is held to.
-      because: await liveEdgesOf(self, subject),
-      report,
-    };
-
-  const because: Cause[] = [];
-  for (const c of report.changed)
-    because.push({ handle: c.was, wording: `${c.proposition}: ${c.before} → ${c.after}` });
-  for (const s of report.kept)
-    because.push({ handle: s.claim, wording: `${s.asserts} — kept, on its original evidence` });
-  for (const u of report.unpaired)
-    because.push({ handle: u.claim, wording: `${u.asserts} — superseded, no successor named` });
-
-  // **Every finding that fell, not just the reworded ones.** Counting only
-  // `changed` loses the restated and the unpaired, so a revision that moved one
-  // of two could report "0 of 1" while `because` listed both.
-  const fell = report.changed.length + report.restated.length + report.unpaired.length;
-  const stood = report.kept.length;
-  return {
-    kind: "analysis",
-    subject: analysis,
-    is:
-      stood === 0
-        ? `a revision of ${report.supersedes}`
-        : `a partial revision of ${report.supersedes}, ${fell} of ${fell + stood} findings`,
-    because,
-    report,
-  };
+  return { kind: "analysis", subject: analysis, is: "a first run", because };
 }
 
 /**
@@ -768,19 +583,13 @@ const PHRASE: Record<EdgeLabel, { out: string; in: string }> = {
   TRIGGERS: { out: "was judged against", in: "was judged by" },
   GATES: { out: "holds up", in: "is held up by" },
   AFTER: { out: "waits on", in: "is waited on by" },
-  REVERIFIES: { out: "re-checks", in: "was re-checked by" },
   CONFIRMED: { out: "confirmed", in: "was confirmed by" },
-  GRADES: { out: "graded", in: "was graded by" },
   ABOUT: { out: "is about", in: "is the subject of" },
-  KEEPS: { out: "kept", in: "was kept by" },
   BASED_ON: { out: "rests on", in: "was cited by" },
   CLOSES: { out: "closed", in: "was closed by" },
   ANSWERS: { out: "answers on", in: "was named as the answer by" },
-  SHARPENS: { out: "sharpened", in: "was sharpened by" },
   ACCEPTS: { out: "left open", in: "was left open by" },
   SUPERSEDES: { out: "replaced", in: "was replaced by" },
-  EVALUATES: { out: "judged", in: "was judged by" },
-  INVALIDATED_BY: { out: "was retracted by", in: "retracted" },
   IMPLEMENTS: { out: "carried out", in: "was carried out by" },
   CONCERNS: { out: "concerns", in: "has a note on it" },
   MENTIONS: { out: "mentions", in: "is mentioned by" },
@@ -801,7 +610,6 @@ const SAYS: Record<WalkedKind, string> = {
   evidence: "a finding",
   decision: "a decision",
   evaluation: "a verdict on one condition",
-  review: "a review",
   observations: "what was observed",
   note: "a note",
 };
@@ -841,7 +649,6 @@ const WALKED = {
   evidence: walked("evidence"),
   decision: walked("decision"),
   evaluation: walked("evaluation"),
-  review: walked("review"),
   observations: walked("observations"),
   note: walked("note"),
 } satisfies Record<WalkedKind, Explainer>;

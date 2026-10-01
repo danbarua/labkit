@@ -26,8 +26,6 @@ Identity is a handle (`Q_1`, `NOTE_68`), never wording.
 
 A relation is a link, or it is absent. Do not invent links.
 
-Neighbor queries filter `n.retracted IS NULL AND m.retracted IS NULL`. Unlabelled Cypher matches skip per-label RLS.
-
 ## Tests
 
 `bun run test` from here runs the API tests on in-memory PGlite, with nothing to install. Set `LABKIT_DB_URL` to a Postgres server and the same suite runs on Postgres instead, in a throwaway database it creates and drops. Two tests only mean something on a real pool of connections, so they run on Postgres and skip on PGlite. A bare `bun test` at the repo root finds this suite too.

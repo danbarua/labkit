@@ -54,7 +54,7 @@ async function collectionError(
 }
 
 describe("labkit_get_collection_as_hal", () => {
-  test("pages the live nodes of a label, retracted ones excluded", async () => {
+  test("pages the nodes of a label", async () => {
     const hal = await collection(1, "Question", 0, 50, 0);
     expect(hal._embedded.Question.map((n: any) => n.id).sort()).toEqual(["Q_1", "Q_2"]);
     expect(hal.count).toBe(2);

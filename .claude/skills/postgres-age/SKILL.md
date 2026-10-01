@@ -18,7 +18,7 @@ triggers:
 # Apache AGE — LabKit reference
 
 LabKit's provenance graph (Question, LineOfEnquiry, EvidenceUnit, Evidence,
-Claim, Decision, Criterion, CriterionEvaluation, Gate, Review, Artefact,
+Claim, Decision, Criterion, CriterionEvaluation, Gate, Artefact,
 Computation, Task) lives in
 **one Apache AGE graph per tenant**, running inside
 PGlite via `pglite-age`. There is no fixed graph name — every tenant's graph
@@ -435,8 +435,8 @@ RETURN x
 (`Gate`, not `Criterion`, is what gates the downstream object — see
 `EDGE_SCHEMA` in `src/db/domain.ts` for the full rationale):
 ```cypher
-MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(comp:Computation)
-RETURN comp
+MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(work:Task)
+RETURN work
 ```
 
 **"What did this computation read, and what did it produce?"** — execution

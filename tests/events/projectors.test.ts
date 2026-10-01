@@ -39,11 +39,6 @@ function inMemoryProjector(): { projector: Projector; state: Projected } {
           case "EdgeCreated":
             state.edges.add(`${change.from}|${change.label}|${change.to}`);
             break;
-          case "NodePropsChanged": {
-            const node = state.nodes.get(change.id);
-            if (node) Object.assign(node.props, change.after);
-            break;
-          }
         }
       }
     },

@@ -27,7 +27,6 @@ export const LABEL_BY_KIND = {
   criterion: "Criterion",
   evaluation: "CriterionEvaluation",
   gate: "Gate",
-  review: "Review",
   observations: "Artefact",
   analysis: "Computation",
   work: "Task",

@@ -30,8 +30,6 @@ GET /notes/68  →  application/hal+json
 
 Rel names are EdgeLabel. No `links.in` / `links.out`. Direction is `dir` on the link and on the embedded neighbor. No edge means no rel. Do not add a link to make a test green.
 
-Unlabelled Cypher `MATCH (...)->(m)` skips per-label RLS. Neighbor queries therefore include `n.retracted IS NULL AND m.retracted IS NULL`. Otherwise GET follows a handle that 404s.
-
 HAL root (`Accept: application/hal+json` on `/`, or `/api` through Vite):
 
 ```

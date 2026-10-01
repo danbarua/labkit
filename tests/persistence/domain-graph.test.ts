@@ -11,6 +11,7 @@ import {
   type DecisionProps,
   type EvidenceProps,
   type LineOfEnquiryProps,
+  type TaskProps,
 } from "@labkit/core-db/domain";
 import type { LabKitDB } from "@labkit/core-db/backend";
 import { resolveTenantContext, type TenantContext } from "@labkit/core-db/tenant";
@@ -350,7 +351,7 @@ describe("edge integrity", () => {
 });
 
 describe("Gate is reconnected to what it actually gates", () => {
-  test("Criterion -> CriterionEvaluation -> Gate -> Computation chains all the way through", async () => {
+  test("Criterion -> CriterionEvaluation -> Gate -> Task chains all the way through", async () => {
     const criterion = await graph.createNode("Criterion", {
       proposition: "max_prediction_error <= 1e-8",
     });
@@ -362,9 +363,11 @@ describe("Gate is reconnected to what it actually gates", () => {
     const gate = await graph.createNode("Gate", {
       consequence: "accelerated ridge implementation may be promoted",
     });
-    const computation = await graph.createNode("Computation", {
-      method: "promotion_run",
-      status: "pending",
+    const work = await graph.createNode("Task", {
+      objective: "promotion_run",
+      mayRead: [],
+      outputs: "",
+      acceptance: "the accelerated implementation is promoted",
     });
     const evidence = await graph.createNode("Evidence", {
       statement: "3.2e-9 max error observed",
@@ -372,19 +375,19 @@ describe("Gate is reconnected to what it actually gates", () => {
 
     await graph.createEdge(criterion.natural_id, "EVALUATED_AS", evaluation.natural_id);
     await graph.createEdge(evaluation.natural_id, "TRIGGERS", gate.natural_id);
-    await graph.createEdge(gate.natural_id, "GATES", computation.natural_id);
+    await graph.createEdge(gate.natural_id, "GATES", work.natural_id);
     // decision #5: evidence_ref replaced with a real edge
     await graph.createEdge(evaluation.natural_id, "BASED_ON", evidence.natural_id);
 
     const rows = await graph.query(
-      `MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(comp:Computation)
-       RETURN comp`,
-      { comp: vertexProps<ComputationProps>() },
+      `MATCH (:Criterion {natural_id: $critId})-[:EVALUATED_AS]->(:CriterionEvaluation {outcome: 'pass'})-[:TRIGGERS]->(:Gate)-[:GATES]->(work:Task)
+       RETURN work`,
+      { work: vertexProps<TaskProps>() },
       { critId: criterion.natural_id },
     );
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.comp).toMatchObject({ method: "promotion_run" });
+    expect(rows[0]!.work).toMatchObject({ objective: "promotion_run" });
   });
 });
 
@@ -411,7 +414,6 @@ describe("all node labels", () => {
       evaluated_at: "2026-08-17T00:00:00Z",
     },
     Gate: { consequence: "c" },
-    Review: { verdict: "v" },
     Artefact: { kind: "json", logical_name: "a" },
     Computation: { method: "k", status: "s" },
     Task: { objective: "o", mayRead: ["a.csv"], outputs: "o", acceptance: "a" },

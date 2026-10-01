@@ -47,7 +47,6 @@ test.describe("getting around", () => {
     await expect(page).toHaveURL(/\/app\/workspace\/alpha\/question$/);
     await expect(page.getByRole("link", { name: "Q_1", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Q_2", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Q_3", exact: true }), "retracted").toHaveCount(0);
 
     await page.getByRole("link", { name: "Q_1", exact: true }).click();
     await expect(page).toHaveURL(/\/app\/workspace\/alpha\/graph\/Q_1$/);

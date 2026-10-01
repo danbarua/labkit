@@ -14,7 +14,6 @@ import type {
   EnquiryRef,
   EnquiryStatus,
   ObservationsRef,
-  Reverification,
   SupportExplanation,
 } from "../report";
 import { DomainRefusal } from "../refusal";
@@ -235,19 +234,7 @@ export class StoryGroup extends SessionCore {
     const forRows = await this.findingsBearing(scope, "SUPPORTS");
     const againstRows = await this.findingsBearing(scope, "CHALLENGES");
 
-    // Findings that re-checked another finding rather than establishing the
-    // proposition themselves. Keyed by identity, never by wording -- two runs
-    // reaching the same conclusion say the same sentence by construction.
-    const reverifying = new Set(
-      (
-        await this.graph.query(`MATCH (e:Evidence)-[:REVERIFIES]->(:Evidence) RETURN e`, {
-          e: vertexProps<{ natural_id: string }>(),
-        })
-      ).map((r) => r.e.natural_id),
-    );
-
     const support: SupportExplanation["support"] = [];
-    const reverifiedBy: Reverification[] = [];
     const against: SupportExplanation["against"] = [];
     const superseded: SupportExplanation["superseded"] = [];
     for (const { rows, bearing, live } of [
@@ -270,15 +257,6 @@ export class StoryGroup extends SessionCore {
               ...entry,
               bearing,
               reason: row.d.reason || "it was superseded",
-            });
-        } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
-          // A re-verification is not a second independent finding: counting it
-          // as one reports a proposition established once as corroborated
-          // twice. See `EDGE_SCHEMA.REVERIFIES`.
-          if (!reverifiedBy.some((r) => r.analysis === row.comp.natural_id))
-            reverifiedBy.push({
-              analysis: ref("analysis", row.comp.natural_id),
-              method: row.comp.method,
             });
         } else {
           live.push(entry);
@@ -384,27 +362,21 @@ export class StoryGroup extends SessionCore {
       standing: confirmed ? "confirmatory" : "exploratory",
       ...(confirmed && promotedBecause ? { promotedBecause } : {}),
       support,
-      reverifiedBy,
       standard,
       unmet,
-      // Re-verifying findings are excluded here for the same reason they are kept out of
-      // `support`: the claim does not rest on inputs belonging to something this very report
-      // says is not an independent supporting finding.
       restingOn: [
         ...new Map(
-          resting
-            .filter((r) => !reverifying.has(r.e.natural_id))
-            .map((r) => [
-              r.a.natural_id,
-              {
-                part: ref("observations", r.a.natural_id),
-                name: r.a.logical_name,
-                // Computed, not stored -- see `retractedArtefacts`.
-                ...(retractedInputs.has(ref("observations", r.a.natural_id))
-                  ? { invalidated: true as const }
-                  : {}),
-              },
-            ]),
+          resting.map((r) => [
+            r.a.natural_id,
+            {
+              part: ref("observations", r.a.natural_id),
+              name: r.a.logical_name,
+              // Computed, not stored -- see `retractedArtefacts`.
+              ...(retractedInputs.has(ref("observations", r.a.natural_id))
+                ? { invalidated: true as const }
+                : {}),
+            },
+          ]),
         ).values(),
       ],
       superseded,

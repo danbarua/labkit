@@ -16,7 +16,7 @@ afterAll(async () => {
   await testDb.close();
 });
 
-test("a tenant provisioned before CONSUMES/EVALUATES existed picks them up on re-resolve", async () => {
+test("a tenant provisioned before CONSUMES existed picks it up on re-resolve", async () => {
   const db = await testDb.openClient();
   const ctx = await resolveTenantContext(db, db.tx, "labkit");
 

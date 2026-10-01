@@ -8,7 +8,6 @@ import type {
   NodeCreated,
   NodeLabel,
   Prose,
-  NodePropsChanged,
 } from "@labkit/core-db/domain";
 import { NODE_TYPES } from "@labkit/core-db/domain";
 import type { Command } from "./commands";
@@ -16,7 +15,7 @@ import type { EventFilter } from "./queries";
 
 export type { EventFilter };
 
-export type { EdgeCreated, GraphChange, NodeCreated, NodePropsChanged };
+export type { EdgeCreated, GraphChange, NodeCreated };
 
 /** Injected so scenario tests can assert on exact timestamps instead of racing the wall clock. */
 export interface Clock {
@@ -181,23 +180,15 @@ export const edgesIn = (event: DomainEvent): EdgeCreated[] =>
   event.changes.flatMap((c) => (c.change === "EdgeCreated" ? [c] : []));
 
 /**
- * Every handle an act touched: what it minted, both ends of every edge it
- * wired, and anything whose properties it changed.
+ * Every handle an act touched: what it minted, and both ends of every edge it
+ * wired.
  *
  * Wider than {@link createdIn} on purpose. `touching` is asked as "what
- * happened to this record", and the acts that connected to a handle, or set a
- * property on it, never name it as their subject and never mint it.
+ * happened to this record", and the acts that connected to a handle never name
+ * it as their subject and never mint it.
  */
 export const touchedIn = (event: DomainEvent): string[] => [
-  ...new Set(
-    event.changes.flatMap((c) =>
-      c.change === "NodeCreated"
-        ? [c.id]
-        : c.change === "EdgeCreated" || c.change === "EdgePropsChanged"
-          ? [c.from, c.to]
-          : [c.id],
-    ),
-  ),
+  ...new Set(event.changes.flatMap((c) => (c.change === "NodeCreated" ? [c.id] : [c.from, c.to]))),
 ];
 
 /**

@@ -141,6 +141,13 @@
       "when": 1790081165005,
       "tag": "0019_get_collection_as_hal",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790817386046,
+      "tag": "0020_hal_reads_drop_review_and_retracted",
+      "breakpoints": true
     }
   ]
 }

@@ -61,7 +61,7 @@ GET /workspace/{slug}/{id}/events         what happened to one entity, change by
 
 ```
 GET /workspace/{slug}          one collection per node type
-GET /workspace/{slug}/{type}   the live nodes of that type
+GET /workspace/{slug}/{type}   the nodes of that type
     ?limit=25               1 to 200
     ?offset=0
     ?depth=0                0 to 6: hops of neighbours to embed in each item

@@ -44,7 +44,7 @@ import type {
 } from "../commands";
 import { SessionCore, type Methods, type ResearchSessionOptions } from "../core";
 import { resolveIn, type DomainEvent } from "../events";
-import { snapshotPriorValues, UnitOfWork } from "../projection";
+import { UnitOfWork } from "../projection";
 import { Asking } from "./asking";
 import { Counting } from "./counting";
 import { Revising } from "./revising";
@@ -181,10 +181,7 @@ export class WriteSurface extends SessionCore {
     return this.graph.inTransaction(async () => {
       const unitOfWork = new UnitOfWork();
       const act = await work(unitOfWork);
-      // **Here and nowhere else.** The graph still holds the old values at this
-      // instant -- the act only staged, and the projectors below have not run --
-      // so this is the one point where a change can record what it replaced.
-      const changes = await snapshotPriorValues(this.graph, unitOfWork.delta());
+      const changes = unitOfWork.delta();
       // The store takes the workspace's next number, stamps it into every placeholder the
       // act staged, and hands back what it wrote. `Q_17` is what event 17 created.
       const recorded = await this.events.record({

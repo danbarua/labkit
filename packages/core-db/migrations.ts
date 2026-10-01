@@ -27,6 +27,9 @@ import m0016 from "../../drizzle/0016_migration_provenance.sql" with { type: "te
 import m0017 from "../../drizzle/0017_get_entity_as_hal.sql" with { type: "text" };
 import m0018 from "../../drizzle/0018_entity_as_hal_links_every_relation.sql" with { type: "text" };
 import m0019 from "../../drizzle/0019_get_collection_as_hal.sql" with { type: "text" };
+import m0020 from "../../drizzle/0020_hal_reads_drop_review_and_retracted.sql" with {
+  type: "text",
+};
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -52,6 +55,7 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0017_get_entity_as_hal": m0017,
   "0018_entity_as_hal_links_every_relation": m0018,
   "0019_get_collection_as_hal": m0019,
+  "0020_hal_reads_drop_review_and_retracted": m0020,
 };
 
 /**

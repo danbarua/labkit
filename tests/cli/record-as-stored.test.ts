@@ -22,7 +22,7 @@ ignoreLabkitDbUrl();
 let dir: string;
 let scratch: Awaited<ReturnType<typeof connectScratch>>;
 let surfaces: Surfaces;
-let seeded: { claim: string; note: string; review: string };
+let seeded: { claim: string; note: string; finding: string };
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "labkit-as-stored-"));
@@ -38,9 +38,10 @@ beforeAll(async () => {
   await graph.createNode("Claim", { name: "another claim" });
   const note = (await graph.createNode("Note", { text: "about the claim" })).natural_id;
   await graph.createEdge(note, "CONCERNS", claim);
-  const review = (await graph.createNode("Review", { verdict: "a review of it" })).natural_id;
-  await graph.createEdge(review, "EVALUATES", claim);
-  seeded = { claim, note, review };
+  const finding = (await graph.createNode("Evidence", { statement: "a finding for it" }))
+    .natural_id;
+  await graph.createEdge(finding, "SUPPORTS", claim);
+  seeded = { claim, note, finding };
 }, 60_000);
 
 afterAll(async () => {
@@ -76,9 +77,9 @@ test("get embeds two hops by default, and --depth narrows it", async () => {
   const byDefault = await invoke(["get", seeded.note]);
   expect(embedded(byDefault!.value)).toEqual([
     [seeded.claim, 1],
-    [seeded.review, 2],
+    [seeded.finding, 2],
   ]);
-  expect(byDefault!.render(PLAIN)).toContain(`    review:evaluates         ${seeded.review}`);
+  expect(byDefault!.render(PLAIN)).toContain(`    evidence:supports        ${seeded.finding}`);
 
   const oneHop = await invoke(["--depth", "1", "get", seeded.note]);
   expect(embedded(oneHop!.value)).toEqual([[seeded.claim, 1]]);

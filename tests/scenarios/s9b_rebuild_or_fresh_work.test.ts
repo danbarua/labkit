@@ -147,7 +147,6 @@ describe("S-9b: was this a rebuild, or new work?", () => {
       "does the accelerated path match the reference?",
     );
     expect(a.why.support.length).toBe(b.why.support.length);
-    expect(a.why.reverifiedBy).toEqual(b.why.reverifiedBy);
     expect(a.known).toEqual(b.known);
     expect(a.rebuilt).toEqual(b.rebuilt);
 
@@ -188,7 +187,6 @@ describe("S-9b: was this a rebuild, or new work?", () => {
     // question this scenario exists to settle; the number is written down so
     // the answer is a fact rather than a recollection.
     expect(why.support.length).toBe(2);
-    expect(why.reverifiedBy).toEqual([]);
   });
 
   /**

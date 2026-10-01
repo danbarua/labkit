@@ -76,8 +76,6 @@ class TenantGraphProvisioner {
     // The event table first: the sequence is seeded from what it holds.
     await this.ensureEventTable();
     await this.ensureNaturalIdSequence();
-    const policies = await this.existingPolicies();
-    for (const label of NODE_LABELS) await this.ensureRetractionPolicy(label, policies);
     await this.ensureGrants();
   }
 
@@ -87,7 +85,7 @@ class TenantGraphProvisioner {
    * Caught up on every reconcile, not only at creation. A counter behind its own workspace
    * hands out a number some row has, the next write dies on `domain_event_pkey`, and the
    * workspace is unwritable with nothing saying why. It falls behind whenever rows arrive by
-   * a route that did not draw from it. Retracted nodes count.
+   * a route that did not draw from it.
    */
   private async ensureNaturalIdSequence(): Promise<void> {
     const seq = `"${this.graphName}".labkit_natural_id_seq`;
@@ -252,42 +250,6 @@ class TenantGraphProvisioner {
     if (existing.has(indexName)) return;
     await this.db.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS ${indexName} ON "${this.graphName}"."${edge}" (start_id, end_id)`,
-    );
-  }
-
-  /** Every RLS policy already on this graph's tables, in one read. */
-  private async existingPolicies(): Promise<Set<string>> {
-    const rows = await this.db.query<{ policyname: string }>(
-      `SELECT policyname FROM pg_policies WHERE schemaname = $1`,
-      [this.graphName],
-    );
-    return new Set(rows.rows.map((r) => r.policyname));
-  }
-
-  /**
-   * Hides a retracted node from `labkit_app` — the compensating act `undo` writes stands in the
-   * record, and this is what stops it being traversed.
-   *
-   * `retracted` is a key inside the agtype `properties` column, not a column. AGE creates
-   * these tables as the provisioning role, so `postgres` owns them and bypasses this.
-   * `_ag_label_vertex` has no policy and shows retracted rows to any reader.
-   */
-  private async ensureRetractionPolicy(label: NodeLabel, existing: Set<string>): Promise<void> {
-    const policyName = `${label.toLowerCase()}_hide_retracted`;
-    // Both statements guarded on the one check: `ensureRetractionPolicy` is the only writer of
-    // this policy and always enables RLS in the same call that creates it, so the policy's
-    // presence already answers both questions.
-    if (existing.has(policyName)) return;
-    await this.db.query(`ALTER TABLE "${this.graphName}"."${label}" ENABLE ROW LEVEL SECURITY`);
-    // `IS DISTINCT FROM`, not `<> true`: the access operator returns SQL NULL
-    // for an absent property and `NULL <> true` is NULL, which would hide every
-    // ordinary row. `WITH CHECK (true)` because a FOR ALL policy defaults it to
-    // the USING expression, refusing the very write that sets `retracted`.
-    await this.db.query(
-      `CREATE POLICY "${policyName}" ON "${this.graphName}"."${label}" FOR ALL TO ${APP_ROLE}
-       USING (ag_catalog.agtype_access_operator(properties, '"retracted"'::agtype)
-              IS DISTINCT FROM 'true'::agtype)
-       WITH CHECK (true)`,
     );
   }
 }

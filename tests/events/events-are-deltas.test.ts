@@ -115,39 +115,6 @@ test("the delta applied to an empty graph rebuilds the node, properties and all"
   expect(rebuilt[0]!.n.posed_at).toBeTruthy();
 });
 
-test("a property set in place is carried by the delta and applied from it", async () => {
-  const { question } = await session.writes.pose({ question: "does it hold?" });
-  const history = await events.all();
-
-  const fresh = await emptyGraph();
-  for (const event of history) await applyDelta(fresh, event as DomainEvent);
-
-  // A property change applied from nothing but the event.
-  await applyDelta(fresh, {
-    at: new Date().toISOString(),
-    attribution: UNATTRIBUTED,
-    operation: "pose",
-    subject: question,
-    command: { question: "and now it says this" },
-    changes: [
-      {
-        change: "NodePropsChanged",
-        id: question,
-        before: {},
-        after: { name: "and now it says this" },
-      },
-    ],
-    reconstructedFrom: null,
-  });
-
-  const after = await fresh.query(
-    `MATCH (n:Question {natural_id: $id}) RETURN n`,
-    { n: vertexProps<Identified & { name: string }>() },
-    { id: question },
-  );
-  expect(after[0]!.n.name).toBe("and now it says this");
-});
-
 test("a refused close writes nothing, because nothing was written before the refusal", async () => {
   const { enquiry } = await session.writes.openEnquiry("does it hold?");
   await session.writes.closeEnquiry({ enquiry });

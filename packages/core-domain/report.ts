@@ -83,7 +83,6 @@ export type WalkedKind =
   | "evidence"
   | "decision"
   | "evaluation"
-  | "review"
   | "observations"
   | "note";
 export type EventPage = {
@@ -136,15 +135,12 @@ export type {
   ConfirmatoryResult,
   GatedWork,
   ReplacementClaim,
-  Reverification,
   BlockedWork,
   UnmetCheck,
   Condition,
   DecidingEvaluation,
   CheckStatus,
-  RevisedFinding,
   GateGoverned,
-  AnalysisRevision,
   ListedAnalysis,
   ListedClaim,
   ListedCriterion,

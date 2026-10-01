@@ -12,7 +12,6 @@ export const NODE_LABELS = [
   "Criterion",
   "CriterionEvaluation",
   "Gate",
-  "Review",
   "Artefact",
   "Computation",
   "Task",
@@ -54,7 +53,6 @@ export const SEARCHABLE_TEXT: {
   Criterion: ["proposition"],
   CriterionEvaluation: ["value"],
   Gate: ["consequence"],
-  Review: ["verdict"],
   Task: ["objective", "acceptance"],
   Note: ["text"],
 };
@@ -74,29 +72,23 @@ export const EDGE_LABELS = [
   "ADDRESSES", // EvidenceUnit -> LineOfEnquiry
   "SUPPORTS", // Evidence -> Claim
   "CHALLENGES", // Evidence -> Claim
-  "REVERIFIES", // Evidence -> Evidence
   "CONFIRMED", // Decision -> Claim (the researcher said `is confirmed`)
-  "GRADES", // Decision -> Claim
   "ABOUT", // CriterionEvaluation -> Claim (which finding this verdict judged)
-  "KEEPS", // Decision -> Claim (a conclusion a revision carried forward)
   "USES", // EvidenceUnit -> Computation
   "CONSUMES", // Computation -> Artefact (execution lineage; the inverse of PRODUCES)
-  "PRODUCES", // EvidenceUnit/Computation/Task -> Evidence/Artefact/Computation
+  "PRODUCES", // EvidenceUnit -> Evidence/Artefact, Computation -> Artefact
   "RECORDED_IN", // Evidence -> Artefact
   "GOVERNS", // Criterion -> Gate (which condition a gate enforces)
   "QUALIFIES", // Criterion -> EvidenceUnit (which standard a finding is held to)
   "EVALUATED_AS", // Criterion -> CriterionEvaluation
   "TRIGGERS", // CriterionEvaluation -> Gate
-  "GATES", // Gate -> Task/Computation
+  "GATES", // Gate -> Task
   "AFTER", // Task -> Task (`plan --after`: this work waits on that work's result)
-  "BASED_ON", // Decision -> Evidence | Review | Claim, Claim -> Claim, CriterionEvaluation -> Evidence
-  "CLOSES", // Decision -> LineOfEnquiry | Task | Gate (`close`)
+  "BASED_ON", // Decision -> Evidence | Claim, Claim -> Claim, CriterionEvaluation -> Evidence
+  "CLOSES", // Decision -> LineOfEnquiry | Task (`close`)
   "ANSWERS", // Decision -> Claim named as an enquiry's answer
-  "SHARPENS", // Decision -> Question (`sharpen`)
   "ACCEPTS", // Decision -> Question (`accept`, left unresolved on purpose)
   "SUPERSEDES", // Decision -> Decision (an amendment is a decision with this edge)
-  "EVALUATES", // Review -> Claim | Decision | Evidence | EvidenceUnit
-  "INVALIDATED_BY", // Artefact -> Review (the artefact is invalidated; this review found it so)
   "IMPLEMENTS", // Task -> EvidenceUnit
   "CONCERNS", // Note -> anything (--on: the one attachment point with no fixed target)
   "MENTIONS", // Note -> any entity mentioned in the note text (by natural_id regex)
@@ -106,7 +98,7 @@ export type EdgeLabel = (typeof EDGE_LABELS)[number];
 /**
  * One change an act made to the graph.
  */
-export type GraphChange = NodeCreated | EdgeCreated | NodePropsChanged | EdgePropsChanged;
+export type GraphChange = NodeCreated | EdgeCreated;
 
 /**
  * Distributed over the labels, so `label` picks the property shape exactly as
@@ -130,36 +122,6 @@ export interface EdgeCreated {
   props?: EdgeProps;
 }
 
-/**
- * Properties set in place on a node that already exists.
- *
- * `before` is what each of `after`'s keys held when the act ran, so the change
- * can be taken back. It is captured once, at the seam in `handling()`, where
- * the graph still holds the old values because no projector has run yet.
- */
-export interface NodePropsChanged {
-  change: "NodePropsChanged";
-  id: string;
-  before: Record<string, unknown>;
-  after: Record<string, unknown>;
-}
-
-/**
- * Properties set in place on an edge that already exists.
- *
- * Keyed by the triple, because that is an edge's identity here — `createEdge`
- * treats a repeat of it as a no-op, so re-creating an edge cannot carry new
- * properties and this is the only way to change them.
- */
-export interface EdgePropsChanged {
-  change: "EdgePropsChanged";
-  from: string;
-  label: EdgeLabel;
-  to: string;
-  before: Record<string, unknown>;
-  after: EdgeProps;
-}
-
 export type EdgeProps = Record<string, string | number | boolean | number[]>;
 
 /**
@@ -169,19 +131,15 @@ export type EdgeProps = Record<string, string | number | boolean | number[]>;
  */
 export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, NodeLabel]>> = {
   /**
-   * "Gave rise to." A question gives rise to a line of enquiry; a decision gives rise to a
-   * question; a note gives rise to the question somebody eventually sharpened out of it.
+   * "Gave rise to." A question gives rise to a line of enquiry; a note gives rise to the
+   * question somebody eventually sharpened out of it; a decision gives rise to the claim or
+   * criterion that stands in place of the one it superseded.
    */
   MOTIVATES: [
     ["Question", "LineOfEnquiry"],
-    ["Decision", "Question"],
     ["Note", "Question"],
     ["Decision", "Claim"],
     ["Decision", "Criterion"],
-    // The revision an act produced, at analysis grain — the half that pairs
-    // with `SUPERSEDES -> Computation`. `MOTIVATES` names what an act put in
-    // place; `SUPERSEDES` names what it stands instead of.
-    ["Decision", "Computation"],
   ],
   REQUIRES: [["LineOfEnquiry", "Evidence"]],
   // The `Task` pair says why a piece of planned work exists. It reuses ADDRESSES rather than
@@ -203,8 +161,6 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["EvidenceUnit", "Evidence"],
     ["EvidenceUnit", "Artefact"],
     ["Computation", "Artefact"],
-    ["Task", "Computation"],
-    ["Task", "Artefact"],
   ],
   RECORDED_IN: [["Evidence", "Artefact"]],
   /**
@@ -217,55 +173,36 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
   QUALIFIES: [["Criterion", "EvidenceUnit"]],
   EVALUATED_AS: [["Criterion", "CriterionEvaluation"]],
   TRIGGERS: [["CriterionEvaluation", "Gate"]],
-  GATES: [
-    ["Gate", "Task"],
-    ["Gate", "Computation"],
-  ],
+  GATES: [["Gate", "Task"]],
   AFTER: [["Task", "Task"]],
-  /**
-   * "Re-checked that finding, without reproducing the run behind it."
-   */
-  REVERIFIES: [["Evidence", "Evidence"]],
   /**
    * The act that confers confirmatory standing on a finding.
    */
   CONFIRMED: [["Decision", "Claim"]],
   /**
-   * **A decision put a claim into a state its evidence does not carry.**
-   */
-  GRADES: [["Decision", "Claim"]],
-  /**
    * Which finding a verdict judged, when one criterion is applied to several.
    */
   ABOUT: [["CriterionEvaluation", "Claim"]],
   /**
-   * A conclusion a revision carried forward unchanged.
-   */
-  KEEPS: [["Decision", "Claim"]],
-  /**
-   * What the researcher cited as the cause — `--because`. A review is the same reading as a
-   * finding: the thing the decision rests on.
+   * What the researcher cited as the cause — `--because`.
    */
   BASED_ON: [
     // A synthesis rests on the findings it is drawn across and computes nothing new.
     ["Claim", "Claim"],
     ["Decision", "Evidence"],
-    ["Decision", "Review"],
     // `accept --in-light-of`: the claim an acceptance rests on.
     ["Decision", "Claim"],
     ["CriterionEvaluation", "Evidence"],
   ],
   /**
-   * The item a decision closes. Question remains legal for replaying historical events; current
-   * question standing is computed from the closures of its lines of enquiry.
+   * The item a decision closes. A question's standing is computed from the closures of its
+   * lines of enquiry.
    */
   CLOSES: [
     ["Decision", "LineOfEnquiry"],
     ["Decision", "Task"],
-    ["Decision", "Gate"],
   ],
   ANSWERS: [["Decision", "Claim"]],
-  SHARPENS: [["Decision", "Question"]],
   ACCEPTS: [["Decision", "Question"]],
   /**
    * **A later record stands instead of an earlier one.**
@@ -274,28 +211,8 @@ export const EDGE_SCHEMA: Record<EdgeLabel, ReadonlyArray<readonly [NodeLabel, N
     ["Decision", "Decision"],
     ["Decision", "Claim"],
     ["Decision", "Criterion"],
-    ["Decision", "Computation"],
     ["Note", "Note"],
   ],
-  /**
-   * `Review -> EvidenceUnit` is how a review of an *analysis* has somewhere to point; without
-   * it the subject survives only in the event stream and "why was this replaced?" is
-   * unanswerable from the graph.
-   */
-  EVALUATES: [
-    ["Review", "Claim"],
-    ["Review", "Decision"],
-    ["Review", "Evidence"],
-    ["Review", "EvidenceUnit"],
-  ],
-  /**
-   * The artefact is invalidated, and this is the review that found it so.
-   *
-   * Only the invalidated thing carries it. A decision that rests on a review is `BASED_ON`:
-   * pointing this at the decision asserts the decision was retracted, which is the opposite
-   * of what it did.
-   */
-  INVALIDATED_BY: [["Artefact", "Review"]],
   IMPLEMENTS: [["Task", "EvidenceUnit"]],
   /**
    * Every other pair in this table names two specific labels because the relationship means
@@ -385,7 +302,7 @@ export interface ClaimProps {
    * Whether the finding was prespecified, and whether anyone has promoted it — **two facts
    * under one value**, which is issue #63.
    */
-  kind?: "exploratory" | "confirmatory" | "undecided";
+  kind?: "exploratory" | "confirmatory";
 }
 
 /** No evidence string shadow, and no mutable open or closed property. */
@@ -411,11 +328,6 @@ export interface CriterionEvaluationProps {
 
 export interface GateProps {
   consequence: Prose;
-}
-
-export interface ReviewProps {
-  /** The reviewer's words. What the review retracted is the edges of the decision citing it. */
-  verdict: Prose;
 }
 
 // Property list for an Artefact.
@@ -482,7 +394,6 @@ export interface NodePropsByLabel {
   Criterion: CriterionProps;
   CriterionEvaluation: CriterionEvaluationProps;
   Gate: GateProps;
-  Review: ReviewProps;
   Artefact: ArtefactProps;
   Computation: ComputationProps;
   Task: TaskProps;
@@ -519,7 +430,6 @@ export const NODE_TYPES: { readonly [L in NodeLabel]: NodeType<L> } = {
   Criterion: { prefix: "CRIT" },
   CriterionEvaluation: { prefix: "CEVAL" },
   Gate: { prefix: "GATE" },
-  Review: { prefix: "REV" },
   Artefact: { prefix: "ART" },
   Computation: { prefix: "COMP" },
   Task: { prefix: "TASK" },
