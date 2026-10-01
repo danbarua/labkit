@@ -251,15 +251,14 @@ export class ReadSurface extends SessionCore {
    * comment for the shape and why there is no `at=`.
    */
   async now({ since }: NowQuery): Promise<Standing> {
-    const [events, gates, work, known, transcribed] = await Promise.all([
-      this.whatHappened(since === undefined ? {} : { since }),
-      this.gateList({}),
-      this.workList({}),
-      this.whatIsKnown(),
-      // Not derived from `events` above: with a cursor that list is the window,
-      // and this answer is about the record.
-      this.howMuchWasTranscribed(),
-    ]);
+    // One after another: every read goes through the one connection this surface holds.
+    const events = await this.whatHappened(since === undefined ? {} : { since });
+    const gates = await this.gateList({});
+    const work = await this.workList({});
+    const known = await this.whatIsKnown();
+    // Not derived from `events` above: with a cursor that list is the window,
+    // and this answer is about the record.
+    const transcribed = await this.howMuchWasTranscribed();
     const last = events.at(-1);
     const seq = last?.seq ?? since ?? 0;
 

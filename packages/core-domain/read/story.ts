@@ -267,13 +267,10 @@ export class StoryGroup extends SessionCore {
     // What the still-current analyses actually consumed -- one hop from the computation, not a
     // detour through the enquiry. Only currently-standing findings count: a superseded
     // analysis's inputs are not what the claim rests on now.
-    const resting = (
-      await Promise.all(
-        (["SUPPORTS", "CHALLENGES"] as const).map((bearing) =>
-          this.artefactsConsumedBy(scope, bearing),
-        ),
-      )
-    ).flat();
+    const resting = [
+      ...(await this.artefactsConsumedBy(scope, "SUPPORTS")),
+      ...(await this.artefactsConsumedBy(scope, "CHALLENGES")),
+    ];
 
     // The standard the finding was held to, if it was held to one. The criteria a researcher
     // agreed before the run are what "does this stand?" is answered against; without them a
@@ -318,14 +315,12 @@ export class StoryGroup extends SessionCore {
 
     // Standing: confirmatory when the conclusion was prespecified as such, or when a decision
     // confirmed it afterwards.
-    const [prespecified, conferred] = await Promise.all([
-      this.graph.query(
-        `MATCH (c:Claim {natural_id: $claim}) RETURN c`,
-        { c: vertexProps<{ kind?: string }>() },
-        { claim },
-      ),
-      this.standingConferred(claim),
-    ]);
+    const prespecified = await this.graph.query(
+      `MATCH (c:Claim {natural_id: $claim}) RETURN c`,
+      { c: vertexProps<{ kind?: string }>() },
+      { claim },
+    );
+    const conferred = await this.standingConferred(claim);
     const confirmed =
       conferred !== undefined || prespecified.some((r) => r.c.kind === "confirmatory");
     const promotedBecause = conferred?.because;
