@@ -8,7 +8,7 @@ import {
   type Icon,
   PencilSimpleIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Activity, activityLabel, activityMood } from "./activity";
 import { MarkdownText } from "./markdown";
 import { Loader, type LoaderMood } from "./loader";
@@ -97,14 +97,21 @@ function MessageToolbar({
 export function UserMessage({
   block,
   last = false,
+  streaming = false,
   onAction,
 }: {
   block: Kind<"user">;
   last?: boolean;
+  /** The turn is still running, so the message may still change: its toolbar waits. */
+  streaming?: boolean;
   onAction?: ((action: MessageAction, block: Block) => void) | undefined;
 }) {
   return (
-    <div className="lk-message user" data-last={last || undefined}>
+    <div
+      className="lk-message user"
+      data-last={last || undefined}
+      data-streaming={streaming || undefined}
+    >
       <div className="lk-user">{textOf(block.content)}</div>
       <MessageToolbar block={block} actions={["edit", "fork"]} onAction={onAction} />
     </div>
@@ -114,14 +121,21 @@ export function UserMessage({
 export function AssistantMessage({
   block,
   last = false,
+  streaming = false,
   onAction,
 }: {
   block: Kind<"assistant">;
   last?: boolean;
+  /** The turn is still running, so the message may still change: its toolbar waits. */
+  streaming?: boolean;
   onAction?: ((action: MessageAction, block: Block) => void) | undefined;
 }) {
   return (
-    <div className="lk-message assistant" data-last={last || undefined}>
+    <div
+      className="lk-message assistant"
+      data-last={last || undefined}
+      data-streaming={streaming || undefined}
+    >
       <div className="lk-assistant">
         <Rich content={block.content} />
       </div>
@@ -150,6 +164,7 @@ export function Thought({
       setTook(Date.now() - started.current);
   }, [streaming, took]);
   const open = chosen ?? streaming;
+  const body = useFollowEnd(block.content);
   return (
     <details
       className="lk-thought"
@@ -168,9 +183,30 @@ export function Thought({
           `Thought for ${Math.max(1, Math.round(took / 1000))}s`
         )}
       </summary>
-      <Rich content={block.content} />
+      <div className="lk-thought-body" ref={body.ref} onScroll={body.onScroll}>
+        <Rich content={block.content} />
+      </div>
     </details>
   );
+}
+
+/**
+ * Keeps a scrolling box at its end as `content` grows, while the reader has not scrolled away
+ * from the end. Returns the ref and scroll handler for the box.
+ */
+function useFollowEnd(content: unknown) {
+  const ref = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the content changes
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && following.current) el.scrollTop = el.scrollHeight;
+  }, [content]);
+  const onScroll = () => {
+    const el = ref.current;
+    if (el) following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  };
+  return { ref, onScroll };
 }
 
 /** Seconds since `key` last changed, counting up once a second. */

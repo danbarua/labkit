@@ -60,7 +60,7 @@ export interface ComposerProps {
   initialText?: string;
   /** The files it takes, pasted, dropped or chosen. Without this it takes none. */
   attach?: AttachLimits | undefined;
-  /** What the agent is doing, shown by the loader in the box's top corner, above Stop. */
+  /** What the agent is doing, shown by the loader just above the box's top-right corner. */
   loader?: LoaderMood | undefined;
 }
 
@@ -294,12 +294,7 @@ export function Composer({
         attachments.add([...event.dataTransfer.files]);
       }}
     >
-      <div
-        className="lk-composer-box"
-        ref={shell}
-        data-dragging={dragging || undefined}
-        data-loader={loader === undefined ? undefined : true}
-      >
+      <div className="lk-composer-box" ref={shell} data-dragging={dragging || undefined}>
         {loader === undefined ? null : (
           <span className="lk-composer-loader">
             <Loader mood={loader} />

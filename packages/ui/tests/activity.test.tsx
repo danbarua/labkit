@@ -122,6 +122,9 @@ describe("the thinking block", () => {
       <Conversation state={state(started, chunk("agent_message_chunk", "So"))} onSend={() => {}} />,
     );
     expect(speaking).toContain('<div class="lk-loader" data-mood="speaking"');
+    expect(speaking).toContain(
+      '<div class="lk-message assistant" data-last="true" data-streaming="true">',
+    );
     expect(speaking).not.toContain('class="lk-working"');
   });
 });

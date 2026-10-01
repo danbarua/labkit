@@ -1,4 +1,4 @@
-import type { RequestPermissionOutcome } from "@agentclientprotocol/sdk";
+import type { AvailableCommand, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import {
   type Block,
   pendingPermissions,
@@ -42,6 +42,11 @@ const PHASE_LABEL: Record<Phase, string> = {
 
 export interface ConversationProps {
   readonly state: TranscriptState;
+  /**
+   * Commands the host carries out itself rather than sending to the agent, such as starting a new
+   * session. The composer offers them before the agent's own; the host sees them in `onSend`.
+   */
+  readonly hostCommands?: readonly AvailableCommand[];
   /** Without this the conversation is read-only and has no composer. */
   readonly onSend?: (text: string, files: readonly File[]) => void;
   /** The files the composer takes. Without this it takes none. */
@@ -75,9 +80,23 @@ function BlockView({
 }) {
   switch (block.kind) {
     case "user":
-      return <UserMessage block={block} last={last} onAction={onMessageAction} />;
+      return (
+        <UserMessage
+          block={block}
+          last={last}
+          streaming={last && state.running}
+          onAction={onMessageAction}
+        />
+      );
     case "assistant":
-      return <AssistantMessage block={block} last={last} onAction={onMessageAction} />;
+      return (
+        <AssistantMessage
+          block={block}
+          last={last}
+          streaming={last && state.running}
+          onAction={onMessageAction}
+        />
+      );
     case "thought":
       return <Thought block={block} streaming={last && state.running} />;
     case "tool": {
@@ -114,7 +133,11 @@ function useQuiet(value: unknown, ms: number): boolean {
   return quiet;
 }
 
-/** Keeps the newest content in view while the reader has not scrolled away from the end. */
+/**
+ * Keeps the newest content in view while the reader has not scrolled away from the end: when the
+ * content changes, and while it changes height without a change of content (a block opening or
+ * closing).
+ */
 function useStickToBottom(dependency: unknown) {
   const ref = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
@@ -123,6 +146,16 @@ function useStickToBottom(dependency: unknown) {
     const el = ref.current;
     if (el && stuck.current) el.scrollTop = el.scrollHeight;
   }, [dependency]);
+  useEffect(() => {
+    const el = ref.current;
+    const content = el?.firstElementChild;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (stuck.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
   const onScroll = () => {
     const el = ref.current;
     if (el) stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
@@ -132,6 +165,7 @@ function useStickToBottom(dependency: unknown) {
 
 export function Conversation({
   state,
+  hostCommands = [],
   onSend,
   onCancel,
   onAnswer,
@@ -215,7 +249,7 @@ export function Conversation({
             {onSend ? (
               <Composer
                 running={state.running}
-                commands={state.commands}
+                commands={[...hostCommands, ...state.commands]}
                 configOptions={state.configOptions ?? []}
                 onSend={onSend}
                 onCancel={onCancel}

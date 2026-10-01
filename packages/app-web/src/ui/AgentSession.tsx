@@ -96,6 +96,9 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
  * fake agent ignores it. Without either, ACP's own default of `/` fails on a read-only root.
  * `/agent` starts a session and `/agent/{sessionId}` reopens one the agent still has.
  */
+/** Commands this page carries out itself. */
+const HOST_COMMANDS = [{ name: "new", description: "Start a new session" }];
+
 export default function AgentSession({ sessionId }: { sessionId?: string }) {
   const cwd = import.meta.env.VITE_LABKIT_ACP_CWD as string | undefined;
   const real = cwd !== undefined;
@@ -131,7 +134,18 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
         <Conversation
           state={state}
           records={{ types: RECORD_TYPES }}
-          onSend={send}
+          hostCommands={HOST_COMMANDS}
+          onSend={(text) => {
+            // A full page load: the page keeps the session it has open, and this starts one.
+            if (text.trim() === "/new")
+              void navigate({
+                to: "/agent/{-$sessionId}",
+                // Named as absent: a route left to fill its own params keeps the current session.
+                params: { sessionId: undefined },
+                reloadDocument: true,
+              });
+            else send(text);
+          }}
           onCancel={cancel}
           onAnswer={answer}
           onSetConfig={setConfig}
