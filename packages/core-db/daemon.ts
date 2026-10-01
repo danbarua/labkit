@@ -18,6 +18,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { stderrLine } from "./colour";
 import {
   type DbBackend,
   directPostgresBackend,
@@ -88,7 +89,7 @@ export function readDaemonInfo(dataDir: string): DaemonInfo | null {
 }
 
 function log(message: string): void {
-  console.error(`${new Date().toISOString()} [labkit daemon ${process.pid}] ${message}`);
+  stderrLine(`${new Date().toISOString()} [labkit daemon ${process.pid}] ${message}`);
 }
 
 /** Serves the record at `dataDir` until idle or signalled. Returns the process exit code. */
@@ -250,7 +251,7 @@ export function daemonBackend(rawDataDir: string): DbBackend {
               `  Something newer has migrated it, and this build would write against a schema it does not know.`,
           );
         if (info && info.migrations < mine) {
-          console.error(
+          stderrLine(
             `labkit: the daemon for ${dataDir} carries ${info.migrations} migrations and this build ${mine}; replacing it`,
           );
           await stopDaemon(dataDir, info.pid, deadline);
