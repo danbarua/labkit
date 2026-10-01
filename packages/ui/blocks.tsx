@@ -11,7 +11,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { type Activity, activityLabel, activityMood } from "./activity";
 import { MarkdownText } from "./markdown";
-import { Loader } from "./loader";
+import { Loader, type LoaderMood } from "./loader";
 import { ContentView } from "./tool";
 
 type Kind<K extends Block["kind"]> = Extract<Block, { kind: K }>;
@@ -193,12 +193,14 @@ function useElapsed(key: string): number {
 const DONE_MS = 600;
 
 /**
- * Under the transcript while a turn runs: the loader, what the agent is doing, and for how long.
- * When the turn stops, the loader shows it is done and then the indicator goes.
+ * The activity to show: the current one, or for a moment after the turn stops the last one, with
+ * `ending` set so the loader can show it is done.
  */
-export function WorkingIndicator({ activity }: { activity: Activity | undefined }) {
+export function useLingering(activity: Activity | undefined): {
+  shown: Activity | undefined;
+  ending: boolean;
+} {
   const [last, setLast] = useState(activity);
-  const ending = activity === undefined && last !== undefined;
   useEffect(() => {
     if (activity !== undefined) {
       setLast(activity);
@@ -207,16 +209,38 @@ export function WorkingIndicator({ activity }: { activity: Activity | undefined 
     const timer = setTimeout(() => setLast(undefined), DONE_MS);
     return () => clearTimeout(timer);
   }, [activity]);
-  const shown = activity ?? last;
+  return { shown: activity ?? last, ending: activity === undefined && last !== undefined };
+}
+
+/** The loader's mood for what is shown, or nothing when nothing is. */
+export const moodOf = ({
+  shown,
+  ending,
+}: ReturnType<typeof useLingering>): LoaderMood | undefined =>
+  shown === undefined ? undefined : ending ? "done" : activityMood(shown);
+
+/**
+ * Under the transcript while a turn runs: what the agent is doing, and for how long, with the
+ * loader before it. With `loader` false the loader is drawn elsewhere and the row is only the
+ * words, so it is not drawn at all while there are none (the agent speaking, or done).
+ */
+export function WorkingIndicator({
+  shown,
+  ending,
+  loader = true,
+}: ReturnType<typeof useLingering> & { loader?: boolean }) {
   const label = shown === undefined || ending ? undefined : activityLabel(shown);
   const seconds = useElapsed(label ?? "");
-  if (shown === undefined) return null;
+  const mood = moodOf({ shown, ending });
+  if (mood === undefined || (!loader && label === undefined)) return null;
   return (
     <div className="lk-working" role="status" aria-label={label ?? (ending ? "Done" : "Answering")}>
-      <Loader mood={ending ? "done" : activityMood(shown)} />
+      {loader ? <Loader mood={mood} /> : null}
       {label === undefined ? null : (
         <>
-          <span className={shown.kind === "tool" ? "lk-working-label lk-mono" : "lk-working-label"}>
+          <span
+            className={shown?.kind === "tool" ? "lk-working-label lk-mono" : "lk-working-label"}
+          >
             <span className="lk-shimmer">{label}</span>
           </span>
           <span className="lk-working-time">{seconds}s</span>

@@ -19,6 +19,8 @@ import {
   type MessageAction,
   Thought,
   UserMessage,
+  moodOf,
+  useLingering,
   WorkingIndicator,
 } from "./blocks";
 import { Composer } from "./composer";
@@ -146,6 +148,7 @@ export function Conversation({
   const usage = state.usage;
   const activity = afterPause(currentActivity(state), useQuiet(state.blocks, PAUSE_MS));
   const drawn = drawnBlocks(state);
+  const indicator = useLingering(activity);
 
   return (
     <RecordsContext.Provider value={records}>
@@ -194,7 +197,7 @@ export function Conversation({
                     />
                   ),
                 )}
-                <WorkingIndicator activity={activity} />
+                <WorkingIndicator {...indicator} loader={onSend === undefined} />
               </div>
             </div>
 
@@ -219,6 +222,7 @@ export function Conversation({
                 onSetConfig={onSetConfig}
                 mentions={mentions}
                 attach={attach}
+                loader={moodOf(indicator)}
               />
             ) : state.configOptions && state.configOptions.length > 0 ? (
               <div className="lk-session-summary">

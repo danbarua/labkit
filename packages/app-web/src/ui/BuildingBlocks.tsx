@@ -13,6 +13,7 @@ import {
   PalettePanel,
   type PickItem,
   Surface,
+  useLingering,
   useToasts,
   WorkingIndicator,
 } from "@labkit/ui";
@@ -445,6 +446,7 @@ const TURN: readonly [Activity | undefined, number][] = [
 function LoaderDemo() {
   const [activity, setActivity] = useState<Activity | undefined>({ kind: "waiting" });
   const [step, setStep] = useState<number | undefined>(undefined);
+  const indicator = useLingering(activity);
   useEffect(() => {
     if (step === undefined) return;
     const [shown, ms] = TURN[step] ?? [undefined, 0];
@@ -456,7 +458,7 @@ function LoaderDemo() {
   return (
     <div style={pad}>
       <div style={{ minHeight: 24 }}>
-        <WorkingIndicator activity={activity} />
+        <WorkingIndicator {...indicator} />
       </div>
       <div style={row}>
         {ACTIVITIES.map((choice) => (

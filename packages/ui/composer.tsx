@@ -1,6 +1,7 @@
 import type { AvailableCommand, SessionConfigOption } from "@agentclientprotocol/sdk";
 import { ArrowUpIcon, AtIcon, PaperclipIcon, StopIcon } from "@phosphor-icons/react";
 import { type AttachLimits, AttachmentChips, useAttachments } from "./attachments";
+import { Loader, type LoaderMood } from "./loader";
 import { type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   filterItems,
@@ -59,6 +60,8 @@ export interface ComposerProps {
   initialText?: string;
   /** The files it takes, pasted, dropped or chosen. Without this it takes none. */
   attach?: AttachLimits | undefined;
+  /** What the agent is doing, shown by the loader in the box's top corner, above Stop. */
+  loader?: LoaderMood | undefined;
 }
 
 /**
@@ -78,6 +81,7 @@ export function Composer({
   mentions,
   initialText = "",
   attach,
+  loader,
 }: ComposerProps) {
   const attachments = useAttachments(attach);
   const [dragging, setDragging] = useState(false);
@@ -290,7 +294,17 @@ export function Composer({
         attachments.add([...event.dataTransfer.files]);
       }}
     >
-      <div className="lk-composer-box" ref={shell} data-dragging={dragging || undefined}>
+      <div
+        className="lk-composer-box"
+        ref={shell}
+        data-dragging={dragging || undefined}
+        data-loader={loader === undefined ? undefined : true}
+      >
+        {loader === undefined ? null : (
+          <span className="lk-composer-loader">
+            <Loader mood={loader} />
+          </span>
+        )}
         <AttachmentChips
           files={attachments.files}
           refused={attachments.refused}

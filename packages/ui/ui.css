@@ -1160,6 +1160,16 @@ button.lk-handle:hover {
     border-color 120ms ease,
     box-shadow 120ms ease;
 }
+/* The loader rides in the top corner, above Stop, and the text keeps clear of it. */
+.lk-composer-loader {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  pointer-events: none;
+}
+.lk-composer-box[data-loader] textarea {
+  padding-right: 48px;
+}
 .lk-composer-box[data-dragging] {
   border-color: var(--lk-accent);
   border-style: dashed;
