@@ -8,6 +8,9 @@ import { answer } from "../output";
 import type { Run } from "../session";
 import {
   claimsAssertingQuery,
+  collectionQuery,
+  DEFAULT_PAGE,
+  MAX_PAGE,
   eventFilter,
   gateListQuery,
   notesQuery,
@@ -60,28 +63,6 @@ export function registerReads(program: Command, run: Run): void {
     .action(async (subject: string) => {
       const query = parseCommand(whyQuery, { subject });
       return run(async ({ read }) => answer(await read.why(query), renderWhyDispatch));
-    });
-  program
-    .command("get")
-    .helpGroup("Finding a handle")
-    .summary("what is stored under a handle, and what it is wired to")
-    .description(
-      "The record as stored, rather than an answer drawn from it: one node's properties and " +
-        "the neighbours within --depth hops, each with the edge that reaches it. Reach for " +
-        "this when a read says something the record does not seem to support. The same " +
-        "resource the HTTP API serves, with relative links.",
-    )
-    .argument("<handle>", "a handle of any kind, e.g. CLM_20")
-    .action(async (handle: string) => {
-      return run(async ({ read }) => {
-        const query = parseCommand(resourceQuery, {
-          handle,
-          ...(program.opts().depth === undefined ? {} : { depth: program.opts().depth }),
-        });
-        const resource = await read.resource(query);
-        if (resource === null) throw new Error(`${handle} not found`);
-        return answer(resource, () => renderResource(resource));
-      });
     });
   program
     .command("search")
@@ -242,6 +223,74 @@ export function registerReads(program: Command, run: Run): void {
         return run(async ({ read }) => answer(await read.whatHappenedPage(query), renderHappened));
       },
     );
+  program
+    .command("get")
+    .helpGroup("The record as stored")
+    .summary("one node as stored, and the neighbours it is wired to")
+    .description(
+      "The node's properties and the neighbours within --depth hops, each with the edge that " +
+        "reaches it, with no interpretation. `why` answers a question about a record; this " +
+        "shows what the answer was drawn from. The same resource the HTTP API serves, with " +
+        "relative links.",
+    )
+    .argument("<handle>", "a handle of any kind, e.g. CLM_20")
+    .action(async (handle: string) => {
+      const query = parseCommand(resourceQuery, { handle, ...depthOption(program) });
+      return run(async ({ read }) => {
+        const resource = await read.resource(query);
+        if (resource === null) throw new Error(`${handle} not found`);
+        return answer(resource, () => renderResource(resource));
+      });
+    });
+  program
+    .command("list")
+    .helpGroup("The record as stored")
+    .summary("every node of one type as stored, a page at a time")
+    .description(
+      "Each node as `get` shows it, oldest handle first, with no interpretation. " +
+        "`--offset` and `--limit` page through them; the output says where the next page " +
+        `starts. --limit is at most ${MAX_PAGE} and defaults to ${DEFAULT_PAGE}.`,
+    )
+    .argument("<node_type>", collectionQuery.shape.type.options.join(" | "))
+    .option("--offset <n>", "how many nodes to skip", whole)
+    .option("--limit <n>", "how many nodes at most", whole)
+    .action(async (type: string, opts: { offset?: number; limit?: number }) => {
+      const query = parseCommand(collectionQuery, {
+        type,
+        ...(opts.offset === undefined ? {} : { offset: opts.offset }),
+        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
+        ...depthOption(program),
+      });
+      return run(async ({ read }) => {
+        const collection = await read.collection(query);
+        return answer(collection, () => renderCollection(collection, query.type));
+      });
+    });
+}
+
+/** The global `--depth`, when it was given. */
+function depthOption(program: Command): { depth?: number } {
+  const depth: number | undefined = program.opts().depth;
+  return depth === undefined ? {} : { depth };
+}
+
+/** One page of stored nodes: each as `get` renders it, then where the next page starts. */
+function renderCollection(collection: unknown, type: string): string {
+  const page = collection as {
+    offset: number;
+    limit: number;
+    count: number;
+    _links: { next?: unknown };
+    _embedded: Record<string, unknown[]>;
+  };
+  const items = page._embedded[type] ?? [];
+  const last = page.offset + page.count;
+  const heading =
+    page.count === 0
+      ? `No ${type} nodes from offset ${page.offset}.`
+      : `${type} ${page.offset + 1}-${last}`;
+  const next = page._links.next === undefined ? "" : `\n\nMore: --offset ${last}`;
+  return [heading, ...items.map(renderResource)].join("\n\n") + next;
 }
 
 /**
@@ -251,22 +300,32 @@ export function registerReads(program: Command, run: Run): void {
  * long lines and would break the quoting. `--json` is the machine-readable form.
  */
 function renderResource(resource: unknown): string {
-  const node = resource as {
-    id?: string;
-    type?: string;
-    _embedded?: Record<string, Array<{ id?: string; type?: string }>>;
-    [key: string]: unknown;
-  };
+  const node = resource as StoredNode;
   const skip = new Set(["id", "type", "_links", "_embedded", "dir", "depth"]);
   const lines = [`${node.id ?? "?"}  ${node.type ?? "?"}`, ""];
   for (const [key, value] of Object.entries(node)) {
     if (skip.has(key) || value === null || typeof value === "object") continue;
     lines.push(`  ${key.padEnd(14)} ${String(value)}`);
   }
-  const embedded = Object.entries(node._embedded ?? {});
-  if (embedded.length > 0) lines.push("");
-  for (const [edge, neighbours] of embedded) {
-    lines.push(`  ${edge.padEnd(24)} ${neighbours.map((n) => n.id ?? "?").join("  ")}`);
-  }
+  const neighbours = renderNeighbours(node, 1);
+  if (neighbours.length > 0) lines.push("", ...neighbours);
   return lines.join("\n");
+}
+
+interface StoredNode {
+  id?: string;
+  type?: string;
+  _embedded?: Record<string, StoredNode[]>;
+  [key: string]: unknown;
+}
+
+/** One line per neighbour, each edge's farther hops indented beneath the neighbour they reach from. */
+function renderNeighbours(node: StoredNode, hop: number): string[] {
+  const indent = "  ".repeat(hop);
+  return Object.entries(node._embedded ?? {}).flatMap(([edge, neighbours]) =>
+    neighbours.flatMap((n) => [
+      `${indent}${edge.padEnd(24)} ${n.id ?? "?"}`,
+      ...renderNeighbours(n, hop + 1),
+    ]),
+  );
 }
