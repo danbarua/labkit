@@ -380,6 +380,25 @@ export const newFile: Scenario = {
   ],
 };
 
+export const turnFails: Scenario = {
+  id: "turn-fails",
+  title: "A turn the provider fails",
+  prompt: "Summarise the seed runs.",
+  stopReason: "end_turn",
+  steps: [
+    think("Read the per-seed scores first.", "t1"),
+    ...openRead("call_seeds", "read runs/seeds.json", "read_file", { path: "runs/seeds.json" }),
+    update({
+      sessionUpdate: "tool_call_update",
+      toolCallId: "call_seeds",
+      status: "completed",
+      content: [asText('{"seeds": 25, "complete": 25}')],
+    }),
+    say("All 25 seeds finished. Comparing them", "m1"),
+  ],
+  fails: { code: -32603, message: "Provider request failed: 529 Overloaded" },
+};
+
 export const sessionReplay: Scenario = {
   id: "session-replay",
   title: "A reopened session",
@@ -440,6 +459,7 @@ export const SCENARIOS: readonly Scenario[] = [
   toolPlot,
   planAndDiff,
   newFile,
+  turnFails,
   sessionReplay,
   noticesAndUsage,
 ];

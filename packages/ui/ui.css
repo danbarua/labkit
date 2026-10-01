@@ -99,6 +99,14 @@
 .lk-badge.awaiting_permission::before {
   background: var(--lk-warn);
 }
+.lk-badge.stopped {
+  color: var(--lk-danger);
+  border-color: var(--lk-danger);
+  background: var(--lk-danger-soft);
+}
+.lk-badge.stopped::before {
+  background: var(--lk-danger);
+}
 @keyframes lk-pulse {
   50% {
     opacity: 0.35;
@@ -272,6 +280,11 @@
   color: var(--lk-muted);
   font-size: 13px;
 }
+/* With the loader in the row, it sits at the row's right end, as it does above the composer. */
+.lk-working > .lk-loader {
+  order: 1;
+  margin-left: auto;
+}
 .lk-working-label {
   min-width: 0;
   overflow: hidden;
@@ -304,6 +317,11 @@
   --lk-loader-from: #a4d957;
   --lk-loader-via: #45c18b;
   --lk-loader-to: #42c6d0;
+}
+.lk-loader[data-mood="failed"] {
+  --lk-loader-from: var(--lk-danger);
+  --lk-loader-via: var(--lk-danger);
+  --lk-loader-to: var(--lk-danger);
 }
 .lk-loader[data-mood="speaking"],
 .lk-loader[data-mood="done"] {
@@ -792,6 +810,23 @@
   font-weight: 600;
 }
 
+/* one model request's figures, under what it produced */
+.lk-step-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  color: var(--lk-faint);
+  font-family: var(--lk-font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.lk-step-stats > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* plan, notice, compaction */
 .lk-plan {
   padding: 10px 12px;
@@ -1197,10 +1232,12 @@ button.lk-handle:hover {
 .lk-composer {
   position: relative;
   width: 100%;
-  /* Its padding is inside this width, so the box itself is as wide as the transcript above. */
-  max-width: calc(var(--lk-column) + 32px);
+  /* Its padding is inside this width, so the box itself is as wide as the transcript above. The
+     padding also keeps the width the transcript keeps for its scrollbar, half on each side, so
+     the two line up when the window is narrower than the column. */
+  max-width: calc(var(--lk-column) + 32px + var(--lk-log-gutter, 0px));
   margin: 0 auto;
-  padding: 8px 16px 16px;
+  padding: 8px calc(16px + var(--lk-log-gutter, 0px) / 2) 16px;
 }
 .lk-composer-box {
   position: relative;

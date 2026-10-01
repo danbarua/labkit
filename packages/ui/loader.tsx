@@ -2,9 +2,10 @@ import { useEffect, useRef } from "react";
 
 /**
  * What the loader shows, by pace and colour: waiting for the first token (slow, and slower still
- * at first), working (fast), speaking (steady), and done (the dots spread and close once).
+ * at first), working (fast), speaking (steady), done (the dots spread and close once), and failed
+ * (red, slowest).
  */
-export type LoaderMood = "waiting" | "working" | "speaking" | "done";
+export type LoaderMood = "waiting" | "working" | "speaking" | "done" | "failed";
 
 /** The dots that pulse, as a five-by-five grid: a cross through the middle. */
 const MATRIX = ["10001", "01010", "00100", "01010", "10001"] as const;
@@ -30,6 +31,7 @@ const PACE: Record<LoaderMood, { start?: number; settle?: number; ease: number }
   working: { start: 0.6, settle: 0.6, ease: 0.1 },
   speaking: { settle: 1.5, ease: 0.4 },
   done: { ease: 1 },
+  failed: { start: 4, settle: 4, ease: 1 },
 };
 
 /** How long the done spread takes, in milliseconds. */

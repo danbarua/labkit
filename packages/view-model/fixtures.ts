@@ -35,7 +35,8 @@ export async function eventsOfFixture(fixture: Fixture): Promise<ViewEvent[]> {
       return answer;
     },
   });
-  if (stopReason !== undefined) events.push({ type: "prompt_ended", stopReason });
+  if (scenario.fails) events.push({ type: "failed", message: scenario.fails.message });
+  else if (stopReason !== undefined) events.push({ type: "prompt_ended", stopReason });
   return events;
 }
 

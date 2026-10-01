@@ -150,10 +150,19 @@ function useStickToBottom(dependency: unknown) {
     const el = ref.current;
     const content = el?.firstElementChild;
     if (!el || !content || typeof ResizeObserver === "undefined") return;
+    // The width the transcript keeps for its scrollbar, for the composer to keep the same and so
+    // line up with it. It is zero where scrollbars float over the content.
+    const keepGutter = () =>
+      el
+        .closest<HTMLElement>(".lk-root")
+        ?.style.setProperty("--lk-log-gutter", `${el.offsetWidth - el.clientWidth}px`);
+    keepGutter();
     const observer = new ResizeObserver(() => {
       if (stuck.current) el.scrollTop = el.scrollHeight;
+      keepGutter();
     });
     observer.observe(content);
+    observer.observe(el);
     return () => observer.disconnect();
   }, []);
   const onScroll = () => {
@@ -191,7 +200,12 @@ export function Conversation({
           <ToastProvider>
             <header className="lk-header">
               <h2 className="lk-title">{state.title ?? "New session"}</h2>
-              <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
+              {/* A turn that ended in an error was stopped, not finished: it needs the person. */}
+              {activity?.kind === "failed" ? (
+                <span className="lk-badge stopped">Stopped</span>
+              ) : (
+                <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
+              )}
               <div className="lk-header-end">
                 {usage === undefined ? null : (
                   <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>
