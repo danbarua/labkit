@@ -699,12 +699,15 @@ async function launcherFixture() {
       .flatMap((name) => readFileSync(join(logs, name), "utf8").trim().split("\n"))
       .map((line) => JSON.parse(line) as LogRecord);
 
+  // The colour variables are cleared so the child's stderr is plain whatever the developer's
+  // shell sets: `FORCE_COLOR` makes Bun colour `console.error` output even into a pipe.
+  const { FORCE_COLOR: _f, NO_COLOR: _n, CI: _c, TERM: _t, ...uncoloured } = process.env;
   const launch = (env: Record<string, string>) =>
     Bun.spawn([process.execPath, cli, "--config", config, "--http", "0"], {
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, LABKIT_ACP_LOG_DIR: logs, ...env },
+      env: { ...uncoloured, LABKIT_ACP_LOG_DIR: logs, ...env },
     });
 
   return { directory, records, launch };
