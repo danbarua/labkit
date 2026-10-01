@@ -10,6 +10,7 @@ import {
   claimsAssertingQuery,
   collectionQuery,
   DEFAULT_PAGE,
+  MAX_PAGE,
   eventFilter,
   gateListQuery,
   notesQuery,
@@ -248,7 +249,7 @@ export function registerReads(program: Command, run: Run): void {
     .description(
       "Each node as `get` shows it, oldest handle first, with no interpretation. " +
         "`--offset` and `--limit` page through them; the output says where the next page " +
-        `starts. --limit is at most 200 and defaults to ${DEFAULT_PAGE}.`,
+        `starts. --limit is at most ${MAX_PAGE} and defaults to ${DEFAULT_PAGE}.`,
     )
     .argument("<node_type>", collectionQuery.shape.type.options.join(" | "))
     .option("--offset <n>", "how many nodes to skip", whole)

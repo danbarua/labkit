@@ -6,7 +6,7 @@ import { Command } from "commander";
 import { labkitVersion } from "@labkit/core-db/version";
 import { worktreeName } from "./worktree";
 import { isoInstant, whole } from "./args";
-import { DEFAULT_DEPTH } from "@labkit/core-domain/queries";
+import { DEFAULT_DEPTH, MAX_DEPTH } from "@labkit/core-domain/queries";
 import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
 import { registerDump, registerRestore } from "./commands/dump";
@@ -34,7 +34,7 @@ export function globalOptions(program: Command): Command {
       .option("--json", "emit the report as JSON instead of prose")
       .option(
         "--depth <n>",
-        `with \`get\` and \`list\`, how many hops of neighbours to embed around each node, 0 to 6 (default: ${DEFAULT_DEPTH})`,
+        `with \`get\` and \`list\`, how many hops of neighbours to embed around each node, 0 to ${MAX_DEPTH} (default: ${DEFAULT_DEPTH})`,
         whole,
       )
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only
