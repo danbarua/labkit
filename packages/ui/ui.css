@@ -280,6 +280,11 @@
   color: var(--lk-muted);
   font-size: 13px;
 }
+/* With the loader in the row, it sits at the row's right end, as it does above the composer. */
+.lk-working > .lk-loader {
+  order: 1;
+  margin-left: auto;
+}
 .lk-working-label {
   min-width: 0;
   overflow: hidden;
@@ -1227,10 +1232,12 @@ button.lk-handle:hover {
 .lk-composer {
   position: relative;
   width: 100%;
-  /* Its padding is inside this width, so the box itself is as wide as the transcript above. */
-  max-width: calc(var(--lk-column) + 32px);
+  /* Its padding is inside this width, so the box itself is as wide as the transcript above. The
+     padding also keeps the width the transcript keeps for its scrollbar, half on each side, so
+     the two line up when the window is narrower than the column. */
+  max-width: calc(var(--lk-column) + 32px + var(--lk-log-gutter, 0px));
   margin: 0 auto;
-  padding: 8px 16px 16px;
+  padding: 8px calc(16px + var(--lk-log-gutter, 0px) / 2) 16px;
 }
 .lk-composer-box {
   position: relative;

@@ -150,10 +150,19 @@ function useStickToBottom(dependency: unknown) {
     const el = ref.current;
     const content = el?.firstElementChild;
     if (!el || !content || typeof ResizeObserver === "undefined") return;
+    // The width the transcript keeps for its scrollbar, for the composer to keep the same and so
+    // line up with it. It is zero where scrollbars float over the content.
+    const keepGutter = () =>
+      el
+        .closest<HTMLElement>(".lk-root")
+        ?.style.setProperty("--lk-log-gutter", `${el.offsetWidth - el.clientWidth}px`);
+    keepGutter();
     const observer = new ResizeObserver(() => {
       if (stuck.current) el.scrollTop = el.scrollHeight;
+      keepGutter();
     });
     observer.observe(content);
+    observer.observe(el);
     return () => observer.disconnect();
   }, []);
   const onScroll = () => {
