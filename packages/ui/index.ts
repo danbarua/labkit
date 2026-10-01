@@ -1,6 +1,9 @@
 export { Composer, type ComposerProps } from "./composer";
 export { Conversation, type ConversationProps } from "./conversation";
+export type { Activity } from "./activity";
+export { WorkingIndicator } from "./blocks";
 export { diffLines } from "./format";
+export { Loader, type LoaderMood } from "./loader";
 export { ElicitationForm, problemsWith } from "./elicitation";
 export { MarkdownText } from "./markdown";
 export { focusableIn, useFocusTrap } from "./overlay/focus-trap";

@@ -182,7 +182,7 @@ export function Conversation({
                     />
                   ),
                 )}
-                {activity === undefined ? null : <WorkingIndicator activity={activity} />}
+                <WorkingIndicator activity={activity} />
               </div>
             </div>
 
