@@ -113,7 +113,7 @@ adding anything to the gate: whatever it costs you, it costs CI double.
 ## What does not build
 
 `test-on-pr` carries an `ignored_files` denylist: a pull request touching only
-`docs/`, `CLAUDE.md`, `README.md`, `.claude/` or `LICENSE` runs no build. A
+`docs/`, `CLAUDE.md`, `.claude/` or `LICENSE` runs no build. A
 build cannot fail on prose, and one that can only ever be green trains you to
 stop reading it.
 

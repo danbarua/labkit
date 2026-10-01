@@ -46,7 +46,6 @@ resource "google_cloudbuild_trigger" "test_on_pr" {
   ignored_files = [
     "docs/**",
     "CLAUDE.md",
-    "README.md",
     ".claude/**",
     "LICENSE",
   ]
