@@ -104,4 +104,27 @@ describe("the thinking block", () => {
     expect(html).toContain('data-mood="speaking"');
     expect(html).not.toContain("lk-working-label");
   });
+
+  test("with a composer, the loader sits in its corner and the row under the transcript is words", () => {
+    const thinking = renderToStaticMarkup(
+      <Conversation
+        state={state(started, chunk("agent_thought_chunk", "hmm"))}
+        onSend={() => {}}
+      />,
+    );
+    expect(thinking).toMatch(
+      /<span class="lk-composer-loader"><div class="lk-loader" data-mood="working"/,
+    );
+    expect(thinking).toMatch(
+      /<div class="lk-working" role="status" aria-label="Thinking"><span class="lk-working-label">/,
+    );
+    const speaking = renderToStaticMarkup(
+      <Conversation state={state(started, chunk("agent_message_chunk", "So"))} onSend={() => {}} />,
+    );
+    expect(speaking).toContain('<div class="lk-loader" data-mood="speaking"');
+    expect(speaking).toContain(
+      '<div class="lk-message assistant" data-last="true" data-streaming="true">',
+    );
+    expect(speaking).not.toContain('class="lk-working"');
+  });
 });

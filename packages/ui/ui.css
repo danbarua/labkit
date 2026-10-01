@@ -167,6 +167,17 @@
 .lk-message[data-last] .lk-message-toolbar {
   opacity: 1;
 }
+/* While the turn runs, the last message may still change: its toolbar is hidden, and fades in
+   once the turn has settled. */
+.lk-message[data-streaming] .lk-message-toolbar {
+  visibility: hidden;
+  opacity: 0;
+}
+.lk-message[data-last]:not([data-streaming]) .lk-message-toolbar {
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s allow-discrete;
+}
 .lk-message-toolbar .lk-icon-btn {
   font-size: 14px;
   color: var(--lk-muted);
@@ -248,7 +259,7 @@
   cursor: pointer;
   user-select: none;
 }
-.lk-thought[data-streaming] > .lk-md {
+.lk-thought[data-streaming] > .lk-thought-body {
   max-height: 12em;
   overflow-y: auto;
 }
@@ -1025,8 +1036,50 @@ a.lk-btn {
   color: var(--lk-danger);
   border-color: var(--lk-danger);
 }
+/* Opening and closing: a block's contents grow and shrink rather than appearing at full size.
+   Where a browser cannot size between zero and auto, they appear at once, as before. */
+.lk-root {
+  interpolate-size: allow-keywords;
+}
+.lk-root details::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition:
+    block-size 0.22s ease,
+    content-visibility 0.22s allow-discrete;
+}
+.lk-root details[open]::details-content {
+  block-size: auto;
+}
+/* A new block in the transcript fades in and settles down into place. */
+.lk-blocks > * {
+  transition:
+    opacity 0.22s ease,
+    translate 0.22s ease;
+}
+@starting-style {
+  .lk-blocks > * {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+/* On a touch screen, a browser zooms the page in on a text field set below 16px when it takes
+   focus (iOS Safari does). Every field that takes typing is 16px there. */
+@media (pointer: coarse) {
+  .lk-root
+    :is(
+      textarea,
+      select,
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])
+    ) {
+    font-size: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .lk-root * {
+  .lk-root *,
+  .lk-root details::details-content {
     animation: none !important;
     transition: none !important;
   }
@@ -1159,6 +1212,13 @@ button.lk-handle:hover {
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease;
+}
+/* The loader sits just above the box's top-right corner, over Stop. */
+.lk-composer-loader {
+  position: absolute;
+  top: -48px;
+  right: 8px;
+  pointer-events: none;
 }
 .lk-composer-box[data-dragging] {
   border-color: var(--lk-accent);
