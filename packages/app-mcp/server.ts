@@ -16,7 +16,7 @@ import {
   type SessionContextProvider,
 } from "@labkit/core-domain/context";
 import { TOOLS, WRITE_TOOLS } from "./tools";
-import { DOCS_URI, instructionsFor, metaTools, renderToolDocs, type Registered } from "./docs";
+import { instructionsFor, type Registered } from "./docs";
 
 /**
  * Everything a tool call needs, for the duration of that call and no longer.
@@ -54,39 +54,6 @@ export function buildServer(withSurfaces: WithSurfaces): McpServer {
     { name: "labkit", version: labkitVersion() },
     { instructions: instructionsFor(registered) },
   );
-
-  // The tool surface as prose, rendered on each read from `registered`. Served twice — as a
-  // resource, and as a tool — because not every client implements resources, and one that does
-  // not sees the resource in no list.
-  server.registerResource(
-    "tool-docs",
-    DOCS_URI,
-    {
-      title: "LabKit tools",
-      description:
-        "What each tool on this server does, in prose, generated from the tool declarations.",
-      mimeType: "text/markdown",
-    },
-    (uri) => ({
-      contents: [{ uri: uri.href, mimeType: "text/markdown", text: renderToolDocs(registered) }],
-    }),
-  );
-
-  // First in the list: `tools/list` is served in registration order, so a client that cannot
-  // see resources meets the documentation before the tools it documents.
-  for (const definition of metaTools(registered)) {
-    server.registerTool(
-      definition.name,
-      {
-        title: definition.title,
-        description: definition.description,
-        annotations: { readOnlyHint: true },
-      },
-      async () => ({
-        content: [{ type: "text" as const, text: definition.handler() }],
-      }),
-    );
-  }
 
   for (const definition of registered.reads) {
     server.registerTool(

@@ -21,13 +21,7 @@ import type { TenantGraph } from "@labkit/core-db/graph";
 import { buildServer } from "@labkit/app-mcp/server";
 import { TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
 import { explanationSchema } from "@labkit/app-mcp/schemas";
-import {
-  DOCS_TOOL_NAME,
-  DOCS_URI,
-  instructionsFor,
-  metaTools,
-  renderToolDocs,
-} from "@labkit/app-mcp/docs";
+import { instructionsFor } from "@labkit/app-mcp/docs";
 import { Command } from "commander";
 import { globalOptions } from "@labkit/app-cli/program";
 import { openScenario, type Scenario } from "../helpers/scenario";
@@ -89,12 +83,11 @@ describe("structure", () => {
 
       const { tools } = await client.listTools();
       expect(tools.map((t) => t.name).sort()).toEqual(
-        [...metaTools(WRITING), ...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
+        [...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
       );
 
       // Derived from which list a tool is in, not from a list of names here.
-      // Meta tools read nothing from the record and are read-only all the same.
-      const readNames = new Set([...metaTools(WRITING), ...TOOLS].map((t) => t.name));
+      const readNames = new Set(TOOLS.map((t) => t.name));
       for (const t of tools) {
         expect(t.annotations?.readOnlyHint ?? false).toBe(readNames.has(t.name));
       }
@@ -277,37 +270,11 @@ describe("the tool documentation resource", () => {
     return client;
   }
 
-  test("the resource is listed and serves markdown", async () => {
+  test("the handshake names the registered tools, and nothing is served beside them", async () => {
     const client = await connected();
     try {
-      const { resources } = await client.listResources();
-      expect(resources.map((r) => r.uri)).toContain(DOCS_URI);
-
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      expect(contents).toHaveLength(1);
-      expect(markdown(contents).mimeType).toBe("text/markdown");
-      expect(markdown(contents).text.startsWith("# LabKit")).toBe(true);
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("the same document is a tool, for a client that cannot see resources", async () => {
-    const client = await connected();
-    try {
-      const { tools } = await client.listTools();
-      // First, so a client scanning the list meets it before what it documents.
-      expect(tools[0]?.name).toBe(DOCS_TOOL_NAME);
-
-      // The handshake says what the record is and names the tools this server registers.
       expect(client.getInstructions()).toBe(instructionsFor(WRITING));
-      expect(client.getInstructions()).not.toContain(DOCS_URI);
-
-      const result = await client.callTool({ name: DOCS_TOOL_NAME, arguments: {} });
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
-      expect(text).toBe(markdown(contents).text);
+      expect(client.getServerCapabilities()?.resources).toBeUndefined();
       await client.close();
     } finally {
       await scenario.end();
@@ -325,40 +292,6 @@ describe("the tool documentation resource", () => {
       .description.toLowerCase();
     expect(cli).toContain("did not perform");
     expect(cli).toContain("not for your own results");
-  });
-
-  test("every tool is documented, and no tool's arguments are restated", async () => {
-    const client = await connected();
-    try {
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      const doc = markdown(contents).text;
-
-      for (const tool of [...TOOLS, ...WRITE_TOOLS]) {
-        expect(doc).toContain(`## ${tool.name}`);
-        expect(doc).toContain(tool.description);
-      }
-
-      // Every caller already has the arguments and the result shape in the
-      // tool list the harness gave it. Repeating them here put the same
-      // `events` envelope in the page 27 times, for a fifth of its length.
-      expect(doc).not.toContain("**Takes**");
-      expect(doc).not.toContain("**Returns**");
-      expect(doc).not.toContain("attribution_label");
-
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("the document is generated, not stored", async () => {
-    // Rendering a subset produces a smaller document naming only that subset --
-    // which a checked-in file could not do, and which is the property that makes
-    // the served one impossible to leave stale.
-    const one = renderToolDocs({ reads: [TOOLS[0]!], writes: [] });
-    expect(one).toContain(`## ${TOOLS[0]!.name}`);
-    expect(one).not.toContain(`## ${TOOLS[1]!.name}`);
-    expect(one).not.toContain(`## ${WRITE_TOOLS[0]!.name}`);
   });
 });
 

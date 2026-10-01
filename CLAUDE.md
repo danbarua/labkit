@@ -10,8 +10,8 @@ The shape is three verbs in three tenses:
 - `labkit why <handle>` — the causes behind one record.
 - `labkit is confirmed <handle> --because` — assert a new present.
 
-`labkit --help` is the command list. `labkit://docs/tools` is the MCP tool
-list, rendered from the declarations on every read.
+`labkit --help` is the command list. The MCP server's `tools/list` is the tool
+list; each tool's description and schema are its documentation.
 
 ## Setup
 
