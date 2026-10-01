@@ -5,6 +5,7 @@ import type {
   SessionConfigOption,
 } from "@agentclientprotocol/sdk";
 import {
+  type Activity,
   CommandPalette,
   Composer,
   ElicitationForm,
@@ -13,8 +14,9 @@ import {
   type PickItem,
   Surface,
   useToasts,
+  WorkingIndicator,
 } from "@labkit/ui";
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 
 type Theme = "light" | "dark" | undefined;
 
@@ -423,6 +425,65 @@ function ElicitationDemo() {
   );
 }
 
+const ACTIVITIES: readonly { label: string; activity: Activity | undefined }[] = [
+  { label: "Waiting", activity: { kind: "waiting" } },
+  { label: "Thinking", activity: { kind: "thinking" } },
+  { label: "Tool", activity: { kind: "tool", label: "read_file DESIGN.md" } },
+  { label: "Speaking", activity: { kind: "speaking" } },
+  { label: "Stop", activity: undefined },
+];
+
+/** A turn as it unfolds, as [what the agent is doing, for how many milliseconds]. */
+const TURN: readonly [Activity | undefined, number][] = [
+  [{ kind: "waiting" }, 4000],
+  [{ kind: "thinking" }, 3000],
+  [{ kind: "tool", label: "read_file DESIGN.md" }, 2000],
+  [{ kind: "speaking" }, 4000],
+  [undefined, 0],
+];
+
+function LoaderDemo() {
+  const [activity, setActivity] = useState<Activity | undefined>({ kind: "waiting" });
+  const [step, setStep] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (step === undefined) return;
+    const [shown, ms] = TURN[step] ?? [undefined, 0];
+    setActivity(shown);
+    if (step === TURN.length - 1) return;
+    const timer = setTimeout(() => setStep(step + 1), ms);
+    return () => clearTimeout(timer);
+  }, [step]);
+  return (
+    <div style={pad}>
+      <div style={{ minHeight: 24 }}>
+        <WorkingIndicator activity={activity} />
+      </div>
+      <div style={row}>
+        {ACTIVITIES.map((choice) => (
+          <button
+            key={choice.label}
+            type="button"
+            className="lk-btn"
+            onClick={() => {
+              setStep(undefined);
+              setActivity(choice.activity);
+            }}
+          >
+            {choice.label}
+          </button>
+        ))}
+        <button type="button" className="lk-btn primary" onClick={() => setStep(0)}>
+          Play a turn
+        </button>
+      </div>
+      <p style={note}>
+        Waiting starts slow and quickens; thinking and tools are fast; speaking is steady; Stop
+        shows the done spread before the indicator goes.
+      </p>
+    </div>
+  );
+}
+
 /** The shared overlay pieces and the composer, each in a tile of its own. */
 export function BuildingBlocks({ theme }: { theme: Theme }) {
   return (
@@ -435,6 +496,9 @@ export function BuildingBlocks({ theme }: { theme: Theme }) {
       </Tile>
       <Tile id="composer-mention" title="Composer, typing a mention" theme={theme}>
         <ComposerDemo initialText="Does @" />
+      </Tile>
+      <Tile id="loader" title="What the agent is doing" theme={theme}>
+        <LoaderDemo />
       </Tile>
       <Tile id="elicitation" title="A question from the agent" theme={theme}>
         <ElicitationDemo />

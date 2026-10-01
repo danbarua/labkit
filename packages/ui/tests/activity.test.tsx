@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { currentActivity } from "../activity";
+import { activityMood, afterPause, currentActivity } from "../activity";
 import { Conversation } from "../conversation";
 
 const started: ViewEvent = { type: "prompt_started", content: [{ type: "text", text: "Go" }] };
@@ -38,13 +38,21 @@ describe("what a running turn is doing", () => {
     });
   });
 
+  test("waiting for the first word right after the prompt", () => {
+    expect(currentActivity(state(started))).toEqual({ kind: "waiting" });
+  });
+
+  test("waiting on the provider again once this turn's tools have settled", () => {
+    expect(currentActivity(state(started, call("a", "completed")))).toEqual({ kind: "waiting" });
+  });
+
   test("a call left unsettled in an earlier turn is not what is happening now", () => {
     expect(
       currentActivity(state(call("old", "pending"), chunk("agent_message_chunk", "done"), started)),
-    ).toEqual({ kind: "working" });
+    ).toEqual({ kind: "waiting" });
   });
 
-  test("thinking while a thought is the last block; nothing once answer text arrives", () => {
+  test("thinking while a thought is the last block; speaking once answer text arrives", () => {
     expect(currentActivity(state(started, chunk("agent_thought_chunk", "hmm")))).toEqual({
       kind: "thinking",
     });
@@ -52,7 +60,22 @@ describe("what a running turn is doing", () => {
       currentActivity(
         state(started, chunk("agent_thought_chunk", "hmm"), chunk("agent_message_chunk", "So")),
       ),
-    ).toBeUndefined();
+    ).toEqual({ kind: "speaking" });
+  });
+
+  test("thinking or speaking that has gone quiet is waiting on the provider again", () => {
+    expect(afterPause({ kind: "speaking" }, true)).toEqual({ kind: "waiting" });
+    expect(afterPause({ kind: "thinking" }, true)).toEqual({ kind: "waiting" });
+    expect(afterPause({ kind: "speaking" }, false)).toEqual({ kind: "speaking" });
+    expect(afterPause({ kind: "tool", label: "x" }, true)).toEqual({ kind: "tool", label: "x" });
+    expect(afterPause(undefined, true)).toBeUndefined();
+  });
+
+  test("the loader's pace and colour follow the activity", () => {
+    expect(activityMood({ kind: "waiting" })).toBe("waiting");
+    expect(activityMood({ kind: "thinking" })).toBe("working");
+    expect(activityMood({ kind: "tool", label: "x" })).toBe("working");
+    expect(activityMood({ kind: "speaking" })).toBe("speaking");
   });
 });
 
@@ -77,6 +100,8 @@ describe("the thinking block", () => {
       />,
     );
     expect(html).toContain('<details class="lk-thought"><summary>Thought</summary>');
-    expect(html).not.toContain('class="lk-working"');
+    expect(html).toContain('<div class="lk-working" role="status" aria-label="Answering">');
+    expect(html).toContain('data-mood="speaking"');
+    expect(html).not.toContain("lk-working-label");
   });
 });

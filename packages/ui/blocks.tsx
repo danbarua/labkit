@@ -9,8 +9,9 @@ import {
   PencilSimpleIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
-import { type Activity, activityLabel } from "./activity";
+import { type Activity, activityLabel, activityMood } from "./activity";
 import { MarkdownText } from "./markdown";
+import { Loader } from "./loader";
 import { ContentView } from "./tool";
 
 type Kind<K extends Block["kind"]> = Extract<Block, { kind: K }>;
@@ -188,16 +189,39 @@ function useElapsed(key: string): number {
   return Math.max(0, Math.floor((now - since) / 1000));
 }
 
-/** Under the transcript while a turn runs: what the agent is doing, and for how long. */
-export function WorkingIndicator({ activity }: { activity: Activity }) {
-  const label = activityLabel(activity);
-  const seconds = useElapsed(label);
+/** How long the indicator stays after the turn stops, while the loader shows it is done. */
+const DONE_MS = 600;
+
+/**
+ * Under the transcript while a turn runs: the loader, what the agent is doing, and for how long.
+ * When the turn stops, the loader shows it is done and then the indicator goes.
+ */
+export function WorkingIndicator({ activity }: { activity: Activity | undefined }) {
+  const [last, setLast] = useState(activity);
+  const ending = activity === undefined && last !== undefined;
+  useEffect(() => {
+    if (activity !== undefined) {
+      setLast(activity);
+      return;
+    }
+    const timer = setTimeout(() => setLast(undefined), DONE_MS);
+    return () => clearTimeout(timer);
+  }, [activity]);
+  const shown = activity ?? last;
+  const label = shown === undefined || ending ? undefined : activityLabel(shown);
+  const seconds = useElapsed(label ?? "");
+  if (shown === undefined) return null;
   return (
-    <div className="lk-working" role="status">
-      <span className={activity.kind === "tool" ? "lk-working-label lk-mono" : "lk-working-label"}>
-        <span className="lk-shimmer">{label}</span>
-      </span>
-      <span className="lk-working-time">{seconds}s</span>
+    <div className="lk-working" role="status" aria-label={label ?? (ending ? "Done" : "Answering")}>
+      <Loader mood={ending ? "done" : activityMood(shown)} />
+      {label === undefined ? null : (
+        <>
+          <span className={shown.kind === "tool" ? "lk-working-label lk-mono" : "lk-working-label"}>
+            <span className="lk-shimmer">{label}</span>
+          </span>
+          <span className="lk-working-time">{seconds}s</span>
+        </>
+      )}
     </div>
   );
 }

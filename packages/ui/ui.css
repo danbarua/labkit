@@ -256,7 +256,7 @@
 /* what the agent is doing, under the transcript while a turn runs */
 .lk-working {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   color: var(--lk-muted);
   font-size: 13px;
@@ -274,6 +274,31 @@
   flex: none;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
+}
+/* The dots beside the indicator: their pace is set a frame at a time, their colours here. */
+.lk-loader {
+  --lk-loader-from: var(--lk-muted);
+  --lk-loader-via: var(--lk-muted);
+  --lk-loader-to: var(--lk-muted);
+  display: grid;
+  flex: none;
+  align-self: center;
+}
+.lk-loader span {
+  border-radius: 50%;
+  opacity: 0.08;
+  transition: background-color 0.4s;
+}
+.lk-loader[data-mood="working"] {
+  --lk-loader-from: #a4d957;
+  --lk-loader-via: #45c18b;
+  --lk-loader-to: #42c6d0;
+}
+.lk-loader[data-mood="speaking"],
+.lk-loader[data-mood="done"] {
+  --lk-loader-from: #42c6d0;
+  --lk-loader-via: #4fa3e0;
+  --lk-loader-to: #6d8cf0;
 }
 /* A light that passes over the words, so a label that is still true still looks alive. */
 .lk-shimmer {
