@@ -38,7 +38,6 @@ test("withdrawn, challenged and never-examined render apart", () => {
         analysis: ref("analysis", "COMP_1"),
       },
     ],
-    reverifiedBy: [],
     standard: [],
     unmet: [],
     restingOn: [],
@@ -108,7 +107,6 @@ test("a synthesis declines the verdict and names its basis", () => {
     verdict: "drawn-across",
     standing: "exploratory",
     support: [],
-    reverifiedBy: [],
     standard: [],
     unmet: [],
     restingOn: [],
@@ -155,7 +153,6 @@ test("a challenged claim says it has no supporting findings, not that it rests o
     standing: "exploratory",
     // Empty by definition: every finding bears against it.
     support: [],
-    reverifiedBy: [],
     standard: [],
     unmet: [],
     // And yet it plainly rests on something.

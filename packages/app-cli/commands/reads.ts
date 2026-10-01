@@ -57,10 +57,8 @@ export function registerReads(program: Command, run: Run): void {
         "and the line of enquiry and question it exists to advance. A line of enquiry: its status, " +
         "and where its question stands. A gate: blocked, incomplete, satisfied or never " +
         "evaluated, and the checks behind it. A condition: its evaluations. An analysis: what " +
-        "it revised, or what it read and produced. Any other handle (a question, note, " +
-        "finding, evidence unit, observations, decision, evaluation, review): its own words " +
-        "and every record " +
-        "joined to it. A proposition resolves only when exactly one claim asserts that " +
+        "it read and produced. Any other handle (a question, note, finding, evidence unit, " +
+        "observations, decision, evaluation): its own words and every record joined to it. A proposition resolves only when exactly one claim asserts that " +
         "sentence; none or several is refused, naming the claims. `labkit get <handle>` shows " +
         "what is stored under a handle instead.",
     )

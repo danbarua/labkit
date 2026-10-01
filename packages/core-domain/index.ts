@@ -43,7 +43,6 @@ export type {
   GraphChange,
   NodeCreated,
   EdgeCreated,
-  NodePropsChanged,
 } from "./events";
 export {
   eventFilter,
@@ -59,7 +58,6 @@ export {
   enquiryStatusQuery,
   enquiryInContextQuery,
   whySupportedQuery,
-  analysisRevisionQuery,
   criterionStandingQuery,
   whyQuery,
   neighboursOfQuery,
@@ -80,7 +78,6 @@ export type {
   EnquiryStatusQuery,
   EnquiryInContextQuery,
   WhySupportedQuery,
-  AnalysisRevisionQuery,
   CriterionStandingQuery,
   WhyQuery,
   NeighboursOfQuery,

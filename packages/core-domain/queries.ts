@@ -80,11 +80,6 @@ export const whySupportedQuery = z.object({
 });
 export type WhySupportedQuery = z.infer<typeof whySupportedQuery>;
 
-export const analysisRevisionQuery = z.object({
-  analysis: refString("analysis"),
-});
-export type AnalysisRevisionQuery = z.infer<typeof analysisRevisionQuery>;
-
 export const criterionStandingQuery = z.object({
   criterion: refString("criterion"),
 });

@@ -120,7 +120,7 @@ interface CollectionHal {
   _embedded: Record<string, unknown[]>;
 }
 
-// A collection lists the live nodes of one type, each as the resource `labkit_get_entity_as_hal`
+// A collection lists the nodes of one type, each as the resource `labkit_get_entity_as_hal`
 // gives, to the depth the client asked for. The database answers with relative links; here they
 // become absolute, the label becomes its slug, and the client's other parameters ride on each.
 async function listing(

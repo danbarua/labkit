@@ -172,10 +172,6 @@ describe("entities", () => {
     expect((await get("/workspace/alpha/NOPE_1")).status).toBe(404);
   });
 
-  test("a retracted node is not served", async () => {
-    expect((await get("/workspace/alpha/Q_3")).status).toBe(404);
-  });
-
   test("the root sends a browser to the workspaces", async () => {
     const r = await get("/");
     expect(r.status).toBe(302);
@@ -319,11 +315,6 @@ describe("collections", () => {
     const r = await get("/workspace/alpha/enquiry");
     expect(Object.keys(r.body._embedded)).toEqual(["enquiry"]);
     expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace/alpha/enquiry?limit=25&offset=0`);
-  });
-
-  test("retracted nodes are not listed", async () => {
-    const r = await get("/workspace/alpha/question");
-    expect(itemsOf(r.body).map((i: any) => i.id)).not.toContain("Q_3");
   });
 
   test("an item carries its own properties, and the edge properties on its links", async () => {
@@ -493,17 +484,17 @@ describe("acts", () => {
   });
 
   test("an act about a record that changes something else is not among the record's events", async () => {
-    // Act 3 is an undo whose subject is LOE_1 and whose only change is to Q_2.
+    // Act 3's subject is LOE_1 and its only change creates Q_2.
     expect((await get("/workspace/alpha/LOE_1/events")).body._embedded.events).toEqual([]);
     const q2 = (await get("/workspace/alpha/Q_2/events")).body._embedded.events;
     expect(q2).toHaveLength(1);
     expect(q2[0]).toMatchObject({
       seq: 3,
       index: 1,
-      operation: "undo",
+      operation: "openEnquiry",
       subject: "LOE_1",
       dir: "subject",
-      change: "NodePropsChanged",
+      change: "NodeCreated",
       id: "Q_2",
     });
   });

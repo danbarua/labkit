@@ -36,8 +36,10 @@ beforeAll(async () => {
     claims.push((await graph.createNode("Claim", { name })).natural_id);
   const note = await graph.createNode("Note", { text: "about the first claim" });
   await graph.createEdge(note.natural_id, "CONCERNS", claims[0]!);
-  const review = await graph.createNode("Review", { verdict: "a review of the first claim" });
-  await graph.createEdge(review.natural_id, "EVALUATES", claims[0]!);
+  const finding = await graph.createNode("Evidence", {
+    statement: "a finding for the first claim",
+  });
+  await graph.createEdge(finding.natural_id, "SUPPORTS", claims[0]!);
 }, 60_000);
 
 afterAll(async () => {

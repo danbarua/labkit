@@ -6,7 +6,6 @@ import { vertexProps } from "@labkit/core-db/cypher";
 import { createdIn, edgesIn } from "../events";
 import type { ListedAnalysis, ListedClaim, ListedCriterion, ListedEnquiry } from "../report";
 import type {
-  AnalysisRevision,
   AnyRef,
   ConcludedClaim,
   CriterionStanding,
@@ -32,7 +31,6 @@ import type { Neighbour } from "./explain";
 import { SessionCore, type Methods } from "../core";
 import type { DomainEvent, EventFilter } from "../events";
 import type {
-  AnalysisRevisionQuery,
   ClaimsAssertingQuery,
   ContractForQuery,
   CriterionStandingQuery,
@@ -228,11 +226,6 @@ export class ReadSurface extends SessionCore {
   /** Is this handle on the record — reached only through `why`. */
   async reachable(query: ReachableQuery): Promise<boolean> {
     return this.#explain.reachable(query);
-  }
-
-  /** What an analysis revised, and which findings moved. */
-  async analysisRevision(query: AnalysisRevisionQuery): Promise<AnalysisRevision> {
-    return this.#explain.analysisRevision(query);
   }
 
   /**

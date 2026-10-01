@@ -60,22 +60,7 @@ const ACTS: RecordedEvent[] = [
       props: { weight: 1 },
     } as GraphChange,
   ]),
-  act("undo", "COMP_3", [
-    { change: "NodePropsChanged", id: "CLM_1", before: {}, after: { retracted: true } },
-  ]),
-  act("note", "NOTE_1", [
-    { change: "NodePropsChanged", id: "NOTE_1", before: {}, after: { text: "x" } },
-  ]),
-  act("evaluateCriterion", "CEVAL_2", [
-    {
-      change: "EdgePropsChanged",
-      from: "CRIT_1",
-      label: "GOVERNS",
-      to: "GATE_1",
-      before: {},
-      after: { state: "satisfied" },
-    } as GraphChange,
-  ]),
+  act("note", "NOTE_1", []),
 ];
 
 const sequenceOf = async (sink: EventSink, touching: string): Promise<string[]> => {
@@ -93,40 +78,23 @@ test("both sinks return the same acts for every position touching reaches", asyn
     await inMemory.record(a);
   }
 
-  for (const handle of [
-    "Q_1",
-    "LOE_1",
-    "CLM_1",
-    "EV_1",
-    "NOTE_1",
-    "COMP_1",
-    "CRIT_1",
-    "GATE_1",
-    "CLM_99",
-  ]) {
+  for (const handle of ["Q_1", "LOE_1", "CLM_1", "EV_1", "NOTE_1", "COMP_1", "CLM_99"]) {
     expect(await sequenceOf(durable, handle)).toEqual(await sequenceOf(inMemory, handle));
   }
 });
 
-test("touching reaches an edge endpoint and a property change, not only what was minted", async () => {
+test("touching reaches an edge endpoint, not only what was minted", async () => {
   const ctx = await resolveTenantContext(db, db.tx, "touching-positions");
   new TenantGraph(ctx, db, db.tx);
   const durable = pgEventLog(db, ctx);
   for (const a of ACTS) await durable.record(a);
 
-  // Minted by one act, pointed at by an edge in another, retracted by a third.
-  expect(await sequenceOf(durable, "CLM_1")).toEqual([
-    "conclude COMP_2",
-    "pursue LOE_1",
-    "undo COMP_3",
-  ]);
+  // Minted by one act, pointed at by an edge in another.
+  expect(await sequenceOf(durable, "CLM_1")).toEqual(["conclude COMP_2", "pursue LOE_1"]);
   // Reached only as an edge's `from`, and carrying edge props, which containment must ignore.
   expect(await sequenceOf(durable, "EV_1")).toEqual(["conclude COMP_2"]);
   // Both a subject and an edge's `to`, counted once.
   expect(await sequenceOf(durable, "LOE_1")).toEqual(["analyse COMP_1", "pursue LOE_1"]);
-  // Reached only through a property set on an edge it is an endpoint of.
-  expect(await sequenceOf(durable, "CRIT_1")).toEqual(["evaluateCriterion CEVAL_2"]);
-  expect(await sequenceOf(durable, "GATE_1")).toEqual(["evaluateCriterion CEVAL_2"]);
 });
 
 test("both sinks stamp the act's number into the same places", async () => {

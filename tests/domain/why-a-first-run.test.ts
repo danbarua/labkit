@@ -1,7 +1,6 @@
 /**
- * Every analysis is a first run until something revises it, so "a first run"
- * is the ordinary case rather than a rare one. It answered with an empty cause
- * list, and a reader had to go to `happened` for edges the graph already held.
+ * `why <analysis>` answers with the edges the graph holds for the analysis and
+ * for the unit that used it, so a reader need not go to `happened` for them.
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
@@ -47,7 +46,6 @@ describe("why <analysis>, on a first run", () => {
     const why = await session.reads.why({ subject: analysis });
     expect(why.is).toBe("a first run");
 
-    // The bug: `because` was `[]`, and nothing objected.
     expect(why.because.length).toBeGreaterThan(0);
 
     const named = why.because.map((c) => c.handle);

@@ -60,7 +60,6 @@ type SearchHandle =
   | Ref<"criterion">
   | Ref<"evaluation">
   | Ref<"gate">
-  | Ref<"review">
   | Ref<"work">
   | Ref<"note">;
 
@@ -156,27 +155,7 @@ const edgeCreated = z.strictObject({
   to: z.string(),
   props: z.record(z.string(), z.unknown()).optional(),
 });
-const propsChanged = z.strictObject({
-  change: z.literal("NodePropsChanged"),
-  id: z.string(),
-  /** What the graph held for each of `after`'s keys, so the change can be taken back. */
-  before: z.record(z.string(), z.unknown()),
-  after: z.record(z.string(), z.unknown()),
-});
-const edgePropsChanged = z.strictObject({
-  change: z.literal("EdgePropsChanged"),
-  from: z.string(),
-  label: edgeLabel,
-  to: z.string(),
-  before: z.record(z.string(), z.unknown()),
-  after: z.record(z.string(), z.unknown()),
-});
-const graphChange = z.union([
-  nodeCreated,
-  edgeCreated,
-  propsChanged,
-  edgePropsChanged,
-]) as unknown as z.ZodType<GraphChange>;
+const graphChange = z.union([nodeCreated, edgeCreated]) as unknown as z.ZodType<GraphChange>;
 
 const changesList = z.array(graphChange) as unknown as z.ZodType<readonly GraphChange[]>;
 
@@ -254,11 +233,6 @@ const replacementClaim = z.strictObject({
   claim: ref("claim"),
   asserts: prose(),
 });
-const reverification = z.strictObject({
-  analysis: ref("analysis"),
-  method: prose(),
-});
-
 const evaluationRecord = z.strictObject({
   evaluation: ref("evaluation"),
   criterion: ref("criterion"),
@@ -341,7 +315,6 @@ export const supportExplanation = z.strictObject({
   promotedBecause: z.string().optional(),
   support: z.array(bearingFinding),
   drawnAcross: z.array(confirmatoryResult),
-  reverifiedBy: z.array(reverification),
   standard: z.array(checkStatus),
   unmet: z.array(unmetCheck),
   restingOn: z.array(identifiedArtefact),
@@ -449,25 +422,6 @@ const explanationCause = z.strictObject({
   when: timestamp().optional(),
 });
 
-/** One superseded finding and the one standing in its place. */
-const revisedFinding = z.strictObject({
-  proposition: prose(),
-  was: ref("claim"),
-  before: z.string(),
-  claim: ref("claim"),
-  after: z.string(),
-});
-
-/** What an analysis revised — `supersedes` absent when it revises nothing. */
-const analysisRevisionSchema = z.strictObject({
-  analysis: ref("analysis"),
-  supersedes: ref("analysis").optional(),
-  changed: z.array(revisedFinding),
-  restated: z.array(concludedClaim),
-  kept: z.array(concludedClaim),
-  unpaired: z.array(concludedClaim),
-});
-
 /**
  * `why` — a discriminated union on `kind`. `report` differs by kind, so a caller that narrows on
  * `kind` gets the right shape without a cast.
@@ -518,12 +472,6 @@ export const explanation = z.discriminatedUnion("kind", [
   }),
   z.strictObject({
     kind: z.literal("evaluation"),
-    subject: anyRef(),
-    is: z.string(),
-    because: z.array(explanationCause),
-  }),
-  z.strictObject({
-    kind: z.literal("review"),
     subject: anyRef(),
     is: z.string(),
     because: z.array(explanationCause),
@@ -580,7 +528,6 @@ export const explanation = z.discriminatedUnion("kind", [
     subject: ref("analysis"),
     is: z.string(),
     because: z.array(explanationCause),
-    report: analysisRevisionSchema,
   }),
 ]);
 
@@ -798,7 +745,6 @@ export type IdentifiedArtefact = z.infer<typeof identifiedArtefact>;
 export type CitedFinding = z.infer<typeof citedFinding>;
 export type ConfirmatoryResult = z.infer<typeof confirmatoryResult>;
 export type ReplacementClaim = z.infer<typeof replacementClaim>;
-export type Reverification = z.infer<typeof reverification>;
 export type EvaluationRecord = z.infer<typeof evaluationRecord>;
 export type BearingFinding = z.infer<typeof bearingFinding>;
 export type GatedWork = z.infer<typeof gatedWork>;
@@ -807,9 +753,7 @@ export type UnmetCheck = z.infer<typeof unmetCheck>;
 export type Condition = z.infer<typeof condition>;
 export type DecidingEvaluation = z.infer<typeof decidingEvaluation>;
 export type CheckStatus = z.infer<typeof checkStatus>;
-export type RevisedFinding = z.infer<typeof revisedFinding>;
 export type GateGoverned = z.infer<typeof gateGoverned>;
-export type AnalysisRevision = z.infer<typeof analysisRevisionSchema>;
 export type ListedGate = z.infer<typeof listedGate>;
 export type ListedWork = z.infer<typeof listedWork>;
 export type Transcription = z.infer<typeof transcription>;

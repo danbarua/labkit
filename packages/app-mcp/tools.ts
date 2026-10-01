@@ -92,9 +92,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "Planned work: its state and what decides it, and the line of enquiry and question it " +
       "exists to advance. A line of enquiry: its status, and where its question stands. A gate: blocked, " +
       "incomplete, satisfied or never evaluated, and the checks behind it. A " +
-      "condition: its evaluations. An analysis: what it revised, or what it read and " +
-      "produced. Any other handle (a question, note, finding, evidence unit, observations, " +
-      "decision, evaluation, review): its own words and every record joined to it. Also takes a " +
+      "condition: its evaluations. An analysis: what it read and produced. Any other handle " +
+      "(a question, note, finding, evidence unit, observations, decision, evaluation): its own words and every record joined to it. Also takes a " +
       "proposition, which resolves only when exactly one claim asserts that sentence; none or " +
       "several is refused, naming the claims. `get` on the CLI shows what is stored under a " +
       "handle rather than an explanation of it.",

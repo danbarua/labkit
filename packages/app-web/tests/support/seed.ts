@@ -21,7 +21,6 @@ export async function seed(db: LabKitDB, tx: Transactor): Promise<void> {
     alpha.graphName,
     `CREATE (:Question {natural_id: 'Q_1', name: 'alpha question'}),
             (:Question {natural_id: 'Q_2', name: 'second alpha question'}),
-            (:Question {natural_id: 'Q_3', name: 'retracted question', retracted: 'x'}),
             (:LineOfEnquiry {natural_id: 'LOE_1', name: 'alpha enquiry'}),
             (:EvidenceUnit {natural_id: 'EU_1', role: 'observation'}),
             (:Evidence {natural_id: 'EV_1', statement: 'alpha evidence'})`,
@@ -76,9 +75,16 @@ export async function seed(db: LabKitDB, tx: Transactor): Promise<void> {
   // An act about LOE_1 whose only change lands on Q_2: it names Q_2 and not its own subject.
   await record({
     at: "2026-01-01T00:02:00.000Z",
-    operation: "undo",
+    operation: "openEnquiry",
     subject: "LOE_1",
-    command: { event: 2 },
-    changes: [{ change: "NodePropsChanged", id: "Q_2", before: {}, after: { retracted: true } }],
+    command: { question: "second alpha question" },
+    changes: [
+      {
+        change: "NodeCreated",
+        id: "Q_2",
+        label: "Question",
+        props: { name: "second alpha question" },
+      },
+    ],
   });
 }

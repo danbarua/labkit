@@ -138,12 +138,6 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
           "",
         )}`
       : "",
-    why.reverifiedBy.length
-      ? `\nRe-checked by\n${bullets(
-          why.reverifiedBy.map((r) => `(${r.analysis})  ${r.method}`),
-          "",
-        )}`
-      : "",
     why.standard.length
       ? `\nHeld to\n${bullets(
           why.standard.map((c) => `${c.proposition} — ${c.state}`),
@@ -247,7 +241,6 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
     case "evidence":
     case "decision":
     case "evaluation":
-    case "review":
     case "observations":
     case "note":
       return renderExplanation(explanation);
