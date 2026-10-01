@@ -91,7 +91,7 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "A claim: the findings under it and against it, the standard it is held to, its verdict. " +
       "Planned work: its state and what decides it, and the line of enquiry and question it " +
       "exists to advance. A line of enquiry: its status, and where its question stands. A gate: blocked, " +
-      "incomplete, satisfied, closed or never evaluated, and the checks behind it. A " +
+      "incomplete, satisfied or never evaluated, and the checks behind it. A " +
       "condition: its evaluations. An analysis: what it revised, or what it read and " +
       "produced. Any other handle (a question, note, finding, evidence unit, observations, " +
       "decision, evaluation, review): its own words and every record joined to it. Also takes a " +

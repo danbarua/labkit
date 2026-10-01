@@ -208,24 +208,14 @@ export class StoryGroup extends SessionCore {
        MATCH (u:EvidenceUnit)-[:PRODUCES]->(e)
        ${this.withinScope(scope)}
        MATCH (u)-[:USES]->(comp:Computation)
-       OPTIONAL MATCH (e)-[:RECORDED_IN]->(a:Artefact)
-       OPTIONAL MATCH (r:Review)-[:EVALUATES]->(u)
        // Supersession, per claim -- the same pair withdrawalOf reads: a
        // decision that stands instead of this one.
        OPTIONAL MATCH (d:Decision)-[:SUPERSEDES]->(c)
-       // Which review THIS retraction rested on (row O), at the grain the
-       // question is asked. Distinct from the 'r' above, which is any review of
-       // the unit -- reading that as the cause is what reported a confirming
-       // review as a reason work was retracted.
-       OPTIONAL MATCH (d)-[:BASED_ON]->(caused:Review)
-       RETURN e, comp, a, r, d, caused`,
+       RETURN e, comp, d`,
       {
         e: vertexProps<EvidenceProps & { natural_id: string }>(),
         comp: vertexProps<ComputationProps & Identified>(),
-        a: optional(vertexProps<ArtefactProps & { natural_id: string }>()),
-        r: optional(vertexProps<{ verdict: string }>()),
         d: optional(vertexProps<{ reason: string }>()),
-        caused: optional(vertexProps<{ verdict: string }>()),
       },
       {
         name: scope.proposition,
@@ -256,18 +246,6 @@ export class StoryGroup extends SessionCore {
       ).map((r) => r.e.natural_id),
     );
 
-    // The review each retraction actually rested on (row O). Absent for an
-    // artefact invalidated by anything other than a recorded `replaceAnalysis`, which is
-    // why the reader still falls back rather than assuming the edge is there.
-    const retractedBy = new Map(
-      (
-        await this.graph.query(`MATCH (a:Artefact)-[:INVALIDATED_BY]->(r:Review) RETURN a, r`, {
-          a: vertexProps<{ natural_id: string }>(),
-          r: vertexProps<{ verdict: string }>(),
-        })
-      ).map((row) => [row.a.natural_id, row.r.verdict] as const),
-    );
-
     const support: SupportExplanation["support"] = [];
     const reverifiedBy: Reverification[] = [];
     const against: SupportExplanation["against"] = [];
@@ -285,24 +263,13 @@ export class StoryGroup extends SessionCore {
         };
         // **Per claim, not per artefact**: a decision that changed *this* claim, which is the
         // same fact `withdrawalOf` reads. An artefact-grain answer could only say why the whole
-        // *analysis* was replaced. Deduped, and one reason per finding rather than one per
-        // review of its unit.
+        // *analysis* was replaced. Deduped, one reason per finding.
         if (row.d) {
           if (!superseded.some((x) => x.evidence === entry.evidence && x.bearing === bearing))
             superseded.push({
               ...entry,
               bearing,
-              // **The review that caused THIS retraction first** (row O). The
-              // decision's own `reason` is generated text -- useful when a
-              // bare `conclude --replacing` superseded a finding with no
-              // review behind it, and not an answer to "which review
-              // retracted it?" when there is one.
-              reason:
-                row.caused?.verdict ||
-                row.d.reason ||
-                (row.a
-                  ? (retractedBy.get(row.a.natural_id) ?? "it was superseded")
-                  : "it was superseded"),
+              reason: row.d.reason || "it was superseded",
             });
         } else if (bearing === "supports" && reverifying.has(row.e.natural_id)) {
           // A re-verification is not a second independent finding: counting it
@@ -372,7 +339,7 @@ export class StoryGroup extends SessionCore {
     const replacedBy = standing?.insteadOf[0];
 
     // Standing: confirmatory when the conclusion was prespecified as such, or when a decision
-    // confirmed it afterwards; undecided when a decision graded it so.
+    // confirmed it afterwards.
     const [prespecified, conferred] = await Promise.all([
       this.graph.query(
         `MATCH (c:Claim {natural_id: $claim}) RETURN c`,
@@ -382,10 +349,8 @@ export class StoryGroup extends SessionCore {
       this.standingConferred(claim),
     ]);
     const confirmed =
-      conferred?.standing === "confirmatory" ||
-      (conferred === undefined && prespecified.some((r) => r.c.kind === "confirmatory"));
-    const undecided = conferred?.standing === "undecided";
-    const promotedBecause = conferred?.standing === "confirmatory" ? conferred.because : undefined;
+      conferred !== undefined || prespecified.some((r) => r.c.kind === "confirmatory");
+    const promotedBecause = conferred?.because;
 
     // What a synthesis was drawn across. By handle, from the claim itself:
     // `synthesise` writes `BASED_ON` at the moment the act names the findings,
@@ -406,19 +371,17 @@ export class StoryGroup extends SessionCore {
       claim,
       proposition,
       drawnAcross,
-      // Six ways not to be supported, and they are different states: the interpretation
+      // Five ways not to be supported, and they are different states: the interpretation
       // withdrawn, evidence bearing against it, a synthesis that measured nothing, evidence
-      // that fails the standard set for it, evidence that settles the proposition neither way,
-      // and nothing having examined it at all.
+      // that fails the standard set for it, and nothing having examined it at all.
       verdict: verdictOf({
         support,
         withdrawn,
         unmet,
-        undecided,
         challenged: against.length > 0,
         drawnAcross,
       }),
-      standing: undecided ? "undecided" : confirmed ? "confirmatory" : "exploratory",
+      standing: confirmed ? "confirmatory" : "exploratory",
       ...(confirmed && promotedBecause ? { promotedBecause } : {}),
       support,
       reverifiedBy,

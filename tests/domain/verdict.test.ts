@@ -10,7 +10,6 @@ const nothing = {
   support: [] as unknown[],
   withdrawn: false,
   unmet: [] as unknown[],
-  undecided: false,
   challenged: false,
   drawnAcross: [] as unknown[],
 };
@@ -21,7 +20,6 @@ describe("verdictOf", () => {
   test("each state is reachable, and by the fact that names it", () => {
     const cases: Array<[Verdict, Partial<typeof nothing>]> = [
       ["supported", { support: finding }],
-      ["undecided", { support: finding, undecided: true }],
       ["withdrawn", { support: finding, withdrawn: true }],
       ["challenged", { challenged: true }],
       ["drawn-across", { drawnAcross: finding }],
@@ -37,9 +35,8 @@ describe("verdictOf", () => {
     expect(verdictOf({ ...nothing, support: finding, challenged: true })).toBe("supported");
   });
 
-  test("undecided beats withdrawn beats challenged", () => {
+  test("withdrawn beats challenged", () => {
     const both = { ...nothing, support: finding, withdrawn: true, challenged: true };
-    expect(verdictOf({ ...both, undecided: true })).toBe("undecided");
     expect(verdictOf(both)).toBe("withdrawn");
     // Without support of its own, so `supported` does not claim it first.
     expect(verdictOf({ ...both, withdrawn: false, support: [] })).toBe("challenged");

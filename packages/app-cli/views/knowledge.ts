@@ -6,6 +6,7 @@ import type {
   AcceptedQuestion,
   AnsweredQuestion,
   ConcludedClaim,
+  EnquiryStatus,
   Explanation,
   KnowledgeSurvey,
   SearchGroup,
@@ -83,7 +84,6 @@ export function renderKnown(survey: KnowledgeSurvey, p: Palette): string {
  */
 const VERDICT_LINE: Record<Verdict, (why: SupportExplanation, p: Palette) => string> = {
   supported: (_, p) => p.settled("supported"),
-  undecided: (_, p) => p.untested("NOT supported — the finding settles this neither way"),
   withdrawn: (_, p) =>
     p.provisional("NOT supported — withdrawn; the record no longer asserts this wording"),
   challenged: (_, p) => p.contested("NOT supported — challenged by evidence bearing against it"),
@@ -99,7 +99,6 @@ const VERDICT_LINE: Record<Verdict, (why: SupportExplanation, p: Palette) => str
  * Why a proposition stands, or does not.
  */
 export function renderWhy(why: SupportExplanation, p: Palette): string {
-  const undecided = why.standing === "undecided";
   // A synthesis measured nothing, so it has no evidence of its own, and the
   // lists below say so rather than printing "no supporting findings" under a
   // verdict line that just named four.
@@ -114,23 +113,17 @@ export function renderWhy(why: SupportExplanation, p: Palette): string {
       : "",
     "",
     // **One word, one meaning.** This list is the supporting *findings*; the inputs they rest
-    // on are `restingOn`, below. An undecided claim keeps its findings and they support
-    // nothing, so the heading names what they are rather than what they do -- a heading has to
-    // describe the list under it.
-    synthesis ? "" : p.heading(undecided ? "Findings" : "Supported by"),
+    // on are `restingOn`, below.
+    synthesis ? "" : p.heading("Supported by"),
     synthesis
       ? ""
       : bullets(
-          (undecided ? [...why.support, ...why.against] : why.support).map(
-            (s) =>
-              `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${s.analysis}${p.quiet(")")}` +
-              (undecided && why.against.includes(s as (typeof why.against)[number])
-                ? `  ${p.quiet("recorded as bearing against")}`
-                : ""),
+          why.support.map(
+            (s) => `${s.finding}  ${p.quiet(`(via ${s.method},`)} ${s.analysis}${p.quiet(")")}`,
           ),
-          undecided ? "no findings" : "no supporting findings",
+          "no supporting findings",
         ),
-    !undecided && why.against.length
+    why.against.length
       ? `\nBearing against\n${bullets(
           why.against.map((a) => `${a.finding}  (via ${a.method}, ${a.analysis})`),
           "",
@@ -215,6 +208,18 @@ function renderExplanation(explanation: Explanation): string {
 }
 
 /**
+ * Why an enquiry's question was accepted as unresolved, and what would reopen it, in full: the
+ * `known` page cuts both to a gist and sends the reader here for the whole of them.
+ */
+function acceptance(question: EnquiryStatus["question"]): string[] {
+  if (!question?.acceptedBecause) return [];
+  return [
+    `accepted because: ${question.acceptedBecause}`,
+    question.reopensIf ? `reopens if: ${question.reopensIf}` : "",
+  ];
+}
+
+/**
  * `why <handle>` — dispatches on `Explanation.kind`, not on what the caller passed in: the
  * redesign's whole point is that the CLI does not know which kind it got until the domain says
  * so.
@@ -223,8 +228,11 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
   switch (explanation.kind) {
     case "claim":
       return renderWhy(explanation.report, p);
-    case "work":
     case "enquiry":
+      return [renderExplanation(explanation), ...acceptance(explanation.report.enquiry.question)]
+        .filter(Boolean)
+        .join("\n");
+    case "work":
     case "gate":
     case "analysis":
     // A criterion's causes are its evaluations, each already carrying the

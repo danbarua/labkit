@@ -55,10 +55,9 @@ export class HappenedGroup extends SessionCore {
    * a claim, gate or line of enquiry, so this is their only route.
    */
   async notes({ concerning }: NotesQuery): Promise<ListedNote[]> {
-    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const rows = await this.graph.query(
       `MATCH (n:Note)
-       OPTIONAL MATCH (n)-[:CONCERNS]->(about) WHERE about.retracted IS NULL
+       OPTIONAL MATCH (n)-[:CONCERNS]->(about)
        OPTIONAL MATCH (n)-[:MOTIVATES]->(q:Question)
        OPTIONAL MATCH (n)-[:SUPERSEDES]->(old:Note)
        OPTIONAL MATCH (newer:Note)-[:SUPERSEDES]->(n)

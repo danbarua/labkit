@@ -3,7 +3,7 @@
  */
 
 import { optional, vertexProps } from "@labkit/core-db/cypher";
-import type { IndexedString, ArtefactProps, ClaimProps, GraphChange } from "@labkit/core-db/domain";
+import type { ArtefactProps, ClaimProps, GraphChange } from "@labkit/core-db/domain";
 import { labelForNaturalId } from "@labkit/core-db/domain";
 import type {
   AnalysisRef,
@@ -13,8 +13,6 @@ import type {
   EnquiryRef,
   EvidenceRef,
   ObservationsRef,
-  Ref,
-  ReviewRef,
   UnitRef,
 } from "../report";
 import { ref, stagedRef } from "../report";
@@ -73,56 +71,6 @@ export class Shared extends SessionCore {
   }
 
   /**
-   * The analysis this one is a revision of, by way of the lineage decision.
-   */
-  protected async revisedBy(
-    analysis: AnalysisRef,
-  ): Promise<{ old: AnalysisRef; decision: Ref<"decision">; because?: ReviewRef } | undefined> {
-    const rows = await this.graph.query(
-      `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
-       OPTIONAL MATCH (d)-[:BASED_ON]->(rev:Review)
-       RETURN old, rev, d`,
-      {
-        old: vertexProps<{ natural_id: string }>(),
-        rev: optional(vertexProps<{ natural_id: string }>()),
-        d: vertexProps<{ natural_id: string }>(),
-      },
-      { id: analysis },
-    );
-    const found = rows[0];
-    if (!found) return undefined;
-    return {
-      old: ref("analysis", found.old.natural_id),
-      decision: ref("decision", found.d.natural_id),
-      ...(found.rev ? { because: ref("review", found.rev.natural_id) } : {}),
-    };
-  }
-
-  /**
-   * The finding this conclusion stands in place of, when the act determines it.
-   */
-  private async impliedSupersession(
-    analysis: AnalysisRef,
-    proposition: IndexedString,
-  ): Promise<RecordedConclusion | undefined> {
-    const revision = await this.revisedBy(analysis);
-    if (revision === undefined) return undefined;
-    // **Scoped to what this revision superseded, not to everything the old
-    // analysis concluded.** A recorded `keep` carries conclusions forward, and a kept
-    // finding still stands; pairing to one would say a live finding was
-    // replaced.
-    const fell = await this.graph.query(
-      `MATCH (:Decision {natural_id: $decision})-[:SUPERSEDES]->(c:Claim {name: $proposition})
-       RETURN c`,
-      { c: vertexProps<{ natural_id: string }>() },
-      { decision: revision.decision, proposition },
-    );
-    const answering = [...new Set(fell.map((r) => r.c.natural_id))];
-    if (answering.length !== 1) return undefined;
-    return (await this.conclusionsOf(revision.old)).find((c) => c.claim === answering[0]);
-  }
-
-  /**
    * One recorded conclusion, by its claim or its finding.
    */
   private async conclusionBehind(
@@ -157,40 +105,6 @@ export class Shared extends SessionCore {
       evidence: ref("evidence", evidence.natural_id),
       bearing: row.ch && !row.s ? "challenges" : "supports",
     };
-  }
-
-  protected async conclusionsOf(analysis: AnalysisRef): Promise<RecordedConclusion[]> {
-    const rows = await this.graph.query(
-      // Either bearing: an analysis whose findings all CHALLENGE returned no
-      // conclusions at all, so replacing one reported nothing as affected.
-      `MATCH (:Computation {natural_id: $id})<-[:USES]-(u:EvidenceUnit)-[:PRODUCES]->(e:Evidence)
-       OPTIONAL MATCH (e)-[:SUPPORTS]->(sc:Claim)
-       OPTIONAL MATCH (e)-[:CHALLENGES]->(cc:Claim)
-       RETURN e, sc, cc`,
-      {
-        e: vertexProps<{ natural_id: string; statement: string }>(),
-        sc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
-        cc: optional(vertexProps<ClaimProps & { natural_id: string }>()),
-      },
-      { id: analysis },
-    );
-    return rows.flatMap((r) => {
-      const claim = r.sc ?? r.cc;
-      return claim
-        ? [
-            {
-              claim: ref("claim", claim.natural_id),
-              proposition: claim.name,
-              finding: r.e.statement,
-              // The handle, beside the text. `conclude --replacing` takes
-              // either a CLM_ or an EV_ and has to match on whichever it was
-              // given; without this the evidence half was unaddressable.
-              evidence: ref("evidence", r.e.natural_id),
-              bearing: r.sc ? ("supports" as const) : ("challenges" as const),
-            },
-          ]
-        : [];
-    });
   }
 
   protected async outputArtefactOf(analysis: AnalysisRef): Promise<ObservationsRef> {
@@ -306,9 +220,6 @@ export class Shared extends SessionCore {
 
         // The finding this one stands in place of, by whichever handle the caller held.
         let superseded: RecordedConclusion | undefined;
-        let revision:
-          | { old: AnalysisRef; decision: Ref<"decision">; because?: ReviewRef }
-          | undefined;
         if (input.replacing !== undefined) {
           superseded = await this.conclusionBehind(input.replacing);
           if (superseded === undefined) throw new Error(`${input.replacing} not found`);
@@ -333,17 +244,8 @@ export class Shared extends SessionCore {
         unitOfWork.edge(evidence, "RECORDED_IN", output);
         unitOfWork.edge(evidence, bearing === "challenges" ? "CHALLENGES" : "SUPPORTS", claim);
 
-        // **The pairing this act implies, when the caller did not name one.** A replacement re-
-        // answering a proposition its predecessor answered stands in place of that finding;
-        // recording it here is the act saying so, not a reader inferring it afterwards from
-        // wording.
-        const stands = superseded ?? (await this.impliedSupersession(input.analysis, proposition));
-        if (stands !== undefined && revision === undefined)
-          revision = await this.revisedBy(input.analysis);
-
         // Per-finding supersession, on the edges the model already has.
-        if (stands) {
-          const superseded = stands;
+        if (superseded) {
           const decision = unitOfWork.node("Decision", {
             decided_at: at,
             reason: `superseded by "${input.finding}"`,
@@ -351,11 +253,6 @@ export class Shared extends SessionCore {
           });
           unitOfWork.edge(decision, "SUPERSEDES", superseded.claim);
           unitOfWork.edge(decision, "MOTIVATES", claim);
-          // The review the revision rested on, carried down from the lineage
-          // decision so a reader asking why THIS finding fell gets the verdict
-          // that caused it rather than any review of the same unit.
-          if (revision?.because !== undefined)
-            unitOfWork.edge(decision, "BASED_ON", revision.because);
         }
 
         return {

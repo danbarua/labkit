@@ -71,6 +71,10 @@ test("an enquiry whose question was accepted as unresolved is listed as accepted
   expect(stateOf(accepted)).toBe("accepted");
   expect(stateOf(running)).toBe("running");
   expect(stateOf(untested)).toBe("untested");
+
+  const why = labkit("why", accepted);
+  expect(why).toContain("accepted because: no more samples");
+  expect(why).toContain("reopens if: a new batch");
 });
 
 test("`analyse` without --from records an analysis that read nothing", () => {

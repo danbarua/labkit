@@ -17,7 +17,6 @@ export class StandingGroup extends SessionCore {
       natural_id: string;
       decided_at: string;
       reason: string;
-      retracted?: boolean;
       /** The closing decision named an answer. Absent is abandoned. */
       answered: boolean;
     };
@@ -84,7 +83,7 @@ export class StandingGroup extends SessionCore {
         };
         if (loe) {
           const pursuit = entry.pursuits.get(loe.natural_id) ?? { name: loe.name, closing: null };
-          if (closing && closing.retracted !== true) {
+          if (closing) {
             if (!pursuit.closing || closing.decided_at > pursuit.closing.decided_at)
               pursuit.closing = closing;
           }
@@ -97,7 +96,7 @@ export class StandingGroup extends SessionCore {
               borne &&
               (borne.natural_id === answering.natural_id || part?.natural_id === borne.natural_id),
           );
-          if (closing && closing.retracted !== true && answering && bearsOnAnswer) {
+          if (closing && answering && bearsOnAnswer) {
             const key = `${loe.natural_id}\0${answering.natural_id}`;
             const prior = entry.answers.get(key);
             entry.answers.set(key, {

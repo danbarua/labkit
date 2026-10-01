@@ -17,7 +17,7 @@ export class InventoryGroup extends SessionCore {
     const rows = await this.graph.query(
       // Two clauses, not `[:SUPPORTS|CHALLENGES]`: AGE has no edge alternation
       // and the alternation is a syntax error rather than an empty result.
-      `MATCH (c:Claim) WHERE c.retracted IS NULL
+      `MATCH (c:Claim)
        OPTIONAL MATCH (sup:Evidence)-[:SUPPORTS]->(c)
        OPTIONAL MATCH (ch:Evidence)-[:CHALLENGES]->(c)
        OPTIONAL MATCH (promoted:Decision)-[:CONFIRMED]->(c)
@@ -61,7 +61,7 @@ export class InventoryGroup extends SessionCore {
   /** Every line of enquiry, with the question it pursues. */
   async enquiryList(): Promise<ListedEnquiry[]> {
     const rows = await this.graph.query(
-      `MATCH (e:LineOfEnquiry) WHERE e.retracted IS NULL
+      `MATCH (e:LineOfEnquiry)
        OPTIONAL MATCH (q:Question)-[:MOTIVATES]->(e)
        OPTIONAL MATCH (u:EvidenceUnit)-[:ADDRESSES]->(e)
        OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(e)
@@ -85,8 +85,7 @@ export class InventoryGroup extends SessionCore {
         closed: false,
         accepted: false,
         units: new Set<string>(),
-        // The handle and the wording together or neither. Held apart, an
-        // enquiry whose question was retracted listed an empty proposition.
+        // The handle and the wording together or neither.
         ...(row.q ? { question: ref("question", row.q.natural_id), pursuing: row.q.name } : {}),
       };
       if (row.u) entry.units.add(row.u.natural_id);
@@ -102,7 +101,7 @@ export class InventoryGroup extends SessionCore {
   /** Every analysis, with what it was run for. */
   async analysisList(): Promise<ListedAnalysis[]> {
     const rows = await this.graph.query(
-      `MATCH (c:Computation) WHERE c.retracted IS NULL
+      `MATCH (c:Computation)
        OPTIONAL MATCH (u:EvidenceUnit)-[:USES]->(c)
        OPTIONAL MATCH (u)-[:PRODUCES]->(ev:Evidence)
        OPTIONAL MATCH (u)-[:ADDRESSES]->(e:LineOfEnquiry)
@@ -134,7 +133,7 @@ export class InventoryGroup extends SessionCore {
   /** Every condition, with what it governs. */
   async criterionList(): Promise<ListedCriterion[]> {
     const rows = await this.graph.query(
-      `MATCH (c:Criterion) WHERE c.retracted IS NULL
+      `MATCH (c:Criterion)
        OPTIONAL MATCH (c)-[:GOVERNS]->(g:Gate)
        OPTIONAL MATCH (c)-[:EVALUATED_AS]->(ev:CriterionEvaluation)
        OPTIONAL MATCH (amended:Decision)-[:SUPERSEDES]->(c)

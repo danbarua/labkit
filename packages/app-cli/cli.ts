@@ -3,11 +3,11 @@
  * The composition root, and nothing else.
  */
 
-import { createColors } from "picocolors";
 import { buildProgram } from "./program";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
 import { DomainRefusal } from "@labkit/core-domain";
-import { colourWanted, recordLocator, runner, type Globals } from "./session";
+import { stderrLine } from "@labkit/core-db/colour";
+import { recordLocator, runner, type Globals } from "./session";
 import { writeOut } from "./stdout";
 import { staleInstall } from "./installed";
 
@@ -40,11 +40,7 @@ export async function main(argv: string[] = Bun.argv.slice(2)): Promise<number> 
     located,
   );
   program.exitOverride();
-  // `console.error` is not used: Bun colours it red whatever `--no-ansi` and `NO_COLOR` say.
-  const refuse = (text: string) => {
-    const colours = createColors(colourWanted(globals(), process.stderr.isTTY));
-    process.stderr.write(`${colours.red(`labkit: ${text}`)}\n`);
-  };
+  const refuse = (text: string) => stderrLine(`labkit: ${text}`, globals());
   try {
     await program.parseAsync(argv, { from: "user" });
     return 0;

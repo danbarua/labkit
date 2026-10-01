@@ -3,6 +3,7 @@
  */
 
 import { openRecord } from "@labkit/core-domain";
+import { colourWanted } from "@labkit/core-db/colour";
 import { locateRecord, type RecordLocation } from "@labkit/core-db/connect";
 import type { ReadSurface, WriteSurface } from "@labkit/core-domain";
 import { commandContext, gitContext, personContext } from "@labkit/core-domain/context";
@@ -35,23 +36,6 @@ export interface Globals {
    * in place of the wall clock.
    */
   date?: string;
-}
-
-/**
- * Whether to colour a stream, decided here for stdout and stderr alike. `--no-ansi`, a non-empty
- * `NO_COLOR` and `FORCE_COLOR=0` (or `false`) turn it off; any other `FORCE_COLOR` or `CI` turns
- * it on; otherwise it is on for a terminal whose `TERM` is not `dumb`.
- */
-export function colourWanted(
-  opts: Pick<Globals, "ansi">,
-  isTTY: boolean | undefined,
-  env: Record<string, string | undefined> = process.env,
-): boolean {
-  if (opts.ansi === false) return false;
-  if (env.NO_COLOR) return false;
-  if (env.FORCE_COLOR !== undefined) return env.FORCE_COLOR !== "0" && env.FORCE_COLOR !== "false";
-  if (env.CI) return true;
-  return Boolean(isTTY) && env.TERM !== "dumb";
 }
 
 /**

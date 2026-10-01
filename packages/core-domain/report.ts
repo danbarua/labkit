@@ -37,7 +37,6 @@ export type NoteRef = Ref<"note">;
 export type GateRef = Ref<"gate">;
 export type WorkRef = Ref<"work">;
 export type AnalysisRef = Ref<"analysis">;
-export type ReviewRef = Ref<"review">;
 export type EnquiryRef = Ref<"enquiry">;
 export type ClaimRef = Ref<"claim">;
 export type EvidenceRef = Ref<"evidence">;
@@ -53,7 +52,6 @@ export interface ConclusionRef {
 
 export type Verdict =
   | "supported"
-  | "undecided"
   | "withdrawn"
   | "challenged"
   | "drawn-across"
@@ -64,13 +62,10 @@ export function verdictOf(of: {
   support: readonly unknown[];
   withdrawn: boolean;
   unmet: readonly unknown[];
-  undecided: boolean;
   challenged: boolean;
   drawnAcross: readonly unknown[];
 }): Verdict {
-  if (of.support.length > 0 && !of.withdrawn && of.unmet.length === 0 && !of.undecided)
-    return "supported";
-  if (of.undecided) return "undecided";
+  if (of.support.length > 0 && !of.withdrawn && of.unmet.length === 0) return "supported";
   if (of.withdrawn) return "withdrawn";
   if (of.challenged) return "challenged";
   if (of.drawnAcross.length > 0 && of.support.length === 0) return "drawn-across";

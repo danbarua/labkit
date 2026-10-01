@@ -94,7 +94,6 @@ export function gateStateFrom(checks: readonly { state: CheckState }[]): GateSta
 export function workStateFrom(
   task: {
     gates: Set<string>;
-    everGated: boolean;
     implemented: boolean;
     stopped: boolean;
     /** The work it waits on, and whether each has a result. */
@@ -107,9 +106,7 @@ export function workStateFrom(
   if (states.includes("blocked")) return "blocked";
   if (task.implemented) return "carried-out";
   if ([...task.after.values()].some((done) => !done)) return "waiting";
-  if (task.gates.size === 0) return task.everGated ? "waiting" : "planned";
-  const cleared = new Set<GateStatus["state"]>(["satisfied", "closed"]);
-  return states.every((state) => state !== undefined && cleared.has(state)) ? "planned" : "waiting";
+  return states.every((state) => state === "satisfied") ? "planned" : "waiting";
 }
 
 export class BlockedGroup extends SessionCore {
@@ -167,13 +164,8 @@ export class BlockedGroup extends SessionCore {
    */
   async gateStatus({ gate }: GateStatusQuery): Promise<GateStatus> {
     const declared = await this.graph.query(
-      `MATCH (g:Gate {natural_id: $id})
-       OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(g)
-       RETURN g, closing`,
-      {
-        g: vertexProps<{ consequence: string }>(),
-        closing: optional(vertexProps<{ natural_id: string; reason: string }>()),
-      },
+      `MATCH (g:Gate {natural_id: $id}) RETURN g`,
+      { g: vertexProps<{ consequence: string }>() },
       { id: gate },
     );
     const found = declared[0];
@@ -217,8 +209,7 @@ export class BlockedGroup extends SessionCore {
       blocks: blocking.get(c.criterion) ?? [],
     }));
 
-    const closing = found.closing;
-    const state = closing ? ("closed" as const) : gateStateFrom(checks);
+    const state = gateStateFrom(checks);
 
     // Criterion-scoped, deliberately unfiltered by gate: "has this check ever
     // been shown able to fail" is a question about the check itself.
@@ -245,14 +236,6 @@ export class BlockedGroup extends SessionCore {
       gate,
       consequence: found.g.consequence,
       state,
-      ...(closing
-        ? {
-            closure: {
-              decision: ref("decision", closing.natural_id),
-              because: closing.reason,
-            },
-          }
-        : {}),
       checks,
       unmet,
       counts,
@@ -315,13 +298,6 @@ export class BlockedGroup extends SessionCore {
       ]);
     }
 
-    const closedRows = await this.graph.query(
-      `MATCH (:Decision)-[:CLOSES]->(g:Gate) RETURN g`,
-      { g: vertexProps<{ natural_id: string }>() },
-      {},
-    );
-    const closed = new Set(closedRows.map((row) => row.g.natural_id));
-
     const listed = [...byGate.entries()]
       .map(([id, { consequence, checks }]) => {
         // The most recent decision across every condition — a gate with no
@@ -334,7 +310,7 @@ export class BlockedGroup extends SessionCore {
         return {
           gate: ref("gate", id),
           consequence,
-          state: closed.has(id) ? ("closed" as const) : gateStateFrom(checks),
+          state: gateStateFrom(checks),
           ...(decidedAt ? { lastTouched: decidedAt } : {}),
           gating: (gating.get(id) ?? []).sort((a, b) => byHandle(a.work, b.work)),
         };
@@ -370,18 +346,14 @@ export class BlockedGroup extends SessionCore {
   async workList({ state }: WorkListQuery): Promise<ListedWork[]> {
     const rows = await this.graph.query(
       `MATCH (t:Task)
-       OPTIONAL MATCH (ever)-[:GATES]->(t)
        OPTIONAL MATCH (g:Gate)-[:GATES]->(t)
        OPTIONAL MATCH (t)-[:IMPLEMENTS]->(u:EvidenceUnit)
        OPTIONAL MATCH (stop:Decision)-[:CLOSES]->(t)
        OPTIONAL MATCH (t)-[:AFTER]->(earlier:Task)
        OPTIONAL MATCH (earlier)-[:IMPLEMENTS]->(done:EvidenceUnit)
-       RETURN t, ever, g, u, stop, earlier, done`,
+       RETURN t, g, u, stop, earlier, done`,
       {
         t: vertexProps<{ natural_id: string; objective: string }>(),
-        // `ever` is deliberately unlabelled: the Gate label policy hides retracted gates, while
-        // the GATES edge still records that this work was gated rather than ready from the start.
-        ever: optional(vertexProps<{ natural_id: string }>()),
         g: optional(vertexProps<{ natural_id: string }>()),
         u: optional(vertexProps<{ natural_id: string }>()),
         stop: optional(vertexProps<{ natural_id: string }>()),
@@ -398,7 +370,6 @@ export class BlockedGroup extends SessionCore {
       {
         objective: string;
         gates: Set<string>;
-        everGated: boolean;
         implemented: boolean;
         stopped: boolean;
         after: Map<string, boolean>;
@@ -409,12 +380,10 @@ export class BlockedGroup extends SessionCore {
       const entry = tasks.get(id) ?? {
         objective: row.t.objective,
         gates: new Set<string>(),
-        everGated: false,
         implemented: false,
         stopped: false,
         after: new Map<string, boolean>(),
       };
-      entry.everGated ||= row.ever !== null;
       entry.stopped ||= row.stop !== null;
       if (row.g?.natural_id) entry.gates.add(row.g.natural_id);
       if (row.u?.natural_id) entry.implemented = true;

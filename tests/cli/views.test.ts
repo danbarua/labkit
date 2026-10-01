@@ -14,10 +14,12 @@ import {
   renderClaims,
 } from "@labkit/app-cli/views/knowledge";
 import { renderHappened } from "@labkit/app-cli/views/events";
+import { renderGateList } from "@labkit/app-cli/views/gates";
 import type {
   RecordedEvent,
   Explanation,
   KnowledgeSurvey,
+  ListedGate,
   SupportExplanation,
 } from "@labkit/core-domain";
 
@@ -372,6 +374,20 @@ test("colouring changes nothing a reader would read", () => {
   expect(stripped(renderKnown(survey, COLOUR))).toBe(renderKnown(survey, PLAIN));
 });
 
+test("`gates` lines its columns up the same with colour on", () => {
+  // The `holding up` cell arrives coloured, so the columns line up only if widths ignore the
+  // escape codes.
+  const gates: ListedGate[] = [
+    {
+      gate: ref("gate", "GATE_1"),
+      consequence: "no publication",
+      state: "blocked",
+      gating: [{ work: ref("work", "TASK_2"), objective: "write it up" }],
+    },
+  ];
+  expect(stripped(renderGateList(gates, COLOUR))).toBe(renderGateList(gates, PLAIN));
+});
+
 test("PLAIN is the identity function, so no view has a second code path", () => {
   // The difference between a coloured run and a plain one is escape sequences
   // and nothing else — never which branch rendered the page.
@@ -429,44 +445,4 @@ test("an evaluation with no basis reads as asserted, not as measured", () => {
   // for "rests on nothing named" the way a cited one's finding text would be.
   const lines = out.split("\n").filter((l) => l.includes("CEVAL_"));
   expect(lines[0]).not.toBe(lines[1]);
-});
-
-test("an undecided claim's findings are one list, and no heading picks a side", () => {
-  // The claim-level state says the evidence settles this neither way. Splitting the findings
-  // into a supporting list and a `Bearing against` list re-asserts a per-finding direction that
-  // state has overridden, and puts a heading that picks a side directly under a verdict line
-  // saying nobody has.
-  const base: SupportExplanation = {
-    claim: ref("claim", "CLM_7"),
-    proposition: "T vs rewiring is distinguishable",
-    drawnAcross: [],
-    verdict: "undecided",
-    standing: "undecided",
-    support: [],
-    against: [
-      {
-        finding: "NOT resolved: primary and sign-flip still say significant, median does not",
-        method: "log-scale re-aggregation",
-        analysis: ref("analysis", "COMP_4"),
-        evidence: ref("evidence", "EV_9"),
-      },
-    ],
-    reverifiedBy: [],
-    standard: [],
-    unmet: [],
-    superseded: [],
-    restingOn: [],
-    challenged: false,
-    withdrawn: false,
-  };
-  const out = renderWhy(base, PLAIN);
-
-  // The finding is on the page, under the neutral heading.
-  expect(out).toContain("Findings");
-  expect(out).toContain("NOT resolved:");
-  expect(out).not.toContain("Bearing against");
-  // And its recorded direction is not lost.
-  expect(out).toMatch(/against/i);
-  // The words the #228 rename existed to avoid.
-  expect(out).not.toContain("no supporting findings");
 });

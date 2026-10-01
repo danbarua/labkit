@@ -196,6 +196,7 @@
         "@electric-sql/pglite-tools": "catalog:",
         "drizzle-orm": "catalog:",
         "pg": "catalog:",
+        "picocolors": "catalog:",
       },
     },
     "packages/core-domain": {

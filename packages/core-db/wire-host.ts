@@ -1,5 +1,6 @@
 import { createServer, type Server, type Socket } from "node:net";
 import type { PGlite } from "@electric-sql/pglite";
+import { stderrLine } from "./colour";
 import { TENANT_SETTING } from "./scoped";
 
 /**
@@ -130,7 +131,7 @@ export function hostPGlite(db: PGlite, socketPath: string): Promise<WireHost> {
         letGo();
       } else {
         idleHold = setTimeout(() => {
-          console.error(
+          stderrLine(
             `[labkit daemon] a client held the record and sent nothing for ${IDLE_HOLD_MS}ms; disconnecting it and rolling back`,
           );
           socket.destroy();
@@ -141,7 +142,7 @@ export function hostPGlite(db: PGlite, socketPath: string): Promise<WireHost> {
       work = work
         .then(() => handle(msg, type))
         .catch((err) => {
-          console.error(`[labkit daemon] ${err instanceof Error ? err.message : err}`);
+          stderrLine(`[labkit daemon] ${err instanceof Error ? err.message : err}`);
           socket.destroy();
         });
     };
