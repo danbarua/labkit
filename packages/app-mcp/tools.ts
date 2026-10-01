@@ -93,8 +93,8 @@ export const TOOLS: readonly ToolDefinition<z.ZodRawShape>[] = [
       "exists to advance. A line of enquiry: its status, and where its question stands. A gate: blocked, " +
       "incomplete, satisfied, closed or never evaluated, and the checks behind it. A " +
       "condition: its evaluations. An analysis: what it revised, or what it read and " +
-      "produced. Any other handle (a question, note, finding, observations, decision, " +
-      "evaluation, review): its own words and every record joined to it. Also takes a " +
+      "produced. Any other handle (a question, note, finding, evidence unit, observations, " +
+      "decision, evaluation, review): its own words and every record joined to it. Also takes a " +
       "proposition, which resolves only when exactly one claim asserts that sentence; none or " +
       "several is refused, naming the claims. `get` on the CLI shows what is stored under a " +
       "handle rather than an explanation of it.",
@@ -283,8 +283,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition<z.ZodRawShape>[] = [
     description:
       "One conclusion per call. `replacing` names one earlier finding, by its claim or evidence " +
       "id, that this conclusion supersedes; `proposition` and `bearing` default to that " +
-      "finding's. On an analysis that revises an earlier one, a conclusion restating a " +
-      "proposition the revision superseded supersedes that finding without `replacing`.",
+      "finding's.",
     inputSchema: {
       analysis: z
         .string()

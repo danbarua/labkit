@@ -211,9 +211,7 @@ export function registerWrites(program: Command, run: Run): void {
     .summary("assert one thing an analysis found")
     .description(
       "One conclusion per call. --replacing names one earlier finding that this conclusion " +
-        "supersedes; --proposition and --bearing default to that finding's. On an analysis " +
-        "that revises an earlier one, a conclusion restating a proposition the revision " +
-        "superseded supersedes that finding without --replacing.",
+        "supersedes; --proposition and --bearing default to that finding's.",
     )
     .argument("<analysis-id>", "the analysis this conclusion belongs to")
     .requiredOption("--finding <text>", "what was found, in this analysis's own words")

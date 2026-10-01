@@ -20,7 +20,10 @@ afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-/** A read whose heading is coloured, and a read that fails, under one environment. */
+/**
+ * A read whose heading is coloured, and two reads that fail, under one environment. A failure's
+ * line goes to stderr and nothing goes to stdout.
+ */
 function both(flags: string[], colour: Record<string, string>) {
   const {
     LABKIT_DB_URL: _url,
@@ -36,11 +39,17 @@ function both(flags: string[], colour: Record<string, string>) {
       env: { ...env, ...colour },
     });
   const listed = run(["claims"]);
-  const refused = run(["why", "CLM_999999"]);
   expect(listed.exitCode).toBe(0);
-  expect(refused.exitCode).toBe(1);
-  expect(refused.stderr.toString()).toContain("labkit: ");
-  return { stdout: listed.stdout.toString(), stderr: refused.stderr.toString() };
+  const refusals = [run(["why", "CLM_999999"]), run(["get", "NOPE_1"])];
+  for (const refused of refusals) {
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout.toString()).toBe("");
+    expect(refused.stderr.toString()).toContain("labkit: ");
+  }
+  return {
+    stdout: listed.stdout.toString(),
+    stderr: refusals.map((r) => r.stderr.toString()).join(""),
+  };
 }
 
 test("FORCE_COLOR=1 colours stdout and stderr", () => {
