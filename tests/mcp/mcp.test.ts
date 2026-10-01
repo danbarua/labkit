@@ -60,9 +60,8 @@ async function connectServer(
   ).connect(transport);
 }
 
-/** Every tool a writing server registers, and every tool a read-only one does. */
+/** Every tool the server registers. */
 const WRITING = { reads: TOOLS, writes: WRITE_TOOLS };
-const READ_ONLY = { reads: TOOLS, writes: [] };
 
 let scenario: Scenario;
 beforeAll(async () => {
@@ -487,123 +486,6 @@ describe("behaviour — the same answers, over the wire", () => {
         arguments: { subject: "LOE_does_not_exist" },
       });
       expect(result.isError).toBe(true);
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-});
-
-/**
- * **A server that cannot write does not offer to.**
- */
-describe("read-only", () => {
-  async function readOnlyClient(graph: TenantGraph, readOnly: boolean) {
-    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    const events = inMemoryEventLog();
-    await buildServer(
-      (work) =>
-        work({
-          read: new ReadSurface(graph, { events }),
-          write: new WriteSurface(graph, { events }),
-        }),
-      { readOnly },
-    ).connect(serverSide);
-    const client = new Client({ name: "read-only", version: "0" });
-    await client.connect(clientSide);
-    return client;
-  }
-
-  async function listToolsFrom(graph: TenantGraph, readOnly: boolean) {
-    const client = await readOnlyClient(graph, readOnly);
-    const { tools } = await client.listTools();
-    await client.close();
-    return tools.map((t) => t.name).sort();
-  }
-
-  test("a read-only server lists every read and no write", async () => {
-    const graph = await scenario.begin();
-    try {
-      const names = await listToolsFrom(graph, true);
-
-      // Derived from the declarations, never a hand-written list of names: a
-      // write tool added later must be absent here without anyone remembering
-      // to come and say so.
-      expect(names).toEqual([...metaTools(READ_ONLY), ...TOOLS].map((t) => t.name).sort());
-
-      for (const write of WRITE_TOOLS) expect(names).not.toContain(write.name);
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("a read-only server's instructions, docs tool and docs resource name no write tool", async () => {
-    const graph = await scenario.begin();
-    try {
-      const client = await readOnlyClient(graph, true);
-      const called = await client.callTool({ name: DOCS_TOOL_NAME, arguments: {} });
-      const tool = (called.content as Array<{ text: string }>)[0]!.text;
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      const resource = (contents[0] as { text: string }).text;
-      const instructions = client.getInstructions() ?? "";
-      await client.close();
-
-      expect(instructions).toContain("does not change the record");
-      for (const read of TOOLS) {
-        expect(instructions).toContain(`\`${read.name}\``);
-        expect(tool).toContain(`## ${read.name}`);
-      }
-      for (const write of WRITE_TOOLS) {
-        expect(instructions).not.toContain(`\`${write.name}\``);
-        expect(tool).not.toContain(`## ${write.name}`);
-        expect(resource).not.toContain(`## ${write.name}`);
-      }
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("the default is not read-only, so the flag is what decides it", async () => {
-    const graph = await scenario.begin();
-    try {
-      // The control. Without this the test above passes on a server that never
-      // had write tools at all, which is a different thing from one that
-      // withheld them.
-      const names = await listToolsFrom(graph, false);
-      expect(names).toEqual(
-        [...metaTools(WRITING), ...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
-      );
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("a hidden write tool cannot be called by name", async () => {
-    const graph = await scenario.begin();
-    try {
-      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-      const events = inMemoryEventLog();
-      await buildServer(
-        (work) =>
-          work({
-            read: new ReadSurface(graph, { events }),
-            write: new WriteSurface(graph, { events }),
-          }),
-        { readOnly: true },
-      ).connect(serverSide);
-      const client = new Client({ name: "read-only", version: "0" });
-      await client.connect(clientSide);
-
-      // Absent from `tools/list` is not the same as unreachable, and a client
-      // that cached an older list would ask anyway. Asserted from the wire
-      // rather than from the registration loop.
-      const result = await client.callTool({
-        name: "note",
-        arguments: { text: "can a hidden tool still be called?" },
-      });
-      expect(result.isError).toBe(true);
-      expect(await events.all()).toHaveLength(0);
-
       await client.close();
     } finally {
       await scenario.end();

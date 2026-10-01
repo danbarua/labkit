@@ -7,7 +7,7 @@ import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ReadSurface, WriteSurface, openRecord } from "@labkit/core-domain";
+import { type ReadSurface, type WriteSurface, openRecord } from "@labkit/core-domain";
 import type { RecordLocation } from "@labkit/core-db/connect";
 import {
   commandContext,
@@ -43,13 +43,10 @@ function declaredOutput(schema: z.ZodType | undefined): { outputSchema?: z.ZodTy
  * Registers every tool against a **scope** that yields both surfaces. Transport-free, so a test
  * can drive it over `InMemoryTransport` without a subprocess.
  */
-export function buildServer(
-  withSurfaces: WithSurfaces,
-  { readOnly = false }: { readOnly?: boolean } = {},
-): McpServer {
+export function buildServer(withSurfaces: WithSurfaces): McpServer {
   // What this server registers, decided before anything is registered: the handshake's
   // instructions and the documentation both describe this list and no other.
-  const registered: Registered = { reads: TOOLS, writes: readOnly ? [] : WRITE_TOOLS };
+  const registered: Registered = { reads: TOOLS, writes: WRITE_TOOLS };
 
   // The package's version, not a constant: `serverInfo.version` is what the MCP spec has for
   // "which build am I talking to".
@@ -187,14 +184,12 @@ export function surfacesOver(
 export async function main({
   record,
   tenant,
-  readOnly = false,
 }: {
   record: RecordLocation;
   tenant: string;
-  readOnly?: boolean;
 }): Promise<void> {
   // Nothing on stdio says who the caller is, so writes carry the stand-in session.
-  const server = buildServer(surfacesOver({ record, tenant }, mockSessionContext), { readOnly });
+  const server = buildServer(surfacesOver({ record, tenant }, mockSessionContext));
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

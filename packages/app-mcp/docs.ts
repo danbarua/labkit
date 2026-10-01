@@ -7,7 +7,7 @@ import type { ToolDefinition, WriteToolDefinition } from "./tools";
 /** The URI this document is served at. */
 export const DOCS_URI = "labkit://docs/tools";
 
-/** The tools one server registers, reads and writes apart. A read-only server has no writes. */
+/** The tools one server registers, reads and writes apart. */
 export interface Registered {
   readonly reads: readonly ToolDefinition[];
   readonly writes: readonly WriteToolDefinition[];
@@ -57,10 +57,7 @@ function named(tools: readonly { name: string }[]): string {
  */
 export function instructionsFor(registered: Registered): string {
   const reads = registered.reads.length === 0 ? "" : ` ${named(registered.reads)} read it.`;
-  const writes =
-    registered.writes.length === 0
-      ? " This server does not change the record."
-      : ` ${named(registered.writes)} change it.`;
+  const writes = ` ${named(registered.writes)} change it.`;
   return (
     "LabKit is a research record: questions, the lines of enquiry pursuing them, what was " +
     "measured, what was concluded, and the conditions results are held to." +
@@ -105,9 +102,12 @@ export function renderToolDocs({ reads, writes }: Registered): string {
     "questions, the lines of enquiry pursuing them, what was measured, what was",
     "concluded, and what any of it is holding up.",
     "",
-    ...(writes.length === 0
-      ? []
-      : ["## Recording work", "", "These change the record.", "", ...index(writes), ""]),
+    "## Recording work",
+    "",
+    "These change the record.",
+    "",
+    ...index(writes),
+    "",
     "## Asking about the record",
     "",
     "These change nothing.",
