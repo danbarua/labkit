@@ -77,7 +77,7 @@ describe("commands are values a caller can hold", () => {
 
     const closing: CloseEnquiryCommand = {
       enquiry,
-      answeredBy: claimOf(analysisClaims, PROP),
+      answeredBy: [claimOf(analysisClaims, PROP)],
     };
     await s.writes.closeEnquiry(closing);
 

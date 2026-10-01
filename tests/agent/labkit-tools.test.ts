@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { labkitTools, LABKIT_TOOL_PREFIX } from "@labkit/app-acp";
 import type { WithSurfaces } from "@labkit/app-mcp/server";
-import { TOOLS, WRITE_TOOLS, SESSION_TOOLS } from "@labkit/app-mcp/tools";
+import { TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
 import { ReadSurface, WriteSurface, inMemoryEventLog } from "@labkit/core-domain";
 import {
   commandContext,
@@ -60,14 +60,11 @@ const run = (
 ) => tools.get(name)!.run(args, new AbortController().signal, context(sessionId));
 
 describe("the tools an agent is offered", () => {
-  test("every read and write verb is offered under the prefix, and the session tools are not", () => {
+  test("every read and write verb is offered under the prefix", () => {
     const tools = labkitTools({ tenant: "unused" });
     expect([...tools.keys()].sort()).toEqual(
       [...TOOLS, ...WRITE_TOOLS].map((t) => LABKIT_TOOL_PREFIX + t.name).sort(),
     );
-    for (const session of SESSION_TOOLS) {
-      expect(tools.has(LABKIT_TOOL_PREFIX + session.name)).toBe(false);
-    }
   });
 
   test("reads are read tools and writes are not, so a write goes through the permission policy", () => {

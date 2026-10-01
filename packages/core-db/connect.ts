@@ -93,29 +93,65 @@ function discoverProjectRoot(from: string): string {
 }
 
 /**
+ * Which record a process opens: a Postgres URL, or an embedded cluster directory and how that
+ * directory was arrived at.
+ */
+export type RecordLocation =
+  | { readonly backend: "postgres"; readonly url: string; readonly askedFor: string | null }
+  | {
+      readonly backend: "pglite";
+      readonly dataDir: string;
+      readonly from: "--db" | "LABKIT_HOME" | "search";
+      /** The directory `--db` named, when it named one. */
+      readonly askedFor: string | null;
+    };
+
+/**
+ * Decides which record `--db`, `LABKIT_DB_URL`, `LABKIT_HOME` and the working directory point at.
+ * `LABKIT_DB_URL` is read first, so a missing `LABKIT_HOME` does not stop a URL-backed record.
+ */
+export function locateRecord(pointedAt?: string): RecordLocation {
+  const url = process.env.LABKIT_DB_URL;
+  if (url) return { backend: "postgres", url, askedFor: pointedAt ?? null };
+  return {
+    backend: "pglite",
+    dataDir: dataDirFor(pointedAt),
+    from: pointedAt ? "--db" : process.env.LABKIT_HOME ? "LABKIT_HOME" : "search",
+    askedFor: pointedAt ?? null,
+  };
+}
+
+/**
  * Picks a `DbBackend` (packages/core-db/backend.ts) and connects through it. `LABKIT_DB_URL` set →
  * connect directly to that Postgres, which is its own arbiter.
  */
 export async function connectDb(projectRoot?: string): Promise<LabKitDBConnection> {
-  const url = process.env.LABKIT_DB_URL;
-  if (url) {
+  return connectTo(locateRecord(projectRoot));
+}
+
+/** Connects to a record already located by {@link locateRecord}. */
+export async function connectTo(location: RecordLocation): Promise<LabKitDBConnection> {
+  if (location.backend === "postgres") {
     noteDecision("record", {
       backend: "postgres",
       from: "LABKIT_DB_URL",
-      database: url.replace(/\/\/[^@]*@/, "//"),
-      askedFor: projectRoot ?? null,
+      database: location.url.replace(/\/\/[^@]*@/, "//"),
+      askedFor: location.askedFor,
     });
-    return withTrace(await directPostgresBackend({ connectionString: url }).connect(), "postgres");
+    return withTrace(
+      await directPostgresBackend({ connectionString: location.url }).connect(),
+      "postgres",
+    );
   }
 
-  const dataDir = dataDirFor(projectRoot);
+  const { dataDir } = location;
   noteDecision("record", {
     backend: "pglite",
-    from: projectRoot ? "--db" : process.env.LABKIT_HOME ? "LABKIT_HOME" : "search",
+    from: location.from,
     dataDir,
-    askedFor: projectRoot ?? null,
+    askedFor: location.askedFor,
   });
-  announceNewRecord(dataDir, projectRoot);
+  announceNewRecord(dataDir, location.askedFor ?? undefined);
   // `LABKIT_DAEMON=0` opens the record in this process for the length of the work, holding its
   // lock, instead of going through the record's daemon.
   const connection =

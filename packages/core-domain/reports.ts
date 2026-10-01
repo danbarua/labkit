@@ -229,9 +229,10 @@ const closedPursuit = z.strictObject({
   question: ref("question"),
   decision: ref("decision"),
   closure: z.enum(["answered", "abandoned"]),
-  answered: z
-    .strictObject({ claim: ref("claim"), bearing: z.enum(["supports", "challenges"]) })
-    .optional(),
+  /** Every claim the closing decision named as an answer. Empty when it was abandoned. */
+  answered: z.array(
+    z.strictObject({ claim: ref("claim"), bearing: z.enum(["supports", "challenges"]) }),
+  ),
 });
 
 const identifiedArtefact = z.strictObject({
@@ -373,7 +374,9 @@ export const enquiryStatus = z.strictObject({
   closure: z.enum(["answered", "abandoned"]).nullable(),
   /** The bearing of the findings the closure cited. Null when it is not answered. */
   bearing: z.enum(["supports", "challenges"]).nullable(),
-  answered: concludedClaim.optional(),
+  /** Every claim the closing decision named as an answer. Empty unless it was answered. */
+  answered: z.array(concludedClaim),
+  /** Confirmatory only when every answering claim is. */
   restsOn: z.enum(["exploratory", "confirmatory"]).optional(),
   evidence: z.array(citedFinding),
   question: enquiryQuestion.nullable(),
@@ -648,7 +651,8 @@ export const closedEnquiry = z.strictObject({
   enquiry: ref("enquiry"),
   question: ref("question"),
   closure: z.enum(["answered", "abandoned"]),
-  answered: concludedClaim.optional(),
+  /** Every claim named as an answer. Empty when the enquiry was abandoned. */
+  answered: z.array(concludedClaim),
   events: z.array(domainEvent),
 });
 /** What stop_work returns. */
@@ -725,21 +729,6 @@ export const amendmentReport = z.strictObject({
   confirmatoryAffected: z.array(confirmatoryResult),
   nature: z.enum(["mechanical", "scientific", "prespecification"]),
   events: z.array(domainEvent),
-});
-
-/**
- * What `register_session` recorded.
- */
-const registration = z.strictObject({
-  id: z.string(),
-  label: z.string(),
-  /** What this connection's writes were read off, or `null` if nobody said. */
-  reconstructed_from: z.string().nullable(),
-});
-
-export const registeredSession = z.strictObject({
-  registered: registration,
-  replaced: registration.optional(),
 });
 
 /** One gate in a list of them. */
@@ -825,7 +814,6 @@ export type CheckStatus = z.infer<typeof checkStatus>;
 export type RevisedFinding = z.infer<typeof revisedFinding>;
 export type GateGoverned = z.infer<typeof gateGoverned>;
 export type AnalysisRevision = z.infer<typeof analysisRevisionSchema>;
-export type Registration = z.infer<typeof registration>;
 export type ListedGate = z.infer<typeof listedGate>;
 export type ListedWork = z.infer<typeof listedWork>;
 export type Transcription = z.infer<typeof transcription>;
@@ -856,7 +844,6 @@ export type EvaluatedCriterion = z.infer<typeof evaluatedCriterion>;
 export type AcceptedAsUnresolved = z.infer<typeof acceptedAsUnresolved>;
 export type Restated = z.infer<typeof restated>;
 export type AmendmentReport = z.infer<typeof amendmentReport>;
-export type RegisteredSession = z.infer<typeof registeredSession>;
 export type GateList = z.infer<typeof gateList>;
 export type WorkList = z.infer<typeof workList>;
 
@@ -880,6 +867,8 @@ export const listedEnquiry = z.strictObject({
   /** Evidence units addressing it — how much has actually been run. */
   runs: z.number(),
   closed: z.boolean(),
+  /** The question it pursues was accepted as unresolved. */
+  accepted: z.boolean(),
 });
 export type ListedEnquiry = z.infer<typeof listedEnquiry>;
 
@@ -946,7 +935,6 @@ const SCHEMAS = {
   acceptedAsUnresolved,
   restated,
   amendmentReport,
-  registeredSession,
   gateList,
   workList,
   transcription,

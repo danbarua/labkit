@@ -139,7 +139,7 @@ describe("the event stream is a write-ahead log for a graph store", () => {
       claim: claims[0]!.claim,
       because: "the prespecified check passed",
     });
-    await session.writes.closeEnquiry({ enquiry, answeredBy: claims[0]!.claim });
+    await session.writes.closeEnquiry({ enquiry, answeredBy: [claims[0]!.claim] });
     void question;
 
     const age = await fromTheGraph(graph, [...state.nodes.keys()]);

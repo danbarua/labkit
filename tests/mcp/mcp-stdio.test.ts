@@ -6,7 +6,7 @@ import pkg from "../../package.json" with { type: "json" };
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,17 +19,25 @@ const id = (v: unknown): string =>
   // layers from the mistake.
   typeof v === "string" ? v : (Object.values(v as Record<string, unknown>)[0] as string);
 
-const SERVER = join(import.meta.dir, "..", "..", "packages", "app-mcp", "server.ts");
+const CLI = join(import.meta.dir, "..", "..", "packages", "app-cli", "cli.ts");
 
 /**
- * This process's environment with `LABKIT_DB_URL` removed.
+ * This process's environment without the variables that choose a record, so `--db` is the only
+ * thing that does.
  */
 function childEnv(): Record<string, string> {
-  const { LABKIT_DB_URL: _dropped, ...rest } = process.env as Record<string, string>;
+  const {
+    LABKIT_DB_URL: _url,
+    LABKIT_HOME: _home,
+    ...rest
+  } = process.env as Record<string, string>;
   return rest;
 }
 
+/** Where the server is started, which is not where its record is. */
 let workdir: string;
+/** The directory `--db` names. */
+let dbdir: string;
 let client: Client;
 
 // Generous, and deliberately not left to bun's 5000ms default: a cold start
@@ -38,16 +46,14 @@ let client: Client;
 const COLD_START = 60_000;
 
 beforeAll(async () => {
-  workdir = mkdtempSync(join(tmpdir(), "labkit-stdio-"));
+  workdir = mkdtempSync(join(tmpdir(), "labkit-stdio-cwd-"));
+  dbdir = mkdtempSync(join(tmpdir(), "labkit-stdio-db-"));
   const transport = new StdioClientTransport({
     // `process.execPath` is bun itself, so this does not depend on PATH.
     command: process.execPath,
-    args: [SERVER],
+    args: [CLI, "--db", dbdir, "--tenant", "stdio-probe", "mcp"],
     cwd: workdir,
-    env: {
-      ...childEnv(),
-      LABKIT_TENANT: "stdio-probe",
-    },
+    env: childEnv(),
   });
   client = new Client({ name: "stdio-probe", version: "0" });
   await client.connect(transport);
@@ -56,6 +62,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await client.close().catch(() => {});
   rmSync(workdir, { recursive: true, force: true });
+  rmSync(dbdir, { recursive: true, force: true });
 });
 
 /**
@@ -82,17 +89,20 @@ test(
 );
 
 test(
-  "the launched server refuses a write until it is told who is calling",
+  "a write is attributed to the stand-in session, since nothing on stdio names the caller",
   async () => {
-    // **This is the gate's only test against a real process.** Everything else drives
-    // `buildServer` in-process over `InMemoryTransport`; here the server was spawned, and the
-    // registry it consults is the one `main()` built.
-    const refused = await client.callTool({
+    const noted = await client.callTool({
       name: "note",
       arguments: { text: "who is asking?" },
     });
-    expect(refused.isError).toBe(true);
-    expect(JSON.stringify(refused.content)).toContain("register_session");
+    expect(noted.isError ?? false).toBe(false);
+    const events = (
+      noted.structuredContent as {
+        events: { attribution: { attribution_label: string; attribution_id: string } }[];
+      }
+    ).events;
+    expect(events.map((e) => e.attribution.attribution_label)).toEqual(["mock-session"]);
+    expect(events.map((e) => e.attribution.attribution_id)).toEqual(["mock-session-0"]);
   },
   COLD_START,
 );
@@ -100,14 +110,6 @@ test(
 test(
   "it writes, and then reads back what it wrote",
   async () => {
-    // Signing on, exactly as an agent would: `agent-bus whoami` gives the id,
-    // this hands it to LabKit. Nothing verifies it and nothing is meant to.
-    const registered = await client.callTool({
-      name: "register_session",
-      arguments: { id: "stdio-test-0", label: "mcp-stdio test" },
-    });
-    expect(registered.isError ?? false).toBe(false);
-
     const noted = await client.callTool({
       name: "note",
       arguments: { text: "does the launched server write?" },
@@ -127,6 +129,20 @@ test(
     expect(groups.flatMap((g) => g.matches.map((m) => m.handle))).toContain(
       id(noted.structuredContent),
     );
+  },
+  COLD_START,
+);
+
+test(
+  "`labkit --db <dir> mcp` serves the record in that directory, not the working directory's",
+  async () => {
+    const noted = await client.callTool({
+      name: "note",
+      arguments: { text: "which record is this?" },
+    });
+    expect(noted.isError ?? false).toBe(false);
+    expect(existsSync(join(dbdir, ".labkit", "pglite", "PG_VERSION"))).toBe(true);
+    expect(readdirSync(workdir)).toEqual([]);
   },
   COLD_START,
 );
@@ -152,12 +168,9 @@ test(
   async () => {
     const dir = mkdtempSync(join(tmpdir(), "labkit-stdout-"));
     try {
-      const child = Bun.spawn([process.execPath, SERVER], {
+      const child = Bun.spawn([process.execPath, CLI, "--db", dir, "mcp"], {
         cwd: dir,
-        env: {
-          ...childEnv(),
-          LABKIT_TENANT: "stdout-probe",
-        },
+        env: childEnv(),
         stdin: "pipe",
         stdout: "pipe",
         stderr: "ignore",
@@ -186,47 +199,6 @@ test(
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  },
-  COLD_START,
-);
-
-test(
-  "a session that says what it is reading off stamps every act it writes",
-  async () => {
-    // The launched process, so this exercises `surfacesOver` -- the in-memory
-    // harness in `tests/mcp.test.ts` builds its own surfaces and would pass
-    // even if the server never sampled the registry for a source.
-    const source = "Ito et al. 2024, fig. 3";
-    await client.callTool({
-      name: "register_session",
-      arguments: { id: "stdio-test-0", label: "mcp-stdio test", reconstructed_from: source },
-    });
-    const noted = await client.callTool({
-      name: "note",
-      arguments: { text: "was this act read off something?" },
-    });
-    expect(noted.isError ?? false).toBe(false);
-
-    // Off the write's own reply: every write returns the events it recorded,
-    // and the stamp rides on the event.
-    const stamps = (r: typeof noted) =>
-      (r.structuredContent as { events: { reconstructedFrom: string | null }[] }).events.map(
-        (e) => e.reconstructedFrom,
-      );
-    expect(stamps(noted).length).toBeGreaterThan(0);
-    expect(stamps(noted)).toEqual(stamps(noted).map(() => source));
-
-    // Registering again is a fresh statement of who is on the line, so the
-    // source does not carry over onto work nobody said was reconstructed.
-    await client.callTool({
-      name: "register_session",
-      arguments: { id: "stdio-test-0", label: "mcp-stdio test" },
-    });
-    const live = await client.callTool({
-      name: "note",
-      arguments: { text: "and this one, written with no source?" },
-    });
-    expect(stamps(live)).toEqual([null]);
   },
   COLD_START,
 );

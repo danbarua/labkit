@@ -50,7 +50,7 @@ describe("S-31: the read answers what was asked", () => {
     expect(closed.enquiry).toBe(enquiry);
     expect(closed.question).toMatch(/^Q_/);
     expect(closed.closure).toBe("abandoned");
-    expect(closed.answered).toBeUndefined();
+    expect(closed.answered).toEqual([]);
 
     await captureConversation(
       {
@@ -78,10 +78,9 @@ describe("S-31: the read answers what was asked", () => {
     });
     const claim = concluded.claims[0]!.claim;
 
-    const closed = await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
+    const closed = await session.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
     expect(closed.closure).toBe("answered");
-    expect(closed.answered?.claim).toBe(claim);
-    expect(closed.answered?.asserts).toBe("the coating slows corrosion");
+    expect(closed.answered).toEqual([{ claim, asserts: "the coating slows corrosion" }]);
   });
 
   /**

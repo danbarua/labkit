@@ -52,12 +52,17 @@ export function registerReads(program: Command, run: Run): void {
     .helpGroup("What stands")
     .summary("why a record is in the state it's in")
     .description(
-      "Dispatches on the handle's own kind: a claim (the findings resting under it, what " +
-        "bears against it, what standard it was held to, what has superseded it), a task " +
-        "(the line of enquiry and question it exists to advance), or a line of enquiry (its " +
-        "status, and how well its own question's answer is currently held up). Takes " +
-        "a proposition too, when exactly one claim asserts it. Anything else this record does " +
-        "not explain yet is refused, naming what it does.",
+      "What one record is and what makes it so. A claim: the findings under it and against it, " +
+        "the standard it is held to, its verdict. Planned work: its state and what decides it, " +
+        "and the line of enquiry and question it exists to advance. A line of enquiry: its status, " +
+        "and where its question stands. A gate: blocked, incomplete, satisfied, closed or never " +
+        "evaluated, and the checks behind it. A condition: its evaluations. An analysis: what " +
+        "it revised, or what it read and produced. Any other handle (a question, note, " +
+        "finding, evidence unit, observations, decision, evaluation, review): its own words " +
+        "and every record " +
+        "joined to it. A proposition resolves only when exactly one claim asserts that " +
+        "sentence; none or several is refused, naming the claims. `labkit get <handle>` shows " +
+        "what is stored under a handle instead.",
     )
     .argument("<subject>", "a handle of any kind, or a claim's proposition")
     .action(async (subject: string) => {

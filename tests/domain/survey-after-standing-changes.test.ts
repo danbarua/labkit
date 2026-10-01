@@ -45,7 +45,7 @@ async function aClosedPromotedAnswer() {
   });
   const claim = rec.claims[0]!.claim;
   await s.writes.isConfirmed({ claim, because: "we are relying on this" });
-  const closed = await s.writes.closeEnquiry({ enquiry, answeredBy: claim });
+  const closed = await s.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
   return { enquiry, observations, analysis: rec.analysis, claim, closed };
 }
 

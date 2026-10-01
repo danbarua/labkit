@@ -130,7 +130,7 @@ describe("Probe 2 — historical survey: what did the record hold at time T?", (
     });
     await s.writes.closeEnquiry({
       enquiry,
-      answeredBy: await claimNamed(s.reads, proposition),
+      answeredBy: [await claimNamed(s.reads, proposition)],
     });
   };
 
@@ -209,7 +209,7 @@ describe("Probe 4 — attribution: who made or authorised the consequential act?
       // No actor may be supplied here. That is the whole finding.
       await s.writes.closeEnquiry({
         enquiry,
-        answeredBy: claimOf(analysisClaims, "the difference is real"),
+        answeredBy: [claimOf(analysisClaims, "the difference is real")],
       });
       return s.reads.enquiryStatus({ enquiry });
     };

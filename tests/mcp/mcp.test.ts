@@ -19,23 +19,15 @@ import {
 } from "@labkit/core-domain";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import { buildServer } from "@labkit/app-mcp/server";
-import {
-  commandContext,
-  mockGitContext,
-  registeredSession,
-  sessionRegistry,
-  type SessionRegistry,
-} from "@labkit/core-domain/context";
-import { SESSION_TOOLS, TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
+import { TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
 import { explanationSchema } from "@labkit/app-mcp/schemas";
 import {
-  DOCS_TOOL,
+  DOCS_TOOL_NAME,
   DOCS_URI,
-  INSTRUCTIONS,
-  META_TOOLS,
+  instructionsFor,
+  metaTools,
   renderToolDocs,
 } from "@labkit/app-mcp/docs";
-import { z } from "zod";
 import { Command } from "commander";
 import { globalOptions } from "@labkit/app-cli/program";
 import { openScenario, type Scenario } from "../helpers/scenario";
@@ -58,28 +50,19 @@ const id = (v: unknown): string =>
 async function connectServer(
   graph: TenantGraph,
   transport: Parameters<ReturnType<typeof buildServer>["connect"]>[0],
-  session: SessionRegistry = registeredSessionRegistry(),
 ) {
   const events = inMemoryEventLog();
-  return buildServer(
-    (work) =>
-      work({
-        read: new ReadSurface(graph, { events }),
-        write: new WriteSurface(graph, { events }),
-      }),
-    session,
+  return buildServer((work) =>
+    work({
+      read: new ReadSurface(graph, { events }),
+      write: new WriteSurface(graph, { events }),
+    }),
   ).connect(transport);
 }
 
-/**
- * A registry that has already been registered, which is what every test but the gate's own
- * wants.
- */
-function registeredSessionRegistry(): SessionRegistry {
-  const session = sessionRegistry();
-  session.register("test-agent", "test-agent-0");
-  return session;
-}
+/** Every tool a writing server registers, and every tool a read-only one does. */
+const WRITING = { reads: TOOLS, writes: WRITE_TOOLS };
+const READ_ONLY = { reads: TOOLS, writes: [] };
 
 let scenario: Scenario;
 beforeAll(async () => {
@@ -107,12 +90,12 @@ describe("structure", () => {
 
       const { tools } = await client.listTools();
       expect(tools.map((t) => t.name).sort()).toEqual(
-        [...META_TOOLS, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort(),
+        [...metaTools(WRITING), ...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
       );
 
       // Derived from which list a tool is in, not from a list of names here.
       // Meta tools read nothing from the record and are read-only all the same.
-      const readNames = new Set([...META_TOOLS, ...TOOLS].map((t) => t.name));
+      const readNames = new Set([...metaTools(WRITING), ...TOOLS].map((t) => t.name));
       for (const t of tools) {
         expect(t.annotations?.readOnlyHint ?? false).toBe(readNames.has(t.name));
       }
@@ -316,16 +299,13 @@ describe("the tool documentation resource", () => {
     try {
       const { tools } = await client.listTools();
       // First, so a client scanning the list meets it before what it documents.
-      expect(tools[0]?.name).toBe(DOCS_TOOL.name);
+      expect(tools[0]?.name).toBe(DOCS_TOOL_NAME);
 
-      // The handshake says what the record is and what to call first. It no
-      // longer sends the agent to read the page: a caller that wants the
-      // arguments already has them, and a person asks for the page.
-      expect(client.getInstructions()).toBe(INSTRUCTIONS);
-      expect(INSTRUCTIONS).toContain("register_session");
-      expect(INSTRUCTIONS).not.toContain(DOCS_URI);
+      // The handshake says what the record is and names the tools this server registers.
+      expect(client.getInstructions()).toBe(instructionsFor(WRITING));
+      expect(client.getInstructions()).not.toContain(DOCS_URI);
 
-      const result = await client.callTool({ name: DOCS_TOOL.name, arguments: {} });
+      const result = await client.callTool({ name: DOCS_TOOL_NAME, arguments: {} });
       const { contents } = await client.readResource({ uri: DOCS_URI });
       const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
       expect(text).toBe(markdown(contents).text);
@@ -336,22 +316,11 @@ describe("the tool documentation resource", () => {
   });
 
   /**
-   * Both surfaces say what `reconstructed_from` is **not** for, and that is the whole of the
-   * guard: an earlier wording said only "if you did not see the work happen", which a caller
-   * writing up yesterday's own run reads as an invitation. An over-stamped act is
-   * indistinguishable downstream from a real transcription, so the description is load-bearing.
+   * The flag says what `--reconstructed-from` is **not** for: a caller writing up yesterday's own
+   * run would otherwise read it as an invitation, and an over-stamped act is indistinguishable
+   * downstream from a real transcription.
    */
-  test("the reconstruction flag says what it is not for, on both surfaces", () => {
-    const registerSession = SESSION_TOOLS.find((t) => t.name === "register_session")!;
-    // Through `toJSONSchema`, the way the output-field test below reads names:
-    // it is what an agent is actually handed.
-    const declared = z.toJSONSchema(z.strictObject(registerSession.inputSchema)) as {
-      properties: Record<string, { description?: string }>;
-    };
-    const described = declared.properties.reconstructed_from!.description!.toLowerCase();
-    expect(described).toContain("did not perform");
-    expect(described).toContain("not for your own results");
-
+  test("the reconstruction flag says what it is not for", () => {
     const cli = globalOptions(new Command("labkit"))
       .options.find((o) => o.long === "--reconstructed-from")!
       .description.toLowerCase();
@@ -365,7 +334,7 @@ describe("the tool documentation resource", () => {
       const { contents } = await client.readResource({ uri: DOCS_URI });
       const doc = markdown(contents).text;
 
-      for (const tool of [...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS]) {
+      for (const tool of [...TOOLS, ...WRITE_TOOLS]) {
         expect(doc).toContain(`## ${tool.name}`);
         expect(doc).toContain(tool.description);
       }
@@ -387,7 +356,7 @@ describe("the tool documentation resource", () => {
     // Rendering a subset produces a smaller document naming only that subset --
     // which a checked-in file could not do, and which is the property that makes
     // the served one impossible to leave stale.
-    const one = renderToolDocs([TOOLS[0]!], []);
+    const one = renderToolDocs({ reads: [TOOLS[0]!], writes: [] });
     expect(one).toContain(`## ${TOOLS[0]!.name}`);
     expect(one).not.toContain(`## ${TOOLS[1]!.name}`);
     expect(one).not.toContain(`## ${WRITE_TOOLS[0]!.name}`);
@@ -419,7 +388,7 @@ describe("behaviour — the same answers, over the wire", () => {
     });
     await s.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(analysisClaims, PROP),
+      answeredBy: [claimOf(analysisClaims, PROP)],
     });
     await s.writes.planWork({
       objective: "publish the convergence result",
@@ -526,189 +495,10 @@ describe("behaviour — the same answers, over the wire", () => {
 });
 
 /**
- * **Who signed this?**
- */
-describe("the write gate, and what a registered write is signed with", () => {
-  /** `main()`'s composition, with the registry left for the caller to control. */
-  async function serverWithRegistry(graph: TenantGraph, session: SessionRegistry) {
-    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    const events = inMemoryEventLog();
-    await buildServer(
-      (work) =>
-        work({
-          read: new ReadSurface(graph, { events }),
-          write: new WriteSurface(graph, {
-            // Sampled per call, and from the registry, because that is what
-            // `surfacesOver` does -- a source read once at connect would pass a
-            // test the server would fail.
-            ...commandContext(
-              mockGitContext,
-              registeredSession(session),
-              undefined,
-              session.registered()?.reconstructedFrom ?? undefined,
-            ),
-            events,
-          }),
-        }),
-      session,
-    ).connect(serverSide);
-    const client = new Client({ name: "gate", version: "0" });
-    await client.connect(clientSide);
-    return { client, events };
-  }
-
-  test("a write before register_session is refused, and the refusal names the remedy", async () => {
-    const graph = await scenario.begin();
-    try {
-      // A fresh registry: nobody has said who they are. This is the only way to
-      // reach the refusal, which is why the default elsewhere is registered.
-      const { client, events } = await serverWithRegistry(graph, sessionRegistry());
-
-      const result = await client.callTool({
-        name: "note",
-        arguments: { text: "does anyone know who wrote this?" },
-      });
-
-      expect(result.isError).toBe(true);
-      // The message has to carry the remedy: refusing rather than hiding the
-      // tool is only worth anything if the caller learns what to do.
-      expect(JSON.stringify(result.content)).toContain("register_session");
-
-      // And nothing was written. A refusal that still records is not a refusal.
-      expect(await events.all()).toHaveLength(0);
-
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("a read before register_session is not gated", async () => {
-    const graph = await scenario.begin();
-    try {
-      const { client } = await serverWithRegistry(graph, sessionRegistry());
-      // Reads create no record, so they have nothing to sign. Gating them would
-      // be a refusal with nothing real to refuse.
-      const result = await client.callTool({ name: "work_list", arguments: {} });
-      expect(result.isError ?? false).toBe(false);
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("after registering, the write is signed with what the agent said", async () => {
-    const graph = await scenario.begin();
-    try {
-      const { client, events } = await serverWithRegistry(graph, sessionRegistry());
-
-      const registered = await client.callTool({
-        name: "register_session",
-        arguments: { id: "claude:9f3a", label: "labkit-mcp-dev" },
-      });
-      // Returns what it recorded -- a caller who cannot read back what LabKit
-      // understood cannot tell a typo from a success.
-      expect(registered.structuredContent).toEqual({
-        registered: { id: "claude:9f3a", label: "labkit-mcp-dev", reconstructed_from: null },
-      });
-
-      const noted = await client.callTool({
-        name: "note",
-        arguments: { text: "does registering change what the event says?" },
-      });
-      expect(noted.isError ?? false).toBe(false);
-
-      // **Asserted from the stream, not from the reply.** The tool's answer is
-      // a handle; attribution rides on the event and nowhere else, so this is
-      // the only place the claim is observable.
-      const written = await events.all();
-      expect(written).toHaveLength(1);
-      expect(written[0]!.attribution.attribution_id).toBe("claude:9f3a");
-      expect(written[0]!.attribution.attribution_label).toBe("labkit-mcp-dev");
-
-      // The invariant the feature exists for: the placeholder never lands.
-      expect(written.map((e) => e.attribution.attribution_id)).not.toContain("mock-session-0");
-
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  /**
-   * An agent transcribing a document has no terminal, so the flag and its environment variable
-   * are out of reach. The registration is the seam it does have.
-   */
-  test("an agent says what it is reading off, and every act it writes carries it", async () => {
-    const graph = await scenario.begin();
-    try {
-      const { client } = await serverWithRegistry(graph, sessionRegistry());
-      await client.callTool({
-        name: "register_session",
-        arguments: { id: "claude:9f3a", reconstructed_from: "Ito et al. 2024, fig. 3" },
-      });
-      const noted = await client.callTool({
-        name: "note",
-        arguments: { text: "does the coating slow corrosion?" },
-      });
-
-      // Off the write's own reply, not the sink: the wire is what an agent
-      // sees, and the field could reach the log and still be dropped from the
-      // output.
-      const stamps = (r: typeof noted) =>
-        (r.structuredContent as { events: { reconstructedFrom: string | null }[] }).events.map(
-          (e) => e.reconstructedFrom,
-        );
-      expect(stamps(noted)).toEqual(["Ito et al. 2024, fig. 3"]);
-
-      // Registering again is a fresh statement of who is on the line. A source
-      // carried over would stamp acts the caller never said were reconstructed.
-      await client.callTool({ name: "register_session", arguments: { id: "claude:9f3a" } });
-      const live = await client.callTool({
-        name: "note",
-        arguments: { text: "and this one, written without a source?" },
-      });
-      expect(stamps(live)).toEqual([null]);
-
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("registering again replaces, and says what it replaced", async () => {
-    const graph = await scenario.begin();
-    try {
-      const { client } = await serverWithRegistry(graph, sessionRegistry());
-      await client.callTool({
-        name: "register_session",
-        arguments: { id: "first-0", label: "first" },
-      });
-      const again = await client.callTool({
-        name: "register_session",
-        arguments: { id: "second-0" },
-      });
-
-      // Anyone may pick up a pen, including a second time. What the record owes
-      // is that the change is visible rather than silent -- and `label`
-      // defaulting to the id keeps a reader from seeing the previous name
-      // against the new id.
-      expect(again.structuredContent).toEqual({
-        registered: { id: "second-0", label: "second-0", reconstructed_from: null },
-        replaced: { id: "first-0", label: "first", reconstructed_from: null },
-      });
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-});
-
-/**
  * **A server that cannot write does not offer to.**
  */
 describe("read-only", () => {
-  async function listToolsFrom(graph: TenantGraph, readOnly: boolean) {
+  async function readOnlyClient(graph: TenantGraph, readOnly: boolean) {
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     const events = inMemoryEventLog();
     await buildServer(
@@ -717,11 +507,15 @@ describe("read-only", () => {
           read: new ReadSurface(graph, { events }),
           write: new WriteSurface(graph, { events }),
         }),
-      registeredSessionRegistry(),
       { readOnly },
     ).connect(serverSide);
     const client = new Client({ name: "read-only", version: "0" });
     await client.connect(clientSide);
+    return client;
+  }
+
+  async function listToolsFrom(graph: TenantGraph, readOnly: boolean) {
+    const client = await readOnlyClient(graph, readOnly);
     const { tools } = await client.listTools();
     await client.close();
     return tools.map((t) => t.name).sort();
@@ -735,7 +529,7 @@ describe("read-only", () => {
       // Derived from the declarations, never a hand-written list of names: a
       // write tool added later must be absent here without anyone remembering
       // to come and say so.
-      expect(names).toEqual([...META_TOOLS, ...TOOLS].map((t) => t.name).sort());
+      expect(names).toEqual([...metaTools(READ_ONLY), ...TOOLS].map((t) => t.name).sort());
 
       for (const write of WRITE_TOOLS) expect(names).not.toContain(write.name);
     } finally {
@@ -743,14 +537,27 @@ describe("read-only", () => {
     }
   });
 
-  test("register_session goes with the writes, not with the reads", async () => {
+  test("a read-only server's instructions, docs tool and docs resource name no write tool", async () => {
     const graph = await scenario.begin();
     try {
-      const names = await listToolsFrom(graph, true);
-      // It exists to open a gate this server has nothing behind. Leaving it
-      // visible would offer an agent a tool whose effect nothing can observe --
-      // and worse, would say through the tool list that writing is possible.
-      for (const session of SESSION_TOOLS) expect(names).not.toContain(session.name);
+      const client = await readOnlyClient(graph, true);
+      const called = await client.callTool({ name: DOCS_TOOL_NAME, arguments: {} });
+      const tool = (called.content as Array<{ text: string }>)[0]!.text;
+      const { contents } = await client.readResource({ uri: DOCS_URI });
+      const resource = (contents[0] as { text: string }).text;
+      const instructions = client.getInstructions() ?? "";
+      await client.close();
+
+      expect(instructions).toContain("does not change the record");
+      for (const read of TOOLS) {
+        expect(instructions).toContain(`\`${read.name}\``);
+        expect(tool).toContain(`## ${read.name}`);
+      }
+      for (const write of WRITE_TOOLS) {
+        expect(instructions).not.toContain(`\`${write.name}\``);
+        expect(tool).not.toContain(`## ${write.name}`);
+        expect(resource).not.toContain(`## ${write.name}`);
+      }
     } finally {
       await scenario.end();
     }
@@ -764,7 +571,7 @@ describe("read-only", () => {
       // withheld them.
       const names = await listToolsFrom(graph, false);
       expect(names).toEqual(
-        [...META_TOOLS, ...TOOLS, ...WRITE_TOOLS, ...SESSION_TOOLS].map((t) => t.name).sort(),
+        [...metaTools(WRITING), ...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
       );
     } finally {
       await scenario.end();
@@ -782,7 +589,6 @@ describe("read-only", () => {
             read: new ReadSurface(graph, { events }),
             write: new WriteSurface(graph, { events }),
           }),
-        registeredSessionRegistry(),
         { readOnly: true },
       ).connect(serverSide);
       const client = new Client({ name: "read-only", version: "0" });

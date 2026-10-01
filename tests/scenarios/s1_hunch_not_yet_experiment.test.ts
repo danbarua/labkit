@@ -74,7 +74,7 @@ async function priorState() {
   });
   await session.writes.closeEnquiry({
     enquiry: nlEnquiry,
-    answeredBy: claimOf(nlAnalysisClaims, NONLINEAR),
+    answeredBy: [claimOf(nlAnalysisClaims, NONLINEAR)],
   });
 
   const { question: smear } = await session.writes.pose({

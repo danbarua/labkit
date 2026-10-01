@@ -65,12 +65,14 @@ export class InventoryGroup extends SessionCore {
        OPTIONAL MATCH (q:Question)-[:MOTIVATES]->(e)
        OPTIONAL MATCH (u:EvidenceUnit)-[:ADDRESSES]->(e)
        OPTIONAL MATCH (closing:Decision)-[:CLOSES]->(e)
-       RETURN e, q, u, closing`,
+       OPTIONAL MATCH (accepting:Decision)-[:ACCEPTS]->(q)
+       RETURN e, q, u, closing, accepting`,
       {
         e: vertexProps<{ natural_id: string; name: string }>(),
         q: optional(vertexProps<{ natural_id: string; name: string }>()),
         u: optional(vertexProps<{ natural_id: string }>()),
         closing: optional(vertexProps<{ natural_id: string }>()),
+        accepting: optional(vertexProps<{ natural_id: string }>()),
       },
       {},
     );
@@ -81,6 +83,7 @@ export class InventoryGroup extends SessionCore {
         approach: row.e.name,
         runs: 0,
         closed: false,
+        accepted: false,
         units: new Set<string>(),
         // The handle and the wording together or neither. Held apart, an
         // enquiry whose question was retracted listed an empty proposition.
@@ -88,6 +91,7 @@ export class InventoryGroup extends SessionCore {
       };
       if (row.u) entry.units.add(row.u.natural_id);
       if (row.closing) entry.closed = true;
+      if (row.accepting) entry.accepted = true;
       found.set(row.e.natural_id, entry);
     }
     return [...found.values()]

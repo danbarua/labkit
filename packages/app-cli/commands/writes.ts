@@ -107,12 +107,12 @@ export function registerWrites(program: Command, run: Run): void {
   program
     .command("note")
     .helpGroup("Asking")
-    .summary("put a note on the record -- the one write with no prerequisites")
+    .summary("put a note on the record, on anything or on nothing")
     .description(
-      "A dated, attributed record with nothing else required. `search` reaches it like anything " +
-        "else with prose on it. --on attaches it to anything already on the record; skipping it " +
-        "costs nothing, since attaching is the part this verb exists to make optional. " +
-        "An existing note id with --supersedes records that it supersedes those notes, without writing a new note.",
+      "A dated, attributed note, on anything already on the record (--on) or on nothing. " +
+        "`search` finds it by its text. --supersedes names earlier notes it supersedes; both " +
+        "stay readable. An existing note id with --supersedes records that it supersedes those " +
+        "notes, without writing a new note.",
     )
     .argument("<text>", "the note, in your own words, or an existing note id with --supersedes")
     .option("--on <handle>", "what this note concerns, if anything")
@@ -181,7 +181,7 @@ export function registerWrites(program: Command, run: Run): void {
     )
     .argument("<enquiry-id>", "the line of enquiry this belongs to")
     .requiredOption("--method <text>", "what was done")
-    .requiredOption(
+    .option(
       "--from <id>",
       "an input: ART_… observations or an earlier COMP_… analysis (repeatable)",
       collect(String),
@@ -198,7 +198,7 @@ export function registerWrites(program: Command, run: Run): void {
         {
           enquiry,
           method: opts.method,
-          from: opts.from,
+          from: opts.from ?? [],
           ...(opts.implementing === undefined ? {} : { implementing: opts.implementing }),
           ...(opts.heldTo === undefined ? {} : { heldTo: opts.heldTo }),
         },
@@ -210,8 +210,8 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Doing the work")
     .summary("assert one thing an analysis found")
     .description(
-      "One conclusion per call. --replacing supersedes exactly one earlier finding and " +
-        "inherits its proposition and bearing; a finding nothing names goes on standing.",
+      "One conclusion per call. --replacing names one earlier finding that this conclusion " +
+        "supersedes; --proposition and --bearing default to that finding's.",
     )
     .argument("<analysis-id>", "the analysis this conclusion belongs to")
     .requiredOption("--finding <text>", "what was found, in this analysis's own words")
@@ -387,10 +387,7 @@ export function registerWrites(program: Command, run: Run): void {
     .argument("<criterion-id>", "the condition being amended")
     .requiredOption("--now-requires <text>", "the replacement condition")
     .requiredOption("--because <text>", "what prompted the amendment")
-    .option(
-      "--citing <claim-id>",
-      "the diagnosis it rests on — required once the condition has been evaluated, omitted for a fix made before the first run",
-    )
+    .option("--citing <claim-id>", "the claim the amendment rests on")
     .action(async (criterion, opts: { nowRequires: string; because: string; citing?: string }) =>
       parsed(
         amendDesignCommand,
@@ -408,7 +405,7 @@ export function registerWrites(program: Command, run: Run): void {
     .command("is")
     .helpGroup("Revising")
     .description(
-      "**The claim's standing changed; its wording did not.** `confirmed` is one others may build on.",
+      "The claim's standing changed; its wording did not. `confirmed` is one others may build on.",
     );
   is.command("confirmed")
     .helpGroup("Revising")
@@ -429,8 +426,8 @@ export function registerWrites(program: Command, run: Run): void {
     .helpGroup("Stopping")
     .summary("close a line of enquiry, answered or abandoned")
     .argument("<enquiry-id>", "the line of enquiry")
-    .option("--answered-by <claim-id>", "the claim that answers it")
-    .action(async (enquiry, { answeredBy }: { answeredBy?: string }) =>
+    .option("--answered-by <claim-id>", "a claim that answers it (repeatable)", collect(String))
+    .action(async (enquiry, { answeredBy }: { answeredBy?: string[] }) =>
       parsed(
         closeEnquiryCommand,
         {
@@ -452,11 +449,12 @@ export function registerWrites(program: Command, run: Run): void {
   program
     .command("accept")
     .helpGroup("Stopping")
-    .summary("leave a question open, and say what would reopen it")
+    .summary("accept the question an enquiry pursues as unresolved, and say what would reopen it")
     .description(
-      "Not the same as abandoning it, and not the same as nobody having got round to it. The " +
-        "enquiry still reports itself open — deliberately — with the reason and the reopening " +
-        "condition beside it.",
+      "Takes a line of enquiry and records a decision on the question it pursues. Not the same " +
+        "as abandoning it, and not the same as nobody having got round to it. The enquiry is " +
+        "not closed: `labkit enquiries` lists it as accepted, and `labkit --json why` on it " +
+        "carries the reason and the reopening condition.",
     )
     .argument("<enquiry-id>", "the line of enquiry")
     .requiredOption("--because <text>", "why it is being left open")

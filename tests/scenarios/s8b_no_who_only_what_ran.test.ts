@@ -76,7 +76,7 @@ describe("S-8b: there is no who, only what ran", () => {
       });
       await s.writes.closeEnquiry({
         enquiry,
-        answeredBy: claimOf(analysisClaims, "the scale-up fits the budget"),
+        answeredBy: [claimOf(analysisClaims, "the scale-up fits the budget")],
       });
       return whyOf((await afterwards()).reads, "the scale-up fits the budget");
     });

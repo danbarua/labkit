@@ -72,7 +72,7 @@ async function anArcOfWork() {
     on: question,
     text: "the locked parameters live here",
   });
-  const { decision } = await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
+  const { decision } = await session.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
   return {
     question,
     enquiry,

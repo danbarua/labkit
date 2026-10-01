@@ -4,6 +4,7 @@ import { optional, vertexProps } from "@labkit/core-db/cypher";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   AcceptedAsUnresolved,
+  ClaimRef,
   ClosedEnquiry,
   EnquiryRef,
   EvidenceRef,
@@ -58,66 +59,66 @@ export class Stopping extends SessionCore {
           subject: input.enquiry,
         });
 
-      // The two together or neither: whichever branch finds the answer sets both,
-      // and every branch that cannot throws. Held apart, the proposition needed a
-      // fallback at each use for a state no path reaches.
-      let answer: { bearing: EvidenceRef[]; asserts: string } | undefined;
-      if (input.answeredBy) {
-        const found = await this.findingOn(input.answeredBy);
+      // One answer per named claim, each resting on the findings that bear on it.
+      const answers: { claim: ClaimRef; bearing: EvidenceRef[]; asserts: string }[] = [];
+      for (const claim of input.answeredBy ?? []) {
+        const found = await this.findingOn(claim);
         if (found) {
-          answer = { bearing: [found.evidence], asserts: found.asserts };
-        } else {
-          // A synthesis rests on findings rather than producing one, so the closure rests on
-          // the findings underneath it — all of them. Citing one would name an arbitrary part
-          // as the answer to a question the whole was drawn to settle.
-          const parts: { c: { name: string }; e: { natural_id: string } }[] = [];
-          for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
-            parts.push(
-              ...(await this.graph.query(
-                `MATCH (c:Claim {natural_id: $claim})-[:BASED_ON]->(:Claim)<-[:${bearing}]-(e:Evidence)
-                 RETURN c, e`,
-                {
-                  c: vertexProps<{ name: string }>(),
-                  e: vertexProps<{ natural_id: string }>(),
-                },
-                { claim: input.answeredBy },
-              )),
-            );
-          }
-          // A claim nothing has concluded yet still answers; the closure then rests on nothing.
-          const [bare] = await this.graph.query(
-            `MATCH (c:Claim {natural_id: $claim}) RETURN c`,
-            { c: vertexProps<{ name: string }>() },
-            { claim: input.answeredBy },
-          );
-          if (!bare)
-            throw new DomainRefusal({
-              kind: "not-found",
-              message: `${input.answeredBy} not found`,
-              subject: input.answeredBy,
-            });
-          answer = {
-            bearing: [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))],
-            asserts: parts[0]?.c.name ?? bare.c.name,
-          };
+          answers.push({ claim, bearing: [found.evidence], asserts: found.asserts });
+          continue;
         }
+        // A synthesis rests on findings rather than producing one, so the closure rests on
+        // the findings underneath it — all of them. Citing one would name an arbitrary part
+        // as the answer to a question the whole was drawn to settle.
+        const parts: { c: { name: string }; e: { natural_id: string } }[] = [];
+        for (const bearing of ["SUPPORTS", "CHALLENGES"] as const) {
+          parts.push(
+            ...(await this.graph.query(
+              `MATCH (c:Claim {natural_id: $claim})-[:BASED_ON]->(:Claim)<-[:${bearing}]-(e:Evidence)
+               RETURN c, e`,
+              {
+                c: vertexProps<{ name: string }>(),
+                e: vertexProps<{ natural_id: string }>(),
+              },
+              { claim },
+            )),
+          );
+        }
+        // A claim nothing has concluded yet still answers; the closure then rests on nothing.
+        const [bare] = await this.graph.query(
+          `MATCH (c:Claim {natural_id: $claim}) RETURN c`,
+          { c: vertexProps<{ name: string }>() },
+          { claim },
+        );
+        if (!bare)
+          throw new DomainRefusal({
+            kind: "not-found",
+            message: `${claim} not found`,
+            subject: claim,
+          });
+        answers.push({
+          claim,
+          bearing: [...new Set(parts.map((r) => ref("evidence", r.e.natural_id)))],
+          asserts: parts[0]?.c.name ?? bare.c.name,
+        });
       }
 
-      const closure = answer === undefined ? ("abandoned" as const) : ("answered" as const);
+      const closure = answers.length === 0 ? ("abandoned" as const) : ("answered" as const);
       const decided = stagedRef(
         "decision",
         unitOfWork.node("Decision", {
           decided_at: this.clock.now(),
           reason:
-            answer === undefined
+            answers.length === 0
               ? "closed without a cited result"
-              : `answered on "${answer.asserts}"`,
+              : `answered on ${answers.map((a) => `"${a.asserts}"`).join("; ")}`,
           invalidation_check: "new evidence bearing on this enquiry's question",
         }),
       );
       unitOfWork.edge(decided, "CLOSES", input.enquiry);
-      if (input.answeredBy) unitOfWork.edge(decided, "ANSWERS", input.answeredBy);
-      for (const basis of answer?.bearing ?? []) unitOfWork.edge(decided, "BASED_ON", basis);
+      for (const answer of answers) unitOfWork.edge(decided, "ANSWERS", answer.claim);
+      for (const basis of new Set(answers.flatMap((a) => a.bearing)))
+        unitOfWork.edge(decided, "BASED_ON", basis);
 
       return {
         subject: input.enquiry,
@@ -126,9 +127,7 @@ export class Stopping extends SessionCore {
           enquiry: input.enquiry,
           question,
           closure,
-          ...(answer === undefined
-            ? {}
-            : { answered: { claim: input.answeredBy!, asserts: answer.asserts } }),
+          answered: answers.map((a) => ({ claim: a.claim, asserts: a.asserts })),
         },
       };
     });

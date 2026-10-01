@@ -2,6 +2,7 @@ import { optional, vertexProps } from "@labkit/core-db/cypher";
 import { SessionCore } from "../core";
 import type { ClaimRef, KnowledgeSurvey, QuestionStanding } from "../report";
 import { byHandle, ref } from "../report";
+import { dedupeById } from "./shared";
 
 /** The two ways a finding bears on a claim; a closure is read for each. */
 const BEARINGS = ["SUPPORTS", "CHALLENGES"] as const;
@@ -165,30 +166,35 @@ export class StandingGroup extends SessionCore {
 
       for (const [enquiry, pursuit] of closed) {
         const closing = pursuit.closing!;
-        const recorded = [...entry.answers.values()].find((answer) => answer.enquiry === enquiry);
-        if (closing.answered && !recorded)
+        const recorded = [...entry.answers.values()].filter((answer) => answer.enquiry === enquiry);
+        if (closing.answered && recorded.length === 0)
           throw new Error(
             `answered decision ${closing.natural_id} has no answering claim for enquiry ${enquiry}`,
           );
-        const live = recorded ? liveFor.get(ref("claim", recorded.claim)) : undefined;
-        const shown = live ?? (recorded ? recorded.claim : undefined);
-        const shownAnswer = answerReport.find((candidate) => candidate.enquiry === enquiry);
+        // Each answer as the claim standing for it now, or as recorded when none stands.
+        const answered = dedupeById(
+          recorded.map((answer) => {
+            const live = liveFor.get(ref("claim", answer.claim));
+            const shown = live ?? answer.claim;
+            const reported = answerReport.find(
+              (candidate) => candidate.enquiry === enquiry && candidate.claim === shown,
+            );
+            return {
+              claim: ref("claim", shown),
+              bearing:
+                reported?.bearing ??
+                (answer.bearing === "CHALLENGES" ? ("challenges" as const) : ("supports" as const)),
+            };
+          }),
+          (answer) => answer.claim,
+        ).sort((a, b) => byHandle(a.claim, b.claim));
         survey.closedPursuits.push({
           enquiry: ref("enquiry", enquiry),
           pursuing: pursuit.name,
           question: standing.question,
           decision: ref("decision", closing.natural_id),
           closure: closing.answered ? ("answered" as const) : ("abandoned" as const),
-          ...(shown
-            ? {
-                answered: {
-                  claim: ref("claim", shown),
-                  bearing:
-                    shownAnswer?.bearing ??
-                    (recorded!.bearing === "CHALLENGES" ? "challenges" : "supports"),
-                },
-              }
-            : {}),
+          answered,
         });
       }
 

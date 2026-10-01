@@ -3,11 +3,11 @@
  */
 
 import { openRecord } from "@labkit/core-domain";
+import { locateRecord, type RecordLocation } from "@labkit/core-db/connect";
 import type { ReadSurface, WriteSurface } from "@labkit/core-domain";
 import { commandContext, gitContext, personContext } from "@labkit/core-domain/context";
 import type { Clock } from "@labkit/core-domain";
 import { asJson, type Answer } from "./output";
-import { isColorSupported } from "picocolors";
 import { type Palette, palette } from "./palette";
 import { colourHandles, shortenInstants, wrap } from "./views/format";
 import { colourVocabulary } from "./vocabulary";
@@ -38,10 +38,27 @@ export interface Globals {
 }
 
 /**
- * Whether to colour, decided once and here.
+ * Whether to colour a stream, decided here for stdout and stderr alike. `--no-ansi`, a non-empty
+ * `NO_COLOR` and `FORCE_COLOR=0` (or `false`) turn it off; any other `FORCE_COLOR` or `CI` turns
+ * it on; otherwise it is on for a terminal whose `TERM` is not `dumb`.
+ */
+export function colourWanted(
+  opts: Pick<Globals, "ansi">,
+  isTTY: boolean | undefined,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  if (opts.ansi === false) return false;
+  if (env.NO_COLOR) return false;
+  if (env.FORCE_COLOR !== undefined) return env.FORCE_COLOR !== "0" && env.FORCE_COLOR !== "false";
+  if (env.CI) return true;
+  return Boolean(isTTY) && env.TERM !== "dumb";
+}
+
+/**
+ * The palette for stdout.
  */
 export function coloursFor(opts: Globals): Palette {
-  return palette(opts.ansi !== false && isColorSupported);
+  return palette(colourWanted(opts, process.stdout.isTTY));
 }
 
 /** Both halves, held separately so a command can only reach the one it was given. */
@@ -56,14 +73,30 @@ export interface Surfaces {
 export type Run = (work: (surfaces: Surfaces) => Promise<Answer>) => Promise<void>;
 
 /**
+ * Which record this invocation opens, located the first time a command asks and the same answer
+ * every time after. Every command, `mcp` included, reads the record through this.
+ */
+export function recordLocator(globals: () => Globals): () => RecordLocation {
+  let located: RecordLocation | undefined;
+  return () => {
+    located ??= locateRecord(globals().db);
+    return located;
+  };
+}
+
+/**
  * The wrap: connect, resolve, build, run, print, close.
  */
-export function runner(globals: () => Globals, write: (line: string) => void): Run {
+export function runner(
+  globals: () => Globals,
+  write: (line: string) => void,
+  located: () => RecordLocation = recordLocator(globals),
+): Run {
   return async (work) => {
     const opts = globals();
     const clock: Clock | undefined = opts.date ? { now: () => opts.date! } : undefined;
     const record = await openRecord({
-      ...(opts.db === undefined ? {} : { db: opts.db }),
+      record: located(),
       ...(opts.tenant === undefined ? {} : { tenant: opts.tenant }),
       context: commandContext(
         gitContext,

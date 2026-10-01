@@ -79,7 +79,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
     const { enquiry, analysisClaims } = await scratchExploration();
     await session.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(analysisClaims, PROPOSITION),
+      answeredBy: [claimOf(analysisClaims, PROPOSITION)],
     });
 
     const reader = await afterwards();
@@ -125,7 +125,7 @@ describe("S-18: scratch work that unexpectedly mattered", () => {
 
     await session.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(analysisClaims, PROPOSITION),
+      answeredBy: [claimOf(analysisClaims, PROPOSITION)],
     });
     const known = await (await afterwards()).reads.whatIsKnown();
     expect(known.established.map((q) => q.asks)).toEqual([QUESTION]);

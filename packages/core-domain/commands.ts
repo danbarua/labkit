@@ -120,10 +120,10 @@ export const recordAnalysisCommand = z.object({
 });
 export type RecordAnalysisCommand = z.infer<typeof recordAnalysisCommand>;
 
-/** `closeEnquiry` — answered, or abandoned when `answeredBy` is absent. */
+/** `closeEnquiry` — answered by every claim in `answeredBy`, or abandoned when it names none. */
 export const closeEnquiryCommand = z.object({
   enquiry: refString("enquiry"),
-  answeredBy: refString("claim").optional(),
+  answeredBy: z.array(refString("claim")).optional(),
 });
 export type CloseEnquiryCommand = z.infer<typeof closeEnquiryCommand>;
 

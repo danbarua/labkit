@@ -11,7 +11,8 @@ import { registerReads } from "./commands/reads";
 import { registerWrites } from "./commands/writes";
 import { registerDump, registerRestore } from "./commands/dump";
 import { registerServe } from "./commands/serve";
-import type { Run } from "./session";
+import type { RecordLocation } from "@labkit/core-db/connect";
+import { recordLocator, type Globals, type Run } from "./session";
 
 const VERSION = labkitVersion();
 
@@ -24,7 +25,7 @@ export function globalOptions(program: Command): Command {
       .option("--tenant <slug>", "which tenant to read or write", "labkit")
       .option(
         "--db <dir>",
-        "the directory holding .labkit/ (default: $LABKIT_HOME, else the nearest .labkit/ at or above cwd)",
+        "the directory holding .labkit/ (default: $LABKIT_HOME, else the root of the git repository cwd is in, else the nearest .labkit/ at or above cwd, else cwd)",
       )
       .option("--author <name>", "who to attribute writes to (default: your username)")
       .option(
@@ -38,9 +39,9 @@ export function globalOptions(program: Command): Command {
         whole,
       )
       // Negatable, so the flag reads as `--no-ansi` and defaults on. It only
-      // subtracts: colour is off already when stdout is not a terminal or
-      // `NO_COLOR` is set, and `--json` is never coloured at all.
-      .option("--no-ansi", "never colour the output")
+      // subtracts: see `colourWanted` for the rest of the decision. `--json` is
+      // never coloured at all.
+      .option("--no-ansi", "never colour the output, on stdout or stderr")
       // Hidden from `--help` deliberately -- a `sudo` for the clock, not a
       // documented feature. It exists for backfilling real historical work
       // (bonsai-2026: a record whose events predate labkit's own existence),
@@ -61,14 +62,14 @@ export function globalOptions(program: Command): Command {
 /**
  * Every command, registered against one program.
  */
-export function buildProgram(run: Run): Command {
-  const program = new Command("labkit")
+export function buildProgram(run: Run, located?: () => RecordLocation): Command {
+  const program: Command = new Command("labkit")
     .description(
       "A research record, from the command line.\n\n" +
         "Start with:\n" +
         "  labkit now              what is blocked, and what is ready to start\n" +
-        "  labkit known            every question, and how well each is answered\n" +
         "  labkit claims           every conclusion on the record\n" +
+        "  labkit enquiries        every line of enquiry\n" +
         "  labkit search <text>    find a handle by its wording\n\n" +
         "Most other commands take a handle. The lists above are where handles come from.",
     )
@@ -81,8 +82,8 @@ export function buildProgram(run: Run): Command {
   registerReads(program, run);
   registerWrites(program, run);
   // Outside the two registries and without `run`: the server owns its own
-  // connection lifecycle and prints no report. See ./commands/serve.ts.
-  registerServe(program);
+  // connection lifecycle and prints no report. It opens the record `run` opens.
+  registerServe(program, located ?? recordLocator(() => program.opts<Globals>()));
   registerDump(program);
   registerRestore(program);
   // Hidden: how a compiled binary spawns a record's daemon, since it has no source file to run.

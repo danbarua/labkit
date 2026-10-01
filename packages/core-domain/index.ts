@@ -187,7 +187,6 @@ export {
   acceptedAsUnresolved,
   restated,
   amendmentReport,
-  registeredSession,
   gateList,
   workList,
   transcription,

@@ -59,7 +59,7 @@ async function aVouchedForNo() {
     claim,
     because: "re-counted blind by a second reader",
   });
-  await session.writes.closeEnquiry({ enquiry, answeredBy: claim });
+  await session.writes.closeEnquiry({ enquiry, answeredBy: [claim] });
   return { enquiry, claim };
 }
 
@@ -125,7 +125,7 @@ describe("S-18b — a negative result that somebody vouched for", () => {
     });
     await session.writes.closeEnquiry({
       enquiry,
-      answeredBy: claimOf(claims, "the sealant reduces cracking"),
+      answeredBy: [claimOf(claims, "the sealant reduces cracking")],
     });
 
     const later = new ResearchSession(await scenario.current(), {

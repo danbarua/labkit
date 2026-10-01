@@ -337,7 +337,7 @@ test("an uncaptured commit is not printed as a hash", () => {
 
 // --------------------------------------------------------------------------- Colour. **Every
 // assertion above renders with `PLAIN`**, which is what `bun test` would get anyway — stdout is
-// not a terminal, so `isColorSupported` is false and the composition root hands out an identity
+// not a terminal, so `colourWanted` is false and the composition root hands out an identity
 // palette.
 
 const COLOUR = palette(true);

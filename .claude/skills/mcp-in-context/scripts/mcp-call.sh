@@ -3,21 +3,20 @@
 # One MCP method against one record, through the inspector CLI.
 #
 # Exists because the raw invocation has three ways to go wrong that all look
-# like server faults: a binary npx cannot spawn, a working directory that
-# chooses the wrong record, and a tool refusal reported as an exit code. This
-# names each one instead.
+# like server faults: a binary npx cannot spawn, a flag the inspector keeps for
+# itself instead of passing to the server, and a tool refusal reported as an
+# exit code. This names each one instead.
 #
 #   mcp-call.sh tools/list
-#   mcp-call.sh tools/call now
-#   mcp-call.sh tools/call gate_status gate=GATE_3
-#   LABKIT_RECORD=~/Code/pycharm/bonsai-2026 mcp-call.sh tools/call now
+#   mcp-call.sh tools/call work_list
+#   mcp-call.sh tools/call why subject=GATE_3
+#   LABKIT_RECORD=~/Code/pycharm/bonsai-2026 mcp-call.sh tools/call work_list
+#   LABKIT_RECORD=/tmp/scratch MCP_CALL_WRITE=1 mcp-call.sh tools/call note text=probe
 #
-# LABKIT_BIN  the labkit binary (default: `labkit` on PATH, else the repo's bin/)
-# LABKIT_RECORD  the directory whose record to read (default: cwd)
-#
-# Read-only in practice: every invocation is one connection, so a write tool's
-# `register_session` cannot carry into it and the write refuses. That is the
-# property that makes this safe to point at a record someone is using.
+# LABKIT_BIN      the labkit binary (default: `labkit` on PATH, else the repo's bin/)
+# LABKIT_RECORD   the directory whose record to serve, passed as --db (default: cwd)
+# MCP_CALL_WRITE  1 serves the write tools too; otherwise the server is started
+#                 with --read-only and registers none
 set -euo pipefail
 
 method="${1:-}"
@@ -42,7 +41,19 @@ fi
   exit 1
 }
 
-args=(--cli "$bin" mcp --method "$method")
+record="$(cd "${LABKIT_RECORD:-$PWD}" && pwd)"
+serve=(mcp --read-only)
+[ "${MCP_CALL_WRITE:-}" = "1" ] && serve=(mcp)
+
+# The server's flags go in a wrapper, not on the inspector's command line: the
+# inspector takes `--db` and `--read-only` after the binary for its own options
+# and starts the server without them.
+wrapper="$(mktemp "${TMPDIR:-/tmp}/labkit-mcp-call.XXXXXX")"
+trap 'rm -f "$wrapper"' EXIT
+printf '#!/bin/sh\nexec %q --db %q %s\n' "$bin" "$record" "${serve[*]}" > "$wrapper"
+chmod +x "$wrapper"
+
+args=(--cli "$wrapper" --method "$method")
 if [ "$method" = "tools/call" ]; then
   tool="${1:-}"
   [ -n "$tool" ] || { echo "mcp-call: tools/call needs a tool name" >&2; exit 2; }
@@ -50,11 +61,6 @@ if [ "$method" = "tools/call" ]; then
   args+=(--tool-name "$tool")
   for pair in "$@"; do args+=(--tool-arg "$pair"); done
 fi
-
-# The record is chosen by where the server starts, so cd rather than passing a
-# flag -- the server resolves its own database exactly as any labkit process
-# does, which is the behaviour being debugged.
-cd "${LABKIT_RECORD:-$PWD}"
 
 # stderr is passed through, not swallowed: LabKit's request log writes one JSON
 # line there naming the tool and the arguments a failing call was given, and

@@ -203,7 +203,9 @@ export function directPostgresBackend(opts: { connectionString: string }): DbBac
       const client = new Client({ connectionString: opts.connectionString });
       // Without a listener, a server going away mid-connection is an uncaught 'error' event that
       // ends the process; the query in flight rejects on its own.
-      client.on("error", (err) => console.error(`labkit: connection lost: ${err.message}`));
+      client.on("error", (err) =>
+        process.stderr.write(`labkit: connection lost: ${err.message}\n`),
+      );
       await client.connect();
       // `pg.Client.query(sql, params, cb)` takes a *callback* third, so
       // `QueryOptions` has to travel in the config-object form. That is why the

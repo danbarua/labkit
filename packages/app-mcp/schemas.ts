@@ -41,7 +41,6 @@ export {
   acceptedAsUnresolved as acceptedAsUnresolvedSchema,
   restated as restatedSchema,
   amendmentReport as amendmentReportSchema,
-  registeredSession as registeredSessionSchema,
   gateList as gateListSchema,
   workList as workListSchema,
   transcription as transcriptionSchema,

@@ -103,7 +103,7 @@ describe("S-4: a negative result that closes the question", () => {
     // Researcher: then close that question for this endpoint.
     await session.writes.closeEnquiry({
       enquiry: specificity,
-      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+      answeredBy: [claimOf(nullResultClaims, SPECIFICITY)],
     });
 
     const status = await session.reads.enquiryStatus({ enquiry: specificity });
@@ -139,7 +139,7 @@ describe("S-4: a negative result that closes the question", () => {
     });
     await session.writes.closeEnquiry({
       enquiry: specificity,
-      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+      answeredBy: [claimOf(nullResultClaims, SPECIFICITY)],
     });
 
     const status = await session.reads.enquiryStatus({ enquiry: specificity });
@@ -169,7 +169,7 @@ describe("S-4: a negative result that closes the question", () => {
     });
     await session.writes.closeEnquiry({
       enquiry: specificity,
-      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+      answeredBy: [claimOf(nullResultClaims, SPECIFICITY)],
     });
 
     const status = await session.reads.enquiryStatus({ enquiry: specificity });
@@ -195,7 +195,7 @@ describe("S-4: a negative result that closes the question", () => {
     });
     await session.writes.closeEnquiry({
       enquiry: specificity,
-      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+      answeredBy: [claimOf(nullResultClaims, SPECIFICITY)],
     });
 
     // Reconstructible from a fresh reader, not from a value we kept.
@@ -228,7 +228,7 @@ describe("S-4: a negative result that closes the question", () => {
     });
     await session.writes.closeEnquiry({
       enquiry: specificity,
-      answeredBy: claimOf(nullResultClaims, SPECIFICITY),
+      answeredBy: [claimOf(nullResultClaims, SPECIFICITY)],
     });
 
     const status = await session.reads.enquiryStatus({ enquiry: specificity });
@@ -313,7 +313,7 @@ describe("S-4: a negative result that closes the question", () => {
     await expect(
       session.writes.closeEnquiry({
         enquiry: specificity,
-        answeredBy: ref("claim", "CLM_99999"),
+        answeredBy: [ref("claim", "CLM_99999")],
       }),
     ).rejects.toThrow(/CLM_99999 not found|does not belong to enquiry/);
 
@@ -350,7 +350,7 @@ describe("S-4: a negative result that closes the question", () => {
 
     await session.writes.closeEnquiry({
       enquiry: specificity,
-      answeredBy: claimOf(mixedClaims, SPECIFICITY),
+      answeredBy: [claimOf(mixedClaims, SPECIFICITY)],
     });
 
     const status = await session.reads.enquiryStatus({ enquiry: specificity });
