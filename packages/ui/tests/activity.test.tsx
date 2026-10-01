@@ -42,6 +42,10 @@ describe("what a running turn is doing", () => {
     expect(currentActivity(state(started))).toEqual({ kind: "waiting" });
   });
 
+  test("waiting on the provider again once this turn's tools have settled", () => {
+    expect(currentActivity(state(started, call("a", "completed")))).toEqual({ kind: "waiting" });
+  });
+
   test("a call left unsettled in an earlier turn is not what is happening now", () => {
     expect(
       currentActivity(state(call("old", "pending"), chunk("agent_message_chunk", "done"), started)),
@@ -64,7 +68,6 @@ describe("what a running turn is doing", () => {
     expect(afterPause({ kind: "thinking" }, true)).toEqual({ kind: "waiting" });
     expect(afterPause({ kind: "speaking" }, false)).toEqual({ kind: "speaking" });
     expect(afterPause({ kind: "tool", label: "x" }, true)).toEqual({ kind: "tool", label: "x" });
-    expect(afterPause({ kind: "working" }, true)).toEqual({ kind: "working" });
     expect(afterPause(undefined, true)).toBeUndefined();
   });
 
@@ -72,7 +75,6 @@ describe("what a running turn is doing", () => {
     expect(activityMood({ kind: "waiting" })).toBe("waiting");
     expect(activityMood({ kind: "thinking" })).toBe("working");
     expect(activityMood({ kind: "tool", label: "x" })).toBe("working");
-    expect(activityMood({ kind: "working" })).toBe("working");
     expect(activityMood({ kind: "speaking" })).toBe("speaking");
   });
 });

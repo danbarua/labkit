@@ -7,19 +7,18 @@ export type Activity =
   | { readonly kind: "waiting" }
   | { readonly kind: "tool"; readonly label: string }
   | { readonly kind: "thinking" }
-  | { readonly kind: "working" }
   | { readonly kind: "speaking" };
 
 /**
- * What a running turn is doing: waiting for the first word after the person's prompt, speaking
- * while answer text is the last block, the tool call it is waiting on (the latest one in this turn
- * not yet settled), thinking while a thought is the last block, else working. Nothing when the
- * turn is idle or waiting on the person (the question says so).
+ * What a running turn is doing: speaking while answer text is the last block, the tool call it is
+ * waiting on (the latest one in this turn not yet settled), thinking while a thought is the last
+ * block, and otherwise waiting on the model's provider: for the first word after the person's
+ * prompt, or for the next step once the tools have settled. Nothing when the turn is idle or
+ * waiting on the person (the question says so).
  */
 export function currentActivity(state: TranscriptState): Activity | undefined {
   if (phase(state) !== "running") return undefined;
   const last = state.blocks.at(-1);
-  if (last?.kind === "user") return { kind: "waiting" };
   if (last?.kind === "assistant") return { kind: "speaking" };
   // Only this turn's calls: one left unsettled in an earlier turn is not what is happening now.
   for (const block of [...state.blocks].reverse()) {
@@ -32,7 +31,7 @@ export function currentActivity(state: TranscriptState): Activity | undefined {
     const preview = call.rawInput === undefined ? undefined : inputPreview(call.rawInput);
     return { kind: "tool", label: preview === undefined ? name : `${name} ${preview}` };
   }
-  return last?.kind === "thought" ? { kind: "thinking" } : { kind: "working" };
+  return last?.kind === "thought" ? { kind: "thinking" } : { kind: "waiting" };
 }
 
 /** How long the stream may stay quiet before the indicator says it is waiting again. */
@@ -40,8 +39,8 @@ export const PAUSE_MS = 1500;
 
 /**
  * An activity seen after the stream has gone quiet. Thinking or speaking that has paused is waiting
- * on the model's provider again, until more arrives. A running tool, or work between steps, is
- * left as it is: no stream is expected while a tool runs.
+ * on the model's provider again, until more arrives. A running tool is left as it is: no stream is
+ * expected while it runs.
  */
 export const afterPause = (activity: Activity | undefined, quiet: boolean): Activity | undefined =>
   quiet && (activity?.kind === "thinking" || activity?.kind === "speaking")
@@ -57,8 +56,6 @@ export function activityLabel(activity: Activity): string | undefined {
       return activity.label;
     case "thinking":
       return "Thinking";
-    case "working":
-      return "Working";
     case "speaking":
       return undefined;
   }
