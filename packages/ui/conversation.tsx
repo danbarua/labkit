@@ -191,7 +191,12 @@ export function Conversation({
           <ToastProvider>
             <header className="lk-header">
               <h2 className="lk-title">{state.title ?? "New session"}</h2>
-              <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
+              {/* A turn that ended in an error was stopped, not finished: it needs the person. */}
+              {activity?.kind === "failed" ? (
+                <span className="lk-badge stopped">Stopped</span>
+              ) : (
+                <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
+              )}
               <div className="lk-header-end">
                 {usage === undefined ? null : (
                   <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>

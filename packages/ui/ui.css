@@ -99,6 +99,14 @@
 .lk-badge.awaiting_permission::before {
   background: var(--lk-warn);
 }
+.lk-badge.stopped {
+  color: var(--lk-danger);
+  border-color: var(--lk-danger);
+  background: var(--lk-danger-soft);
+}
+.lk-badge.stopped::before {
+  background: var(--lk-danger);
+}
 @keyframes lk-pulse {
   50% {
     opacity: 0.35;

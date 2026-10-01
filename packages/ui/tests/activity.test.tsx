@@ -80,6 +80,9 @@ describe("what a running turn is doing", () => {
       kind: "failed",
     });
     expect(currentActivity(state(started, failed, started))).toEqual({ kind: "waiting" });
+    const html = renderToStaticMarkup(<Conversation state={state(started, failed)} />);
+    expect(html).toContain('<span class="lk-badge stopped">Stopped</span>');
+    expect(html).toContain('data-mood="failed"');
   });
 
   test("the loader's pace and colour follow the activity", () => {
