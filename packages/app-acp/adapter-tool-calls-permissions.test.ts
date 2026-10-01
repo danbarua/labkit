@@ -334,11 +334,11 @@ test("interrupted permission recovers on load with no effects or repeated reques
   expect(completions).toBe(1);
   expect(ran).toBe(0);
   expect(loaded.messages.some((m) => m.method === "session/request_permission")).toBe(false);
-  expect(
-    loaded
-      .updates()
-      .some((m) => m.update.sessionUpdate === "tool_call_update" && m.update.status === "failed"),
-  ).toBe(true);
+  // The journal holds the call and no outcome for it, so the card is drawn with no result.
+  expect(loaded.updates().map(({ update }) => update.sessionUpdate)).toContain("tool_call");
+  expect(loaded.updates().some(({ update }) => update.sessionUpdate === "tool_call_update")).toBe(
+    false,
+  );
   await loaded.close();
 });
 

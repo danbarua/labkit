@@ -3,7 +3,6 @@ import { isAbsolute } from "node:path";
 import { RequestError, type AgentContext, type NewSessionRequest } from "@agentclientprotocol/sdk";
 import {
   createSession,
-  projectConversation,
   restoreSession,
   SessionNotFoundError,
   type SessionOptions,
@@ -28,7 +27,7 @@ import type { AdapterCore } from "./core.ts";
 import { forwardPermission } from "./permission.ts";
 import type { Session } from "./session.ts";
 import type { SessionRegistry } from "./sessions.ts";
-import { replayFacts, type SessionUpdates } from "./updates.ts";
+import { transcriptUpdates, type SessionUpdates } from "./updates.ts";
 
 /** Everything opening a session needs from the connection. */
 export type OpenDeps = Readonly<{
@@ -377,20 +376,8 @@ export function opener(deps: OpenDeps): OpenSession {
       sessions.set(sessionId, commandEntry);
       entry.revision = runtime.snapshot.durable.revision;
       if (id && replay) {
-        const durable = runtime.snapshot.durable;
-        const view = projectConversation(durable);
-        const facts = replayFacts(durable);
-        await updates.replay(client, id, view.context, `${id}/context`, facts, tools, renderers);
-        for (const [index, turn] of view.log.entries())
-          await updates.replay(
-            client,
-            id,
-            turn.messages,
-            `${id}/history/${index}`,
-            facts,
-            tools,
-            renderers,
-          );
+        for (const update of transcriptUpdates(runtime.snapshot.durable, renderers))
+          core.send(client, id, update);
       }
       const registry = runtime.registry;
       if (registry.kind === "pending_adoption")

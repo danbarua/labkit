@@ -179,6 +179,20 @@ export const StreamDeltaSchema = z
 
 export type StreamDelta = z.infer<typeof StreamDeltaSchema>;
 
+/**
+ * What a client was sent of one step's stream: its thinking text, and, for a step that did not
+ * produce an answer (failed or cancelled), the answer text streamed before it stopped. A settled
+ * answer's text is its completion and is not repeated here. Empty when nothing streamed.
+ */
+export const ShownSchema = z
+  .strictObject({
+    thinking: z.string().min(1).optional(),
+    text: z.string().min(1).optional(),
+  })
+  .readonly();
+
+export type Shown = z.infer<typeof ShownSchema>;
+
 export type StreamDeltaSink = (delta: StreamDelta) => unknown;
 
 export type StreamEvent = Readonly<{ event?: string; data: string }>;

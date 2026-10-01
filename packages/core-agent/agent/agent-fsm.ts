@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 import { defineMachine, stay, type Decision } from "../fsm/fsm.ts";
-import type { Continuation } from "../providers/types.ts";
+import type { Continuation, Shown } from "../providers/types.ts";
 import type { CompletionUsage } from "../providers/usage.ts";
 import { validatePermissionDecisions, type PermissionDecisions } from "./permissions.ts";
 import type { BatchOutcome } from "./tool-batch.ts";
@@ -104,6 +104,7 @@ export type TurnEvent =
    * @property provider Provider that produced this output, when the policy named one.
    * @property model Application model name that produced this output.
    * @property continuation Provider continuation payload (thinking signatures), not the next step.
+   * @property shown What the client was shown while the step streamed; see `ShownSchema`.
    * @property permissionRequired Ask the user before running the proposed tool calls.
    */
   | {
@@ -113,6 +114,7 @@ export type TurnEvent =
       provider?: string;
       model?: string;
       continuation?: Continuation;
+      shown?: Shown;
       usage?: CompletionUsage;
       permissionRequired?: true;
     }

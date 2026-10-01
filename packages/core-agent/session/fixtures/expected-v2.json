@@ -200,6 +200,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "example-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -381,6 +382,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "example-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -764,6 +766,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "example-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -836,6 +839,9 @@
                 "value": {
                   "text": "{\"body\":\"Keep decisions pure; persist before releasing effects.\"}"
                 }
+              },
+              "shown": {
+                "kind": "read"
               }
             }
           },
@@ -878,6 +884,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "example-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/4"
@@ -1261,6 +1268,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "example-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -1347,6 +1355,9 @@
                     "permissionChildId": "00000000-0000-4000-8000-000000000001/turn/1/2"
                   }
                 }
+              },
+              "shown": {
+                "kind": "read"
               }
             }
           },
@@ -1389,6 +1400,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "example-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/4"
@@ -1763,6 +1775,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -2078,6 +2091,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -2534,6 +2548,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -2615,6 +2630,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -2869,6 +2885,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -2950,6 +2967,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -3890,6 +3908,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -3952,6 +3971,9 @@
                     "message": "broken"
                   }
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -3971,6 +3993,9 @@
                 "value": {
                   "text": "ok"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -4013,6 +4038,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -4268,6 +4294,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -4330,6 +4357,9 @@
                     "message": "broken"
                   }
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -4349,6 +4379,9 @@
                 "value": {
                   "text": "ok"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -4391,6 +4424,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -4803,6 +4837,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -4851,6 +4886,9 @@
                 "value": {
                   "text": "fast"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -4956,6 +4994,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -5227,6 +5266,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -5275,6 +5315,9 @@
                 "value": {
                   "text": "fast"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -5380,6 +5423,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -5825,6 +5869,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -6129,6 +6174,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000007/turn/1/1"
@@ -6160,6 +6206,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000007/turn/1/2"
@@ -6403,6 +6450,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000007/turn/1/1"
@@ -6434,6 +6482,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000007/turn/1/2"
@@ -6836,6 +6885,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -6920,6 +6970,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -7161,6 +7212,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -7245,6 +7297,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -7545,6 +7598,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -7770,6 +7824,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -8875,6 +8930,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -8916,6 +8972,9 @@
                 "value": {
                   "text": "result-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -8975,6 +9034,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -9016,6 +9076,9 @@
                 "value": {
                   "text": "result-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -9075,6 +9138,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/5"
@@ -9203,6 +9267,7 @@
                   "type": "model_settled",
                   "provider": "google-generate@1",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -9551,6 +9616,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -9592,6 +9658,9 @@
                 "value": {
                   "text": "result-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -9651,6 +9720,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -9692,6 +9762,9 @@
                 "value": {
                   "text": "result-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -9751,6 +9824,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/5"
@@ -10304,6 +10378,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000011/turn/2/1"
@@ -10562,6 +10637,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000016/turn/1/1"
@@ -11119,6 +11195,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@1",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -11425,6 +11502,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@1",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -11720,6 +11798,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@1",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000005/turn/2/1"
@@ -11984,6 +12063,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@1",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000010/turn/1/1"
@@ -12790,6 +12870,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -12838,6 +12919,9 @@
                 "value": {
                   "text": "result-0-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -12857,6 +12941,9 @@
                 "value": {
                   "text": "result-0-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -12939,6 +13026,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -12987,6 +13075,9 @@
                 "value": {
                   "text": "result-1-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -13006,6 +13097,9 @@
                 "value": {
                   "text": "result-1-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -13064,6 +13158,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/5"
@@ -13504,6 +13599,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -13552,6 +13648,9 @@
                 "value": {
                   "text": "result-0-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -13571,6 +13670,9 @@
                 "value": {
                   "text": "result-0-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -13653,6 +13755,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -13701,6 +13804,9 @@
                 "value": {
                   "text": "result-1-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -13720,6 +13826,9 @@
                 "value": {
                   "text": "result-1-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -13778,6 +13887,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/5"
@@ -14470,6 +14580,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -14511,6 +14622,9 @@
                 "value": {
                   "text": "result-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -14571,6 +14685,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -14612,6 +14727,9 @@
                 "value": {
                   "text": "result-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -14672,6 +14790,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/5"
@@ -15020,6 +15139,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -15061,6 +15181,9 @@
                 "value": {
                   "text": "result-0"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -15121,6 +15244,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -15162,6 +15286,9 @@
                 "value": {
                   "text": "result-1"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -15222,6 +15349,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/5"
@@ -15931,6 +16059,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -16037,6 +16166,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -16141,6 +16271,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/3/1"
@@ -16483,6 +16614,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -16589,6 +16721,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/2/1"
@@ -16693,6 +16826,7 @@
                       ]
                     }
                   },
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/3/1"
@@ -17185,6 +17319,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@2",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -17253,6 +17388,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -17296,6 +17434,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@2",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -17593,6 +17732,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@2",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -17661,6 +17801,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -17704,6 +17847,7 @@
                   "type": "model_settled",
                   "provider": "openai-chat@2",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/3"
@@ -18241,6 +18385,9 @@
                       ]
                     }
                   },
+                  "shown": {
+                    "thinking": "Considering"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -18312,6 +18459,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -18370,6 +18520,9 @@
                         }
                       ]
                     }
+                  },
+                  "shown": {
+                    "thinking": "Considering"
                   },
                   "child": {
                     "kind": "completion",
@@ -18734,6 +18887,9 @@
                       ]
                     }
                   },
+                  "shown": {
+                    "thinking": "Considering"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -18805,6 +18961,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -18863,6 +19022,9 @@
                         }
                       ]
                     }
+                  },
+                  "shown": {
+                    "thinking": "Considering"
                   },
                   "child": {
                     "kind": "completion",
@@ -19469,6 +19631,9 @@
                       ]
                     }
                   },
+                  "shown": {
+                    "thinking": "Considering"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -19537,6 +19702,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -19601,6 +19769,9 @@
                         }
                       ]
                     }
+                  },
+                  "shown": {
+                    "thinking": "Considering"
                   },
                   "child": {
                     "kind": "completion",
@@ -19995,6 +20166,9 @@
                       ]
                     }
                   },
+                  "shown": {
+                    "thinking": "Considering"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -20063,6 +20237,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -20127,6 +20304,9 @@
                         }
                       ]
                     }
+                  },
+                  "shown": {
+                    "thinking": "Considering"
                   },
                   "child": {
                     "kind": "completion",
@@ -20704,6 +20884,9 @@
                       ]
                     }
                   },
+                  "shown": {
+                    "thinking": "Considering"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -20772,6 +20955,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -20831,6 +21017,9 @@
                         }
                       ]
                     }
+                  },
+                  "shown": {
+                    "thinking": "Considering"
                   },
                   "child": {
                     "kind": "completion",
@@ -21190,6 +21379,9 @@
                       ]
                     }
                   },
+                  "shown": {
+                    "thinking": "Considering"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -21258,6 +21450,9 @@
                 "value": {
                   "text": "Hello 🌍"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -21317,6 +21512,9 @@
                         }
                       ]
                     }
+                  },
+                  "shown": {
+                    "thinking": "Considering"
                   },
                   "child": {
                     "kind": "completion",
@@ -21772,6 +21970,9 @@
                   "type": "model_settled",
                   "provider": "openai-chat@2",
                   "model": "test-model",
+                  "shown": {
+                    "text": "Hello 🌍"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -22075,6 +22276,9 @@
                   "type": "model_settled",
                   "provider": "openai-chat@2",
                   "model": "test-model",
+                  "shown": {
+                    "text": "Hello 🌍"
+                  },
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -22618,6 +22822,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -22701,6 +22906,9 @@
                 "value": {
                   "text": "one"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -22720,6 +22928,9 @@
                 "value": {
                   "text": "two"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -22762,6 +22973,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/4"
@@ -23019,6 +23231,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -23102,6 +23315,9 @@
                 "value": {
                   "text": "one"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -23121,6 +23337,9 @@
                 "value": {
                   "text": "two"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -23163,6 +23382,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/4"
@@ -23656,6 +23876,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -23753,6 +23974,9 @@
                     "permissionChildId": "00000000-0000-4000-8000-000000000001/turn/1/2"
                   }
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -23772,6 +23996,9 @@
                 "value": {
                   "text": "one"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -23814,6 +24041,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/4"
@@ -24071,6 +24299,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -24168,6 +24397,9 @@
                     "permissionChildId": "00000000-0000-4000-8000-000000000001/turn/1/2"
                   }
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -24187,6 +24419,9 @@
                 "value": {
                   "text": "one"
                 }
+              },
+              "shown": {
+                "kind": "other"
               }
             }
           },
@@ -24229,6 +24464,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/4"
@@ -24617,6 +24853,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -25030,6 +25267,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"
@@ -25288,6 +25526,7 @@
                 "event": {
                   "type": "model_settled",
                   "model": "test-model",
+                  "shown": {},
                   "child": {
                     "kind": "completion",
                     "id": "00000000-0000-4000-8000-000000000001/turn/1/1"

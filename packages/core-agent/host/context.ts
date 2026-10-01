@@ -21,6 +21,7 @@ import {
   type ExecutionBindings,
   type PermissionPort,
   type Tool,
+  type ToolLocation,
 } from "./ports.ts";
 
 /**
@@ -60,6 +61,8 @@ export type PermissionGrant = {
   refused: Map<string, Failure>;
   pending: HostToolNotification[];
   remembered: Map<string, string>;
+  /** Locations shown for each call while permission was asked. */
+  locations: Map<string, readonly ToolLocation[]>;
 };
 
 /**
@@ -119,18 +122,7 @@ export function createHostContext(
   const emit = fanoutEffects(diagnosticsSubscriber(), bindings.effects);
   const remembered = new Map<string, string>();
 
-  const grants = new Map<
-    ActorId,
-    {
-      batchId: ActorId;
-      approved: boolean;
-      inputs: Map<string, unknown>;
-      invalidInputs: Map<string, Failure>;
-      refused: Map<string, Failure>;
-      pending: HostToolNotification[];
-      remembered: Map<string, string>;
-    }
-  >();
+  const grants = new Map<ActorId, PermissionGrant>();
 
   const ctx: HostContext = {
     closed: false,

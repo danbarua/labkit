@@ -30,6 +30,7 @@ export function requestPermission(
     refused: new Map<string, Failure>(),
     pending: [] as HostToolNotification[],
     remembered: new Map<string, string>(),
+    locations: new Map<string, readonly ToolLocation[]>(),
   };
   host.grants.set(command.child.id, grant);
   host.spawn(
@@ -82,8 +83,10 @@ export function requestPermission(
                 });
               }
             }
-            if (locations)
+            if (locations) {
+              grant.locations.set(call.id, locations);
               host.notifyTool({ ...identity, sessionUpdate: "tool_call_update", locations });
+            }
             signal.throwIfAborted();
             const permissionStartedAt = performance.now();
             const permissionContext = {

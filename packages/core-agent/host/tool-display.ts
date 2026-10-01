@@ -3,7 +3,7 @@ import { z } from "zod";
 import { toolOperationId, type ToolRunResult } from "../agent/tool-batch.ts";
 import { ref, type ActorId, type Result, type ToolCall } from "../agent/types.ts";
 import type { HostToolNotification } from "./host.ts";
-import { ToolLocationSchema, type Tool, type ToolLocation } from "./ports.ts";
+import { ToolLocationSchema, type Tool, type ToolKind, type ToolLocation } from "./ports.ts";
 
 /** The ID a client knows call `callId` of tool batch `batchId` by: its `tool` operation's ID. */
 export const toolCallIdOf = (batchId: string, callId: string): ActorId =>
@@ -23,20 +23,20 @@ export type ToolIdentity = Readonly<{
 }>;
 
 /**
- * The `tool_call` that announces a call. A call whose tool is no longer registered is shown with
- * kind `other`.
+ * The `tool_call` that announces a call, with the kind it is shown as: the tool's when announced
+ * live, the recorded one when a journal is drawn. Without one it is `other`, the protocol's default.
  */
 export function toolAnnouncement(
   identity: ToolIdentity,
   call: Readonly<{ name: string; args: unknown }>,
-  tool: Pick<Tool, "kind"> | undefined,
+  shown: Readonly<{ kind?: ToolKind }> | undefined,
 ): HostToolNotification {
   return {
     ...identity,
     sessionUpdate: "tool_call",
     title: call.name,
     name: call.name,
-    kind: tool?.kind ?? "other",
+    kind: shown?.kind ?? "other",
     status: "pending",
     rawInput: call.args,
   };

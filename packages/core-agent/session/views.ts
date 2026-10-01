@@ -51,7 +51,8 @@ export type ConversationView = Readonly<{
   live: readonly MessageView[];
 }>;
 
-function projectBlob(ref: BlobRef): ViewBlob {
+/** A stored blob as a view shows it, with its `blob://` URI. */
+export function projectBlob(ref: BlobRef): ViewBlob {
   return {
     id: ref.id,
     media: ref.media,

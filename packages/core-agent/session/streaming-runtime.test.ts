@@ -103,6 +103,17 @@ for (const profile of streamingProfiles) {
         record.body.event.event.type === "model_settled",
     );
     expect(settlements).toHaveLength(3);
+    // Each step records the thinking its stream showed; a settled answer's text is its completion.
+    for (const { body } of settlements) {
+      if (body.kind !== "event" || body.event.type !== "child") continue;
+      const event = body.event.event;
+      if (event.type !== "model_settled") continue;
+      const thinking = updates
+        .filter((update) => update.completionId === event.child.id)
+        .map((update) => update.thinking ?? "")
+        .join("");
+      expect(event.shown).toEqual(thinking ? { thinking } : {});
+    }
     expect(journalJSONL(durable)).not.toContain('"completion_update"');
     if (profile.id !== "openai-chat@2") {
       expect(durable.continuations).toHaveLength(3);
@@ -115,6 +126,10 @@ for (const profile of streamingProfiles) {
     expect(updates).toHaveLength(count);
     const fork = await session.fork();
     await fork.input("Next").settled;
+    // The thinking a step showed is recorded for display only: without a provider continuation to
+    // carry it, the model never sees it again.
+    if (profile.id === "openai-chat@2")
+      expect(JSON.stringify(requests.at(-1))).not.toContain("Considering");
     expect(updates.at(-1)?.sessionId).toBe(fork.snapshot.durable.conversation.sessionId);
     expect(updates.at(-1)?.status).toBe("completed");
     await Promise.all([session, restored, fork].map((runtime) => runtime.close()));
@@ -159,6 +174,22 @@ for (const profile of streamingProfiles) {
     });
     expect(updates.at(-1)?.status).toBe("failed");
     expect(updates.some((event) => event.status === "completed")).toBe(false);
+    // A step that failed mid-stream still records what its stream showed, answer text included.
+    const shown = (field: "thinking" | "text") =>
+      updates.map((event) => event[field] ?? "").join("");
+    expect(settlements[0]).toMatchObject({
+      body: {
+        event: {
+          event: {
+            shown: {
+              ...(shown("thinking") ? { thinking: shown("thinking") } : {}),
+              ...(shown("text") ? { text: shown("text") } : {}),
+            },
+          },
+        },
+      },
+    });
+    expect(shown("thinking")).not.toBe("");
     await session.close();
   });
 }

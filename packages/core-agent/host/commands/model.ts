@@ -40,8 +40,14 @@ export function completeModel(
   };
   let status = "pending";
   let stream = false;
+  // What the client was sent of this step's stream, recorded on `model_settled` whatever the
+  // step's outcome, so a reopened session shows exactly what was shown live.
+  let shownThinking = "";
+  let shownText = "";
   const notifyStream = (fields: Omit<HostStreamNotification, keyof typeof identity>) => {
-    if (!host.closed && stream) notify(host.streamUpdate, { ...identity, ...fields });
+    if (host.closed || !stream) return false;
+    notify(host.streamUpdate, { ...identity, ...fields });
+    return true;
   };
 
   host.spawn(
@@ -138,8 +144,15 @@ export function completeModel(
           blobs,
           (delta) => {
             const parsed = StreamDeltaSchema.safeParse(delta);
-            if (parsed.success && !signal.aborted && status === "in_progress")
-              notifyStream({ ...parsed.data, sessionUpdate: "completion_update" });
+            if (
+              parsed.success &&
+              !signal.aborted &&
+              status === "in_progress" &&
+              notifyStream({ ...parsed.data, sessionUpdate: "completion_update" })
+            ) {
+              shownThinking += parsed.data.thinking ?? "";
+              shownText += parsed.data.text ?? "";
+            }
           },
           {
             sessionId: host.sessionId,
@@ -203,6 +216,11 @@ export function completeModel(
         ...(result.kind === "succeeded" && result.value.continuation
           ? { continuation: result.value.continuation }
           : {}),
+        shown: {
+          ...(shownThinking ? { thinking: shownThinking } : {}),
+          // A settled answer's text is the completion itself; only an unfinished one needs its own.
+          ...(shownText && result.kind !== "succeeded" ? { text: shownText } : {}),
+        },
       }),
     (state) => {
       const next =

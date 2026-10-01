@@ -91,6 +91,20 @@ export const ToolLocationSchema = z
 export type ToolLocation = z.infer<typeof ToolLocationSchema>;
 
 /**
+ * How a tool call's card was shown: the tool's kind and the locations resolved from its input,
+ * recorded with the call's outcome so a reopened session draws the same card whatever the tool is
+ * now.
+ */
+export const ToolShownSchema = z
+  .strictObject({
+    kind: z.lazy(() => ToolKindSchema),
+    locations: z.array(ToolLocationSchema).readonly().optional(),
+  })
+  .readonly();
+
+export type ToolShown = z.infer<typeof ToolShownSchema>;
+
+/**
  * Identity of one live tool invocation, passed to {@link Tool.run}.
  * Ephemeral display identity for this live invocation; never journaled or an authorization grant.
  */

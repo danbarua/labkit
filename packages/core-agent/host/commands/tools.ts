@@ -72,6 +72,10 @@ export function runTools(
           toolCallId: batchCommand.child.id,
           name: batchCommand.call.name,
         };
+        // What the card shows, recorded with the call's outcome: the kind it was announced with and
+        // the locations resolved from its input, whether while permission was asked or here.
+        let locations = grant?.locations.get(batchCommand.call.id);
+        const shown = () => ({ kind: tool.kind ?? "other", ...(locations ? { locations } : {}) });
         const refused = grant?.refused.get(batchCommand.call.id);
         host.emit({
           type: "tool.admitted",
@@ -97,6 +101,7 @@ export function runTools(
             turnId,
             batchId: command.child.id,
             callId: batchCommand.call.id,
+            shown: shown(),
             result: {
               kind: "failed",
               error: failure(refused, {
@@ -150,7 +155,7 @@ export function runTools(
               const input = await tool.parseInput(raw);
               if (!host.closed && status === "pending" && tool.locations) {
                 try {
-                  const locations = toolLocations(tool, input)!;
+                  locations = toolLocations(tool, input)!;
                   host.emit({
                     type: "tool.locations_resolved",
                     ...identity,
@@ -222,6 +227,7 @@ export function runTools(
               batchId: command.child.id,
               callId: batchCommand.call.id,
               result,
+              shown: shown(),
             };
             host.pendingTools.set(`${outcome.batchId}/${outcome.callId}`, {
               outcome,

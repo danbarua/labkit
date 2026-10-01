@@ -10,6 +10,8 @@ import { initialState, reduce, type ViewEvent } from "@labkit/view-model";
 import { z } from "zod";
 
 import { until } from "../core-agent/agent/test-support.ts";
+import { anthropicMessagesV3, openaiChatV2 } from "../core-agent/providers/index.ts";
+import { streamResponse, streamVector } from "../core-agent/providers/testing/stream-vectors.ts";
 import { acpHttpHandler } from "./http.ts";
 import { answer, configurable, tools } from "./testing/fixtures.ts";
 import { setup } from "./testing/harness.ts";
@@ -202,3 +204,51 @@ test("the options a session opens with are shown, a selection updates them, and 
   await reopened.client.close();
   await handler.close();
 });
+
+for (const profile of [openaiChatV2, anthropicMessagesV3]) {
+  test(`${profile.id}: streamed thinking and answer are the same live and after session/load`, async () => {
+    const base = setup();
+    const options: typeof base.options = {
+      ...base.options,
+      sessionOptions: async (context) => {
+        const original = await base.options.sessionOptions(context);
+        return {
+          ...original,
+          configuration: {
+            ...original.configuration,
+            policy: {
+              provider: profile.id,
+              model: "m",
+              stream: true,
+              thinking: profile.capabilities.thinking.mode === "budget" ? "budget" : "high",
+              thinkingBudgetTokens: profile.capabilities.thinking.mode === "budget" ? 1024 : null,
+              maxOutputTokens: 4096,
+            },
+          },
+          bindings: {
+            ...original.bindings,
+            complete: undefined,
+            providers: new Map([
+              [
+                profile.id,
+                {
+                  profile,
+                  transport: {
+                    baseUrl: "https://example.invalid",
+                    fetch: (async () =>
+                      streamResponse(streamVector(profile))) as unknown as typeof fetch,
+                  },
+                },
+              ],
+            ]),
+          },
+        };
+      },
+    };
+    const { handler, fetch } = host(options);
+    const { id, state } = await answering(fetch, "allow_once");
+    expect(state.blocks.map((block) => block.kind)).toEqual(["user", "thought", "assistant"]);
+    expect(seen(await reopen(fetch, id, state.blocks.length))).toEqual(seen(state));
+    await handler.close();
+  });
+}

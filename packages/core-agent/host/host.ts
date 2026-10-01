@@ -15,6 +15,7 @@ import {
   type ExecutionBindings,
   type ToolKind,
   type ToolLocation,
+  type ToolShown,
 } from "./ports.ts";
 
 /**
@@ -29,6 +30,8 @@ export type HostToolOutcome = Readonly<{
   callId: ToolCall["id"];
   /** Raw result, before the configuration's `toolFailure` handling (applied on release). */
   result: Result<ToolRunResult>;
+  /** How the call's card was shown. */
+  shown: ToolShown;
 }>;
 /**
  * A display update about one tool call, for UI cards. Non-authoritative display data. toolCallId is

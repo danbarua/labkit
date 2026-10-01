@@ -5,14 +5,13 @@ import { partialResults } from "./shared.ts";
 import type { Fold, JournalState } from "./state.ts";
 
 /**
- * Converts a {@link WireEvent} into the richer event the turn machine reads:
- * `model_settled` gets a `permissionRequired` flag derived fresh from the
- * policy in force (never stored, so there is nothing to compare against on load), and
- * `batch_settled` gets its results assembled from the batch's committed `tool` records (never
- * stored on the wire either). A failed dispatch of a turn's child operation becomes a `failed`
+ * Converts a {@link WireEvent} into the event the turn machine reads. `model_settled` gains
+ * `permissionRequired`, computed here from `state.policy`: the step's record does not hold whether
+ * permission was asked. `batch_settled` gains its results, read from the batch's `tool` records,
+ * which hold each call's outcome. A failed dispatch of a turn's child operation becomes a `failed`
  * child event.
  *
- * @throws Error for a failed branch reply, which has no journaled form.
+ * @throws Error for a failed branch reply, which has no journal record.
  */
 export function domainEvent(state: JournalState, event: WireEvent, fold: Fold): ConversationEvent {
   if (event.type !== "child") return event;
@@ -41,8 +40,7 @@ export function domainEvent(state: JournalState, event: WireEvent, fold: Fold): 
       )
         throw new Error("Unpermitted tool");
     }
-    // The permission route is always derived from the policy in force, both when staging and on
-    // load; it is never stored, so there is nothing for a stored copy to disagree with.
+    // Computed from the policy in force at this point in the journal, when staging and on load.
     const permissionRequired =
       state.policy?.permissions === "ask" &&
       child.result.kind === "succeeded" &&
@@ -53,8 +51,7 @@ export function domainEvent(state: JournalState, event: WireEvent, fold: Fold): 
     };
   }
   if (child.type !== "batch_settled") return { ...event, event: child };
-  // Individual results are never stored on the wire; both staging and load assemble them from the
-  // batch's committed `tool` records.
+  // Each call's outcome is in its `tool` record; the batch's results are read from those.
   const results = partialResults(state);
   if (child.outcome.kind !== "succeeded")
     return { ...event, event: { ...child, outcome: { ...child.outcome, results } } };

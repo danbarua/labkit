@@ -17,7 +17,8 @@ import {
   TurnRecordSchema,
 } from "../agent/types.ts";
 import { PolicySchema, PolicyVersionSchema } from "../policy/policy.ts";
-import { ContinuationSchema } from "../providers/types.ts";
+import { ToolShownSchema } from "../host/ports.ts";
+import { ContinuationSchema, ShownSchema } from "../providers/types.ts";
 import { CompletionUsageSchema, type CompletionUsage } from "../providers/usage.ts";
 import { AppendIdSchema, RevisionSchema } from "./persistence.ts";
 
@@ -199,6 +200,12 @@ export const WireEventSchema = z.discriminatedUnion("type", [
         /** Application model name the step was made with, whether or not it produced output. */
         model: z.string().min(1),
         continuation: ContinuationSchema.optional(),
+        /**
+         * What the client was shown while the step streamed; see {@link ShownSchema}. Every step
+         * records it, even when empty, so its absence means the step was recorded without it and a
+         * reader cannot know what was shown.
+         */
+        shown: ShownSchema.optional(),
         child: child("completion"),
         result: result(CompletionSchema.brand<"AdmittedCompletion">()),
       }),
@@ -299,6 +306,8 @@ export const BodySchema = z.discriminatedUnion("kind", [
     callId: ToolCallIdSchema,
     /** Raw outcome; see {@link ToolRunOutcomeSchema}. */
     result: ToolRunOutcomeSchema,
+    /** How the call's card was shown. Absent on calls recorded without it. */
+    shown: ToolShownSchema.optional(),
   }),
   z.strictObject({
     kind: z.literal("effect"),
