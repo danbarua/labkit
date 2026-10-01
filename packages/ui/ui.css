@@ -1064,6 +1064,19 @@ a.lk-btn {
   }
 }
 
+/* On a touch screen, a browser zooms the page in on a text field set below 16px when it takes
+   focus (iOS Safari does). Every field that takes typing is 16px there. */
+@media (pointer: coarse) {
+  .lk-root
+    :is(
+      textarea,
+      select,
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])
+    ) {
+    font-size: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lk-root *,
   .lk-root details::details-content {
