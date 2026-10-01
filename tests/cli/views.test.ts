@@ -14,10 +14,12 @@ import {
   renderClaims,
 } from "@labkit/app-cli/views/knowledge";
 import { renderHappened } from "@labkit/app-cli/views/events";
+import { renderGateList } from "@labkit/app-cli/views/gates";
 import type {
   RecordedEvent,
   Explanation,
   KnowledgeSurvey,
+  ListedGate,
   SupportExplanation,
 } from "@labkit/core-domain";
 
@@ -370,6 +372,20 @@ test("colouring changes nothing a reader would read", () => {
     closedPursuits: [],
   };
   expect(stripped(renderKnown(survey, COLOUR))).toBe(renderKnown(survey, PLAIN));
+});
+
+test("`gates` lines its columns up the same with colour on", () => {
+  // The `holding up` cell arrives coloured; padding it by its length with the escape codes
+  // counted pushed the work handle out of the gate handle's column.
+  const gates: ListedGate[] = [
+    {
+      gate: ref("gate", "GATE_1"),
+      consequence: "no publication",
+      state: "blocked",
+      gating: [{ work: ref("work", "TASK_2"), objective: "write it up" }],
+    },
+  ];
+  expect(stripped(renderGateList(gates, COLOUR))).toBe(renderGateList(gates, PLAIN));
 });
 
 test("PLAIN is the identity function, so no view has a second code path", () => {

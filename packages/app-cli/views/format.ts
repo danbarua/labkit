@@ -27,11 +27,14 @@ export function questionLines(questions: QuestionStanding[]): string[] {
 export function rows(cells: string[][]): string[] {
   if (cells.length === 0) return [];
   const columns = Math.max(...cells.map((row) => row.length)) - 1;
+  // Widths are visible widths: a cell may arrive coloured, and its escape codes take no column.
   const widths = Array.from({ length: columns }, (_, i) =>
-    Math.max(...cells.map((row) => (row[i] ?? "").length)),
+    Math.max(...cells.map((row) => bare(row[i] ?? "").length)),
   );
+  const padded = (cell: string, to: number) =>
+    cell + " ".repeat(Math.max(0, to - bare(cell).length));
   return cells.map((row) =>
-    [...row.slice(0, columns).map((cell, i) => (cell ?? "").padEnd(widths[i] ?? 0)), row.at(-1)]
+    [...row.slice(0, columns).map((cell, i) => padded(cell ?? "", widths[i] ?? 0)), row.at(-1)]
       .join("  ")
       .trimEnd(),
   );
