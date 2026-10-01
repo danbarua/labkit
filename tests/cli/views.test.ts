@@ -375,8 +375,8 @@ test("colouring changes nothing a reader would read", () => {
 });
 
 test("`gates` lines its columns up the same with colour on", () => {
-  // The `holding up` cell arrives coloured; padding it by its length with the escape codes
-  // counted pushed the work handle out of the gate handle's column.
+  // The `holding up` cell arrives coloured, so the columns line up only if widths ignore the
+  // escape codes.
   const gates: ListedGate[] = [
     {
       gate: ref("gate", "GATE_1"),

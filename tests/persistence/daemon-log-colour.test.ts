@@ -25,7 +25,7 @@ test("FORCE_COLOR=1 colours the daemon's stderr", () => {
 });
 
 test("NO_COLOR keeps the daemon's stderr plain, even beside FORCE_COLOR", () => {
-  // Bun's `console.error` colours this case; the daemon's lines no longer go through it.
+  // Bun's `console.error` would colour this case; the daemon does not write through it.
   expect(usageLine({ FORCE_COLOR: "3", NO_COLOR: "1" })).not.toContain(ESC);
 });
 
