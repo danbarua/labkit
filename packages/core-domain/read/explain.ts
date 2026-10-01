@@ -87,20 +87,18 @@ export class ExplainGroup extends SessionCore {
       other: vertexProps<Record<string, unknown> & { natural_id: string }>(),
       via: scalar<string>(),
     };
-    const [out, into] = await Promise.all([
-      this.graph.query(
-        `MATCH (n {natural_id: $id})-[r]->(other)
-         RETURN other, type(r) AS via`,
-        decoders,
-        { id: subject },
-      ),
-      this.graph.query(
-        `MATCH (other)-[r]->(n {natural_id: $id})
-         RETURN other, type(r) AS via`,
-        decoders,
-        { id: subject },
-      ),
-    ]);
+    const out = await this.graph.query(
+      `MATCH (n {natural_id: $id})-[r]->(other)
+       RETURN other, type(r) AS via`,
+      decoders,
+      { id: subject },
+    );
+    const into = await this.graph.query(
+      `MATCH (other)-[r]->(n {natural_id: $id})
+       RETURN other, type(r) AS via`,
+      decoders,
+      { id: subject },
+    );
     const seen = (rows: typeof out, direction: "out" | "in"): Neighbour[] =>
       rows.map((r) => {
         const label = labelForNaturalId(r.other.natural_id);
@@ -438,9 +436,8 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
   const analysis = ref("analysis", subject);
   const direct = await self.neighboursOf({ subject: analysis });
   const units = direct.filter((n) => n.via === "USES").map((n) => n.handle);
-  const through = (
-    await Promise.all(units.map((unit) => self.neighboursOf({ subject: unit })))
-  ).flat();
+  const through: Awaited<ReturnType<typeof self.neighboursOf>> = [];
+  for (const unit of units) through.push(...(await self.neighboursOf({ subject: unit })));
 
   const because: Cause[] = [];
   const seen = new Set<string>([analysis, ...units]);
