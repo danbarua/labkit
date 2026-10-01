@@ -6,6 +6,7 @@ import type {
   AcceptedQuestion,
   AnsweredQuestion,
   ConcludedClaim,
+  EnquiryStatus,
   Explanation,
   KnowledgeSurvey,
   SearchGroup,
@@ -215,6 +216,18 @@ function renderExplanation(explanation: Explanation): string {
 }
 
 /**
+ * Why an enquiry's question was accepted as unresolved, and what would reopen it, in full: the
+ * `known` page cuts both to a gist and sends the reader here for the whole of them.
+ */
+function acceptance(question: EnquiryStatus["question"]): string[] {
+  if (!question?.acceptedBecause) return [];
+  return [
+    `accepted because: ${question.acceptedBecause}`,
+    question.reopensIf ? `reopens if: ${question.reopensIf}` : "",
+  ];
+}
+
+/**
  * `why <handle>` — dispatches on `Explanation.kind`, not on what the caller passed in: the
  * redesign's whole point is that the CLI does not know which kind it got until the domain says
  * so.
@@ -223,8 +236,11 @@ export function renderWhyDispatch(explanation: Explanation, p: Palette): string 
   switch (explanation.kind) {
     case "claim":
       return renderWhy(explanation.report, p);
-    case "work":
     case "enquiry":
+      return [renderExplanation(explanation), ...acceptance(explanation.report.enquiry.question)]
+        .filter(Boolean)
+        .join("\n");
+    case "work":
     case "gate":
     case "analysis":
     // A criterion's causes are its evaluations, each already carrying the

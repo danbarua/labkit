@@ -453,8 +453,8 @@ export function registerWrites(program: Command, run: Run): void {
     .description(
       "Takes a line of enquiry and records a decision on the question it pursues. Not the same " +
         "as abandoning it, and not the same as nobody having got round to it. The enquiry is " +
-        "not closed: `labkit enquiries` lists it as accepted, and `labkit --json why` on it " +
-        "carries the reason and the reopening condition.",
+        "not closed: `labkit enquiries` lists it as accepted, and `labkit why` on it prints " +
+        "the reason and the reopening condition.",
     )
     .argument("<enquiry-id>", "the line of enquiry")
     .requiredOption("--because <text>", "why it is being left open")
