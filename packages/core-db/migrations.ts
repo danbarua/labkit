@@ -30,6 +30,10 @@ import m0019 from "../../drizzle/0019_get_collection_as_hal.sql" with { type: "t
 import m0020 from "../../drizzle/0020_hal_reads_drop_review_and_retracted.sql" with {
   type: "text",
 };
+import m0021 from "../../drizzle/0021_snapshot_drops_public_labkit_event.sql" with { type: "text" };
+import m0022 from "../../drizzle/0022_drop_per_label_natural_id_sequences.sql" with {
+  type: "text",
+};
 
 /**
  * Tag to SQL, one entry per file in `drizzle/`.
@@ -56,6 +60,8 @@ const EMBEDDED: Readonly<Record<string, string>> = {
   "0018_entity_as_hal_links_every_relation": m0018,
   "0019_get_collection_as_hal": m0019,
   "0020_hal_reads_drop_review_and_retracted": m0020,
+  "0021_snapshot_drops_public_labkit_event": m0021,
+  "0022_drop_per_label_natural_id_sequences": m0022,
 };
 
 /**

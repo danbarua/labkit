@@ -96,21 +96,28 @@ docs, not assumed:
 
 ## SQL In Cypher
 
-A `LANGUAGE sql` Postgres function can be called from inside a Cypher
-clause — only void/scalar-returning functions, **not** set-returning ones.
-LabKit's natural-id generator is exactly this pattern:
+A Postgres function (`LANGUAGE sql` or `plpgsql`) can be called from inside a
+Cypher clause — only void/scalar-returning functions, **not** set-returning ones.
+LabKit's natural-id generator is exactly this pattern. It draws from the
+workspace's own sequence, `<workspace>.labkit_natural_id_seq`
+(`drizzle/0015_next_workspace_id_exists.sql`):
 
 ```sql
-CREATE OR REPLACE FUNCTION public.labkit_next_natural_id(label text, prefix text)
-RETURNS text LANGUAGE sql AS $$
-  SELECT prefix || '_' || nextval('public.labkit_' || lower(label) || '_natural_id_seq')::text;
-$$;
+CREATE OR REPLACE FUNCTION public.labkit_next_workspace_id(workspace text, prefix text)
+RETURNS text LANGUAGE plpgsql SET search_path = ag_catalog, public AS $fn$
+DECLARE next_id bigint;
+BEGIN
+  EXECUTE format('SELECT nextval(%L)', format('%I.labkit_natural_id_seq', workspace))
+    INTO next_id;
+  RETURN prefix || '_' || next_id::text;
+END;
+$fn$;
 ```
 
 ```cypher
 CREATE (n:Computation {
   kind: $kind,
-  natural_id: public.labkit_next_natural_id('computation'::text, 'COMP'::text)
+  natural_id: public.labkit_next_workspace_id('labkit_t1'::text, 'COMP'::text)
 })
 RETURN n
 ```
@@ -300,7 +307,7 @@ throwaway script before relying on it.
   `LABKIT_SCHEMA` constant (`"public"`, the single place that would change
   if LabKit ever moved to schema-per-tenancy for its own relational tables)
   on every LabKit-owned object: `${LABKIT_SCHEMA}.tenants`,
-  `${LABKIT_SCHEMA}.labkit_next_natural_id(...)`,
+  `${LABKIT_SCHEMA}.labkit_next_workspace_id(...)`,
   `${LABKIT_SCHEMA}.labkit_prop(...)`. Note `drizzle-orm` itself refuses
   `pgSchema("public")` at the query-builder level ("just use pgTable()
   instead") — `schema.ts`'s `tenants` table declaration stays a plain
