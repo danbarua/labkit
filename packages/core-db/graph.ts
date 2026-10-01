@@ -88,6 +88,25 @@ export class TenantGraph {
   }
 
   /**
+   * One page of the live nodes of `label`, each as `entityAsHal` gives it at `depth`.
+   *
+   * The same `public.labkit_get_collection_as_hal` the HTTP API calls. Its paging links are
+   * relative `/collections/...` paths, as that function writes them.
+   */
+  async collectionAsHal(
+    label: NodeLabel,
+    offset: number,
+    limit: number,
+    depth: number,
+  ): Promise<unknown> {
+    const { rows } = await this.db.query<{ collection: unknown }>(
+      "SELECT public.labkit_get_collection_as_hal($1, $2, $3, $4, $5) AS collection",
+      [this.ctx.tenantId, label, offset, limit, depth],
+    );
+    return rows[0]?.collection ?? null;
+  }
+
+  /**
    * Reserves the next natural id for a label, creating nothing.
    */
   async reserveId(label: NodeLabel): Promise<string> {

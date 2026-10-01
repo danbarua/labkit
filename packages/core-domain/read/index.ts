@@ -50,6 +50,7 @@ import type {
   WhyQuery,
   WhySupportedQuery,
   ResourceQuery,
+  CollectionQuery,
   WorkListQuery,
 } from "../queries";
 import { HappenedGroup } from "./happened";
@@ -193,6 +194,15 @@ export class ReadSurface extends SessionCore {
    */
   async resource(query: ResourceQuery): Promise<unknown> {
     return this.graph.entityAsHal(query.handle, query.depth);
+  }
+
+  /**
+   * One page of the records of one type, each as `resource` gives it.
+   *
+   * Like `resource`, this is what is stored rather than an answer drawn from it.
+   */
+  async collection(query: CollectionQuery): Promise<unknown> {
+    return this.graph.collectionAsHal(query.type, query.offset, query.limit, query.depth);
   }
 
   /** "Why does this conclusion count as supported?" and "what did the superseded inference claim?" */

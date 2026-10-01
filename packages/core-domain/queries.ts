@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { NODE_LABELS } from "@labkit/core-db/domain";
 import { anyRefString, refString } from "./brand";
 import { GATE_STATES, WORK_STATES } from "./vocab";
 
@@ -94,12 +95,35 @@ export const whyQuery = z.object({
 });
 export type WhyQuery = z.infer<typeof whyQuery>;
 
-/** How far `resource` embeds neighbours. Six is `labkit_get_entity_as_hal`'s own ceiling. */
+/** How many hops of neighbours `resource` and `collection` embed when not told. */
+export const DEFAULT_DEPTH = 2;
+
+/** Six is `labkit_get_entity_as_hal`'s own ceiling. */
+const depth = z.number().int().min(0).max(6).default(DEFAULT_DEPTH);
+
 export const resourceQuery = z.object({
   handle: z.string(),
-  depth: z.number().int().min(0).max(6).default(1),
+  depth,
 });
 export type ResourceQuery = z.infer<typeof resourceQuery>;
+
+/** How many nodes one page of `collection` holds when not told. */
+export const DEFAULT_PAGE = 25;
+
+/**
+ * One page of the live nodes of a type. The bounds on `limit` and `depth` are
+ * `labkit_get_collection_as_hal`'s own.
+ */
+export const collectionQuery = z.object({
+  type: z.enum(NODE_LABELS, {
+    error: (issue) =>
+      `no node type \`${String(issue.input)}\`; the types are ${NODE_LABELS.join(", ")}`,
+  }),
+  offset: z.number().int().min(0).default(0),
+  limit: z.number().int().min(1).max(200).default(DEFAULT_PAGE),
+  depth,
+});
+export type CollectionQuery = z.infer<typeof collectionQuery>;
 
 export const neighboursOfQuery = z.object({
   subject: anyRefString(),

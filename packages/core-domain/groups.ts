@@ -14,6 +14,8 @@ export const READ_GROUPS = [
   "One record's story",
   /** The acts themselves — the only read that is not about now. */
   "What was done",
+  /** The nodes and edges as stored, with no interpretation; every group above interprets them. */
+  "The record as stored",
 ] as const;
 
 /** The write groups, in the order a reader meets them. */
