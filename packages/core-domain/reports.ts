@@ -331,14 +331,13 @@ export const supportExplanation = z.strictObject({
   proposition: prose(),
   verdict: z.enum([
     "supported",
-    "undecided",
     "withdrawn",
     "challenged",
     "drawn-across",
     "standard-unmet",
     "unexamined",
   ]),
-  standing: z.enum(["exploratory", "confirmatory", "undecided"]),
+  standing: z.enum(["exploratory", "confirmatory"]),
   promotedBecause: z.string().optional(),
   support: z.array(bearingFinding),
   drawnAcross: z.array(confirmatoryResult),
@@ -427,7 +426,6 @@ export const gateStatus = z.strictObject({
   gate: ref("gate"),
   consequence: prose(),
   state: z.enum(GATE_STATES),
-  closure: z.strictObject({ decision: ref("decision"), because: prose() }).optional(),
   checks: z.array(checkStatus),
   unmet: z.array(unmetCheck),
   counts: z.strictObject({
@@ -464,7 +462,6 @@ const revisedFinding = z.strictObject({
 const analysisRevisionSchema = z.strictObject({
   analysis: ref("analysis"),
   supersedes: ref("analysis").optional(),
-  because: z.strictObject({ review: ref("review"), verdict: z.string() }).optional(),
   changed: z.array(revisedFinding),
   restated: z.array(concludedClaim),
   kept: z.array(concludedClaim),
@@ -609,7 +606,6 @@ export const recordedAnalysis = z.strictObject({
   claims: z.array(concludedClaim),
   events: z.array(domainEvent),
 });
-export const reviewRef = minted("review");
 export const workRef = minted("work");
 export const criterionRef = minted("criterion");
 export const gateRef = minted("gate");

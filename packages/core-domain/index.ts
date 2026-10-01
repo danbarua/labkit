@@ -28,7 +28,6 @@ export {
   domainEvent,
   createdIn,
   edgesIn,
-  retractedIn,
   UNATTRIBUTED,
 } from "./events";
 export type {
@@ -93,7 +92,6 @@ export type {
   Ref,
   ObservationsRef,
   AnalysisRef,
-  ReviewRef,
   EnquiryRef,
   NoteRef,
   QuestionRef,
@@ -168,7 +166,6 @@ export {
   observationsRef,
   analysisRef,
   recordedAnalysis,
-  reviewRef,
   workRef,
   criterionRef,
   gateRef,

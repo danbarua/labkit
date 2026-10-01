@@ -6,7 +6,6 @@ import type { TenantGraph } from "@labkit/core-db/graph";
 import type {
   EnquiryRef,
   OpenedEnquiry,
-  AnyRef,
   Noted,
   NoteRef,
   Posed,
@@ -132,26 +131,15 @@ export class Asking extends SessionCore {
     if (origin) throw new Error(`${question} already came from ${origin}`);
   }
 
-  /** What a question already says it came from — a note, or the decision that sharpened it. */
-  private async originAlready(question: QuestionRef): Promise<AnyRef | undefined> {
-    // Two MATCHes: AGE has no edge alternation, and the sharpening arm arrives
-    // through the decision that recorded why rather than directly.
-    for (const pattern of [
-      `MATCH (n:Note)-[:MOTIVATES]->(:Question {natural_id: $id}) RETURN n AS found`,
-      `MATCH (d:Decision)-[:MOTIVATES]->(:Question {natural_id: $id})
-       MATCH (d)-[:SHARPENS]->(:Question) RETURN d AS found`,
-    ]) {
-      const rows = await this.graph.query(
-        pattern,
-        { found: vertexProps<{ natural_id: string }>() },
-        { id: question },
-      );
-      // The kind differs by arm -- a Note on the first, the Decision that
-      // recorded the sharpening on the second -- and the caller only prints it.
-      const found = rows[0]?.found.natural_id;
-      if (found) return ref(KIND_BY_LABEL[labelForNaturalId(found)]!, found);
-    }
-    return undefined;
+  /** The note a question already says it came from. */
+  private async originAlready(question: QuestionRef): Promise<NoteRef | undefined> {
+    const rows = await this.graph.query(
+      `MATCH (n:Note)-[:MOTIVATES]->(:Question {natural_id: $id}) RETURN n`,
+      { n: vertexProps<{ natural_id: string }>() },
+      { id: question },
+    );
+    const found = rows[0]?.n.natural_id;
+    return found ? ref("note", found) : undefined;
   }
 
   /**

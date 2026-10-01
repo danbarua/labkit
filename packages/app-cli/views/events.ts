@@ -2,7 +2,7 @@
  * The acts themselves — the one view over the event log rather than the graph.
  */
 
-import { createdIn, edgesIn, retractedIn } from "@labkit/core-domain";
+import { createdIn, edgesIn } from "@labkit/core-domain";
 import { gist } from "./format";
 import type { EventPage, ListedNote } from "@labkit/core-domain";
 import type { Palette } from "../palette";
@@ -103,15 +103,8 @@ export function renderHappened(
       const wired = edgesIn(e).map(
         (x) => `           ${x.from} ${p.quiet(`-[${x.label}]->`)} ${x.to}`,
       );
-      // What an `undo` took back. Without it the log said `undo LOE_3` and
-      // nothing about what stopped being readable.
-      const gone = retractedIn(e);
-      const retracted = gone.length
-        ? [`         ${p.quiet("retracting")}  ${gone.join(p.quiet(", "))}`]
-        : [];
       // **What was asked for, not just what it did.** The arguments are on the
-      // log and nowhere else: no other read recovers the `--because` behind an
-      // `undo`. A gist apiece, and a short one — `wrap` breaks at a space and
+      // log and nowhere else. A gist apiece, and a short one — `wrap` breaks at a space and
       // a value may have none, so the cut plus the indent has to fit a line by
       // itself.
       const asked = Object.entries(e.command)
@@ -130,7 +123,6 @@ export function renderHappened(
         `         ${p.quiet(`by ${who}`)}${how}${p.quiet(commit)}${minted}`,
         ...args,
         ...source,
-        ...retracted,
         ...(wired.length ? [`         ${p.quiet("connecting")}`, ...wired] : []),
       ].join("\n");
     })

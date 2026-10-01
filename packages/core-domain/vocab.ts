@@ -3,12 +3,6 @@
  * events, commands, or reports, so query schemas can use the arrays without a cycle.
  */
 
-export const GATE_STATES = [
-  "never-evaluated",
-  "incomplete",
-  "blocked",
-  "satisfied",
-  "closed",
-] as const;
+export const GATE_STATES = ["never-evaluated", "incomplete", "blocked", "satisfied"] as const;
 
 export const WORK_STATES = ["planned", "waiting", "blocked", "carried-out", "abandoned"] as const;

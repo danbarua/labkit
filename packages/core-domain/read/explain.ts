@@ -46,17 +46,12 @@ import type { Identified } from "./shared";
 export class ExplainGroup extends SessionCore {
   /**
    * A record's own text, whatever kind it is — the properties `search` scans.
-   *
-   * Matches without a label because the kind is not known until the id is parsed, so the
-   * per-label retraction policy cannot apply and `retracted` is filtered here instead. An
-   * unlabelled pattern with no such filter reads nodes `undo` was supposed to have hidden.
    */
   async proseFor({ subject }: ProseForQuery): Promise<string | null> {
     const props = SEARCHABLE_TEXT[labelForNaturalId(subject)] ?? [];
     if (props.length === 0) return null;
-    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const [row] = await this.graph.query(
-      `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
+      `MATCH (n {natural_id: $id}) RETURN n`,
       { n: vertexProps<Record<string, unknown>>() },
       { id: subject },
     );
@@ -69,16 +64,14 @@ export class ExplainGroup extends SessionCore {
   }
 
   /**
-   * Is this handle on the record and not retracted?
+   * Is this handle on the record?
    *
    * Its own question rather than a null from `proseFor`: an `EvidenceUnit` holds no prose and
-   * is still there, so "no words" and "not here" are different answers. Matches without a
-   * label, so it filters `retracted` rather than relying on the per-label policy.
+   * is still there, so "no words" and "not here" are different answers.
    */
   async reachable({ subject }: ReachableQuery): Promise<boolean> {
-    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const rows = await this.graph.query(
-      `MATCH (n {natural_id: $id}) WHERE n.retracted IS NULL RETURN n`,
+      `MATCH (n {natural_id: $id}) RETURN n`,
       { n: vertexProps<{ natural_id: string }>() },
       { id: subject },
     );
@@ -89,27 +82,23 @@ export class ExplainGroup extends SessionCore {
    * One record's neighbours: everything joined to it, both directions, with the edge each was
    * reached by and the other end's own prose.
    *
-   * Both ends are unlabelled — the subject's kind is not known until its id is parsed, and the
-   * far end is any kind by design — so neither carries the per-label retraction policy and both
-   * filter `retracted` here. Without it, `why` cites decisions and findings `undo` took back.
+   * Both ends are unlabelled: the subject's kind is not known until its id is parsed, and the
+   * far end is any kind by design.
    */
   async neighboursOf({ subject }: NeighboursOfQuery): Promise<Neighbour[]> {
     const decoders = {
       other: vertexProps<Record<string, unknown> & { natural_id: string }>(),
       via: scalar<string>(),
     };
-    // AGE Cypher rejects `IS DISTINCT FROM`; undo only writes `retracted: true`.
     const [out, into] = await Promise.all([
       this.graph.query(
         `MATCH (n {natural_id: $id})-[r]->(other)
-         WHERE n.retracted IS NULL AND other.retracted IS NULL
          RETURN other, type(r) AS via`,
         decoders,
         { id: subject },
       ),
       this.graph.query(
         `MATCH (other)-[r]->(n {natural_id: $id})
-         WHERE n.retracted IS NULL AND other.retracted IS NULL
          RETURN other, type(r) AS via`,
         decoders,
         { id: subject },
@@ -196,11 +185,9 @@ export class ExplainGroup extends SessionCore {
   async analysisRevision({ analysis }: AnalysisRevisionQuery): Promise<AnalysisRevision> {
     const lineage = await this.graph.query(
       `MATCH (:Computation {natural_id: $id})<-[:MOTIVATES]-(d:Decision)-[:SUPERSEDES]->(old:Computation)
-       OPTIONAL MATCH (d)-[:BASED_ON]->(rev:Review)
-       RETURN old, rev, d`,
+       RETURN old, d`,
       {
         old: vertexProps<{ natural_id: string }>(),
-        rev: optional(vertexProps<{ natural_id: string; verdict: string }>()),
         d: vertexProps<{ natural_id: string }>(),
       },
       { id: analysis },
@@ -250,14 +237,6 @@ export class ExplainGroup extends SessionCore {
     return {
       analysis,
       supersedes: ref("analysis", revises.old.natural_id),
-      ...(revises.rev
-        ? {
-            because: {
-              review: ref("review", revises.rev.natural_id),
-              verdict: revises.rev.verdict,
-            },
-          }
-        : {}),
       changed: changed.sort((a, b) => a.was.localeCompare(b.was)),
       restated: restated.sort(byClaim),
       kept: kept.sort(byClaim),
@@ -388,12 +367,6 @@ async function explainClaim(self: ReadSurface, subject: string): Promise<ClaimEx
   switch (report.verdict) {
     case "supported":
       is = "supported";
-      because = findings(report.support);
-      break;
-    case "undecided":
-      // The evidence is real and the claim keeps it; what is absent is a
-      // direction anyone will stand behind.
-      is = "undecided — the findings settle this neither way";
       because = findings(report.support);
       break;
     case "withdrawn":
@@ -643,8 +616,6 @@ async function explainAnalysis(self: ReadSurface, subject: string): Promise<Anal
     };
 
   const because: Cause[] = [];
-  if (report.because)
-    because.push({ handle: report.because.review, wording: report.because.verdict });
   for (const c of report.changed)
     because.push({ handle: c.was, wording: `${c.proposition}: ${c.before} → ${c.after}` });
   for (const s of report.kept)
@@ -732,12 +703,6 @@ async function explainGate(self: ReadSurface, subject: string): Promise<GateExpl
     case "satisfied":
       is = "satisfied";
       because = report.checks.map(causeForCheck);
-      break;
-    case "closed":
-      is = "closed";
-      because = report.closure
-        ? [{ handle: report.closure.decision, wording: report.closure.because }]
-        : [];
       break;
     case "never-evaluated":
       is = "never evaluated";

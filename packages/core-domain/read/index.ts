@@ -225,7 +225,7 @@ export class ReadSurface extends SessionCore {
     return this.#explain.proseFor(query);
   }
 
-  /** Is this handle on the record and not retracted — reached only through `why`. */
+  /** Is this handle on the record — reached only through `why`. */
   async reachable(query: ReachableQuery): Promise<boolean> {
     return this.#explain.reachable(query);
   }

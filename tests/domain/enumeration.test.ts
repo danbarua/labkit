@@ -365,13 +365,11 @@ describe("enumerating gates and work", () => {
     }
   });
 
-  test("an unknown or retracted gate keeps work waiting", () => {
-    // `gateStates` comes from `gateList()`. A live gate that contributed no rows is absent from
-    // that map; a retracted gate is absent from both the map and the live gate set. Neither case
-    // makes previously gated work equivalent to work that was ready from the start.
+  test("an unknown gate keeps work waiting", () => {
+    // `gateStates` comes from `gateList()`. A gate that contributed no rows is absent from that
+    // map, and does not make gated work equivalent to work that was ready from the start.
     const task = {
       gates: new Set(["GATE_9"]),
-      everGated: true,
       implemented: false,
       stopped: false,
       after: new Map<string, boolean>(),
@@ -379,22 +377,13 @@ describe("enumerating gates and work", () => {
     expect(workStateFrom(task, new Map())).toBe("waiting");
     // Work it waits on holds it until that work has a result, gates or no gates.
     expect(
-      workStateFrom(
-        { ...task, gates: new Set(), everGated: false, after: new Map([["TASK_1", false]]) },
-        new Map(),
-      ),
+      workStateFrom({ ...task, gates: new Set(), after: new Map([["TASK_1", false]]) }, new Map()),
     ).toBe("waiting");
     expect(
-      workStateFrom(
-        { ...task, gates: new Set(), everGated: false, after: new Map([["TASK_1", true]]) },
-        new Map(),
-      ),
+      workStateFrom({ ...task, gates: new Set(), after: new Map([["TASK_1", true]]) }, new Map()),
     ).toBe("planned");
     expect(workStateFrom(task, new Map([["GATE_9", "satisfied"]]))).toBe("planned");
-    expect(workStateFrom({ ...task, gates: new Set() }, new Map())).toBe("waiting");
-    expect(workStateFrom({ ...task, gates: new Set(), everGated: false }, new Map())).toBe(
-      "planned",
-    );
+    expect(workStateFrom({ ...task, gates: new Set() }, new Map())).toBe("planned");
   });
 
   test("blocked beats carried-out when both hold", async () => {

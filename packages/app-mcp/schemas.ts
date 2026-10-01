@@ -22,7 +22,6 @@ export {
   observationsRef as observationsRefSchema,
   analysisRef as analysisRefSchema,
   recordedAnalysis as recordedAnalysisSchema,
-  reviewRef as reviewRefSchema,
   workRef as workRefSchema,
   criterionRef as criterionRefSchema,
   gateRef as gateRefSchema,

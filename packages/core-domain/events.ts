@@ -200,14 +200,6 @@ export const touchedIn = (event: DomainEvent): string[] => [
   ),
 ];
 
-/** Every handle an act retracted. Only an `undo` event carries these. */
-export const retractedIn = (event: DomainEvent): string[] =>
-  event.changes.flatMap((c) =>
-    c.change === "NodePropsChanged" && (c.after as { retracted?: boolean }).retracted === true
-      ? [c.id]
-      : [],
-  );
-
 /**
  * An event a sink has taken: the same act, and now with its position.
  *
