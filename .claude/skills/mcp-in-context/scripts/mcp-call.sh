@@ -11,12 +11,10 @@
 #   mcp-call.sh tools/call work_list
 #   mcp-call.sh tools/call why subject=GATE_3
 #   LABKIT_RECORD=~/Code/pycharm/bonsai-2026 mcp-call.sh tools/call work_list
-#   LABKIT_RECORD=/tmp/scratch MCP_CALL_WRITE=1 mcp-call.sh tools/call note text=probe
+#   LABKIT_RECORD=/tmp/scratch mcp-call.sh tools/call note text=probe
 #
 # LABKIT_BIN      the labkit binary (default: `labkit` on PATH, else the repo's bin/)
 # LABKIT_RECORD   the directory whose record to serve, passed as --db (default: cwd)
-# MCP_CALL_WRITE  1 serves the write tools too; otherwise the server is started
-#                 with --read-only and registers none
 set -euo pipefail
 
 method="${1:-}"
@@ -42,15 +40,13 @@ fi
 }
 
 record="$(cd "${LABKIT_RECORD:-$PWD}" && pwd)"
-serve=(mcp --read-only)
-[ "${MCP_CALL_WRITE:-}" = "1" ] && serve=(mcp)
 
 # The server's flags go in a wrapper, not on the inspector's command line: the
-# inspector takes `--db` and `--read-only` after the binary for its own options
-# and starts the server without them.
+# inspector takes `--db` after the binary for its own option and starts the
+# server without it.
 wrapper="$(mktemp "${TMPDIR:-/tmp}/labkit-mcp-call.XXXXXX")"
 trap 'rm -f "$wrapper"' EXIT
-printf '#!/bin/sh\nexec %q --db %q %s\n' "$bin" "$record" "${serve[*]}" > "$wrapper"
+printf '#!/bin/sh\nexec %q --db %q mcp\n' "$bin" "$record" > "$wrapper"
 chmod +x "$wrapper"
 
 args=(--cli "$wrapper" --method "$method")

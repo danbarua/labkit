@@ -15,17 +15,12 @@ export function registerServe(program: Command, located: () => RecordLocation): 
     .command("mcp")
     .helpGroup("Operating LabKit")
     .description("run the MCP server over stdio (for an agent, not a terminal)")
-    .option(
-      "--read-only",
-      "expose only the tools that answer questions, never the ones that change the record",
-    )
-    .action(async (opts: { readOnly?: boolean }) => {
+    .action(async () => {
       // `--tenant` and `--db` are declared on the root, so they are read from the root's options.
       const globals = program.opts<Globals>();
       await serveMcp({
         record: located(),
         tenant: globals.tenant ?? "labkit",
-        readOnly: opts.readOnly ?? false,
       });
     });
 }

@@ -28,9 +28,8 @@ refuses if it cannot.
 **The inspector keeps the server's flags.** In
 `npx @modelcontextprotocol/inspector --cli <binary> --db <dir> mcp …`, the
 inspector takes `--db` for itself and labkit starts with no command, which
-closes the connection. `mcp --read-only` loses `--read-only` the same way, and
-the server starts with its write tools. `scripts/mcp-call.sh` puts the flags in
-a wrapper script and hands the inspector that.
+closes the connection. `scripts/mcp-call.sh` puts the flags in a wrapper
+script and hands the inspector that.
 
 **The record is `--db`, or else the working directory's.** The server resolves
 its record the way every LabKit command does: `--db`, then `LABKIT_HOME`, then
@@ -39,9 +38,7 @@ Pointed at the wrong place it answers about a different record, or creates an
 empty one.
 
 **Writes go through.** Every write tool is live over the inspector, and a
-write lands in the record the server opened. `scripts/mcp-call.sh` starts the
-server with `--read-only` unless `MCP_CALL_WRITE=1`; a read-only server
-registers no write tool, and a call to one fails as `tool_not_found`.
+write lands in the record the server opened.
 
 **A refusal is not a crash.** An erroring tool returns `isError: true` with the
 message in `content[0].text`, and the CLI exits non-zero with
@@ -98,9 +95,8 @@ distinction with no renderer was found on 2026-09-03.
 
 ## Rules against a live record
 
-Read-only against a record someone is working in: leave `MCP_CALL_WRITE`
-unset. A write goes to a scratch record — `LABKIT_RECORD` set to a temporary
-directory. Never `rm -rf` a `.labkit` directory that is not yours.
+Against a record someone is working in, call only the tools that read. A write
+goes to a scratch record — `LABKIT_RECORD` set to a temporary directory. Never `rm -rf` a `.labkit` directory that is not yours.
 
 ## SDK traps (`@modelcontextprotocol/sdk` 1.30.0)
 
@@ -120,8 +116,7 @@ Each was found by debugging. Each is a behaviour, not a design rule.
 ## Additional resources
 
 - **`scripts/mcp-call.sh`** — resolves the binary and runs one method against a
-  named record, read-only unless `MCP_CALL_WRITE=1`. Use it rather than
-  retyping the invocation.
+  named record. Use it rather than retyping the invocation.
 - **`references/response-anatomy.md`** — the full shape of a success, a
   refusal and the stderr request log, with real payloads; read it when a
   response looks wrong rather than merely unexpected.

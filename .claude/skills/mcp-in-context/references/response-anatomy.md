@@ -82,8 +82,8 @@ An erroring tool does not crash the server. It returns the message with
 }
 ```
 
-A call to a tool the server did not register — a write tool on a server started
-with `--read-only` — is not a refusal from LabKit but from the inspector:
+A call to a tool the server did not register is not a refusal from LabKit but
+from the inspector:
 
 ```json
 {"error":{"code":"tool_not_found","message":"Tool 'note' not found on server."}}

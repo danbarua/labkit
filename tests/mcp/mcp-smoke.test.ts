@@ -15,7 +15,6 @@ import {
 import { commandContext, mockGitContext, mockSessionContext } from "@labkit/core-domain/context";
 import type { TenantGraph } from "@labkit/core-db/graph";
 import { buildServer } from "@labkit/app-mcp/server";
-import { DOCS_TOOL_NAME, metaTools } from "@labkit/app-mcp/docs";
 import { TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
 import { openScenario, type Scenario } from "../helpers/scenario";
 
@@ -63,8 +62,6 @@ async function client(): Promise<{ client: Client; events: EventSink; seed: Writ
   const events = await connectServer(graph, serverSide);
   const c = new Client({ name: "smoke", version: "0" });
   await c.connect(clientSide);
-  // The first thing an agent does: read what the server is for.
-  await call(c, DOCS_TOOL_NAME, {});
   return { client: c, events, seed };
 }
 
@@ -253,9 +250,7 @@ describe("every tool answers when an agent actually calls it", () => {
    * The gate. It runs last because it reads what the tests above recorded.
    */
   test("no tool goes unexercised", () => {
-    const all = [...metaTools({ reads: TOOLS, writes: WRITE_TOOLS }), ...TOOLS, ...WRITE_TOOLS]
-      .map((t) => t.name)
-      .sort();
+    const all = [...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort();
     expect([...called].sort()).toEqual(all);
   });
 

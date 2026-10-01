@@ -21,13 +21,7 @@ import type { TenantGraph } from "@labkit/core-db/graph";
 import { buildServer } from "@labkit/app-mcp/server";
 import { TOOLS, WRITE_TOOLS } from "@labkit/app-mcp/tools";
 import { explanationSchema } from "@labkit/app-mcp/schemas";
-import {
-  DOCS_TOOL_NAME,
-  DOCS_URI,
-  instructionsFor,
-  metaTools,
-  renderToolDocs,
-} from "@labkit/app-mcp/docs";
+import { instructionsFor } from "@labkit/app-mcp/docs";
 import { Command } from "commander";
 import { globalOptions } from "@labkit/app-cli/program";
 import { openScenario, type Scenario } from "../helpers/scenario";
@@ -60,9 +54,8 @@ async function connectServer(
   ).connect(transport);
 }
 
-/** Every tool a writing server registers, and every tool a read-only one does. */
+/** Every tool the server registers. */
 const WRITING = { reads: TOOLS, writes: WRITE_TOOLS };
-const READ_ONLY = { reads: TOOLS, writes: [] };
 
 let scenario: Scenario;
 beforeAll(async () => {
@@ -90,12 +83,11 @@ describe("structure", () => {
 
       const { tools } = await client.listTools();
       expect(tools.map((t) => t.name).sort()).toEqual(
-        [...metaTools(WRITING), ...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
+        [...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
       );
 
       // Derived from which list a tool is in, not from a list of names here.
-      // Meta tools read nothing from the record and are read-only all the same.
-      const readNames = new Set([...metaTools(WRITING), ...TOOLS].map((t) => t.name));
+      const readNames = new Set(TOOLS.map((t) => t.name));
       for (const t of tools) {
         expect(t.annotations?.readOnlyHint ?? false).toBe(readNames.has(t.name));
       }
@@ -278,37 +270,11 @@ describe("the tool documentation resource", () => {
     return client;
   }
 
-  test("the resource is listed and serves markdown", async () => {
+  test("the handshake names the registered tools, and nothing is served beside them", async () => {
     const client = await connected();
     try {
-      const { resources } = await client.listResources();
-      expect(resources.map((r) => r.uri)).toContain(DOCS_URI);
-
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      expect(contents).toHaveLength(1);
-      expect(markdown(contents).mimeType).toBe("text/markdown");
-      expect(markdown(contents).text.startsWith("# LabKit")).toBe(true);
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("the same document is a tool, for a client that cannot see resources", async () => {
-    const client = await connected();
-    try {
-      const { tools } = await client.listTools();
-      // First, so a client scanning the list meets it before what it documents.
-      expect(tools[0]?.name).toBe(DOCS_TOOL_NAME);
-
-      // The handshake says what the record is and names the tools this server registers.
       expect(client.getInstructions()).toBe(instructionsFor(WRITING));
-      expect(client.getInstructions()).not.toContain(DOCS_URI);
-
-      const result = await client.callTool({ name: DOCS_TOOL_NAME, arguments: {} });
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
-      expect(text).toBe(markdown(contents).text);
+      expect(client.getServerCapabilities()?.resources).toBeUndefined();
       await client.close();
     } finally {
       await scenario.end();
@@ -326,40 +292,6 @@ describe("the tool documentation resource", () => {
       .description.toLowerCase();
     expect(cli).toContain("did not perform");
     expect(cli).toContain("not for your own results");
-  });
-
-  test("every tool is documented, and no tool's arguments are restated", async () => {
-    const client = await connected();
-    try {
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      const doc = markdown(contents).text;
-
-      for (const tool of [...TOOLS, ...WRITE_TOOLS]) {
-        expect(doc).toContain(`## ${tool.name}`);
-        expect(doc).toContain(tool.description);
-      }
-
-      // Every caller already has the arguments and the result shape in the
-      // tool list the harness gave it. Repeating them here put the same
-      // `events` envelope in the page 27 times, for a fifth of its length.
-      expect(doc).not.toContain("**Takes**");
-      expect(doc).not.toContain("**Returns**");
-      expect(doc).not.toContain("attribution_label");
-
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("the document is generated, not stored", async () => {
-    // Rendering a subset produces a smaller document naming only that subset --
-    // which a checked-in file could not do, and which is the property that makes
-    // the served one impossible to leave stale.
-    const one = renderToolDocs({ reads: [TOOLS[0]!], writes: [] });
-    expect(one).toContain(`## ${TOOLS[0]!.name}`);
-    expect(one).not.toContain(`## ${TOOLS[1]!.name}`);
-    expect(one).not.toContain(`## ${WRITE_TOOLS[0]!.name}`);
   });
 });
 
@@ -487,123 +419,6 @@ describe("behaviour — the same answers, over the wire", () => {
         arguments: { subject: "LOE_does_not_exist" },
       });
       expect(result.isError).toBe(true);
-      await client.close();
-    } finally {
-      await scenario.end();
-    }
-  });
-});
-
-/**
- * **A server that cannot write does not offer to.**
- */
-describe("read-only", () => {
-  async function readOnlyClient(graph: TenantGraph, readOnly: boolean) {
-    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    const events = inMemoryEventLog();
-    await buildServer(
-      (work) =>
-        work({
-          read: new ReadSurface(graph, { events }),
-          write: new WriteSurface(graph, { events }),
-        }),
-      { readOnly },
-    ).connect(serverSide);
-    const client = new Client({ name: "read-only", version: "0" });
-    await client.connect(clientSide);
-    return client;
-  }
-
-  async function listToolsFrom(graph: TenantGraph, readOnly: boolean) {
-    const client = await readOnlyClient(graph, readOnly);
-    const { tools } = await client.listTools();
-    await client.close();
-    return tools.map((t) => t.name).sort();
-  }
-
-  test("a read-only server lists every read and no write", async () => {
-    const graph = await scenario.begin();
-    try {
-      const names = await listToolsFrom(graph, true);
-
-      // Derived from the declarations, never a hand-written list of names: a
-      // write tool added later must be absent here without anyone remembering
-      // to come and say so.
-      expect(names).toEqual([...metaTools(READ_ONLY), ...TOOLS].map((t) => t.name).sort());
-
-      for (const write of WRITE_TOOLS) expect(names).not.toContain(write.name);
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("a read-only server's instructions, docs tool and docs resource name no write tool", async () => {
-    const graph = await scenario.begin();
-    try {
-      const client = await readOnlyClient(graph, true);
-      const called = await client.callTool({ name: DOCS_TOOL_NAME, arguments: {} });
-      const tool = (called.content as Array<{ text: string }>)[0]!.text;
-      const { contents } = await client.readResource({ uri: DOCS_URI });
-      const resource = (contents[0] as { text: string }).text;
-      const instructions = client.getInstructions() ?? "";
-      await client.close();
-
-      expect(instructions).toContain("does not change the record");
-      for (const read of TOOLS) {
-        expect(instructions).toContain(`\`${read.name}\``);
-        expect(tool).toContain(`## ${read.name}`);
-      }
-      for (const write of WRITE_TOOLS) {
-        expect(instructions).not.toContain(`\`${write.name}\``);
-        expect(tool).not.toContain(`## ${write.name}`);
-        expect(resource).not.toContain(`## ${write.name}`);
-      }
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("the default is not read-only, so the flag is what decides it", async () => {
-    const graph = await scenario.begin();
-    try {
-      // The control. Without this the test above passes on a server that never
-      // had write tools at all, which is a different thing from one that
-      // withheld them.
-      const names = await listToolsFrom(graph, false);
-      expect(names).toEqual(
-        [...metaTools(WRITING), ...TOOLS, ...WRITE_TOOLS].map((t) => t.name).sort(),
-      );
-    } finally {
-      await scenario.end();
-    }
-  });
-
-  test("a hidden write tool cannot be called by name", async () => {
-    const graph = await scenario.begin();
-    try {
-      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-      const events = inMemoryEventLog();
-      await buildServer(
-        (work) =>
-          work({
-            read: new ReadSurface(graph, { events }),
-            write: new WriteSurface(graph, { events }),
-          }),
-        { readOnly: true },
-      ).connect(serverSide);
-      const client = new Client({ name: "read-only", version: "0" });
-      await client.connect(clientSide);
-
-      // Absent from `tools/list` is not the same as unreachable, and a client
-      // that cached an older list would ask anyway. Asserted from the wire
-      // rather than from the registration loop.
-      const result = await client.callTool({
-        name: "note",
-        arguments: { text: "can a hidden tool still be called?" },
-      });
-      expect(result.isError).toBe(true);
-      expect(await events.all()).toHaveLength(0);
-
       await client.close();
     } finally {
       await scenario.end();

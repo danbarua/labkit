@@ -7,7 +7,7 @@ import type { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { logFailedRequest, type Adapter } from "@labkit/core-domain/request-log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ReadSurface, WriteSurface, openRecord } from "@labkit/core-domain";
+import { type ReadSurface, type WriteSurface, openRecord } from "@labkit/core-domain";
 import type { RecordLocation } from "@labkit/core-db/connect";
 import {
   commandContext,
@@ -16,7 +16,7 @@ import {
   type SessionContextProvider,
 } from "@labkit/core-domain/context";
 import { TOOLS, WRITE_TOOLS } from "./tools";
-import { DOCS_URI, instructionsFor, metaTools, renderToolDocs, type Registered } from "./docs";
+import { instructionsFor, type Registered } from "./docs";
 
 /**
  * Everything a tool call needs, for the duration of that call and no longer.
@@ -43,13 +43,10 @@ function declaredOutput(schema: z.ZodType | undefined): { outputSchema?: z.ZodTy
  * Registers every tool against a **scope** that yields both surfaces. Transport-free, so a test
  * can drive it over `InMemoryTransport` without a subprocess.
  */
-export function buildServer(
-  withSurfaces: WithSurfaces,
-  { readOnly = false }: { readOnly?: boolean } = {},
-): McpServer {
+export function buildServer(withSurfaces: WithSurfaces): McpServer {
   // What this server registers, decided before anything is registered: the handshake's
   // instructions and the documentation both describe this list and no other.
-  const registered: Registered = { reads: TOOLS, writes: readOnly ? [] : WRITE_TOOLS };
+  const registered: Registered = { reads: TOOLS, writes: WRITE_TOOLS };
 
   // The package's version, not a constant: `serverInfo.version` is what the MCP spec has for
   // "which build am I talking to".
@@ -57,39 +54,6 @@ export function buildServer(
     { name: "labkit", version: labkitVersion() },
     { instructions: instructionsFor(registered) },
   );
-
-  // The tool surface as prose, rendered on each read from `registered`. Served twice — as a
-  // resource, and as a tool — because not every client implements resources, and one that does
-  // not sees the resource in no list.
-  server.registerResource(
-    "tool-docs",
-    DOCS_URI,
-    {
-      title: "LabKit tools",
-      description:
-        "What each tool on this server does, in prose, generated from the tool declarations.",
-      mimeType: "text/markdown",
-    },
-    (uri) => ({
-      contents: [{ uri: uri.href, mimeType: "text/markdown", text: renderToolDocs(registered) }],
-    }),
-  );
-
-  // First in the list: `tools/list` is served in registration order, so a client that cannot
-  // see resources meets the documentation before the tools it documents.
-  for (const definition of metaTools(registered)) {
-    server.registerTool(
-      definition.name,
-      {
-        title: definition.title,
-        description: definition.description,
-        annotations: { readOnlyHint: true },
-      },
-      async () => ({
-        content: [{ type: "text" as const, text: definition.handler() }],
-      }),
-    );
-  }
 
   for (const definition of registered.reads) {
     server.registerTool(
@@ -187,14 +151,12 @@ export function surfacesOver(
 export async function main({
   record,
   tenant,
-  readOnly = false,
 }: {
   record: RecordLocation;
   tenant: string;
-  readOnly?: boolean;
 }): Promise<void> {
   // Nothing on stdio says who the caller is, so writes carry the stand-in session.
-  const server = buildServer(surfacesOver({ record, tenant }, mockSessionContext), { readOnly });
+  const server = buildServer(surfacesOver({ record, tenant }, mockSessionContext));
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

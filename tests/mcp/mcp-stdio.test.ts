@@ -147,19 +147,6 @@ test(
   COLD_START,
 );
 
-test(
-  "it serves the tool documentation as a resource",
-  async () => {
-    const { contents } = await client.readResource({
-      uri: "labkit://docs/tools",
-    });
-    const text = (contents[0] as { text: string }).text;
-    expect(text).toContain("work_list");
-    expect(text.length).toBeGreaterThan(1000);
-  },
-  COLD_START,
-);
-
 /**
  * Every line the process writes to stdout parses as JSON.
  */
