@@ -4,6 +4,7 @@ export type { Activity } from "./activity";
 export { useLingering, WorkingIndicator } from "./blocks";
 export { diffLines } from "./format";
 export { Loader, type LoaderMood } from "./loader";
+export { type StepFigures, StepStats } from "./step-stats";
 export { ElicitationForm, problemsWith } from "./elicitation";
 export { MarkdownText } from "./markdown";
 export { focusableIn, useFocusTrap } from "./overlay/focus-trap";

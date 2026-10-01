@@ -71,11 +71,23 @@ describe("what a running turn is doing", () => {
     expect(afterPause(undefined, true)).toBeUndefined();
   });
 
+  test("after a turn that ended in an error, failed until the next prompt", () => {
+    const failed: ViewEvent = {
+      type: "failed",
+      message: "Provider request failed: 529 Overloaded",
+    };
+    expect(currentActivity(state(started, chunk("agent_message_chunk", "So"), failed))).toEqual({
+      kind: "failed",
+    });
+    expect(currentActivity(state(started, failed, started))).toEqual({ kind: "waiting" });
+  });
+
   test("the loader's pace and colour follow the activity", () => {
     expect(activityMood({ kind: "waiting" })).toBe("waiting");
     expect(activityMood({ kind: "thinking" })).toBe("working");
     expect(activityMood({ kind: "tool", label: "x" })).toBe("working");
     expect(activityMood({ kind: "speaking" })).toBe("speaking");
+    expect(activityMood({ kind: "failed" })).toBe("failed");
   });
 });
 

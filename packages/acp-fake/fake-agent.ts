@@ -125,6 +125,7 @@ export function createFakeAgent(world: FakeWorld = createFakeWorld()) {
         },
       });
       session.cancel = undefined;
+      if (scenario.fails) throw new acp.RequestError(scenario.fails.code, scenario.fails.message);
       return { stopReason: stopReason ?? "end_turn" };
     })
     .onNotification(acp.methods.agent.session.cancel, (ctx) => {

@@ -270,7 +270,11 @@ export function WorkingIndicator({
   const mood = moodOf({ shown, ending });
   if (mood === undefined || (!loader && label === undefined)) return null;
   return (
-    <div className="lk-working" role="status" aria-label={label ?? (ending ? "Done" : "Answering")}>
+    <div
+      className="lk-working"
+      role="status"
+      aria-label={label ?? (ending ? "Done" : shown?.kind === "failed" ? "Failed" : "Answering")}
+    >
       {loader ? <Loader mood={mood} /> : null}
       {label === undefined ? null : (
         <>

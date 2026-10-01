@@ -7,18 +7,22 @@ export type Activity =
   | { readonly kind: "waiting" }
   | { readonly kind: "tool"; readonly label: string }
   | { readonly kind: "thinking" }
-  | { readonly kind: "speaking" };
+  | { readonly kind: "speaking" }
+  | { readonly kind: "failed" };
 
 /**
  * What a running turn is doing: speaking while answer text is the last block, the tool call it is
  * waiting on (the latest one in this turn not yet settled), thinking while a thought is the last
  * block, and otherwise waiting on the model's provider: for the first word after the person's
- * prompt, or for the next step once the tools have settled. Nothing when the turn is idle or
- * waiting on the person (the question says so).
+ * prompt, or for the next step once the tools have settled. After a turn that ended in an error,
+ * failed, until the next prompt. Nothing when the turn is idle or waiting on the person (the
+ * question says so).
  */
 export function currentActivity(state: TranscriptState): Activity | undefined {
-  if (phase(state) !== "running") return undefined;
   const last = state.blocks.at(-1);
+  if (!state.running && last?.kind === "notice" && last.severity === "error")
+    return { kind: "failed" };
+  if (phase(state) !== "running") return undefined;
   if (last?.kind === "assistant") return { kind: "speaking" };
   // Only this turn's calls: one left unsettled in an earlier turn is not what is happening now.
   for (const block of [...state.blocks].reverse()) {
@@ -47,7 +51,10 @@ export const afterPause = (activity: Activity | undefined, quiet: boolean): Acti
     ? { kind: "waiting" }
     : activity;
 
-/** The indicator's words for an activity. While the agent speaks, its words say so. */
+/**
+ * The indicator's words for an activity. While the agent speaks, its words say so; after a
+ * failure, the error notice does.
+ */
 export function activityLabel(activity: Activity): string | undefined {
   switch (activity.kind) {
     case "waiting":
@@ -57,10 +64,20 @@ export function activityLabel(activity: Activity): string | undefined {
     case "thinking":
       return "Thinking";
     case "speaking":
+    case "failed":
       return undefined;
   }
 }
 
 /** The loader's mood for an activity. */
-export const activityMood = (activity: Activity): LoaderMood =>
-  activity.kind === "waiting" ? "waiting" : activity.kind === "speaking" ? "speaking" : "working";
+export function activityMood(activity: Activity): LoaderMood {
+  switch (activity.kind) {
+    case "waiting":
+    case "speaking":
+    case "failed":
+      return activity.kind;
+    case "thinking":
+    case "tool":
+      return "working";
+  }
+}

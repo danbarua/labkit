@@ -10,6 +10,7 @@ import {
   toolImageResult,
   toolPlot,
   toolSucceeds,
+  turnFails,
 } from "./scenarios";
 
 /** A scenario with a fixed way of answering its permission requests: one state to draw or test. */
@@ -39,6 +40,7 @@ export const FIXTURES: readonly Fixture[] = [
   fixture(toolPlot),
   fixture(planAndDiff),
   fixture(newFile),
+  fixture(turnFails),
   fixture(sessionReplay),
   fixture(noticesAndUsage),
   fixture(permissionRequired, never, "permission-pending", "Waiting for a permission answer"),

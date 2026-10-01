@@ -39,6 +39,11 @@ export interface Scenario {
   readonly steps: readonly Step[];
   /** How the turn ends when no branch says otherwise. */
   readonly stopReason: StopReason;
+  /**
+   * The turn ends in a JSON-RPC error instead, after its steps: what a client sees when the
+   * agent's provider or server fails mid-turn.
+   */
+  readonly fails?: { readonly code: number; readonly message: string };
 }
 
 /** The answer given to an open permission request. `hold` leaves it open. */

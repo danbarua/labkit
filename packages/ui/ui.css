@@ -305,6 +305,11 @@
   --lk-loader-via: #45c18b;
   --lk-loader-to: #42c6d0;
 }
+.lk-loader[data-mood="failed"] {
+  --lk-loader-from: var(--lk-danger);
+  --lk-loader-via: var(--lk-danger);
+  --lk-loader-to: var(--lk-danger);
+}
 .lk-loader[data-mood="speaking"],
 .lk-loader[data-mood="done"] {
   --lk-loader-from: #42c6d0;
@@ -790,6 +795,23 @@
 .hljs-title,
 .hljs-section {
   font-weight: 600;
+}
+
+/* one model request's figures, under what it produced */
+.lk-step-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  color: var(--lk-faint);
+  font-family: var(--lk-font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.lk-step-stats > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* plan, notice, compaction */

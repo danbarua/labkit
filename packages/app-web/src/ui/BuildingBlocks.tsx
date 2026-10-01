@@ -11,6 +11,8 @@ import {
   ElicitationForm,
   Modal,
   PalettePanel,
+  type StepFigures,
+  StepStats,
   type PickItem,
   Surface,
   useLingering,
@@ -431,6 +433,7 @@ const ACTIVITIES: readonly { label: string; activity: Activity | undefined }[] =
   { label: "Thinking", activity: { kind: "thinking" } },
   { label: "Tool", activity: { kind: "tool", label: "read_file DESIGN.md" } },
   { label: "Speaking", activity: { kind: "speaking" } },
+  { label: "Failed", activity: { kind: "failed" } },
   { label: "Stop", activity: undefined },
 ];
 
@@ -486,6 +489,55 @@ function LoaderDemo() {
   );
 }
 
+/** Sample figures: the agent does not send these yet (#620). */
+const STEPS: readonly { label: string; figures: StepFigures }[] = [
+  {
+    label: "A step that read a file",
+    figures: {
+      startedAt: "2026-10-01T20:59:14+01:00",
+      durationMs: 6_000,
+      inputTokens: 289,
+      outputTokens: 103,
+      cacheReadTokens: 487_000,
+      firstTokenMs: 2_700,
+    },
+  },
+  {
+    label: "A long answer",
+    figures: {
+      startedAt: "2026-10-01T21:02:40+01:00",
+      durationMs: 58_200,
+      inputTokens: 2_200,
+      outputTokens: 2_810,
+      cacheReadTokens: 485_000,
+      firstTokenMs: 1_700,
+    },
+  },
+  {
+    label: "A provider that reports only tokens",
+    figures: {
+      startedAt: "2026-10-01T21:05:03+01:00",
+      durationMs: 4_400,
+      inputTokens: 11_200_000,
+      outputTokens: 95,
+    },
+  },
+];
+
+function StepStatsDemo() {
+  return (
+    <div style={pad}>
+      {STEPS.map(({ label, figures }) => (
+        <div key={label}>
+          <p style={note}>{label}</p>
+          <StepStats figures={figures} />
+        </div>
+      ))}
+      <p style={note}>Sample figures. The agent does not send these yet: see #620.</p>
+    </div>
+  );
+}
+
 /** The shared overlay pieces and the composer, each in a tile of its own. */
 export function BuildingBlocks({ theme }: { theme: Theme }) {
   return (
@@ -501,6 +553,9 @@ export function BuildingBlocks({ theme }: { theme: Theme }) {
       </Tile>
       <Tile id="loader" title="What the agent is doing" theme={theme}>
         <LoaderDemo />
+      </Tile>
+      <Tile id="step-stats" title="What a step cost" theme={theme}>
+        <StepStatsDemo />
       </Tile>
       <Tile id="elicitation" title="A question from the agent" theme={theme}>
         <ElicitationDemo />
