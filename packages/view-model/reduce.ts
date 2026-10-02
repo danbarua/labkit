@@ -121,13 +121,18 @@ function applyUpdate(state: TranscriptState, update: SessionUpdate): TranscriptS
     case "tool_call":
     case "tool_call_update":
       return upsertToolCall(state, update);
+    // A plan of no entries is the protocol's way to clear the plan: it goes, heading and all.
     case "plan":
-      return setPlan(state, "plan", { kind: "items", entries: update.entries });
+      return update.entries.length === 0
+        ? removePlan(state, "plan")
+        : setPlan(state, "plan", { kind: "items", entries: update.entries });
     case "plan_update": {
       const { plan } = update;
       switch (plan.type) {
         case "items":
-          return setPlan(state, plan.planId, { kind: "items", entries: plan.entries });
+          return plan.entries.length === 0
+            ? removePlan(state, plan.planId)
+            : setPlan(state, plan.planId, { kind: "items", entries: plan.entries });
         case "file":
           return setPlan(state, plan.planId, { kind: "file", uri: plan.uri });
         case "markdown":

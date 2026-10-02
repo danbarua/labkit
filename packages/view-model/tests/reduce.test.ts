@@ -103,6 +103,19 @@ describe("plans", () => {
     ]);
   });
 
+  test("a plan updated to no entries is cleared, heading and all", () => {
+    expect(replay([plan("p", "pending"), plan("p")]).blocks).toEqual([]);
+    const cleared = replay([
+      update({
+        sessionUpdate: "plan",
+        entries: [{ content: "step", priority: "high", status: "pending" }],
+      }),
+      update({ sessionUpdate: "plan", entries: [] }),
+    ]);
+    expect(cleared.blocks).toEqual([]);
+    expect(cleared.plans).toEqual({});
+  });
+
   test("removing a plan takes its block with it", () => {
     const state = replay([
       plan("p", "pending"),
