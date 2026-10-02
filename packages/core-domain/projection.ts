@@ -60,7 +60,11 @@ export const graphProjector = (graph: TenantGraph): Projector => ({
   apply: (event) => applyDelta(graph, event),
 });
 
-/** Writes an event's changes into the graph, in the order the act made them. */
+/**
+ * Writes an event's changes into the graph, in the order the act made them. A stored event can
+ * carry a change kind this build does not know; that throws, naming the event, rather than
+ * leaving the graph short of what the event records.
+ */
 export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promise<void> {
   for (const change of event.changes) {
     switch (change.change) {
@@ -70,6 +74,13 @@ export async function applyDelta(graph: TenantGraph, event: DomainEvent): Promis
       case "EdgeCreated":
         await graph.createEdge(change.from, change.label, change.to, change.props);
         break;
+      default: {
+        const unknown: never = change;
+        const seq = "seq" in event ? ` ${String(event.seq)}` : "";
+        throw new Error(
+          `event${seq} (${event.operation} ${event.subject}) carries a change the graph cannot apply: ${JSON.stringify(unknown)}`,
+        );
+      }
     }
   }
 }
