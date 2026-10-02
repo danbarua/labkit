@@ -3,6 +3,7 @@ export { Conversation, type ConversationProps } from "./conversation";
 export type { Activity } from "./activity";
 export { useLingering, WorkingIndicator } from "./blocks";
 export { diffLines } from "./format";
+export type { ResolveLink } from "./links";
 export { Loader, type LoaderMood } from "./loader";
 export { type StepFigures, StepStats } from "./step-stats";
 export { ElicitationForm, problemsWith } from "./elicitation";
