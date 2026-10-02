@@ -177,6 +177,19 @@ describe("the event stream is a write-ahead log for a graph store", () => {
     ]);
   });
 
+  test("a change the graph cannot apply stops the projection and names its event", async () => {
+    const event = {
+      seq: 7,
+      at: clock.now(),
+      operation: "undo",
+      subject: "NOTE_6",
+      changes: [{ change: "PropsChanged", id: "NOTE_6", props: { retracted: true } }],
+    } as unknown as DomainEvent;
+    await expect(graphProjector(graph).apply(event)).rejects.toThrow(
+      /event 7 \(undo NOTE_6\) carries a change the graph cannot apply: .*PropsChanged/,
+    );
+  });
+
   test("the graph is a subscriber: with none, an act writes an event and no state", async () => {
     // The inverse of the first test, and what makes it mean anything. If the
     // verb still wrote to the graph inline, this would pass with state in it.
