@@ -85,6 +85,18 @@ describe("what a running turn is doing", () => {
     expect(html).toContain('data-mood="failed"');
   });
 
+  test("a refusal or a limit stops the turn like an error; a cancellation does not", () => {
+    const ended = (stopReason: "max_tokens" | "cancelled"): ViewEvent => ({
+      type: "prompt_ended",
+      stopReason,
+    });
+    expect(currentActivity(state(started, ended("max_tokens")))).toEqual({ kind: "failed" });
+    expect(currentActivity(state(started, ended("cancelled")))).toBeUndefined();
+    const html = renderToStaticMarkup(<Conversation state={state(started, ended("max_tokens"))} />);
+    expect(html).toContain('<span class="lk-badge stopped">Stopped</span>');
+    expect(html).toContain("The answer was cut short");
+  });
+
   test("the loader's pace and colour follow the activity", () => {
     expect(activityMood({ kind: "waiting" })).toBe("waiting");
     expect(activityMood({ kind: "thinking" })).toBe("working");

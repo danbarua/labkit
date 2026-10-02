@@ -1,7 +1,7 @@
 import { isAbsolute } from "node:path";
 
 import type { SessionConfigOption, SessionNotification } from "@agentclientprotocol/sdk";
-import type { ViewEvent } from "@labkit/view-model";
+import { promptEnded, type ViewEvent } from "@labkit/view-model";
 import * as vscode from "vscode";
 
 import type { SessionManager } from "../core/SessionManager";
@@ -138,7 +138,7 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 
     try {
       const response = await this.sessionManager.sendPrompt(activeId, text);
-      this.postEvent({ type: "prompt_ended", stopReason: response.stopReason });
+      this.postEvent(promptEnded(response));
       this.sessionManager.touchHistory(activeId);
     } catch (e) {
       logError("Prompt failed", e);

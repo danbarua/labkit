@@ -93,6 +93,8 @@ const COMPLETED = [
   "permission-refused",
   "permission-cancelled",
   "turn-fails",
+  "answer-cut-short",
+  "turn-cancelled",
 ];
 
 describe("a live session reduces to what the corpus says", () => {

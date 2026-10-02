@@ -1,5 +1,6 @@
 import type {
   ContentBlock,
+  PromptResponse,
   RequestPermissionOutcome,
   SessionUpdate,
   StopReason,
@@ -21,7 +22,12 @@ import {
 export type ViewEvent =
   | { readonly type: "update"; readonly update: SessionUpdate }
   | { readonly type: "prompt_started"; readonly content: readonly ContentBlock[] }
-  | { readonly type: "prompt_ended"; readonly stopReason: StopReason }
+  | {
+      readonly type: "prompt_ended";
+      readonly stopReason: StopReason;
+      /** Why the turn stopped short, in the agent's words, when it said. */
+      readonly reason?: string;
+    }
   | {
       readonly type: "permission_requested";
       readonly requestId: string;
@@ -195,6 +201,48 @@ function applyUpdate(state: TranscriptState, update: SessionUpdate): TranscriptS
   }
 }
 
+/**
+ * The event for an answer to `session/prompt`: its stop reason, and the reason labkit's agent
+ * gives for a refusal or a token limit, the `message` of the failure in `_meta`, written for
+ * people.
+ */
+export function promptEnded(response: PromptResponse): ViewEvent {
+  const failure = response._meta?.["labkit.dev/failure"];
+  const message =
+    typeof failure === "object" && failure !== null
+      ? (failure as Record<string, unknown>).message
+      : undefined;
+  return typeof message === "string" && message !== ""
+    ? { type: "prompt_ended", stopReason: response.stopReason, reason: message }
+    : { type: "prompt_ended", stopReason: response.stopReason };
+}
+
+/**
+ * What a turn that did not finish its work says about how it stopped: a title, a description
+ * when the agent gave no reason of its own, and how much it needs the person. A turn that ended
+ * with `end_turn` says nothing.
+ */
+const STOPPED: Partial<
+  Record<StopReason, { title: string; description?: string; severity: "warning" | "info" }>
+> = {
+  max_tokens: {
+    title: "The answer was cut short",
+    description: "The model reached its limit on tokens for one reply.",
+    severity: "warning",
+  },
+  refusal: { title: "The model refused to continue", severity: "warning" },
+  max_turn_requests: {
+    title: "The turn stopped at its step limit",
+    description: "It made as many model requests as one turn may.",
+    severity: "warning",
+  },
+  cancelled: {
+    title: "Cancelled",
+    description: "The turn was stopped before it finished.",
+    severity: "info",
+  },
+};
+
 /** The next view of a session after one event. Pure: the same events give the same view. */
 export function reduce(state: TranscriptState, event: ViewEvent): TranscriptState {
   switch (event.type) {
@@ -209,8 +257,20 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
       const { stopReason: _cleared, ...rest } = state;
       return { ...rest, running: true, blocks: [...state.blocks, block] };
     }
-    case "prompt_ended":
-      return { ...state, running: false, stopReason: event.stopReason };
+    case "prompt_ended": {
+      const ended = { ...state, running: false, stopReason: event.stopReason };
+      const stopped = STOPPED[event.stopReason];
+      if (stopped === undefined) return ended;
+      const description = event.reason ?? stopped.description;
+      const block: Block = {
+        kind: "notice",
+        id: `notice:${state.blocks.length}`,
+        severity: stopped.severity,
+        title: stopped.title,
+        ...(description === undefined ? {} : { description }),
+      };
+      return { ...ended, blocks: [...state.blocks, block] };
+    }
     case "failed": {
       const block: Block = {
         kind: "notice",

@@ -7,10 +7,12 @@ export {
   type PermissionRequest,
   type PlaySink,
   play,
+  promptResponse,
   type Scenario,
   type Step,
 } from "./scenario";
 export {
+  answerCutShort,
   newFile,
   noticesAndUsage,
   permissionRequired,
@@ -22,5 +24,6 @@ export {
   toolImageResult,
   toolPlot,
   toolSucceeds,
+  turnCancelled,
   turnFails,
 } from "./scenarios";

@@ -6,7 +6,7 @@
 
 import * as acp from "@agentclientprotocol/sdk";
 import { createHttpStream } from "@agentclientprotocol/sdk/experimental/http-client";
-import type { PermissionRequest, ViewEvent } from "@labkit/view-model";
+import { type PermissionRequest, promptEnded, type ViewEvent } from "@labkit/view-model";
 
 export interface ConnectOptions {
   /** The agent's ACP endpoint. */
@@ -123,11 +123,11 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
     async prompt(text) {
       onEvent({ type: "prompt_started", content: [{ type: "text", text }] });
       try {
-        const { stopReason } = await agent.request(acp.methods.agent.session.prompt, {
+        const response = await agent.request(acp.methods.agent.session.prompt, {
           sessionId: id,
           prompt: [{ type: "text", text }],
         });
-        onEvent({ type: "prompt_ended", stopReason });
+        onEvent(promptEnded(response));
       } catch (err) {
         onEvent({ type: "failed", message: describeError(err) });
       }

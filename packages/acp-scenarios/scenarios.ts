@@ -399,6 +399,30 @@ export const turnFails: Scenario = {
   fails: { code: -32603, message: "Provider request failed: 529 Overloaded" },
 };
 
+export const answerCutShort: Scenario = {
+  id: "answer-cut-short",
+  title: "An answer cut short by the token limit",
+  prompt: "Write up the seed comparison in full.",
+  stopReason: "max_tokens",
+  stopDetail: "The model stopped at its output limit of 4096 tokens.",
+  steps: [
+    say("## Seed comparison\n\nAcross the 25 seeds, the control run scored", "m1"),
+    say(" a mean AUC of 0.61 against 0.74 for the", "m1"),
+  ],
+};
+
+export const turnCancelled: Scenario = {
+  id: "turn-cancelled",
+  title: "A turn the person cancelled",
+  prompt: "Re-run every seed.",
+  stopReason: "cancelled",
+  steps: [
+    ...openRead("call_rerun", "list runs", "list_dir", { path: "runs" }),
+    update({ sessionUpdate: "tool_call_update", toolCallId: "call_rerun", status: "completed" }),
+    say("Starting with seed 1", "m1"),
+  ],
+};
+
 export const sessionReplay: Scenario = {
   id: "session-replay",
   title: "A reopened session",
@@ -460,6 +484,8 @@ export const SCENARIOS: readonly Scenario[] = [
   planAndDiff,
   newFile,
   turnFails,
+  answerCutShort,
+  turnCancelled,
   sessionReplay,
   noticesAndUsage,
 ];

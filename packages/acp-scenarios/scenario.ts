@@ -44,7 +44,20 @@ export interface Scenario {
    * agent's provider or server fails mid-turn.
    */
   readonly fails?: { readonly code: number; readonly message: string };
+  /**
+   * Why the turn stopped short, as labkit's agent reports it for a refusal or a token limit: the
+   * message of the failure it puts in the prompt response's `_meta`.
+   */
+  readonly stopDetail?: string;
 }
+
+/** A scenario's answer to the prompt that started it, once it has stopped. */
+export const promptResponse = (scenario: Scenario, stopReason: StopReason) => ({
+  stopReason,
+  ...(scenario.stopDetail === undefined
+    ? {}
+    : { _meta: { "labkit.dev/failure": { message: scenario.stopDetail } } }),
+});
 
 /** The answer given to an open permission request. `hold` leaves it open. */
 export type Answer = { readonly optionId: string } | "hold" | "cancel";
