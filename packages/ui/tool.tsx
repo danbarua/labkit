@@ -15,7 +15,8 @@ import {
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { diffLines, STATUS_LABEL } from "./format";
+import { useMemo, useState } from "react";
+import { type DiffLine, diffLines, foldUnchanged, STATUS_LABEL } from "./format";
 import { CodeView } from "./code";
 import { toolTally } from "./grouping";
 import { useLink } from "./links";
@@ -151,20 +152,38 @@ function DiffView({
   before?: string | null;
   after: string;
 }) {
-  const lines = diffLines(before ?? "", after);
+  const rows = useMemo(() => foldUnchanged(diffLines(before ?? "", after)), [before, after]);
+  // Folds the reader has opened, by where their hidden lines start.
+  const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set());
   const marker = { same: "  ", add: "+ ", remove: "- " } as const;
+  const line = (l: DiffLine, key: string) => (
+    <code key={key} className={`lk-diff-line ${l.kind}`}>
+      {marker[l.kind] + l.text}
+    </code>
+  );
   return (
     <div className="lk-diff">
       <div className="lk-diff-path" title={title}>
         {path}
       </div>
-      {lines.map((line, i) => (
-        // A diff has no stable ids: the same text can appear on many lines.
-        // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
-        <code key={i} className={`lk-diff-line ${line.kind}`}>
-          {marker[line.kind] + line.text}
-        </code>
-      ))}
+      {/* A diff has no ids: the same text can appear on many lines, so lines are keyed by
+          where they stand in it. */}
+      {rows.flatMap((row) =>
+        row.kind === "line"
+          ? [line(row.line, String(row.at))]
+          : opened.has(row.from)
+            ? row.lines.map((l, j) => line(l, String(row.from + j)))
+            : [
+                <button
+                  key={`fold:${row.from}`}
+                  type="button"
+                  className="lk-diff-fold"
+                  onClick={() => setOpened(new Set([...opened, row.from]))}
+                >
+                  ⋯ {row.lines.length} unchanged lines
+                </button>,
+              ],
+      )}
     </div>
   );
 }

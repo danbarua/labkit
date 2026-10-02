@@ -726,6 +726,21 @@
 .lk-diff-line.add {
   background: var(--lk-accent-soft);
 }
+.lk-diff-fold {
+  display: block;
+  width: 100%;
+  padding: 2px 10px;
+  border: 0;
+  border-block: 1px dashed var(--lk-line);
+  background: var(--lk-surface-2);
+  color: var(--lk-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lk-diff-fold:hover {
+  color: var(--lk-text);
+}
 .lk-diff-line.remove {
   background: var(--lk-danger-soft);
 }

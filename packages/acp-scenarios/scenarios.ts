@@ -279,6 +279,33 @@ export const toolPlot: Scenario = {
   ],
 };
 
+/** A run config long enough that most of an edit to it is unchanged. */
+const CONFIG_BEFORE = [
+  "seeds = 20",
+  'control = "rewired"',
+  "",
+  "[data]",
+  'train = "runs/train.parquet"',
+  'test = "runs/test.parquet"',
+  "shuffle = true",
+  "",
+  "[model]",
+  'kind = "logistic"',
+  "l2 = 0.01",
+  "max_iter = 500",
+  "",
+  "[report]",
+  'metric = "auc"',
+  "per_class = true",
+  'out = "runs/report.json"',
+  "",
+].join("\n");
+
+const CONFIG_AFTER = CONFIG_BEFORE.replace("seeds = 20", "seeds = 25").replace(
+  'out = "runs/report.json"',
+  'out = "runs/report.json"\ncontrol_seed = 7',
+);
+
 export const planAndDiff: Scenario = {
   id: "plan-and-diff",
   title: "A plan and a file edit",
@@ -320,8 +347,8 @@ export const planAndDiff: Scenario = {
         {
           type: "diff",
           path: "/workspace/runs/control.toml",
-          oldText: 'seeds = 20\ncontrol = "rewired"\n',
-          newText: 'seeds = 25\ncontrol = "rewired"\ncontrol_seed = 7\n',
+          oldText: CONFIG_BEFORE,
+          newText: CONFIG_AFTER,
         },
       ],
     }),
