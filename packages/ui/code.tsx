@@ -26,6 +26,16 @@ function draw(node: Highlighted, key: number): ReactNode {
   );
 }
 
+/**
+ * `source` highlighted as `language` (a name or extension highlight.js knows), or `undefined`
+ * when it knows no such language.
+ */
+export function highlight(language: string, source: string): ReactNode | undefined {
+  return lowlight.registered(language)
+    ? lowlight.highlight(language, source).children.map(draw)
+    : undefined;
+}
+
 /** How many non-blank lines of a file show before the rest is asked for. */
 export const PREVIEW_LINES = 5;
 

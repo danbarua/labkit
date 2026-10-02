@@ -17,6 +17,7 @@
     "lowlight": "^3.3.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "remend": "^1.4.0",
     "unist-util-visit": "^5.0.0",
     "vega": "6.4.0",
     "vega-embed": "7.3.0",
