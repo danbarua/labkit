@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
 import {
   initialState,
+  cancelledPrompt,
   mergeToolCall,
   promptEnded,
   reduce,
@@ -228,6 +229,25 @@ describe("a turn that stopped short", () => {
       type: "prompt_ended",
       stopReason: "end_turn",
     });
+  });
+});
+
+describe("the prompt of a cancelled turn", () => {
+  const started = (text: string): ViewEvent => ({
+    type: "prompt_started",
+    content: [{ type: "text", text }],
+  });
+
+  test("is there to send again after a cancellation, and only then", () => {
+    expect(
+      cancelledPrompt(
+        replay([started("Re-run every seed."), { type: "prompt_ended", stopReason: "cancelled" }]),
+      ),
+    ).toBe("Re-run every seed.");
+    expect(
+      cancelledPrompt(replay([started("Hello"), { type: "prompt_ended", stopReason: "end_turn" }])),
+    ).toBeUndefined();
+    expect(cancelledPrompt(replay([started("Still going")]))).toBeUndefined();
   });
 });
 

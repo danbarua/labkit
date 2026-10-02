@@ -1,6 +1,7 @@
 import type { AvailableCommand, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import {
   type Block,
+  cancelledPrompt,
   pendingPermissions,
   type Phase,
   permissionFor,
@@ -279,6 +280,7 @@ export function Conversation({
                   mentions={mentions}
                   attach={attach}
                   loader={moodOf(indicator)}
+                  recall={cancelledPrompt(state)}
                 />
               ) : state.configOptions && state.configOptions.length > 0 ? (
                 <div className="lk-session-summary">

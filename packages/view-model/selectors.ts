@@ -33,3 +33,13 @@ export function toolCallOf(
 export function textOf(content: readonly ContentBlock[]): string {
   return content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("");
 }
+
+/**
+ * What the person sent in the last turn when that turn was cancelled, to edit and send again; else
+ * nothing. A turn that finished, or one still running, has nothing to redo.
+ */
+export function cancelledPrompt(state: TranscriptState): string | undefined {
+  if (state.running || state.stopReason !== "cancelled") return undefined;
+  const prompt = state.blocks.findLast((block) => block.kind === "user");
+  return prompt?.kind === "user" ? textOf(prompt.content) || undefined : undefined;
+}
