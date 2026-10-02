@@ -17,13 +17,20 @@ import { ContentView } from "./tool";
 type Kind<K extends Block["kind"]> = Extract<Block, { kind: K }>;
 
 /** Text as markdown, and any other block as what it is. */
-function Rich({ content }: { content: readonly ContentBlock[] }) {
+function Rich({
+  content,
+  streaming = false,
+}: {
+  content: readonly ContentBlock[];
+  /** The text may still be arriving: see `MarkdownText`. */
+  streaming?: boolean;
+}) {
   return (
     <>
       {content.map((block, i) =>
         block.type === "text" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: a message's blocks have no ids
-          <MarkdownText key={i} text={block.text} />
+          <MarkdownText key={i} text={block.text} streaming={streaming} />
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: a message's blocks have no ids
           <ContentView key={i} block={block} />
@@ -137,7 +144,7 @@ export function AssistantMessage({
       data-streaming={streaming || undefined}
     >
       <div className="lk-assistant">
-        <Rich content={block.content} />
+        <Rich content={block.content} streaming={streaming} />
       </div>
       <MessageToolbar block={block} actions={["regenerate", "fork"]} onAction={onAction} />
     </div>
@@ -184,7 +191,7 @@ export function Thought({
         )}
       </summary>
       <div className="lk-thought-body" ref={body.ref} onScroll={body.onScroll}>
-        <Rich content={block.content} />
+        <Rich content={block.content} streaming={streaming} />
       </div>
     </details>
   );
