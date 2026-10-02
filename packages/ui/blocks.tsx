@@ -300,6 +300,7 @@ export function PlanView({ plan }: { plan: Plan }) {
             // biome-ignore lint/suspicious/noArrayIndexKey: plan entries have no ids
             <li key={i} className={entry.status}>
               <span>{entry.content}</span>
+              <span className={`lk-plan-priority ${entry.priority}`}>{entry.priority}</span>
             </li>
           ))}
         </ol>
