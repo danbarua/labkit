@@ -35,6 +35,21 @@ describe("transcriptsRoute", () => {
     expect(body).toEqual({ id: "a", title: "A", description: "first", events: [1, 2, 3] });
   });
 
+  test("a transcript is found by the id inside it, whatever its file is called", async () => {
+    await write("renamed.json", { id: "the-id", title: "T", description: "x", events: [1] });
+    const list = await transcriptsRoute(dir, "");
+    expect(list.body).toEqual([{ id: "the-id", title: "T", description: "x" }]);
+    const one = await transcriptsRoute(dir, "the-id");
+    expect(one.status).toBe(200);
+    expect(one.body).toMatchObject({ id: "the-id", events: [1] });
+    expect((await transcriptsRoute(dir, "renamed")).status).toBe(404);
+  });
+
+  test("an id is read URL-encoded, as a browser sends it", async () => {
+    await write("spaced.json", { id: "two words", title: "T", description: "x", events: [] });
+    expect((await transcriptsRoute(dir, "two%20words")).status).toBe(200);
+  });
+
   test("an id nothing on disk answers, is a 404 naming it", async () => {
     const { status, body } = await transcriptsRoute(dir, "missing");
     expect(status).toBe(404);

@@ -18,8 +18,10 @@ export interface RouteResponse {
 /**
  * Answers `GET /transcripts` (every file's `{id, title, description}`) and `GET /transcripts/:id`
  * (that one file whole, `events` included) by reading `dataDir` fresh on every call -- not a
- * module a static import would cache. `requested` is the path after `/transcripts/`, `""` for the
- * list. Malformed JSON in one file fails only a request for that file, never the list.
+ * module a static import would cache. `requested` is the path after `/transcripts/`, URL-encoded,
+ * `""` for the list. Both key a transcript by the `id` inside its file, whatever the file is
+ * called. Malformed JSON in one file fails only a request for that file (asked for by its file
+ * name, the only name it has), never the list.
  */
 export async function transcriptsRoute(dataDir: string, requested: string): Promise<RouteResponse> {
   const files = async (): Promise<string[]> =>
@@ -42,14 +44,18 @@ export async function transcriptsRoute(dataDir: string, requested: string): Prom
       );
       return { status: 200, body: entries.filter((entry) => entry !== undefined) };
     }
-    const match = (await files()).find((name) => name === `${requested}.json`);
-    if (!match) {
-      return {
-        status: 404,
-        body: { title: "Not Found", detail: `no transcript named ${requested}` },
-      };
+    const id = decodeURIComponent(requested);
+    for (const name of await files()) {
+      let file: TranscriptFile;
+      try {
+        file = await read(name);
+      } catch (error) {
+        if (name === `${id}.json`) throw error;
+        continue;
+      }
+      if (file.id === id) return { status: 200, body: file };
     }
-    return { status: 200, body: await read(match) };
+    return { status: 404, body: { title: "Not Found", detail: `no transcript named ${id}` } };
   } catch (error) {
     return {
       status: 500,
