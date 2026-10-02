@@ -52,6 +52,7 @@
 		"ports": "bash scripts/dev/worktree-ports.sh",
 		"postinstall": "bun scripts/dev/stamp-install.ts",
 		"probe:dogfood": "zsh scripts/db/probe-dogfood.sh",
+		"record:sync": "bun scripts/db/sync-record.ts",
 		"snapshot:record": "bun scripts/db/snapshot-record.ts",
 		"test:agent:logs": "LOGTAPE_TEST_MODE=always LOGTAPE_TEST_LOWEST_LEVEL=debug bun run test:agent",
 		"test:agent": "bun test --timeout 20000 packages/core-agent packages/app-acp",
