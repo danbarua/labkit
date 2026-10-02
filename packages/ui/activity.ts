@@ -11,16 +11,25 @@ export type Activity =
   | { readonly kind: "failed" };
 
 /**
+ * Whether the last turn stopped short for a reason outside the person's hands: a refusal, a token
+ * limit or the step limit. A cancelled turn was the person's own doing.
+ */
+const halted = (state: TranscriptState): boolean =>
+  state.stopReason === "refusal" ||
+  state.stopReason === "max_tokens" ||
+  state.stopReason === "max_turn_requests";
+
+/**
  * What a running turn is doing: speaking while answer text is the last block, the tool call it is
  * waiting on (the latest one in this turn not yet settled), thinking while a thought is the last
  * block, and otherwise waiting on the model's provider: for the first word after the person's
  * prompt, or for the next step once the tools have settled. After a turn that ended in an error,
- * failed, until the next prompt. Nothing when the turn is idle or waiting on the person (the
+ * a refusal, a token limit or the step limit, failed, until the next prompt. Nothing when the turn is idle or waiting on the person (the
  * question says so).
  */
 export function currentActivity(state: TranscriptState): Activity | undefined {
   const last = state.blocks.at(-1);
-  if (!state.running && last?.kind === "notice" && last.severity === "error")
+  if (!state.running && last?.kind === "notice" && (last.severity === "error" || halted(state)))
     return { kind: "failed" };
   if (phase(state) !== "running") return undefined;
   if (last?.kind === "assistant") return { kind: "speaking" };

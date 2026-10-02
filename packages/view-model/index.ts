@@ -1,5 +1,5 @@
 export { mergeToolCall } from "./merge-tool-call";
-export { reduce, replay, type ViewEvent } from "./reduce";
+export { promptEnded, reduce, replay, type ViewEvent } from "./reduce";
 export {
   pendingPermissions,
   type Phase,

@@ -5,6 +5,7 @@ import type { SessionUpdate } from "@agentclientprotocol/sdk";
 import {
   initialState,
   mergeToolCall,
+  promptEnded,
   reduce,
   replay,
   textOf,
@@ -169,6 +170,51 @@ describe("the client's own events", () => {
       outcome: { outcome: "cancelled" },
     });
     expect(state).toEqual(initialState);
+  });
+});
+
+describe("a turn that stopped short", () => {
+  const notices = (state: ReturnType<typeof reduce>) =>
+    state.blocks.flatMap((b) => (b.kind === "notice" ? [b] : []));
+
+  test("says so for a refusal, a token limit, the step limit or a cancellation", () => {
+    const seen = (["refusal", "max_tokens", "max_turn_requests", "cancelled"] as const).map(
+      (stopReason) => {
+        const [notice] = notices(reduce(initialState, { type: "prompt_ended", stopReason }));
+        return [stopReason, notice?.severity, notice?.title];
+      },
+    );
+    expect(seen).toEqual([
+      ["refusal", "warning", "The model refused to continue"],
+      ["max_tokens", "warning", "The answer was cut short"],
+      ["max_turn_requests", "warning", "The turn stopped at its step limit"],
+      ["cancelled", "info", "Cancelled"],
+    ]);
+  });
+
+  test("a turn that finished says nothing more", () => {
+    expect(notices(reduce(initialState, { type: "prompt_ended", stopReason: "end_turn" }))).toEqual(
+      [],
+    );
+  });
+
+  test("the agent's reason, where it gave one, is the description", () => {
+    const event = promptEnded({
+      stopReason: "max_tokens",
+      _meta: { "labkit.dev/failure": { message: "Stopped at 4096 output tokens." } },
+    });
+    expect(event).toEqual({
+      type: "prompt_ended",
+      stopReason: "max_tokens",
+      reason: "Stopped at 4096 output tokens.",
+    });
+    expect(notices(reduce(initialState, event))[0]?.description).toBe(
+      "Stopped at 4096 output tokens.",
+    );
+    expect(promptEnded({ stopReason: "end_turn", _meta: { other: 1 } })).toEqual({
+      type: "prompt_ended",
+      stopReason: "end_turn",
+    });
   });
 });
 

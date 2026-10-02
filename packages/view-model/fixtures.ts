@@ -3,9 +3,9 @@
  * that only reduces a live session does not carry the scripts.
  */
 
-import { type Fixture, play } from "@labkit/acp-scenarios";
+import { type Fixture, play, promptResponse } from "@labkit/acp-scenarios";
 import { initialState, type TranscriptState } from "./state";
-import { replay, type ViewEvent } from "./reduce";
+import { promptEnded, replay, type ViewEvent } from "./reduce";
 
 /** The events a client would see for a fixture: its own prompt, the agent's updates, its answers. */
 export async function eventsOfFixture(fixture: Fixture): Promise<ViewEvent[]> {
@@ -36,7 +36,7 @@ export async function eventsOfFixture(fixture: Fixture): Promise<ViewEvent[]> {
     },
   });
   if (scenario.fails) events.push({ type: "failed", message: scenario.fails.message });
-  else if (stopReason !== undefined) events.push({ type: "prompt_ended", stopReason });
+  else if (stopReason !== undefined) events.push(promptEnded(promptResponse(scenario, stopReason)));
   return events;
 }
 
