@@ -41,6 +41,52 @@ export interface SessionClient {
 
 const describeError = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
+/** Introduces this client to the agent: the protocol it speaks and what it can draw. */
+const introduce = (agent: acp.ClientConnection["agent"]) =>
+  agent.request(acp.methods.agent.initialize, {
+    protocolVersion: acp.PROTOCOL_VERSION,
+    // Questions in both modes are drawn in the conversation; nothing else is offered.
+    clientCapabilities: { elicitation: { form: {}, url: {} } },
+  });
+
+export interface ListOptions {
+  /** The agent's ACP endpoint. */
+  readonly url: string;
+  /** Only the sessions about this directory. */
+  readonly cwd?: string;
+  /** Replaces the platform `fetch`, to reach a server in the same process. */
+  readonly fetch?: typeof fetch;
+}
+
+/**
+ * Every session the agent keeps for `cwd`, in the agent's order, read page by page. Resolves to
+ * `undefined` when the agent does not list its sessions (it does not advertise `session/list`).
+ */
+export async function listSessions(
+  options: ListOptions,
+): Promise<readonly acp.SessionInfo[] | undefined> {
+  const stream = createHttpStream(options.url, options.fetch ? { fetch: options.fetch } : {});
+  const connection = acp.client({ name: "labkit-view" }).connect(stream);
+  try {
+    const { agentCapabilities } = await introduce(connection.agent);
+    if (!agentCapabilities?.sessionCapabilities?.list) return undefined;
+    const sessions: acp.SessionInfo[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await connection.agent.request(acp.methods.agent.session.list, {
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      sessions.push(...page.sessions);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
+    return sessions;
+  } finally {
+    connection.close();
+    await stream.writable.close().catch(() => {});
+  }
+}
+
 export async function connectSession(options: ConnectOptions): Promise<SessionClient> {
   const { onEvent } = options;
   const cwd = options.cwd ?? "/";
@@ -123,11 +169,7 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
   const { agent } = connection;
 
   try {
-    await agent.request(acp.methods.agent.initialize, {
-      protocolVersion: acp.PROTOCOL_VERSION,
-      // Questions in both modes are drawn in the conversation; nothing else is offered.
-      clientCapabilities: { elicitation: { form: {}, url: {} } },
-    });
+    await introduce(agent);
     let opened: { configOptions?: readonly acp.SessionConfigOption[] | null };
     if (sessionId === undefined) {
       const created = await agent.request(acp.methods.agent.session.new, { cwd, mcpServers: [] });

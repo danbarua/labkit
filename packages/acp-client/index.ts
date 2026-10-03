@@ -1,1 +1,7 @@
-export { type ConnectOptions, connectSession, type SessionClient } from "./session";
+export {
+  type ConnectOptions,
+  connectSession,
+  type ListOptions,
+  listSessions,
+  type SessionClient,
+} from "./session";

@@ -5,6 +5,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import * as acp from "@agentclientprotocol/sdk";
+import { AcpServer } from "@agentclientprotocol/sdk/experimental/server";
 import { createFakeAcpServer, inProcessFetch } from "@labkit/acp-fake";
 import { type Fixture, FIXTURES } from "@labkit/acp-scenarios";
 import {
@@ -15,7 +17,7 @@ import {
   type ViewEvent,
 } from "@labkit/view-model";
 import { eventsOfFixture, stateOfFixture } from "@labkit/view-model/fixtures";
-import { connectSession, type SessionClient } from "../index";
+import { connectSession, listSessions, type SessionClient } from "../index";
 
 const URL = "http://fake.test/acp";
 
@@ -209,6 +211,33 @@ describe("reopening a session", () => {
     expect(replayed.toolCalls.call_why?.status).toBe("completed");
     await played.client.close();
     await reopened.client.close();
+  });
+});
+
+describe("listing sessions", () => {
+  test("lists the sessions the agent keeps, for one directory when asked", async () => {
+    const server = createFakeAcpServer();
+    const fetch = inProcessFetch(server);
+    const here = await connectSession({ url: URL, fetch, cwd: "/work", onEvent: () => {} });
+    const there = await connectSession({ url: URL, fetch, cwd: "/elsewhere", onEvent: () => {} });
+
+    const all = await listSessions({ url: URL, fetch });
+    expect(all?.map((s) => s.sessionId)).toEqual([here.sessionId, there.sessionId]);
+    const listed = await listSessions({ url: URL, fetch, cwd: "/work" });
+    expect(listed).toEqual([{ sessionId: here.sessionId, cwd: "/work" }]);
+    await here.close();
+    await there.close();
+  });
+
+  test("is undefined from an agent that does not list its sessions", async () => {
+    const server = new AcpServer({
+      createAgent: () =>
+        acp.agent({ name: "no-list" }).onRequest(acp.methods.agent.initialize, () => ({
+          protocolVersion: acp.PROTOCOL_VERSION,
+          agentCapabilities: { loadSession: true },
+        })),
+    });
+    expect(await listSessions({ url: URL, fetch: inProcessFetch(server) })).toBeUndefined();
   });
 });
 

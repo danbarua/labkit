@@ -13,7 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as AgentChar123SessionIdChar125RouteImport } from './routes/agent.{-$sessionId}'
 import { Route as GallerySlugRouteImport } from './routes/gallery_.$slug'
+import { Route as GallerySessionsRouteImport } from './routes/gallery_.sessions'
 import { Route as WorkspaceSlugRouteRouteImport } from './routes/workspace.$slug.route'
+import { Route as GallerySessionsSessionIdRouteImport } from './routes/gallery_.sessions_.$sessionId'
 import { Route as WorkspaceSlugIndexRouteImport } from './routes/workspace.$slug.index'
 import { Route as WorkspaceSlugTypeRouteImport } from './routes/workspace.$slug.$type'
 import { Route as WorkspaceSlugGraphIdRouteImport } from './routes/workspace.$slug.graph.$id'
@@ -39,11 +41,22 @@ const GallerySlugRoute = GallerySlugRouteImport.update({
   path: '/gallery/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GallerySessionsRoute = GallerySessionsRouteImport.update({
+  id: '/gallery_/sessions',
+  path: '/gallery/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorkspaceSlugRouteRoute = WorkspaceSlugRouteRouteImport.update({
   id: '/workspace/$slug',
   path: '/workspace/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GallerySessionsSessionIdRoute =
+  GallerySessionsSessionIdRouteImport.update({
+    id: '/gallery_/sessions_/$sessionId',
+    path: '/gallery/sessions/$sessionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const WorkspaceSlugIndexRoute = WorkspaceSlugIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -66,6 +79,8 @@ export interface FileRoutesByFullPath {
   '/workspace/$slug': typeof WorkspaceSlugRouteRouteWithChildren
   '/agent/{-$sessionId}': typeof AgentChar123SessionIdChar125Route
   '/gallery/$slug': typeof GallerySlugRoute
+  '/gallery/sessions': typeof GallerySessionsRoute
+  '/gallery/sessions/$sessionId': typeof GallerySessionsSessionIdRoute
   '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
   '/workspace/$slug/': typeof WorkspaceSlugIndexRoute
   '/workspace/$slug/graph/$id': typeof WorkspaceSlugGraphIdRoute
@@ -75,6 +90,8 @@ export interface FileRoutesByTo {
   '/gallery': typeof GalleryRoute
   '/agent/{-$sessionId}': typeof AgentChar123SessionIdChar125Route
   '/gallery/$slug': typeof GallerySlugRoute
+  '/gallery/sessions': typeof GallerySessionsRoute
+  '/gallery/sessions/$sessionId': typeof GallerySessionsSessionIdRoute
   '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
   '/workspace/$slug': typeof WorkspaceSlugIndexRoute
   '/workspace/$slug/graph/$id': typeof WorkspaceSlugGraphIdRoute
@@ -86,6 +103,8 @@ export interface FileRoutesById {
   '/workspace/$slug': typeof WorkspaceSlugRouteRouteWithChildren
   '/agent/{-$sessionId}': typeof AgentChar123SessionIdChar125Route
   '/gallery_/$slug': typeof GallerySlugRoute
+  '/gallery_/sessions': typeof GallerySessionsRoute
+  '/gallery_/sessions_/$sessionId': typeof GallerySessionsSessionIdRoute
   '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
   '/workspace/$slug/': typeof WorkspaceSlugIndexRoute
   '/workspace/$slug/graph/$id': typeof WorkspaceSlugGraphIdRoute
@@ -98,6 +117,8 @@ export interface FileRouteTypes {
     | '/workspace/$slug'
     | '/agent/{-$sessionId}'
     | '/gallery/$slug'
+    | '/gallery/sessions'
+    | '/gallery/sessions/$sessionId'
     | '/workspace/$slug/$type'
     | '/workspace/$slug/'
     | '/workspace/$slug/graph/$id'
@@ -107,6 +128,8 @@ export interface FileRouteTypes {
     | '/gallery'
     | '/agent/{-$sessionId}'
     | '/gallery/$slug'
+    | '/gallery/sessions'
+    | '/gallery/sessions/$sessionId'
     | '/workspace/$slug/$type'
     | '/workspace/$slug'
     | '/workspace/$slug/graph/$id'
@@ -117,6 +140,8 @@ export interface FileRouteTypes {
     | '/workspace/$slug'
     | '/agent/{-$sessionId}'
     | '/gallery_/$slug'
+    | '/gallery_/sessions'
+    | '/gallery_/sessions_/$sessionId'
     | '/workspace/$slug/$type'
     | '/workspace/$slug/'
     | '/workspace/$slug/graph/$id'
@@ -128,6 +153,8 @@ export interface RootRouteChildren {
   WorkspaceSlugRouteRoute: typeof WorkspaceSlugRouteRouteWithChildren
   AgentChar123SessionIdChar125Route: typeof AgentChar123SessionIdChar125Route
   GallerySlugRoute: typeof GallerySlugRoute
+  GallerySessionsRoute: typeof GallerySessionsRoute
+  GallerySessionsSessionIdRoute: typeof GallerySessionsSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -160,11 +187,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GallerySlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gallery_/sessions': {
+      id: '/gallery_/sessions'
+      path: '/gallery/sessions'
+      fullPath: '/gallery/sessions'
+      preLoaderRoute: typeof GallerySessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/workspace/$slug': {
       id: '/workspace/$slug'
       path: '/workspace/$slug'
       fullPath: '/workspace/$slug'
       preLoaderRoute: typeof WorkspaceSlugRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery_/sessions_/$sessionId': {
+      id: '/gallery_/sessions_/$sessionId'
+      path: '/gallery/sessions/$sessionId'
+      fullPath: '/gallery/sessions/$sessionId'
+      preLoaderRoute: typeof GallerySessionsSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workspace/$slug/': {
@@ -212,6 +253,8 @@ const rootRouteChildren: RootRouteChildren = {
   WorkspaceSlugRouteRoute: WorkspaceSlugRouteRouteWithChildren,
   AgentChar123SessionIdChar125Route: AgentChar123SessionIdChar125Route,
   GallerySlugRoute: GallerySlugRoute,
+  GallerySessionsRoute: GallerySessionsRoute,
+  GallerySessionsSessionIdRoute: GallerySessionsSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
