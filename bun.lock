@@ -47,7 +47,7 @@
         "@agentclientprotocol/sdk": "catalog:",
         "@labkit/view-model": "workspace:*",
         "effect": "4.0.0",
-        "effective-acp": "0.1.0",
+        "effective-acp": "0.2.1",
       },
       "devDependencies": {
         "@labkit/acp-fake": "workspace:*",
@@ -1017,7 +1017,7 @@
 
     "effect": ["effect@4.0.0", "", {}, "sha512-ooc1TG5t+FfzgYnFz2ff6BBKyZ7EwBRVXC7c4RhQUAD6/TZ2gTXXMeb4WX7a19ozQo4J73/QW+S00YAIresoMQ=="],
 
-    "effective-acp": ["effective-acp@0.1.0", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-wMVLNbSikzhv4Z7P3OqhUSMlXZwispwTppAqwkVPBOf0FcVTCeK0f7KbguARclq0GHllB3DhGwrUKPYqPmu2NQ=="],
+    "effective-acp": ["effective-acp@0.2.1", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-/t5u8a6JcYQVvJPLumNGq8kkYAD2zkufkqTDN1s1i7XdNJ0Zvyjhlw21GNSXhUf7f54kdSy2MdNVGsvPf/o66g=="],
 
     "electron-to-chromium": ["electron-to-chromium@1.5.433", "", {}, "sha512-5lCAbyZBjtmUt/RAGHRqrL2q0oEFRThDAsZHHDn9XHa89Qw7gMYOeSicBTy+AHfvo0r6vwsZvqNJTQIQy1BLzA=="],
 
