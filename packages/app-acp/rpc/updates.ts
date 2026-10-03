@@ -11,6 +11,7 @@ import type { HostToolNotification } from "@labkit/core-agent/host";
 import { diagnostic, diagnosticError } from "@labkit/core-agent/logging";
 
 import type { AcpOptions } from "../adapter.ts";
+import { PlanResultSchema, type PlanEntries } from "../plan.ts";
 import { parseSessionInfo } from "../session-info.ts";
 import { renderToolContent, type AcpToolContent } from "../tool-content.ts";
 import type { ConfigProjection } from "./config.ts";
@@ -35,6 +36,7 @@ export type SessionUpdates = Readonly<{
     prefix: string,
     evidence: Map<string, "completed" | "failed">,
     renderers: ReadonlyMap<string, AcpToolContent>,
+    plans: ReadonlySet<string>,
   ): void;
   bindings(
     entry: Omit<Session, "runtime"> & { runtime?: SessionRuntime },
@@ -278,6 +280,31 @@ export function sessionUpdates(
     }
   };
 
+  // Live, the plan tool publishes exactly the entries it returns, so the saved result is the plan
+  // the client saw. Each is replayed where it happened; the client keeps the last one.
+  const replayPlan = (client: AgentContext, id: string, toolCallId: string, output: string) => {
+    let entries: PlanEntries;
+    try {
+      entries = PlanResultSchema.parse(JSON.parse(output)).entries;
+    } catch (error) {
+      diagnostic("acp", "warning", "acp.plan.replay_failed", {
+        connectionId,
+        sessionId: id,
+        toolCallId,
+        reason: "Saved plan tool result is not a plan; the plan view is not restored for this call",
+        error: diagnosticError(error),
+      });
+      return;
+    }
+    core.send(client, id, { sessionUpdate: "plan", entries });
+    diagnostic("acp", "debug", "acp.plan.replayed", {
+      connectionId,
+      sessionId: id,
+      toolCallId,
+      count: entries.length,
+    });
+  };
+
   const replay = (
     client: AgentContext,
     id: string,
@@ -285,6 +312,7 @@ export function sessionUpdates(
     prefix: string,
     evidence: Map<string, "completed" | "failed">,
     renderers: ReadonlyMap<string, AcpToolContent>,
+    plans: ReadonlySet<string>,
   ) => {
     const calls = new Map<
       string,
@@ -363,6 +391,8 @@ export function sessionUpdates(
             ],
           });
           calls.delete(message.callId);
+          if (status === "completed" && plans.has(toolName))
+            replayPlan(client, id, toolCallId, message.text);
         }
       }
     });
