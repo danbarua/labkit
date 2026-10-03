@@ -35,6 +35,30 @@ const digest = (value: string) => createHash("sha256").update(value).digest();
 
 const stoppingReason = "ACP HTTP host is stopping";
 
+/**
+ * An event stream that starts with an SSE comment. `Bun.serve` sends a streamed response's headers
+ * with its first chunk, and the SDK's server writes nothing to a quiet stream until its 15 s
+ * keepalive, so without the comment every stream a client opens takes up to 15 s to open.
+ */
+function openedAtOnce(response: Response): Response {
+  if (
+    response.body === null ||
+    !response.headers.get("content-type")?.startsWith("text/event-stream")
+  )
+    return response;
+  const comment = new TextEncoder().encode(":\n\n");
+  const body = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      start: (controller) => controller.enqueue(comment),
+    }),
+  );
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 /** What a refused HTTP request means for the client, so a WARNING-only scan explains it. */
 function refusal(requestPath: string, status: number, reason: string | undefined) {
   if (requestPath !== path)
@@ -128,11 +152,13 @@ export function acpHttpHandler(
         else {
           let adapter: Readonly<{ connectionId: string; closed: Promise<void> }> | undefined;
           try {
-            response = await server.handleRequest(request, {
-              createAgent: agent((connectionId, closed) => {
-                adapter = { connectionId, closed };
+            response = openedAtOnce(
+              await server.handleRequest(request, {
+                createAgent: agent((connectionId, closed) => {
+                  adapter = { connectionId, closed };
+                }),
               }),
-            });
+            );
           } catch (error) {
             diagnostic("acp", "error", "acp.http.request.failed", {
               ...trace,
