@@ -509,6 +509,15 @@
   border-top: 1px solid var(--lk-line);
   background: var(--lk-bg);
 }
+/* A run of one call is that call's card alone: no row, no frame. */
+.lk-tool-run > .lk-tool-head {
+  display: none;
+}
+.lk-tool-run > .lk-tool-group-body {
+  padding: 0;
+  border: 0;
+  background: none;
+}
 .lk-tool-end {
   flex: none;
   margin-left: auto;

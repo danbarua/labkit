@@ -37,9 +37,9 @@ import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
 import { ICONS } from "./surface";
 import { ElicitationForm, ElicitationReceipt } from "./elicitation";
-import { drawnBlocks } from "./grouping";
+import { type Drawn, drawnBlocks } from "./grouping";
 import { LinksContext, type ResolveLink } from "./links";
-import { ToolCard, ToolGroup } from "./tool";
+import { ToolRun } from "./tool";
 
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Idle",
@@ -88,7 +88,7 @@ function BlockView({
   onMessageAction,
   onAnswerQuestion,
 }: {
-  block: Block;
+  block: Extract<Drawn, { kind: "block" }>["block"];
   state: TranscriptState;
   last?: boolean;
   onMessageAction?: ((action: MessageAction, block: Block) => void) | undefined;
@@ -115,12 +115,6 @@ function BlockView({
       );
     case "thought":
       return <Thought block={block} streaming={last && state.running} />;
-    case "tool": {
-      const call = state.toolCalls[block.toolCallId];
-      if (call === undefined) return null;
-      const permission = permissionFor(state, block.toolCallId);
-      return <ToolCard call={call} {...(permission ? { permission } : {})} />;
-    }
     case "plan": {
       const plan = state.plans[block.planId];
       return plan === undefined ? null : <PlanView plan={plan} />;
@@ -273,7 +267,7 @@ export function Conversation({
                         onAnswerQuestion={onAnswerQuestion}
                       />
                     ) : (
-                      <ToolGroup
+                      <ToolRun
                         key={item.key}
                         calls={item.blocks.flatMap((block) => {
                           const call = state.toolCalls[block.toolCallId];

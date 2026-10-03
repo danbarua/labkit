@@ -4,12 +4,17 @@ import { pendingPermissions } from "@labkit/view-model";
 type ToolBlock = Extract<Block, { kind: "tool" }>;
 
 /**
- * One item the conversation draws: a block on its own, or a run of tool calls drawn as one row.
- * `key` is the identity of its first block, so it stays the same when a block before it is removed.
+ * One item the conversation draws: a block that is not a tool call, or a run of one or more
+ * consecutive tool calls. `key` is the identity of its first block, so it stays the same when a
+ * block before it is removed, and when a run of one grows into a group.
  */
 export type Drawn =
-  | { readonly kind: "block"; readonly block: Block; readonly key: string }
-  | { readonly kind: "tools"; readonly blocks: readonly ToolBlock[]; readonly key: string };
+  | { readonly kind: "block"; readonly block: Exclude<Block, ToolBlock>; readonly key: string }
+  | {
+      readonly kind: "tools";
+      readonly blocks: readonly [ToolBlock, ...ToolBlock[]];
+      readonly key: string;
+    };
 
 /** The block's identity, which no other block in the transcript has. */
 export function keyOf(block: Block): string {
@@ -36,30 +41,28 @@ const isBlank = (block: Block): boolean =>
   block.content.every((part) => part.type === "text" && part.text.trim() === "");
 
 /**
- * The conversation's blocks, less the ones that would draw as nothing, with every run of two or more consecutive tool calls folded into one
- * item. A call waiting on the person's answer is never folded in: it breaks the run and stands
- * alone, so the question is always in view.
+ * The conversation's blocks, less the ones that would draw as nothing, with each run of
+ * consecutive tool calls as one item. A call waiting on the person's answer is a run of its own,
+ * so the question is always in view.
  */
 export function drawnBlocks(state: TranscriptState): Drawn[] {
   const waiting = new Set(pendingPermissions(state).map((p) => p.request.toolCall.toolCallId));
   const out: Drawn[] = [];
   let run: [ToolBlock, ...ToolBlock[]] | undefined;
   const flush = () => {
-    if (run === undefined) return;
-    const key = keyOf(run[0]);
-    if (run.length === 1) out.push({ kind: "block", block: run[0], key });
-    else out.push({ kind: "tools", blocks: run, key });
+    if (run !== undefined) out.push({ kind: "tools", blocks: run, key: keyOf(run[0]) });
     run = undefined;
   };
   for (const block of state.blocks) {
     if (isBlank(block)) continue;
-    if (block.kind === "tool" && !waiting.has(block.toolCallId)) {
-      if (run === undefined) run = [block];
-      else run.push(block);
-      continue;
-    }
-    flush();
-    out.push({ kind: "block", block, key: keyOf(block) });
+    if (block.kind !== "tool") {
+      flush();
+      out.push({ kind: "block", block, key: keyOf(block) });
+    } else if (waiting.has(block.toolCallId)) {
+      flush();
+      out.push({ kind: "tools", blocks: [block], key: keyOf(block) });
+    } else if (run === undefined) run = [block];
+    else run.push(block);
   }
   flush();
   return out;
