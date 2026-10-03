@@ -15,6 +15,7 @@
 		"acp:logs": "bun packages/app-acp/logs.ts",
 		"acp:start": "bun packages/app-acp/dist/cli.js --config packages/app-acp/dist/examples/vscode-workspace.js",
 		"bonsai:record": "zsh scripts/db/build-bonsai-record.sh",
+		"e2e:agent": "bun packages/app-web/scripts/e2e-agent.ts",
 		"scenarios:build": "bun scripts/build/build-scenario-docs.ts",
 		"check:all-checks": "bun scripts/checks/check-all-checks.ts",
 		"check:binary": "bash scripts/checks/smoke-binary.sh",
