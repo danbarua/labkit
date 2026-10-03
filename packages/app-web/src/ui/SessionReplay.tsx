@@ -1,40 +1,10 @@
-import { connectSession } from "@labkit/acp-client";
-import type { ViewEvent } from "@labkit/view-model";
+import { sessionHistory } from "@labkit/acp-client";
 import { useEffect, useState } from "react";
 import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
 import type { Recording } from "./playback";
 import { Page, Replay } from "./Replay";
 
 type Loaded = { kind: "loading" } | { kind: "failed"; message: string } | Recording;
-
-/** How long the history must stop arriving before it is taken as complete. */
-const QUIET_MS = 300;
-
-/**
- * Reopens `sessionId` and keeps everything the agent sends while reopening it. The history can
- * still be arriving when the reopen is answered, so it waits until nothing has come for a moment.
- */
-async function loadHistory(sessionId: string): Promise<readonly ViewEvent[]> {
-  const events: ViewEvent[] = [];
-  let last = Date.now();
-  const client = await connectSession({
-    url: AGENT_URL,
-    sessionId,
-    ...(AGENT_CWD === undefined ? {} : { cwd: AGENT_CWD }),
-    onEvent: (event) => {
-      events.push(event);
-      last = Date.now();
-    },
-  });
-  try {
-    while (Date.now() - last < QUIET_MS) {
-      await new Promise((resolve) => setTimeout(resolve, QUIET_MS));
-    }
-    return events;
-  } finally {
-    await client.close();
-  }
-}
 
 /**
  * A session the agent keeps, replayed from the start: what reopening it shows, an event at a
@@ -49,7 +19,11 @@ export default function SessionReplay({ sessionId }: { sessionId: string }) {
     // Deferred a tick, as the agent page does: React's development double-invoke cancels the
     // first run before it connects, so one connection opens, not two racing for one stream.
     const timer = setTimeout(() => {
-      loadHistory(sessionId).then(
+      sessionHistory({
+        url: AGENT_URL,
+        sessionId,
+        ...(AGENT_CWD === undefined ? {} : { cwd: AGENT_CWD }),
+      }).then(
         (events) => {
           if (!cancelled) setLoaded({ events });
         },

@@ -6,7 +6,9 @@
   "main": "index.ts",
   "dependencies": {
     "@agentclientprotocol/sdk": "catalog:",
-    "@labkit/view-model": "workspace:*"
+    "@labkit/view-model": "workspace:*",
+    "effect": "4.0.0",
+    "effective-acp": "0.1.0"
   },
   "devDependencies": {
     "@labkit/acp-fake": "workspace:*",
