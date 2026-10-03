@@ -1,4 +1,5 @@
 import type { SessionConfigOption } from "@agentclientprotocol/sdk";
+import type { Theme } from "@labkit/ui";
 import type { ViewEvent } from "@labkit/view-model";
 
 /**
@@ -27,6 +28,8 @@ export type OutboundMessage =
 
 interface VsCodeApi {
   postMessage(message: OutboundMessage): void;
+  getState(): unknown;
+  setState(state: unknown): void;
 }
 
 declare function acquireVsCodeApi(): VsCodeApi;
@@ -35,6 +38,21 @@ declare function acquireVsCodeApi(): VsCodeApi;
 // `reset` (a new session, or switching to another) remounts the React tree that calls
 // `vscodeSession`, so the handle is acquired once here, at module scope, and reused.
 const api = acquireVsCodeApi();
+
+/**
+ * The theme last picked in this view. VS Code keeps a webview's state while it is hidden and
+ * shown again; what comes back is whatever was saved, so anything else reads as "system".
+ */
+export function savedTheme(): Theme {
+  const saved = api.getState();
+  const theme =
+    typeof saved === "object" && saved !== null && "theme" in saved ? saved.theme : undefined;
+  return theme === "light" || theme === "dark" ? theme : "system";
+}
+
+export function saveTheme(theme: Theme): void {
+  api.setState({ theme });
+}
 
 /**
  * The webview's side of the bridge: posts outbound messages, and calls `onMessage` for each one

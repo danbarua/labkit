@@ -102,6 +102,12 @@ button:hover {
 button:active {
   transform: translateY(1px);
 }
+/* The theme button: an icon alone, as tall as the text buttons beside it. */
+button.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+}
 
 .view-toggle {
   display: flex;

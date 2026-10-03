@@ -1,8 +1,8 @@
-import { Conversation } from "@labkit/ui";
+import { Conversation, type Theme } from "@labkit/ui";
 import "@labkit/ui/ui.css";
 import { initialState, reduce } from "@labkit/view-model";
 import { useEffect, useReducer, useRef, useState } from "react";
-import { type InboundMessage, vscodeSession } from "./vscode-session";
+import { type InboundMessage, savedTheme, saveTheme, vscodeSession } from "./vscode-session";
 
 /**
  * The extension host is already the ACP client (it owns the connection to the agent); this
@@ -10,14 +10,33 @@ import { type InboundMessage, vscodeSession } from "./vscode-session";
  * `ViewEvent`s the web app's HTTP client produces, so `reduce` and `Conversation` need nothing
  * webview-specific. Keyed by `generation`, which increments on `reset` (a new or switched
  * session), so the conversation starts from `initialState` rather than carrying the previous
- * session's blocks forward.
+ * session's blocks forward. The theme is held here, above that key, so a new session keeps it.
  */
 export function App() {
   const [generation, setGeneration] = useState(0);
-  return <Session key={generation} onReset={() => setGeneration((current) => current + 1)} />;
+  const [theme, setTheme] = useState<Theme>(savedTheme);
+  return (
+    <Session
+      key={generation}
+      theme={theme}
+      onThemeChange={(next) => {
+        setTheme(next);
+        saveTheme(next);
+      }}
+      onReset={() => setGeneration((current) => current + 1)}
+    />
+  );
 }
 
-function Session({ onReset }: { onReset: () => void }) {
+function Session({
+  theme,
+  onThemeChange,
+  onReset,
+}: {
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
+  onReset: () => void;
+}) {
   const [state, dispatch] = useReducer(reduce, initialState);
   const bridge = useRef<ReturnType<typeof vscodeSession> | null>(null);
 
@@ -54,6 +73,8 @@ function Session({ onReset }: { onReset: () => void }) {
   return (
     <Conversation
       state={state}
+      theme={theme}
+      onThemeChange={onThemeChange}
       onSend={(text) => bridge.current?.prompt(text)}
       onCancel={() => bridge.current?.cancel()}
       onSetConfig={(configId, value) => bridge.current?.setConfigOption(configId, value)}

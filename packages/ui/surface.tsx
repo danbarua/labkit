@@ -1,6 +1,7 @@
 import { IconContext } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { ToastProvider } from "./overlay/toast";
+import type { Theme } from "./theme";
 
 /** Every icon in these components: one size and weight, in the colour of the text around it. */
 export const ICONS = { size: 14, weight: "regular", color: "currentColor" } as const;
@@ -14,8 +15,8 @@ export function Surface({
   className,
   children,
 }: {
-  /** Leave unset to follow the system's light or dark setting. */
-  theme?: "light" | "dark" | undefined;
+  /** "system", or unset, follows the system's light or dark setting. */
+  theme?: Theme | undefined;
   className?: string;
   children: ReactNode;
 }) {
@@ -23,7 +24,7 @@ export function Surface({
     <IconContext.Provider value={ICONS}>
       <div
         className={["lk-root", className].filter(Boolean).join(" ")}
-        {...(theme ? { "data-theme": theme } : {})}
+        {...(theme === "light" || theme === "dark" ? { "data-theme": theme } : {})}
       >
         <ToastProvider>{children}</ToastProvider>
       </div>

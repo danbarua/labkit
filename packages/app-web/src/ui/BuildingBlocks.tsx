@@ -18,10 +18,9 @@ import {
   useLingering,
   useToasts,
   WorkingIndicator,
+  type Theme,
 } from "@labkit/ui";
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
-
-type Theme = "light" | "dark" | undefined;
 
 // Shaped like what the agent sends: the same categories, groups and kinds of value.
 const COMMANDS: AvailableCommand[] = [

@@ -1,5 +1,5 @@
 import { FIXTURES } from "@labkit/acp-scenarios";
-import { Conversation } from "@labkit/ui";
+import { Conversation, type Theme, ThemeToggle } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import type { TranscriptState } from "@labkit/view-model";
@@ -9,8 +9,6 @@ import { useEffect, useState } from "react";
 import { Bar } from "./Bar";
 import { BuildingBlocks } from "./BuildingBlocks";
 import { type TranscriptEntry, transcriptList, transcriptState } from "./transcripts-api";
-
-type Theme = "system" | "light" | "dark";
 
 /**
  * Every state in the shared corpus drawn at once: the scripted scenarios in `@labkit/acp-scenarios`
@@ -60,11 +58,7 @@ export default function Gallery() {
     <>
       <Bar>
         <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-          {(["system", "light", "dark"] as const).map((t) => (
-            <button key={t} type="button" onClick={() => setTheme(t)} disabled={theme === t}>
-              {t}
-            </button>
-          ))}
+          <ThemeToggle theme={theme} onChange={setTheme} className="theme-toggle" />
         </span>
       </Bar>
       <div
@@ -79,7 +73,7 @@ export default function Gallery() {
           alignContent: "start",
         }}
       >
-        <BuildingBlocks theme={theme === "system" ? undefined : theme} />
+        <BuildingBlocks theme={theme} />
         {failures[""] === undefined ? null : (
           <p role="alert" style={{ margin: 0, color: "var(--lk-danger)" }}>
             The recorded transcripts could not be listed: {failures[""]}
@@ -107,11 +101,7 @@ export default function Gallery() {
                     </p>
                   )
                 ) : (
-                  <Conversation
-                    state={state}
-                    records={{ types: RECORD_TYPES }}
-                    {...(theme === "system" ? {} : { theme })}
-                  />
+                  <Conversation state={state} records={{ types: RECORD_TYPES }} theme={theme} />
                 )}
               </div>
             </section>

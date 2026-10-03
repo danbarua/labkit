@@ -1,4 +1,4 @@
-import { Conversation } from "@labkit/ui";
+import { Conversation, type Theme, ThemeToggle } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import type { TranscriptState } from "@labkit/view-model";
@@ -8,7 +8,6 @@ import { Bar } from "./Bar";
 import { type Recording, usePlayback } from "./playback";
 import { transcriptRecording } from "./transcripts-api";
 
-type Theme = "system" | "light" | "dark";
 type Loaded = { kind: "loading" } | { kind: "missing" } | { kind: "failed"; message: string };
 
 // Passing handlers is what makes `Conversation` draw the composer and live config controls. They
@@ -86,11 +85,7 @@ function Replay({ slug, recording }: { slug: string; recording: Recording }) {
         {playback.applied} / {playback.total}
         {recording.at === undefined ? " · no times recorded" : ""}
       </span>
-      {(["system", "light", "dark"] as const).map((t) => (
-        <button key={t} type="button" onClick={() => setTheme(t)} disabled={theme === t}>
-          {t}
-        </button>
-      ))}
+      <ThemeToggle theme={theme} onChange={setTheme} className="theme-toggle" />
     </>
   );
 
@@ -106,7 +101,7 @@ function Replay({ slug, recording }: { slug: string; recording: Recording }) {
           onMessageAction={inert}
           attach={{ maxFiles: 4, maxBytes: 5 * 1024 * 1024 }}
           onSetConfig={(configId, value) => setPicked((prev) => new Map(prev).set(configId, value))}
-          {...(theme === "system" ? {} : { theme })}
+          theme={theme}
         />
       </div>
     </Page>

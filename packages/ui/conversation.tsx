@@ -35,6 +35,7 @@ import { ToastProvider } from "./overlay/toast";
 import { PermissionBatch, PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
+import { type Theme, ThemeToggle } from "./theme";
 import { ICONS } from "./surface";
 import { ElicitationForm, ElicitationReceipt } from "./elicitation";
 import { type Drawn, drawnBlocks } from "./grouping";
@@ -63,8 +64,10 @@ export interface ConversationProps {
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
   /** Answers a question from the agent. Without it a question is shown and cannot be answered. */
   readonly onAnswerQuestion?: (requestId: string, response: CreateElicitationResponse) => void;
-  /** Leave unset to follow the system's light or dark setting. */
-  readonly theme?: "light" | "dark";
+  /** "system", or unset, follows the system's light or dark setting. */
+  readonly theme?: Theme;
+  /** Called when the theme button is pressed. Without it the conversation has no theme button. */
+  readonly onThemeChange?: (theme: Theme) => void;
   /** Called when a configuration control changes. Without it the controls are shown read-only. */
   readonly onSetConfig?: (configId: string, value: string | boolean) => void;
   /** The records prose may name, so a handle in a message becomes a chip. */
@@ -210,6 +213,7 @@ export function Conversation({
   onAnswer,
   onAnswerQuestion,
   theme,
+  onThemeChange,
   records,
   resolveLink,
   onSetConfig,
@@ -231,7 +235,10 @@ export function Conversation({
     <RecordsContext.Provider value={records}>
       <LinksContext.Provider value={resolveLink}>
         <IconContext.Provider value={ICONS}>
-          <section className="lk-root" {...(theme ? { "data-theme": theme } : {})}>
+          <section
+            className="lk-root"
+            {...(theme === "light" || theme === "dark" ? { "data-theme": theme } : {})}
+          >
             <ToastProvider>
               <header className="lk-header">
                 <h2 className="lk-title">{state.title ?? "New session"}</h2>
@@ -250,6 +257,9 @@ export function Conversation({
                       {fillPercent(usage.used, usage.size)}%
                       {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
                     </span>
+                  )}
+                  {onThemeChange === undefined ? null : (
+                    <ThemeToggle theme={theme ?? "system"} onChange={onThemeChange} />
                   )}
                 </div>
               </header>
