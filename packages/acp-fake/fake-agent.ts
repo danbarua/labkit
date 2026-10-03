@@ -12,6 +12,7 @@ import {
   SCENARIOS,
   play,
   promptResponse,
+  type QuestionAnswer,
 } from "@labkit/acp-scenarios";
 
 export interface FakeAgentOptions {
@@ -123,6 +124,14 @@ export function createFakeAgent(world: FakeWorld = createFakeWorld()) {
           const settled = await Promise.race([asked, whenAborted(cancel.signal)]);
           if (settled === "cancel" || settled.outcome.outcome === "cancelled") return "cancel";
           return { optionId: settled.outcome.optionId };
+        },
+        question: async (request): Promise<QuestionAnswer> => {
+          const asked = ctx.client.request(acp.methods.client.elicitation.create, {
+            ...request,
+            sessionId,
+          } as acp.CreateElicitationRequest);
+          const settled = await Promise.race([asked, whenAborted(cancel.signal)]);
+          return settled === "cancel" ? { action: "cancel" } : settled;
         },
       });
       session.cancel = undefined;

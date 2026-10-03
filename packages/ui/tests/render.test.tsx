@@ -73,6 +73,19 @@ describe("the transcript", () => {
     expect(html).toContain("/workspace/runs/control.toml");
   });
 
+  test("a question waiting on the person is a form; an answered one is a record of the answer", async () => {
+    const waiting = await draw("question-asked", true);
+    expect(waiting).toContain("Settings for the seed sweep");
+    expect(waiting).toContain("Run name");
+    expect(waiting).toContain("Waiting for you");
+    const answered = await draw("question-answered");
+    expect(answered).toContain('aria-label="Your answer"');
+    expect(answered).toContain("<dt>Run name</dt><dd>seed-sweep-25</dd>");
+    expect(answered).toContain("<dt>Optimiser</dt><dd>adamw</dd>");
+    expect(answered).toContain("Sent");
+    expect(answered).toContain("Starting the sweep with those settings.");
+  });
+
   test("notices, usage and a compaction are drawn", async () => {
     const html = await draw("notices-and-usage");
     expect(html).toContain("Closing the seed-count question");
@@ -172,6 +185,7 @@ describe("the empty and read-only states", () => {
           toolCalls: {},
           plans: {},
           permissions: [],
+          elicitations: [],
           running: false,
           commands: [],
         }}

@@ -5,6 +5,8 @@
  */
 
 import type {
+  CreateElicitationRequest,
+  CreateElicitationResponse,
   RequestPermissionOutcome,
   RequestPermissionRequest,
   SessionUpdate,
@@ -22,6 +24,11 @@ export interface Branch {
 
 export type Step =
   | { readonly kind: "update"; readonly update: SessionUpdate }
+  /**
+   * The agent asks the person something (`elicitation/create`) and waits for the answer; what
+   * follows in the list comes after it. The fake agent sends it under the live session's id.
+   */
+  | { readonly kind: "question"; readonly request: CreateElicitationRequest }
   | {
       readonly kind: "permission";
       readonly request: PermissionRequest;
@@ -62,10 +69,14 @@ export const promptResponse = (scenario: Scenario, stopReason: StopReason) => ({
 /** The answer given to an open permission request. `hold` leaves it open. */
 export type Answer = { readonly optionId: string } | "hold" | "cancel";
 
+/** The answer given to a question from the agent. `hold` leaves it open. */
+export type QuestionAnswer = CreateElicitationResponse | "hold";
+
 /** What the client does when the agent asks: fixed by a fixture, or by a person. */
 export interface PlaySink {
   update(update: SessionUpdate): void | Promise<void>;
   permission(request: PermissionRequest): Answer | Promise<Answer>;
+  question(request: CreateElicitationRequest): QuestionAnswer | Promise<QuestionAnswer>;
 }
 
 type Ended = { readonly held: true } | { readonly held: false; readonly stopReason?: StopReason };
@@ -80,6 +91,10 @@ export async function play(scenario: Scenario, sink: PlaySink): Promise<StopReas
     for (const step of steps) {
       if (step.kind === "update") {
         await sink.update(step.update);
+        continue;
+      }
+      if (step.kind === "question") {
+        if ((await sink.question(step.request)) === "hold") return { held: true };
         continue;
       }
       const answer = await sink.permission(step.request);
@@ -114,6 +129,7 @@ export interface Played {
 export async function collect(
   scenario: Scenario,
   decide: (request: PermissionRequest) => Answer,
+  answerQuestion: (request: CreateElicitationRequest) => QuestionAnswer = () => "hold",
 ): Promise<Played> {
   const updates: SessionUpdate[] = [];
   const permissions: { request: PermissionRequest; outcome?: RequestPermissionOutcome }[] = [];
@@ -133,6 +149,7 @@ export async function collect(
         });
       return answer;
     },
+    question: answerQuestion,
   });
   return { updates, permissions, stopReason };
 }

@@ -37,10 +37,10 @@ describe("the corpus", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  test("a turn is still running only in the fixture that holds a permission request open", async () => {
+  test("a turn is still running only in the fixtures that leave a request to the person open", async () => {
     for (const fixture of FIXTURES) {
       const state = await viewOf(fixture.id);
-      expect(state.running).toBe(fixture.id === "permission-pending");
+      expect(state.running).toBe(["permission-pending", "question-asked"].includes(fixture.id));
     }
   });
 });

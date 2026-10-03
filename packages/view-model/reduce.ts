@@ -1,5 +1,6 @@
 import type {
   ContentBlock,
+  CreateElicitationResponse,
   PromptResponse,
   RequestPermissionOutcome,
   SessionUpdate,
@@ -9,6 +10,7 @@ import type {
 import { mergeToolCall } from "./merge-tool-call";
 import {
   type Block,
+  type ElicitationRequest,
   initialState,
   type PermissionRequest,
   type Plan,
@@ -38,6 +40,18 @@ export type ViewEvent =
       readonly requestId: string;
       readonly outcome: RequestPermissionOutcome;
     }
+  | {
+      readonly type: "elicitation_requested";
+      readonly requestId: string;
+      readonly request: ElicitationRequest;
+    }
+  | {
+      readonly type: "elicitation_answered";
+      readonly requestId: string;
+      readonly response: CreateElicitationResponse;
+    }
+  /** The agent says the URL-mode interaction it asked for has finished (`elicitation/complete`). */
+  | { readonly type: "elicitation_completed"; readonly elicitationId: string }
   /** The client could not reach the agent or the agent's reply was an error. */
   | { readonly type: "failed"; readonly message: string };
 
@@ -291,6 +305,32 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
       const entry = { requestId: event.requestId, request: event.request };
       return { ...withCall, permissions: [...withCall.permissions, entry] };
     }
+    case "elicitation_requested": {
+      const entry = { requestId: event.requestId, request: event.request };
+      const block: Block = { kind: "elicitation", requestId: event.requestId };
+      return {
+        ...state,
+        elicitations: [...state.elicitations, entry],
+        blocks: [...state.blocks, block],
+      };
+    }
+    case "elicitation_answered":
+      return {
+        ...state,
+        elicitations: state.elicitations.map((e) =>
+          e.requestId === event.requestId ? { ...e, response: event.response } : e,
+        ),
+      };
+    case "elicitation_completed":
+      // An id this client does not know, or one already finished, changes nothing.
+      return {
+        ...state,
+        elicitations: state.elicitations.map((e) =>
+          "elicitationId" in e.request && e.request.elicitationId === event.elicitationId
+            ? { ...e, completed: true }
+            : e,
+        ),
+      };
     case "permission_answered":
       return {
         ...state,

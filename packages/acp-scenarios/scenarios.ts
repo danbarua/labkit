@@ -450,6 +450,42 @@ export const turnCancelled: Scenario = {
   ],
 };
 
+export const questionAsked: Scenario = {
+  id: "question-asked",
+  title: "A question from the agent",
+  prompt: "Set up the seed sweep.",
+  stopReason: "end_turn",
+  steps: [
+    say("Before I start the sweep, I need a few settings.", "m1"),
+    {
+      kind: "question",
+      request: {
+        mode: "form",
+        // The fake agent sends it under the live session's id.
+        sessionId: "scenario",
+        message: "Settings for the seed sweep",
+        requestedSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", title: "Run name", minLength: 1 },
+            seeds: { type: "integer", title: "Seeds", minimum: 1, maximum: 50, default: 25 },
+            optimiser: {
+              type: "string",
+              title: "Optimiser",
+              oneOf: [
+                { const: "adamw", title: "AdamW" },
+                { const: "sgd", title: "SGD with momentum" },
+              ],
+            },
+          },
+          required: ["name"],
+        },
+      },
+    },
+    say("Starting the sweep with those settings.", "m2"),
+  ],
+};
+
 export const sessionReplay: Scenario = {
   id: "session-replay",
   title: "A reopened session",
@@ -513,6 +549,7 @@ export const SCENARIOS: readonly Scenario[] = [
   turnFails,
   answerCutShort,
   turnCancelled,
+  questionAsked,
   sessionReplay,
   noticesAndUsage,
 ];

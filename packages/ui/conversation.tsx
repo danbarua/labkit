@@ -1,4 +1,8 @@
-import type { AvailableCommand, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
+import type {
+  AvailableCommand,
+  CreateElicitationResponse,
+  RequestPermissionOutcome,
+} from "@agentclientprotocol/sdk";
 import {
   type Block,
   cancelledPrompt,
@@ -32,6 +36,7 @@ import { PermissionBatch, PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
 import { ICONS } from "./surface";
+import { ElicitationForm, ElicitationReceipt } from "./elicitation";
 import { drawnBlocks } from "./grouping";
 import { LinksContext, type ResolveLink } from "./links";
 import { ToolCard, ToolGroup } from "./tool";
@@ -55,6 +60,8 @@ export interface ConversationProps {
   readonly attach?: AttachLimits;
   readonly onCancel?: () => void;
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
+  /** Answers a question from the agent. Without it a question is shown and cannot be answered. */
+  readonly onAnswerQuestion?: (requestId: string, response: CreateElicitationResponse) => void;
   /** Leave unset to follow the system's light or dark setting. */
   readonly theme?: "light" | "dark";
   /** Called when a configuration control changes. Without it the controls are shown read-only. */
@@ -79,11 +86,13 @@ function BlockView({
   state,
   last = false,
   onMessageAction,
+  onAnswerQuestion,
 }: {
   block: Block;
   state: TranscriptState;
   last?: boolean;
   onMessageAction?: ((action: MessageAction, block: Block) => void) | undefined;
+  onAnswerQuestion?: ((requestId: string, response: CreateElicitationResponse) => void) | undefined;
 }) {
   switch (block.kind) {
     case "user":
@@ -115,6 +124,25 @@ function BlockView({
     case "plan": {
       const plan = state.plans[block.planId];
       return plan === undefined ? null : <PlanView plan={plan} />;
+    }
+    case "elicitation": {
+      const entry = state.elicitations.find((e) => e.requestId === block.requestId);
+      if (entry === undefined) return null;
+      return entry.response === undefined ? (
+        <ElicitationForm
+          request={entry.request}
+          completed={entry.completed ?? false}
+          onRespond={
+            onAnswerQuestion && ((response) => onAnswerQuestion(entry.requestId, response))
+          }
+        />
+      ) : (
+        <ElicitationReceipt
+          request={entry.request}
+          response={entry.response}
+          completed={entry.completed ?? false}
+        />
+      );
     }
     case "notice":
       return <Notice block={block} />;
@@ -185,6 +213,7 @@ export function Conversation({
   onSend,
   onCancel,
   onAnswer,
+  onAnswerQuestion,
   theme,
   records,
   resolveLink,
@@ -241,6 +270,7 @@ export function Conversation({
                         state={state}
                         last={item === drawn.at(-1)}
                         onMessageAction={onMessageAction}
+                        onAnswerQuestion={onAnswerQuestion}
                       />
                     ) : (
                       <ToolGroup

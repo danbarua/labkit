@@ -2,6 +2,8 @@ import type {
   AvailableCommand,
   ContentBlock,
   Cost,
+  CreateElicitationRequest,
+  CreateElicitationResponse,
   PlanEntry,
   RequestPermissionOutcome,
   RequestPermissionRequest,
@@ -12,6 +14,9 @@ import type {
 
 /** A permission request as the agent sends it, less the session the connection supplies. */
 export type PermissionRequest = Omit<RequestPermissionRequest, "sessionId">;
+
+/** A question the agent asks the person (`elicitation/create`), as the agent sends it. */
+export type ElicitationRequest = CreateElicitationRequest;
 
 /**
  * One item of a transcript, in the order it first appeared. Text-bearing blocks hold the content
@@ -24,6 +29,7 @@ export type Block =
   | { readonly kind: "thought"; readonly id: string; readonly content: readonly ContentBlock[] }
   | { readonly kind: "tool"; readonly toolCallId: string }
   | { readonly kind: "plan"; readonly planId: string }
+  | { readonly kind: "elicitation"; readonly requestId: string }
   | {
       readonly kind: "notice";
       readonly id: string;
@@ -51,6 +57,17 @@ export interface PermissionEntry {
   readonly outcome?: RequestPermissionOutcome;
 }
 
+/**
+ * A question from the agent and, once the person has answered it, the answer. A URL-mode question
+ * is `completed` once the agent says the interaction behind it has finished (`elicitation/complete`).
+ */
+export interface ElicitationEntry {
+  readonly requestId: string;
+  readonly request: ElicitationRequest;
+  readonly response?: CreateElicitationResponse;
+  readonly completed?: boolean;
+}
+
 export interface Usage {
   readonly used: number;
   readonly size: number;
@@ -63,6 +80,7 @@ export interface TranscriptState {
   readonly toolCalls: Readonly<Record<string, ToolCall>>;
   readonly plans: Readonly<Record<string, Plan>>;
   readonly permissions: readonly PermissionEntry[];
+  readonly elicitations: readonly ElicitationEntry[];
   /** A prompt has been sent and the turn has not ended. */
   readonly running: boolean;
   readonly stopReason?: StopReason;
@@ -78,6 +96,7 @@ export const initialState: TranscriptState = {
   toolCalls: {},
   plans: {},
   permissions: [],
+  elicitations: [],
   running: false,
   commands: [],
 };

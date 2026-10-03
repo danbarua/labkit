@@ -2,6 +2,7 @@ export { mergeToolCall } from "./merge-tool-call";
 export { promptEnded, reduce, replay, type ViewEvent } from "./reduce";
 export {
   cancelledPrompt,
+  pendingElicitations,
   pendingPermissions,
   type Phase,
   permissionFor,
@@ -11,6 +12,8 @@ export {
 } from "./selectors";
 export {
   type Block,
+  type ElicitationEntry,
+  type ElicitationRequest,
   initialState,
   type PermissionEntry,
   type PermissionRequest,

@@ -34,6 +34,14 @@ export async function eventsOfFixture(fixture: Fixture): Promise<ViewEvent[]> {
       }
       return answer;
     },
+    question: (request) => {
+      const requestId = `question-${++count}`;
+      events.push({ type: "elicitation_requested", requestId, request });
+      const answer = fixture.answer?.(request) ?? "hold";
+      if (answer !== "hold")
+        events.push({ type: "elicitation_answered", requestId, response: answer });
+      return answer;
+    },
   });
   if (scenario.fails) events.push({ type: "failed", message: scenario.fails.message });
   else if (stopReason !== undefined) events.push(promptEnded(promptResponse(scenario, stopReason)));

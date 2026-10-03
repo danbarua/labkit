@@ -1,5 +1,5 @@
 import type { ContentBlock, ToolCall } from "@agentclientprotocol/sdk";
-import type { Block, PermissionEntry, TranscriptState } from "./state";
+import type { Block, ElicitationEntry, PermissionEntry, TranscriptState } from "./state";
 
 /** Requests the client has not yet answered. The agent's turn is blocked on each. */
 export function pendingPermissions(state: TranscriptState): readonly PermissionEntry[] {
@@ -14,11 +14,20 @@ export function permissionFor(
   return state.permissions.findLast((p) => p.request.toolCall.toolCallId === toolCallId);
 }
 
+/** Questions from the agent the person has not yet answered. The agent's turn waits on each. */
+export function pendingElicitations(state: TranscriptState): readonly ElicitationEntry[] {
+  return state.elicitations.filter((e) => e.response === undefined);
+}
+
 export type Phase = "idle" | "running" | "awaiting_permission";
 
-/** A turn that is waiting on the person is not the same as one that is working. */
+/**
+ * A turn that is waiting on the person, for a permission or an answer to a question, is not the
+ * same as one that is working.
+ */
 export function phase(state: TranscriptState): Phase {
-  if (pendingPermissions(state).length > 0) return "awaiting_permission";
+  if (pendingPermissions(state).length > 0 || pendingElicitations(state).length > 0)
+    return "awaiting_permission";
   return state.running ? "running" : "idle";
 }
 
