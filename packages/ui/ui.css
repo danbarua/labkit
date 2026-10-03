@@ -141,9 +141,10 @@
   padding: 18px 16px 8px;
 }
 .lk-blocks {
+  --lk-block-gap: 14px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--lk-block-gap);
   max-width: var(--lk-column);
   margin: 0 auto;
 }
@@ -1128,7 +1129,21 @@ a.lk-btn {
 .lk-blocks > * {
   transition:
     opacity 0.22s ease,
-    translate 0.22s ease;
+    translate 0.22s ease,
+    block-size 0.22s ease,
+    margin-block-end 0.22s ease;
+}
+/* One block, or one run of tool calls. A column, so a message can sit to one side of it. */
+.lk-item {
+  display: flex;
+  flex-direction: column;
+}
+/* A block that has gone from the transcript closes up, taking the gap after it, and fades. */
+.lk-item[data-leaving] {
+  block-size: 0;
+  margin-block-end: calc(-1 * var(--lk-block-gap));
+  opacity: 0;
+  overflow: clip;
 }
 @starting-style {
   .lk-blocks > * {

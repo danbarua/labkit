@@ -38,6 +38,7 @@ import { SessionControls } from "./session-controls";
 import { ICONS } from "./surface";
 import { ElicitationForm, ElicitationReceipt } from "./elicitation";
 import { type Drawn, drawnBlocks } from "./grouping";
+import { TranscriptItem, useLeaving } from "./leaving";
 import { LinksContext, type ResolveLink } from "./links";
 import { ToolRun } from "./tool";
 
@@ -222,6 +223,8 @@ export function Conversation({
   const usage = state.usage;
   const activity = afterPause(currentActivity(state), useQuiet(state.blocks, PAUSE_MS));
   const drawn = drawnBlocks(state);
+  // A block that has gone (a cleared plan) is drawn as it last was while it leaves.
+  const { shown, left } = useLeaving(drawn.map((item) => ({ key: item.key, item, state })));
   const indicator = useLingering(activity);
 
   return (
@@ -256,28 +259,28 @@ export function Conversation({
                   {state.blocks.length === 0 ? (
                     <div className="lk-empty">Nothing here yet.</div>
                   ) : null}
-                  {drawn.map((item) =>
-                    item.kind === "block" ? (
-                      <BlockView
-                        key={item.key}
-                        block={item.block}
-                        state={state}
-                        last={item === drawn.at(-1)}
-                        onMessageAction={onMessageAction}
-                        onAnswerQuestion={onAnswerQuestion}
-                      />
-                    ) : (
-                      <ToolRun
-                        key={item.key}
-                        calls={item.blocks.flatMap((block) => {
-                          const call = state.toolCalls[block.toolCallId];
-                          return call === undefined
-                            ? []
-                            : [{ call, permission: permissionFor(state, block.toolCallId) }];
-                        })}
-                      />
-                    ),
-                  )}
+                  {shown.map(({ key, value: { item, state: at }, leaving }) => (
+                    <TranscriptItem key={key} id={key} leaving={leaving} onLeft={left}>
+                      {item.kind === "block" ? (
+                        <BlockView
+                          block={item.block}
+                          state={at}
+                          last={item === drawn.at(-1)}
+                          onMessageAction={onMessageAction}
+                          onAnswerQuestion={onAnswerQuestion}
+                        />
+                      ) : (
+                        <ToolRun
+                          calls={item.blocks.flatMap((block) => {
+                            const call = at.toolCalls[block.toolCallId];
+                            return call === undefined
+                              ? []
+                              : [{ call, permission: permissionFor(at, block.toolCallId) }];
+                          })}
+                        />
+                      )}
+                    </TranscriptItem>
+                  ))}
                   <WorkingIndicator {...indicator} loader={onSend === undefined} />
                 </div>
               </div>
