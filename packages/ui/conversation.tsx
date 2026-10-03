@@ -265,7 +265,7 @@ export function Conversation({
                   {drawn.map((item) =>
                     item.kind === "block" ? (
                       <BlockView
-                        key={item.index}
+                        key={item.key}
                         block={item.block}
                         state={state}
                         last={item === drawn.at(-1)}
@@ -274,7 +274,7 @@ export function Conversation({
                       />
                     ) : (
                       <ToolGroup
-                        key={item.index}
+                        key={item.key}
                         calls={item.blocks.flatMap((block) => {
                           const call = state.toolCalls[block.toolCallId];
                           return call === undefined

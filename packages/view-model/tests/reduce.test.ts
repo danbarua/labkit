@@ -129,6 +129,21 @@ describe("plans", () => {
     expect(state.plans).toEqual({});
   });
 
+  test("a block added after plans are removed has an id no other block has", () => {
+    const state = replay([
+      plan("p", "pending"),
+      plan("q", "pending"),
+      said("first"),
+      update({ sessionUpdate: "plan_removed", planId: "p" }),
+      update({ sessionUpdate: "plan_removed", planId: "q" }),
+      update({ sessionUpdate: "tool_call", toolCallId: "t", title: "read_file" }),
+      said("second"),
+    ]);
+    const ids = state.blocks.flatMap((b) => ("id" in b ? [b.id] : []));
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+
   test("a plan given as markdown or a file is kept as sent", () => {
     const state = replay([
       update({

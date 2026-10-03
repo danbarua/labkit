@@ -70,6 +70,17 @@ function joinContent(
 type MessageKind = "user" | "assistant" | "thought";
 
 /**
+ * An id for a new block that no block in the transcript has. Blocks can be removed (a cleared
+ * plan), so the count of blocks alone can name one that is already there.
+ */
+function freshId(state: TranscriptState, kind: Block["kind"]): string {
+  const taken = new Set(state.blocks.flatMap((b) => ("id" in b ? [b.id] : [])));
+  let n = state.blocks.length;
+  while (taken.has(`${kind}:${n}`)) n++;
+  return `${kind}:${n}`;
+}
+
+/**
  * A chunk continues the block before it when that is the same kind of message and the ids do not
  * say otherwise. An id that changes starts a new message; chunks with no id continue.
  */
@@ -86,7 +97,7 @@ function appendChunk(
   }
   const block: Block = {
     kind,
-    id: messageId ?? `${kind}:${state.blocks.length}`,
+    id: messageId ?? freshId(state, kind),
     content: [chunk],
   };
   return { ...state, blocks: [...state.blocks, block] };
@@ -188,7 +199,7 @@ function applyUpdate(state: TranscriptState, update: SessionUpdate): TranscriptS
     case "notice": {
       const block: Block = {
         kind: "notice",
-        id: `notice:${state.blocks.length}`,
+        id: freshId(state, "notice"),
         severity: update.severity,
         title: update.title,
         ...(update.description ? { description: update.description } : {}),
@@ -270,7 +281,7 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
     case "prompt_started": {
       const block: Block = {
         kind: "user",
-        id: `user:${state.blocks.length}`,
+        id: freshId(state, "user"),
         content: event.content,
       };
       const { stopReason: _cleared, ...rest } = state;
@@ -283,7 +294,7 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
       const description = event.reason ?? stopped.description;
       const block: Block = {
         kind: "notice",
-        id: `notice:${state.blocks.length}`,
+        id: freshId(state, "notice"),
         severity: stopped.severity,
         title: stopped.title,
         ...(description === undefined ? {} : { description }),
@@ -293,7 +304,7 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
     case "failed": {
       const block: Block = {
         kind: "notice",
-        id: `notice:${state.blocks.length}`,
+        id: freshId(state, "notice"),
         severity: "error",
         title: "The request failed",
         description: event.message,

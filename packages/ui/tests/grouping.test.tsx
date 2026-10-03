@@ -50,6 +50,27 @@ describe("folding runs of tool calls", () => {
     expect(drawn.map((d) => d.kind)).toEqual(["block", "block", "block"]);
   });
 
+  test("an item keeps its key when a block before it is removed", () => {
+    const plan = (entries: number): ViewEvent => ({
+      type: "update",
+      update: {
+        sessionUpdate: "plan",
+        entries: Array.from({ length: entries }, () => ({
+          content: "step",
+          priority: "medium" as const,
+          status: "pending" as const,
+        })),
+      },
+    });
+    const before = state(text("first"), plan(1), call("a", "read_file"), text("then"));
+    const after = reduce(before, plan(0));
+    const keys = (drawn: ReturnType<typeof drawnBlocks>) => drawn.map((d) => d.key);
+    expect(keys(drawnBlocks(after))).toEqual(
+      keys(drawnBlocks(before)).filter((key) => !key.startsWith("plan/")),
+    );
+    expect(new Set(keys(drawnBlocks(after))).size).toBe(drawnBlocks(after).length);
+  });
+
   test("the tally counts each tool in the order it first appears", () => {
     expect(toolTally(["read_file", "list_dir", "read_file", "update_plan", "read_file"])).toBe(
       "read_file ×3 · list_dir · update_plan",
