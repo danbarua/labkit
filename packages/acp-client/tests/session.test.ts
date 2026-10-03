@@ -199,11 +199,9 @@ describe("reopening a session", () => {
     const played = await playFixture(fixture);
     const live = replay(played.events);
 
+    // Reopening completes once the replayed history has been handled: nothing is left to wait for.
     const reopened = await open(played.server, undefined, played.client.sessionId);
-    await until(
-      () => updatesIn(reopened.events) >= updatesIn(played.events) + 1,
-      "the replay to arrive",
-    );
+    expect(updatesIn(reopened.events)).toBe(updatesIn(played.events) + 1);
     const replayed = replay(reopened.events);
 
     expect(replayed.blocks.map((b) => b.kind)).toEqual(live.blocks.map((b) => b.kind));
