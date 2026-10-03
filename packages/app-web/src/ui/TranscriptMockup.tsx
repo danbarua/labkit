@@ -84,7 +84,7 @@ function Replay({ slug, recording }: { slug: string; recording: Recording }) {
       </button>
       <span className="dim" style={{ fontVariantNumeric: "tabular-nums", minWidth: 90 }}>
         {playback.applied} / {playback.total}
-        {recording.at === undefined ? " · untimed" : ""}
+        {recording.at === undefined ? " · no times recorded" : ""}
       </span>
       {(["system", "light", "dark"] as const).map((t) => (
         <button key={t} type="button" onClick={() => setTheme(t)} disabled={theme === t}>

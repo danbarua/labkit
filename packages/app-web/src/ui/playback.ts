@@ -9,13 +9,17 @@ export interface Recording {
 
 /** The longest a replay waits between two events, so a session's idle minutes play in a moment. */
 export const LONGEST_WAIT_MS = 1500;
-/** The wait between events of a recording with no arrival times. */
-export const STEADY_WAIT_MS = 40;
+/**
+ * The wait between events of a recording with no arrival times, at 1×: slow enough to watch a
+ * block open, fold or leave. Faster speeds divide it.
+ */
+export const STEADY_WAIT_MS = 300;
 
 /** How long to wait before applying event `index`, at `speed` times the recorded pace. */
 export function stepDelay(recording: Recording, index: number, speed: number): number {
   const { at } = recording;
-  if (at === undefined || index === 0) return at === undefined ? STEADY_WAIT_MS : 0;
+  if (at === undefined) return STEADY_WAIT_MS / speed;
+  if (index === 0) return 0;
   const gap = (at[index] ?? 0) - (at[index - 1] ?? 0);
   return Math.min(Math.max(0, gap) / speed, LONGEST_WAIT_MS);
 }
