@@ -60,22 +60,7 @@ const CAPABILITIES: V1.ClientCapabilities = {
   session: { notices: {}, compaction: {}, configOptions: { boolean: {} } },
 };
 
-/**
- * Words for why a call failed. An error the agent answered with is a JSON-RPC error object
- * (`{ code, message }`), not an `Error`; the library's own errors are tagged `Error`s, some with
- * the reason in a field rather than in `message`.
- */
-const describeError = (err: unknown): string => {
-  if (typeof err !== "object" || err === null) return String(err);
-  const fields = err as { message?: unknown; reason?: unknown; _tag?: unknown };
-  if (typeof fields.message === "string" && fields.message !== "") return fields.message;
-  if (typeof fields.reason === "string") return fields.reason;
-  return typeof fields._tag === "string" ? fields._tag : String(err);
-};
-
-/** Promise rejections carry what the effect failed with; this makes each an `Error` with words. */
-const asError = (err: unknown): Error =>
-  err instanceof Error && err.message !== "" ? err : new Error(describeError(err));
+const describeError = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** The services a connection runs on: HTTP through `fetch`, or through the one given. */
 const runtimeFor = (fetchImpl: typeof fetch | undefined) =>
@@ -107,28 +92,22 @@ const open = (
   url: string,
   handlers: Client.ClientHandlers<Protocol.V1Version, never>,
 ): Promise<Connection> =>
-  runtime
-    .runPromise(
-      Effect.gen(function* () {
-        const wire = yield* Http.connect(url);
-        return yield* Client.connect({
-          wire,
-          info: CLIENT_INFO,
-          implementations: [implementation(handlers)],
-        });
-      }).pipe(Scope.provide(scope)),
-    )
-    .catch((err: unknown) => Promise.reject(asError(err)));
+  runtime.runPromise(
+    Effect.gen(function* () {
+      const wire = yield* Http.connect(url);
+      return yield* Client.connect({
+        wire,
+        info: CLIENT_INFO,
+        implementations: [implementation(handlers)],
+      });
+    }).pipe(Scope.provide(scope)),
+  );
 
 /** Ends the connection and the runtime it ran on. */
 const shut = async (runtime: Runtime, scope: Scope.Closeable): Promise<void> => {
   await runtime.runPromise(Scope.close(scope, Exit.void));
   await runtime.dispose();
 };
-
-/** Runs one call on the connection's runtime; a failure rejects with an `Error` that says why. */
-const run = <A, E>(runtime: Runtime, effect: Effect.Effect<A, E, never>): Promise<A> =>
-  runtime.runPromise(effect).catch((err: unknown) => Promise.reject(asError(err)));
 
 const decodePermissionResponse = Schema.decodeUnknownSync(V1.RequestPermissionResponse);
 const decodeElicitationResponse = Schema.decodeUnknownSync(V1.CreateElicitationResponse);
@@ -157,8 +136,7 @@ export async function listSessions(
     const sessions: acp.SessionInfo[] = [];
     let cursor: string | undefined;
     do {
-      const page = await run(
-        runtime,
+      const page = await runtime.runPromise(
         connection.agent["session/list"]({
           ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
           ...(cursor === undefined ? {} : { cursor }),
@@ -256,12 +234,13 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
   try {
     connection = await open(runtime, scope, options.url, handlers);
     if (sessionId === undefined) {
-      const created = await run(runtime, connection.agent["session/new"]({ cwd, mcpServers: [] }));
+      const created = await runtime.runPromise(
+        connection.agent["session/new"]({ cwd, mcpServers: [] }),
+      );
       sessionId = created.sessionId;
       opened = created;
     } else {
-      opened = await run(
-        runtime,
+      opened = await runtime.runPromise(
         connection.agent["session/load"]({ sessionId, cwd, mcpServers: [] }),
       );
     }
@@ -279,8 +258,7 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
     async prompt(text) {
       onEvent({ type: "prompt_started", content: [{ type: "text", text }] });
       try {
-        const response = await run(
-          runtime,
+        const response = await runtime.runPromise(
           connection.agent["session/prompt"]({ sessionId: id, prompt: [{ type: "text", text }] }),
         );
         onEvent(promptEnded(response as unknown as acp.PromptResponse));
@@ -288,13 +266,12 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
         onEvent({ type: "failed", message: describeError(err) });
       }
     },
-    cancel: () => run(runtime, connection.notify("session/cancel", { sessionId: id })),
+    cancel: () => runtime.runPromise(connection.notify("session/cancel", { sessionId: id })),
     answerPermission: answer,
     answerQuestion,
     async setConfigOption(configId, value) {
       try {
-        const { configOptions } = await run(
-          runtime,
+        const { configOptions } = await runtime.runPromise(
           connection.agent["session/set_config_option"](
             typeof value === "boolean"
               ? {
