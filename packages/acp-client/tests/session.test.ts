@@ -17,7 +17,7 @@ import {
   type ViewEvent,
 } from "@labkit/view-model";
 import { eventsOfFixture, stateOfFixture } from "@labkit/view-model/fixtures";
-import { connectSession, listSessions, type SessionClient } from "../index";
+import { connectSession, listSessions, type SessionClient, sessionHistory } from "../index";
 
 const URL = "http://fake.test/acp";
 
@@ -186,11 +186,10 @@ describe("a turn waiting on the person", () => {
 
     await client.close();
 
-    expect(events).toContainEqual({
-      type: "permission_answered",
-      requestId: "permission-1",
-      outcome: { outcome: "cancelled" },
-    });
+    // Once: answered on close, and not again when the closed connection ends the request.
+    expect(events.filter((e) => e.type === "permission_answered")).toEqual([
+      { type: "permission_answered", requestId: "permission-1", outcome: { outcome: "cancelled" } },
+    ]);
   });
 });
 
@@ -211,6 +210,23 @@ describe("reopening a session", () => {
     expect(replayed.toolCalls.call_why?.status).toBe("completed");
     await played.client.close();
     await reopened.client.close();
+  });
+});
+
+describe("a session's history", () => {
+  test("is what reopening it sends, complete, with the connection closed after", async () => {
+    const fixture = fixtureNamed("tool-succeeds");
+    const played = await playFixture(fixture);
+    const history = await sessionHistory({
+      url: URL,
+      fetch: inProcessFetch(played.server),
+      sessionId: played.client.sessionId,
+    });
+    expect(updatesIn(history)).toBe(updatesIn(played.events) + 1);
+    expect(replay(history).blocks.map((b) => b.kind)).toEqual(
+      replay(played.events).blocks.map((b) => b.kind),
+    );
+    await played.client.close();
   });
 });
 

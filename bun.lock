@@ -46,6 +46,8 @@
       "dependencies": {
         "@agentclientprotocol/sdk": "catalog:",
         "@labkit/view-model": "workspace:*",
+        "effect": "4.0.0",
+        "effective-acp": "0.1.0",
       },
       "devDependencies": {
         "@labkit/acp-fake": "workspace:*",
@@ -1012,6 +1014,10 @@
     "editions": ["editions@6.22.0", "", { "dependencies": { "version-range": "^4.15.0" } }, "sha512-UgGlf8IW75je7HZjNDpJdCv4cGJWIi6yumFdZ0R7A8/CIhQiWUjyGLCxdHpd8bmyD1gnkfUNK0oeOXqUS2cpfQ=="],
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
+
+    "effect": ["effect@4.0.0", "", {}, "sha512-ooc1TG5t+FfzgYnFz2ff6BBKyZ7EwBRVXC7c4RhQUAD6/TZ2gTXXMeb4WX7a19ozQo4J73/QW+S00YAIresoMQ=="],
+
+    "effective-acp": ["effective-acp@0.1.0", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-wMVLNbSikzhv4Z7P3OqhUSMlXZwispwTppAqwkVPBOf0FcVTCeK0f7KbguARclq0GHllB3DhGwrUKPYqPmu2NQ=="],
 
     "electron-to-chromium": ["electron-to-chromium@1.5.433", "", {}, "sha512-5lCAbyZBjtmUt/RAGHRqrL2q0oEFRThDAsZHHDn9XHa89Qw7gMYOeSicBTy+AHfvo0r6vwsZvqNJTQIQy1BLzA=="],
 
