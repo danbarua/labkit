@@ -9,6 +9,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
 import { Bar } from "./Bar";
+import { useSavedTheme } from "./saved-theme";
 
 type Status = "connecting" | "ready" | "failed";
 
@@ -109,6 +110,7 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
   const real = AGENT_CWD !== undefined;
   const { state, status, started, send, cancel, answer, answerQuestion, setConfig } =
     useAgentSession(AGENT_URL, AGENT_CWD, sessionId);
+  const [theme, setTheme] = useSavedTheme();
   // A session started here takes its own address, so reloading the page reopens it.
   const navigate = useNavigate();
   useEffect(() => {
@@ -136,6 +138,8 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
         <Conversation
           state={state}
           records={{ types: RECORD_TYPES }}
+          theme={theme}
+          onThemeChange={setTheme}
           hostCommands={HOST_COMMANDS}
           onSend={(text) => {
             // A full page load: the page keeps the session it has open, and this starts one.
