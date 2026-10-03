@@ -1,6 +1,11 @@
-import type { AvailableCommand, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
+import type {
+  AvailableCommand,
+  CreateElicitationResponse,
+  RequestPermissionOutcome,
+} from "@agentclientprotocol/sdk";
 import {
   type Block,
+  cancelledPrompt,
   pendingPermissions,
   type Phase,
   permissionFor,
@@ -30,10 +35,13 @@ import { ToastProvider } from "./overlay/toast";
 import { PermissionBatch, PermissionPrompt } from "./permission";
 import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
+import { type Theme, ThemeToggle } from "./theme";
 import { ICONS } from "./surface";
-import { drawnBlocks } from "./grouping";
+import { ElicitationForm, ElicitationReceipt } from "./elicitation";
+import { type Drawn, drawnBlocks } from "./grouping";
+import { TranscriptItem, useLeaving } from "./leaving";
 import { LinksContext, type ResolveLink } from "./links";
-import { ToolCard, ToolGroup } from "./tool";
+import { ToolRun } from "./tool";
 
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Idle",
@@ -54,8 +62,12 @@ export interface ConversationProps {
   readonly attach?: AttachLimits;
   readonly onCancel?: () => void;
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
-  /** Leave unset to follow the system's light or dark setting. */
-  readonly theme?: "light" | "dark";
+  /** Answers a question from the agent. Without it a question is shown and cannot be answered. */
+  readonly onAnswerQuestion?: (requestId: string, response: CreateElicitationResponse) => void;
+  /** "system", or unset, follows the system's light or dark setting. */
+  readonly theme?: Theme;
+  /** Called when the theme button is pressed. Without it the conversation has no theme button. */
+  readonly onThemeChange?: (theme: Theme) => void;
   /** Called when a configuration control changes. Without it the controls are shown read-only. */
   readonly onSetConfig?: (configId: string, value: string | boolean) => void;
   /** The records prose may name, so a handle in a message becomes a chip. */
@@ -78,11 +90,13 @@ function BlockView({
   state,
   last = false,
   onMessageAction,
+  onAnswerQuestion,
 }: {
-  block: Block;
+  block: Extract<Drawn, { kind: "block" }>["block"];
   state: TranscriptState;
   last?: boolean;
   onMessageAction?: ((action: MessageAction, block: Block) => void) | undefined;
+  onAnswerQuestion?: ((requestId: string, response: CreateElicitationResponse) => void) | undefined;
 }) {
   switch (block.kind) {
     case "user":
@@ -105,15 +119,28 @@ function BlockView({
       );
     case "thought":
       return <Thought block={block} streaming={last && state.running} />;
-    case "tool": {
-      const call = state.toolCalls[block.toolCallId];
-      if (call === undefined) return null;
-      const permission = permissionFor(state, block.toolCallId);
-      return <ToolCard call={call} {...(permission ? { permission } : {})} />;
-    }
     case "plan": {
       const plan = state.plans[block.planId];
       return plan === undefined ? null : <PlanView plan={plan} />;
+    }
+    case "elicitation": {
+      const entry = state.elicitations.find((e) => e.requestId === block.requestId);
+      if (entry === undefined) return null;
+      return entry.response === undefined ? (
+        <ElicitationForm
+          request={entry.request}
+          completed={entry.completed ?? false}
+          onRespond={
+            onAnswerQuestion && ((response) => onAnswerQuestion(entry.requestId, response))
+          }
+        />
+      ) : (
+        <ElicitationReceipt
+          request={entry.request}
+          response={entry.response}
+          completed={entry.completed ?? false}
+        />
+      );
     }
     case "notice":
       return <Notice block={block} />;
@@ -184,7 +211,9 @@ export function Conversation({
   onSend,
   onCancel,
   onAnswer,
+  onAnswerQuestion,
   theme,
+  onThemeChange,
   records,
   resolveLink,
   onSetConfig,
@@ -198,13 +227,18 @@ export function Conversation({
   const usage = state.usage;
   const activity = afterPause(currentActivity(state), useQuiet(state.blocks, PAUSE_MS));
   const drawn = drawnBlocks(state);
+  // A block that has gone (a cleared plan) is drawn as it last was while it leaves.
+  const { shown, left } = useLeaving(drawn.map((item) => ({ key: item.key, item, state })));
   const indicator = useLingering(activity);
 
   return (
     <RecordsContext.Provider value={records}>
       <LinksContext.Provider value={resolveLink}>
         <IconContext.Provider value={ICONS}>
-          <section className="lk-root" {...(theme ? { "data-theme": theme } : {})}>
+          <section
+            className="lk-root"
+            {...(theme === "light" || theme === "dark" ? { "data-theme": theme } : {})}
+          >
             <ToastProvider>
               <header className="lk-header">
                 <h2 className="lk-title">{state.title ?? "New session"}</h2>
@@ -224,6 +258,9 @@ export function Conversation({
                       {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
                     </span>
                   )}
+                  {onThemeChange === undefined ? null : (
+                    <ThemeToggle theme={theme ?? "system"} onChange={onThemeChange} />
+                  )}
                 </div>
               </header>
 
@@ -232,27 +269,28 @@ export function Conversation({
                   {state.blocks.length === 0 ? (
                     <div className="lk-empty">Nothing here yet.</div>
                   ) : null}
-                  {drawn.map((item) =>
-                    item.kind === "block" ? (
-                      <BlockView
-                        key={item.index}
-                        block={item.block}
-                        state={state}
-                        last={item === drawn.at(-1)}
-                        onMessageAction={onMessageAction}
-                      />
-                    ) : (
-                      <ToolGroup
-                        key={item.index}
-                        calls={item.blocks.flatMap((block) => {
-                          const call = state.toolCalls[block.toolCallId];
-                          return call === undefined
-                            ? []
-                            : [{ call, permission: permissionFor(state, block.toolCallId) }];
-                        })}
-                      />
-                    ),
-                  )}
+                  {shown.map(({ key, value: { item, state: at }, leaving }) => (
+                    <TranscriptItem key={key} id={key} leaving={leaving} onLeft={left}>
+                      {item.kind === "block" ? (
+                        <BlockView
+                          block={item.block}
+                          state={at}
+                          last={item === drawn.at(-1)}
+                          onMessageAction={onMessageAction}
+                          onAnswerQuestion={onAnswerQuestion}
+                        />
+                      ) : (
+                        <ToolRun
+                          calls={item.blocks.flatMap((block) => {
+                            const call = at.toolCalls[block.toolCallId];
+                            return call === undefined
+                              ? []
+                              : [{ call, permission: permissionFor(at, block.toolCallId) }];
+                          })}
+                        />
+                      )}
+                    </TranscriptItem>
+                  ))}
                   <WorkingIndicator {...indicator} loader={onSend === undefined} />
                 </div>
               </div>
@@ -279,6 +317,7 @@ export function Conversation({
                   mentions={mentions}
                   attach={attach}
                   loader={moodOf(indicator)}
+                  recall={cancelledPrompt(state)}
                 />
               ) : state.configOptions && state.configOptions.length > 0 ? (
                 <div className="lk-session-summary">

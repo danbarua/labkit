@@ -5,6 +5,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import * as acp from "@agentclientprotocol/sdk";
+import { AcpServer } from "@agentclientprotocol/sdk/experimental/server";
 import { createFakeAcpServer, inProcessFetch } from "@labkit/acp-fake";
 import { type Fixture, FIXTURES } from "@labkit/acp-scenarios";
 import {
@@ -15,7 +17,7 @@ import {
   type ViewEvent,
 } from "@labkit/view-model";
 import { eventsOfFixture, stateOfFixture } from "@labkit/view-model/fixtures";
-import { connectSession, type SessionClient } from "../index";
+import { connectSession, listSessions, type SessionClient } from "../index";
 
 const URL = "http://fake.test/acp";
 
@@ -41,11 +43,12 @@ interface Live {
   readonly events: ViewEvent[];
 }
 
-/** Connects, answering permission requests the way the fixture says the person does. */
+/** Connects, answering permission requests and questions the way the fixture says the person does. */
 async function open(
   server: ReturnType<typeof createFakeAcpServer>,
   decide: Fixture["decide"] | undefined,
   sessionId?: string,
+  answerQuestion?: Fixture["answer"],
 ): Promise<Live> {
   const events: ViewEvent[] = [];
   const holder: { client?: SessionClient } = {};
@@ -55,6 +58,12 @@ async function open(
     ...(sessionId === undefined ? {} : { sessionId }),
     onEvent: (event) => {
       events.push(event);
+      if (event.type === "elicitation_requested" && answerQuestion !== undefined) {
+        const answer = answerQuestion(event.request);
+        if (answer !== "hold")
+          queueMicrotask(() => holder.client?.answerQuestion(event.requestId, answer));
+        return;
+      }
       if (event.type !== "permission_requested" || decide === undefined) return;
       const answer = decide(event.request);
       if (answer === "hold") return;
@@ -75,7 +84,7 @@ async function open(
 /** Plays a fixture through the client, waiting for everything the corpus says the agent sends. */
 async function playFixture(fixture: Fixture, server = createFakeAcpServer()) {
   const expected = updatesIn(await eventsOfFixture(fixture));
-  const live = await open(server, fixture.decide);
+  const live = await open(server, fixture.decide, undefined, fixture.answer);
   await live.client.prompt(fixture.scenario.prompt);
   await until(() => updatesIn(live.events) >= expected, "the agent's updates to arrive");
   return { ...live, server };
@@ -95,14 +104,34 @@ const COMPLETED = [
   "turn-fails",
   "answer-cut-short",
   "turn-cancelled",
+  "question-answered",
 ];
+
+/**
+ * The events a live session gave, with each question's session id set to the corpus's own. The
+ * fake agent asks under the live session's id, which the corpus cannot know; nothing else differs.
+ */
+const asInCorpus = (events: readonly ViewEvent[], fixture: Fixture): ViewEvent[] => {
+  const placeholder = fixture.scenario.steps.flatMap((step) =>
+    step.kind === "question" &&
+    "sessionId" in step.request &&
+    typeof step.request.sessionId === "string"
+      ? [step.request.sessionId]
+      : [],
+  )[0];
+  return events.map((event) =>
+    event.type === "elicitation_requested" && placeholder !== undefined
+      ? { ...event, request: { ...event.request, sessionId: placeholder } as typeof event.request }
+      : event,
+  );
+};
 
 describe("a live session reduces to what the corpus says", () => {
   for (const id of COMPLETED) {
     test(`${id}`, async () => {
       const fixture = fixtureNamed(id);
       const { events, client } = await playFixture(fixture);
-      expect(replay(events)).toEqual(await stateOfFixture(fixture));
+      expect(replay(asInCorpus(events, fixture))).toEqual(await stateOfFixture(fixture));
       await client.close();
     });
   }
@@ -182,6 +211,33 @@ describe("reopening a session", () => {
     expect(replayed.toolCalls.call_why?.status).toBe("completed");
     await played.client.close();
     await reopened.client.close();
+  });
+});
+
+describe("listing sessions", () => {
+  test("lists the sessions the agent keeps, for one directory when asked", async () => {
+    const server = createFakeAcpServer();
+    const fetch = inProcessFetch(server);
+    const here = await connectSession({ url: URL, fetch, cwd: "/work", onEvent: () => {} });
+    const there = await connectSession({ url: URL, fetch, cwd: "/elsewhere", onEvent: () => {} });
+
+    const all = await listSessions({ url: URL, fetch });
+    expect(all?.map((s) => s.sessionId)).toEqual([here.sessionId, there.sessionId]);
+    const listed = await listSessions({ url: URL, fetch, cwd: "/work" });
+    expect(listed).toEqual([{ sessionId: here.sessionId, cwd: "/work" }]);
+    await here.close();
+    await there.close();
+  });
+
+  test("is undefined from an agent that does not list its sessions", async () => {
+    const server = new AcpServer({
+      createAgent: () =>
+        acp.agent({ name: "no-list" }).onRequest(acp.methods.agent.initialize, () => ({
+          protocolVersion: acp.PROTOCOL_VERSION,
+          agentCapabilities: { loadSession: true },
+        })),
+    });
+    expect(await listSessions({ url: URL, fetch: inProcessFetch(server) })).toBeUndefined();
   });
 });
 

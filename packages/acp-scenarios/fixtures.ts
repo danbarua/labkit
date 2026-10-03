@@ -1,4 +1,5 @@
-import type { Answer, PermissionRequest, Scenario } from "./scenario";
+import type { CreateElicitationRequest } from "@agentclientprotocol/sdk";
+import type { Answer, PermissionRequest, QuestionAnswer, Scenario } from "./scenario";
 import {
   answerCutShort,
   newFile,
@@ -6,6 +7,7 @@ import {
   permissionRequired,
   planAndDiff,
   plainAnswer,
+  questionAsked,
   sessionReplay,
   toolFails,
   toolImageResult,
@@ -21,6 +23,8 @@ export interface Fixture {
   readonly title: string;
   readonly scenario: Scenario;
   readonly decide: (request: PermissionRequest) => Answer;
+  /** How the person answers the agent's questions; left open when not given. */
+  readonly answer?: (request: CreateElicitationRequest) => QuestionAnswer;
 }
 
 const never = (): Answer => "hold";
@@ -45,6 +49,14 @@ export const FIXTURES: readonly Fixture[] = [
   fixture(turnFails),
   fixture(answerCutShort),
   fixture(turnCancelled),
+  fixture(questionAsked),
+  {
+    ...fixture(questionAsked, never, "question-answered", "A question the person answered"),
+    answer: () => ({
+      action: "accept",
+      content: { name: "seed-sweep-25", seeds: 25, optimiser: "adamw" },
+    }),
+  },
   fixture(sessionReplay),
   fixture(noticesAndUsage),
   fixture(permissionRequired, never, "permission-pending", "Waiting for a permission answer"),

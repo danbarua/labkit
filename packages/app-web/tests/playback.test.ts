@@ -18,8 +18,9 @@ describe("stepDelay", () => {
     expect(stepDelay({ events, at: [0, 600_000, 600_001, 600_002] }, 1, 1)).toBe(LONGEST_WAIT_MS);
   });
 
-  test("a recording with no arrival times plays at a steady pace", () => {
+  test("a recording with no arrival times plays at a steady pace, divided by the speed", () => {
     expect(stepDelay({ events }, 0, 1)).toBe(STEADY_WAIT_MS);
-    expect(stepDelay({ events }, 2, 16)).toBe(STEADY_WAIT_MS);
+    expect(stepDelay({ events }, 2, 1)).toBe(STEADY_WAIT_MS);
+    expect(stepDelay({ events }, 2, 16)).toBe(STEADY_WAIT_MS / 16);
   });
 });

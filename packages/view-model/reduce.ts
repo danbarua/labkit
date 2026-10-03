@@ -1,5 +1,6 @@
 import type {
   ContentBlock,
+  CreateElicitationResponse,
   PromptResponse,
   RequestPermissionOutcome,
   SessionUpdate,
@@ -9,6 +10,7 @@ import type {
 import { mergeToolCall } from "./merge-tool-call";
 import {
   type Block,
+  type ElicitationRequest,
   initialState,
   type PermissionRequest,
   type Plan,
@@ -38,6 +40,18 @@ export type ViewEvent =
       readonly requestId: string;
       readonly outcome: RequestPermissionOutcome;
     }
+  | {
+      readonly type: "elicitation_requested";
+      readonly requestId: string;
+      readonly request: ElicitationRequest;
+    }
+  | {
+      readonly type: "elicitation_answered";
+      readonly requestId: string;
+      readonly response: CreateElicitationResponse;
+    }
+  /** The agent says the URL-mode interaction it asked for has finished (`elicitation/complete`). */
+  | { readonly type: "elicitation_completed"; readonly elicitationId: string }
   /** The client could not reach the agent or the agent's reply was an error. */
   | { readonly type: "failed"; readonly message: string };
 
@@ -56,6 +70,17 @@ function joinContent(
 type MessageKind = "user" | "assistant" | "thought";
 
 /**
+ * An id for a new block that no block in the transcript has. Blocks can be removed (a cleared
+ * plan), so the count of blocks alone can name one that is already there.
+ */
+function freshId(state: TranscriptState, kind: Block["kind"]): string {
+  const taken = new Set(state.blocks.flatMap((b) => ("id" in b ? [b.id] : [])));
+  let n = state.blocks.length;
+  while (taken.has(`${kind}:${n}`)) n++;
+  return `${kind}:${n}`;
+}
+
+/**
  * A chunk continues the block before it when that is the same kind of message and the ids do not
  * say otherwise. An id that changes starts a new message; chunks with no id continue.
  */
@@ -72,7 +97,7 @@ function appendChunk(
   }
   const block: Block = {
     kind,
-    id: messageId ?? `${kind}:${state.blocks.length}`,
+    id: messageId ?? freshId(state, kind),
     content: [chunk],
   };
   return { ...state, blocks: [...state.blocks, block] };
@@ -174,7 +199,7 @@ function applyUpdate(state: TranscriptState, update: SessionUpdate): TranscriptS
     case "notice": {
       const block: Block = {
         kind: "notice",
-        id: `notice:${state.blocks.length}`,
+        id: freshId(state, "notice"),
         severity: update.severity,
         title: update.title,
         ...(update.description ? { description: update.description } : {}),
@@ -256,7 +281,7 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
     case "prompt_started": {
       const block: Block = {
         kind: "user",
-        id: `user:${state.blocks.length}`,
+        id: freshId(state, "user"),
         content: event.content,
       };
       const { stopReason: _cleared, ...rest } = state;
@@ -269,7 +294,7 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
       const description = event.reason ?? stopped.description;
       const block: Block = {
         kind: "notice",
-        id: `notice:${state.blocks.length}`,
+        id: freshId(state, "notice"),
         severity: stopped.severity,
         title: stopped.title,
         ...(description === undefined ? {} : { description }),
@@ -279,7 +304,7 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
     case "failed": {
       const block: Block = {
         kind: "notice",
-        id: `notice:${state.blocks.length}`,
+        id: freshId(state, "notice"),
         severity: "error",
         title: "The request failed",
         description: event.message,
@@ -291,6 +316,32 @@ export function reduce(state: TranscriptState, event: ViewEvent): TranscriptStat
       const entry = { requestId: event.requestId, request: event.request };
       return { ...withCall, permissions: [...withCall.permissions, entry] };
     }
+    case "elicitation_requested": {
+      const entry = { requestId: event.requestId, request: event.request };
+      const block: Block = { kind: "elicitation", requestId: event.requestId };
+      return {
+        ...state,
+        elicitations: [...state.elicitations, entry],
+        blocks: [...state.blocks, block],
+      };
+    }
+    case "elicitation_answered":
+      return {
+        ...state,
+        elicitations: state.elicitations.map((e) =>
+          e.requestId === event.requestId ? { ...e, response: event.response } : e,
+        ),
+      };
+    case "elicitation_completed":
+      // An id this client does not know, or one already finished, changes nothing.
+      return {
+        ...state,
+        elicitations: state.elicitations.map((e) =>
+          "elicitationId" in e.request && e.request.elicitationId === event.elicitationId
+            ? { ...e, completed: true }
+            : e,
+        ),
+      };
     case "permission_answered":
       return {
         ...state,

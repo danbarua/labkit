@@ -279,6 +279,33 @@ export const toolPlot: Scenario = {
   ],
 };
 
+/** A run config long enough that most of an edit to it is unchanged. */
+const CONFIG_BEFORE = [
+  "seeds = 20",
+  'control = "rewired"',
+  "",
+  "[data]",
+  'train = "runs/train.parquet"',
+  'test = "runs/test.parquet"',
+  "shuffle = true",
+  "",
+  "[model]",
+  'kind = "logistic"',
+  "l2 = 0.01",
+  "max_iter = 500",
+  "",
+  "[report]",
+  'metric = "auc"',
+  "per_class = true",
+  'out = "runs/report.json"',
+  "",
+].join("\n");
+
+const CONFIG_AFTER = CONFIG_BEFORE.replace("seeds = 20", "seeds = 25").replace(
+  'out = "runs/report.json"',
+  'out = "runs/report.json"\ncontrol_seed = 7',
+);
+
 export const planAndDiff: Scenario = {
   id: "plan-and-diff",
   title: "A plan and a file edit",
@@ -320,8 +347,8 @@ export const planAndDiff: Scenario = {
         {
           type: "diff",
           path: "/workspace/runs/control.toml",
-          oldText: 'seeds = 20\ncontrol = "rewired"\n',
-          newText: 'seeds = 25\ncontrol = "rewired"\ncontrol_seed = 7\n',
+          oldText: CONFIG_BEFORE,
+          newText: CONFIG_AFTER,
         },
       ],
     }),
@@ -423,6 +450,42 @@ export const turnCancelled: Scenario = {
   ],
 };
 
+export const questionAsked: Scenario = {
+  id: "question-asked",
+  title: "A question from the agent",
+  prompt: "Set up the seed sweep.",
+  stopReason: "end_turn",
+  steps: [
+    say("Before I start the sweep, I need a few settings.", "m1"),
+    {
+      kind: "question",
+      request: {
+        mode: "form",
+        // The fake agent sends it under the live session's id.
+        sessionId: "scenario",
+        message: "Settings for the seed sweep",
+        requestedSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", title: "Run name", minLength: 1 },
+            seeds: { type: "integer", title: "Seeds", minimum: 1, maximum: 50, default: 25 },
+            optimiser: {
+              type: "string",
+              title: "Optimiser",
+              oneOf: [
+                { const: "adamw", title: "AdamW" },
+                { const: "sgd", title: "SGD with momentum" },
+              ],
+            },
+          },
+          required: ["name"],
+        },
+      },
+    },
+    say("Starting the sweep with those settings.", "m2"),
+  ],
+};
+
 export const sessionReplay: Scenario = {
   id: "session-replay",
   title: "A reopened session",
@@ -486,6 +549,7 @@ export const SCENARIOS: readonly Scenario[] = [
   turnFails,
   answerCutShort,
   turnCancelled,
+  questionAsked,
   sessionReplay,
   noticesAndUsage,
 ];

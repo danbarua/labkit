@@ -12,6 +12,7 @@ import {
   SCENARIOS,
   play,
   promptResponse,
+  type QuestionAnswer,
 } from "@labkit/acp-scenarios";
 
 export interface FakeAgentOptions {
@@ -76,60 +77,76 @@ export function createFakeAgent(world: FakeWorld = createFakeWorld()) {
     return session;
   };
 
-  return acp
-    .agent({ name: "labkit-fake-agent" })
-    .onRequest(acp.methods.agent.initialize, () => ({
-      protocolVersion: acp.PROTOCOL_VERSION,
-      agentCapabilities: { loadSession: true },
-    }))
-    .onRequest(acp.methods.agent.authenticate, () => ({}))
-    .onRequest(acp.methods.agent.session.new, (ctx) => {
-      const sessionId = `fake-${++world.created}`;
-      sessions.set(sessionId, { cwd: ctx.params.cwd, history: [], turns: 0 });
-      return { sessionId };
-    })
-    .onRequest(acp.methods.agent.session.load, async (ctx) => {
-      const session = known(ctx.params.sessionId);
-      for (const notification of session.history) {
-        await ctx.client.notify(acp.methods.client.session.update, notification);
-      }
-      return {};
-    })
-    .onRequest(acp.methods.agent.session.prompt, async (ctx) => {
-      const { sessionId, prompt } = ctx.params;
-      const session = known(sessionId);
-      const text = promptText(prompt);
-      const scenario = pickScenario(scenarios, text, session.turns++);
-      const cancel = new AbortController();
-      session.cancel = cancel;
-
-      // A real agent records what the person said, so a reopened session shows it.
-      session.history.push({
-        sessionId,
-        update: { sessionUpdate: "user_message_chunk", content: { type: "text", text } },
-      });
-
-      const stopReason = await play(scenario, {
-        update: async (update) => {
-          const notification = { sessionId, update };
-          session.history.push(notification);
+  return (
+    acp
+      .agent({ name: "labkit-fake-agent" })
+      .onRequest(acp.methods.agent.initialize, () => ({
+        protocolVersion: acp.PROTOCOL_VERSION,
+        agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } },
+      }))
+      .onRequest(acp.methods.agent.authenticate, () => ({}))
+      .onRequest(acp.methods.agent.session.new, (ctx) => {
+        const sessionId = `fake-${++world.created}`;
+        sessions.set(sessionId, { cwd: ctx.params.cwd, history: [], turns: 0 });
+        return { sessionId };
+      })
+      // Every session in one page, in the order they were made; `cwd` narrows it to one directory.
+      .onRequest(acp.methods.agent.session.list, (ctx) => ({
+        sessions: [...sessions]
+          .filter(([, session]) => ctx.params.cwd == null || session.cwd === ctx.params.cwd)
+          .map(([sessionId, session]) => ({ sessionId, cwd: session.cwd })),
+      }))
+      .onRequest(acp.methods.agent.session.load, async (ctx) => {
+        const session = known(ctx.params.sessionId);
+        for (const notification of session.history) {
           await ctx.client.notify(acp.methods.client.session.update, notification);
-        },
-        permission: async (request: PermissionRequest): Promise<Answer> => {
-          const asked = ctx.client.request(acp.methods.client.session.requestPermission, {
-            sessionId,
-            ...request,
-          });
-          const settled = await Promise.race([asked, whenAborted(cancel.signal)]);
-          if (settled === "cancel" || settled.outcome.outcome === "cancelled") return "cancel";
-          return { optionId: settled.outcome.optionId };
-        },
-      });
-      session.cancel = undefined;
-      if (scenario.fails) throw new acp.RequestError(scenario.fails.code, scenario.fails.message);
-      return promptResponse(scenario, stopReason ?? "end_turn");
-    })
-    .onNotification(acp.methods.agent.session.cancel, (ctx) => {
-      sessions.get(ctx.params.sessionId)?.cancel?.abort();
-    });
+        }
+        return {};
+      })
+      .onRequest(acp.methods.agent.session.prompt, async (ctx) => {
+        const { sessionId, prompt } = ctx.params;
+        const session = known(sessionId);
+        const text = promptText(prompt);
+        const scenario = pickScenario(scenarios, text, session.turns++);
+        const cancel = new AbortController();
+        session.cancel = cancel;
+
+        // A real agent records what the person said, so a reopened session shows it.
+        session.history.push({
+          sessionId,
+          update: { sessionUpdate: "user_message_chunk", content: { type: "text", text } },
+        });
+
+        const stopReason = await play(scenario, {
+          update: async (update) => {
+            const notification = { sessionId, update };
+            session.history.push(notification);
+            await ctx.client.notify(acp.methods.client.session.update, notification);
+          },
+          permission: async (request: PermissionRequest): Promise<Answer> => {
+            const asked = ctx.client.request(acp.methods.client.session.requestPermission, {
+              sessionId,
+              ...request,
+            });
+            const settled = await Promise.race([asked, whenAborted(cancel.signal)]);
+            if (settled === "cancel" || settled.outcome.outcome === "cancelled") return "cancel";
+            return { optionId: settled.outcome.optionId };
+          },
+          question: async (request): Promise<QuestionAnswer> => {
+            const asked = ctx.client.request(acp.methods.client.elicitation.create, {
+              ...request,
+              sessionId,
+            } as acp.CreateElicitationRequest);
+            const settled = await Promise.race([asked, whenAborted(cancel.signal)]);
+            return settled === "cancel" ? { action: "cancel" } : settled;
+          },
+        });
+        session.cancel = undefined;
+        if (scenario.fails) throw new acp.RequestError(scenario.fails.code, scenario.fails.message);
+        return promptResponse(scenario, stopReason ?? "end_turn");
+      })
+      .onNotification(acp.methods.agent.session.cancel, (ctx) => {
+        sessions.get(ctx.params.sessionId)?.cancel?.abort();
+      })
+  );
 }

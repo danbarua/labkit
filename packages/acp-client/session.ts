@@ -29,6 +29,8 @@ export interface SessionClient {
   cancel(): Promise<void>;
   /** Answers a permission request the agent is waiting on. */
   answerPermission(requestId: string, outcome: acp.RequestPermissionOutcome): void;
+  /** Answers a question the agent asked (`elicitation/create`) and is waiting on. */
+  answerQuestion(requestId: string, response: acp.CreateElicitationResponse): void;
   /**
    * Selects a configuration option, such as the model. The agent takes the selection at once and
    * applies it between turns; the options it answers with come out through `onEvent`.
@@ -39,6 +41,52 @@ export interface SessionClient {
 
 const describeError = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
+/** Introduces this client to the agent: the protocol it speaks and what it can draw. */
+const introduce = (agent: acp.ClientConnection["agent"]) =>
+  agent.request(acp.methods.agent.initialize, {
+    protocolVersion: acp.PROTOCOL_VERSION,
+    // Questions in both modes are drawn in the conversation; nothing else is offered.
+    clientCapabilities: { elicitation: { form: {}, url: {} } },
+  });
+
+export interface ListOptions {
+  /** The agent's ACP endpoint. */
+  readonly url: string;
+  /** Only the sessions about this directory. */
+  readonly cwd?: string;
+  /** Replaces the platform `fetch`, to reach a server in the same process. */
+  readonly fetch?: typeof fetch;
+}
+
+/**
+ * Every session the agent keeps for `cwd`, in the agent's order, read page by page. Resolves to
+ * `undefined` when the agent does not list its sessions (it does not advertise `session/list`).
+ */
+export async function listSessions(
+  options: ListOptions,
+): Promise<readonly acp.SessionInfo[] | undefined> {
+  const stream = createHttpStream(options.url, options.fetch ? { fetch: options.fetch } : {});
+  const connection = acp.client({ name: "labkit-view" }).connect(stream);
+  try {
+    const { agentCapabilities } = await introduce(connection.agent);
+    if (!agentCapabilities?.sessionCapabilities?.list) return undefined;
+    const sessions: acp.SessionInfo[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await connection.agent.request(acp.methods.agent.session.list, {
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      sessions.push(...page.sessions);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
+    return sessions;
+  } finally {
+    connection.close();
+    await stream.writable.close().catch(() => {});
+  }
+}
+
 export async function connectSession(options: ConnectOptions): Promise<SessionClient> {
   const { onEvent } = options;
   const cwd = options.cwd ?? "/";
@@ -46,6 +94,8 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
 
   /** Requests the agent is waiting on, by the id the view knows them by. */
   const open = new Map<string, (response: acp.RequestPermissionResponse) => void>();
+  /** Questions the agent is waiting on, by the id the view knows them by. */
+  const asked = new Map<string, (response: acp.CreateElicitationResponse) => void>();
   let requests = 0;
   let sessionId: string | undefined = options.sessionId;
 
@@ -61,6 +111,14 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
     open.delete(requestId);
     onEvent({ type: "permission_answered", requestId, outcome });
     respond({ outcome });
+  };
+
+  const answerQuestion = (requestId: string, response: acp.CreateElicitationResponse): void => {
+    const respond = asked.get(requestId);
+    if (respond === undefined) return;
+    asked.delete(requestId);
+    onEvent({ type: "elicitation_answered", requestId, response });
+    respond(response);
   };
 
   const connection = acp
@@ -83,6 +141,24 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
           });
         }),
     )
+    .onRequest(
+      acp.methods.client.elicitation.create,
+      (ctx) =>
+        new Promise<acp.CreateElicitationResponse>((resolve) => {
+          const requestId = `question-${++requests}`;
+          asked.set(requestId, resolve);
+          onEvent({ type: "elicitation_requested", requestId, request: ctx.params });
+          // A question the agent has given up on stops waiting for the person.
+          ctx.signal.addEventListener(
+            "abort",
+            () => answerQuestion(requestId, { action: "cancel" }),
+            { once: true },
+          );
+        }),
+    )
+    .onNotification(acp.methods.client.elicitation.complete, (ctx) => {
+      onEvent({ type: "elicitation_completed", elicitationId: ctx.params.elicitationId });
+    })
     .onNotification(acp.methods.client.session.update, (ctx) => {
       if (sessionId === undefined || ctx.params.sessionId === sessionId) {
         onEvent({ type: "update", update: ctx.params.update });
@@ -93,10 +169,7 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
   const { agent } = connection;
 
   try {
-    await agent.request(acp.methods.agent.initialize, {
-      protocolVersion: acp.PROTOCOL_VERSION,
-      clientCapabilities: {},
-    });
+    await introduce(agent);
     let opened: { configOptions?: readonly acp.SessionConfigOption[] | null };
     if (sessionId === undefined) {
       const created = await agent.request(acp.methods.agent.session.new, { cwd, mcpServers: [] });
@@ -134,6 +207,7 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
     },
     cancel: () => agent.notify(acp.methods.agent.session.cancel, { sessionId: id }),
     answerPermission: answer,
+    answerQuestion,
     async setConfigOption(configId, value) {
       try {
         const { configOptions } = await agent.request(acp.methods.agent.session.setConfigOption, {
@@ -150,6 +224,7 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
     },
     async close() {
       for (const requestId of [...open.keys()]) answer(requestId, { outcome: "cancelled" });
+      for (const requestId of [...asked.keys()]) answerQuestion(requestId, { action: "cancel" });
       connection.close();
       await stream.writable.close().catch(() => {});
     },

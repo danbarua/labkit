@@ -1,5 +1,5 @@
 import { FIXTURES } from "@labkit/acp-scenarios";
-import { Conversation } from "@labkit/ui";
+import { Conversation, type Theme, ThemeToggle } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import type { TranscriptState } from "@labkit/view-model";
@@ -9,8 +9,6 @@ import { useEffect, useState } from "react";
 import { Bar } from "./Bar";
 import { BuildingBlocks } from "./BuildingBlocks";
 import { type TranscriptEntry, transcriptList, transcriptState } from "./transcripts-api";
-
-type Theme = "system" | "light" | "dark";
 
 /**
  * Every state in the shared corpus drawn at once: the scripted scenarios in `@labkit/acp-scenarios`
@@ -25,26 +23,34 @@ export default function Gallery() {
   const [states, setStates] = useState<Record<string, TranscriptState>>({});
   const [theme, setTheme] = useState<Theme>("system");
   const [recorded, setRecorded] = useState<ReadonlySet<string>>(new Set());
+  // Why a card, or the list of recorded transcripts, could not be loaded, by id ("" for the list).
+  const [failures, setFailures] = useState<Readonly<Record<string, string>>>({});
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all(FIXTURES.map(async (f) => [f.id, await stateOfFixture(f)] as const)).then(
-      (loaded) => {
-        if (!controller.signal.aborted)
-          setStates((prev) => ({ ...prev, ...Object.fromEntries(loaded) }));
-      },
-    );
+    // A request this page gave up on, leaving or remounting, is not a failure to show.
+    const failed = (id: string) => (error: unknown) => {
+      if (controller.signal.aborted) return;
+      const reason = error instanceof Error ? error.message : String(error);
+      setFailures((prev) => ({ ...prev, [id]: reason }));
+    };
+    for (const fixture of FIXTURES) {
+      stateOfFixture(fixture).then((state) => {
+        if (!controller.signal.aborted) setStates((prev) => ({ ...prev, [fixture.id]: state }));
+      }, failed(fixture.id));
+    }
     transcriptList(controller.signal).then((list) => {
       if (controller.signal.aborted) return;
       setEntries([...FIXTURES, ...list]);
       setRecorded(new Set(list.map(({ id }) => id)));
       for (const { id } of list) {
         transcriptState(id, controller.signal).then((state) => {
-          if (!controller.signal.aborted && state !== undefined)
-            setStates((prev) => ({ ...prev, [id]: state }));
-        });
+          if (controller.signal.aborted) return;
+          if (state === undefined) failed(id)(new Error(`no transcript named ${id}`));
+          else setStates((prev) => ({ ...prev, [id]: state }));
+        }, failed(id));
       }
-    });
+    }, failed(""));
     return () => controller.abort();
   }, []);
 
@@ -52,11 +58,7 @@ export default function Gallery() {
     <>
       <Bar>
         <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-          {(["system", "light", "dark"] as const).map((t) => (
-            <button key={t} type="button" onClick={() => setTheme(t)} disabled={theme === t}>
-              {t}
-            </button>
-          ))}
+          <ThemeToggle theme={theme} onChange={setTheme} className="theme-toggle" />
         </span>
       </Bar>
       <div
@@ -71,7 +73,12 @@ export default function Gallery() {
           alignContent: "start",
         }}
       >
-        <BuildingBlocks theme={theme === "system" ? undefined : theme} />
+        <BuildingBlocks theme={theme} />
+        {failures[""] === undefined ? null : (
+          <p role="alert" style={{ margin: 0, color: "var(--lk-danger)" }}>
+            The recorded transcripts could not be listed: {failures[""]}
+          </p>
+        )}
         {entries.map((entry) => {
           const state = states[entry.id];
           return (
@@ -87,12 +94,14 @@ export default function Gallery() {
                 <code style={{ color: "var(--text-dim)" }}>{entry.id}</code>
               </h3>
               <div style={{ height: 480, border: "1px solid var(--panel-border)" }}>
-                {state === undefined ? null : (
-                  <Conversation
-                    state={state}
-                    records={{ types: RECORD_TYPES }}
-                    {...(theme === "system" ? {} : { theme })}
-                  />
+                {state === undefined ? (
+                  failures[entry.id] === undefined ? null : (
+                    <p role="alert" style={{ margin: 16, color: "var(--lk-danger)" }}>
+                      Could not load this transcript: {failures[entry.id]}
+                    </p>
+                  )
+                ) : (
+                  <Conversation state={state} records={{ types: RECORD_TYPES }} theme={theme} />
                 )}
               </div>
             </section>

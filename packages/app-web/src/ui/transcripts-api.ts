@@ -9,6 +9,7 @@ export interface TranscriptEntry {
 /** `GET /transcripts`: `{id, title, description}` for each recorded session on disk. */
 export async function transcriptList(signal: AbortSignal): Promise<TranscriptEntry[]> {
   const res = await fetch("/transcripts", { signal });
+  if (!res.ok) throw new Error(`GET /transcripts answered ${res.status}`);
   return (await res.json()) as TranscriptEntry[];
 }
 

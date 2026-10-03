@@ -11,6 +11,46 @@ const linesOf = (text: string): string[] => {
   return lines.at(-1) === "" ? lines.slice(0, -1) : lines;
 };
 
+/** A diff as drawn: lines, with each long unchanged stretch folded away. */
+export type DiffRow =
+  | { readonly kind: "line"; readonly line: DiffLine; readonly at: number }
+  | { readonly kind: "fold"; readonly from: number; readonly lines: readonly DiffLine[] };
+
+/** Unchanged lines kept in view on each side of a change. */
+export const DIFF_CONTEXT = 3;
+
+/** A stretch shorter than this stays in view: a fold row would hide almost nothing. */
+const FOLD_AT_LEAST = 4;
+
+/**
+ * A diff with each stretch of unchanged lines more than `context` away from any change folded
+ * into one row, which keeps the lines it hides and where they start.
+ */
+export function foldUnchanged(lines: readonly DiffLine[], context = DIFF_CONTEXT): DiffRow[] {
+  const near = lines.map(() => false);
+  lines.forEach((line, i) => {
+    if (line.kind === "same") return;
+    for (let j = Math.max(0, i - context); j <= Math.min(lines.length - 1, i + context); j++)
+      near[j] = true;
+  });
+  const rows: DiffRow[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (near[i] || lines[i]?.kind !== "same") {
+      rows.push({ kind: "line", line: lines[i] as DiffLine, at: i });
+      i++;
+      continue;
+    }
+    let end = i;
+    while (end < lines.length && !near[end]) end++;
+    const hidden = lines.slice(i, end);
+    if (hidden.length >= FOLD_AT_LEAST) rows.push({ kind: "fold", from: i, lines: hidden });
+    else rows.push(...hidden.map((line, j): DiffRow => ({ kind: "line", line, at: i + j })));
+    i = end;
+  }
+  return rows;
+}
+
 /** A line diff by longest common subsequence: what stayed, what went, what was added. */
 export function diffLines(before: string, after: string): DiffLine[] {
   const a = linesOf(before);

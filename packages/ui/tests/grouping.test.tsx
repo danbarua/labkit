@@ -16,13 +16,19 @@ const text = (value: string): ViewEvent => ({
 });
 const state = (...events: ViewEvent[]): TranscriptState => events.reduce(reduce, initialState);
 
-describe("folding runs of tool calls", () => {
-  test("two or more calls in a row become one item; a lone call stays a block", () => {
+describe("runs of tool calls", () => {
+  test("calls in a row become one item, and a lone call is a run of one", () => {
     const drawn = drawnBlocks(
       state(call("a", "read_file"), call("b", "read_file"), text("so"), call("c", "list_dir")),
     );
-    expect(drawn.map((d) => d.kind)).toEqual(["tools", "block", "block"]);
-    expect(drawn[0]?.kind === "tools" && drawn[0].blocks.length).toBe(2);
+    expect(drawn.map((d) => d.kind)).toEqual(["tools", "block", "tools"]);
+    expect(drawn.map((d) => (d.kind === "tools" ? d.blocks.length : 0))).toEqual([2, 0, 1]);
+  });
+
+  test("a run of one keeps its key when a second call joins it", () => {
+    const one = drawnBlocks(state(call("a", "read_file")));
+    const two = drawnBlocks(state(call("a", "read_file"), call("b", "read_file")));
+    expect(two.map((d) => d.key)).toEqual(one.map((d) => d.key));
   });
 
   test("a message that is only whitespace is not drawn, and does not break a run", () => {
@@ -47,13 +53,42 @@ describe("folding runs of tool calls", () => {
         asked,
       ),
     );
-    expect(drawn.map((d) => d.kind)).toEqual(["block", "block", "block"]);
+    expect(drawn.map((d) => (d.kind === "tools" ? d.blocks.length : 0))).toEqual([1, 1, 1]);
+  });
+
+  test("an item keeps its key when a block before it is removed", () => {
+    const plan = (entries: number): ViewEvent => ({
+      type: "update",
+      update: {
+        sessionUpdate: "plan",
+        entries: Array.from({ length: entries }, () => ({
+          content: "step",
+          priority: "medium" as const,
+          status: "pending" as const,
+        })),
+      },
+    });
+    const before = state(text("first"), plan(1), call("a", "read_file"), text("then"));
+    const after = reduce(before, plan(0));
+    const keys = (drawn: ReturnType<typeof drawnBlocks>) => drawn.map((d) => d.key);
+    expect(keys(drawnBlocks(after))).toEqual(
+      keys(drawnBlocks(before)).filter((key) => !key.startsWith("plan/")),
+    );
+    expect(new Set(keys(drawnBlocks(after))).size).toBe(drawnBlocks(after).length);
   });
 
   test("the tally counts each tool in the order it first appears", () => {
     expect(toolTally(["read_file", "list_dir", "read_file", "update_plan", "read_file"])).toBe(
       "read_file ×3 · list_dir · update_plan",
     );
+  });
+});
+
+describe("a run of one", () => {
+  test("is the call's card, held open with the group's row hidden", () => {
+    const html = renderToStaticMarkup(<Conversation state={state(call("a", "read_file"))} />);
+    expect(html).toMatch(/<details class="lk-tool-run" data-status="completed" open="">/);
+    expect(html).toContain('<span class="lk-tool-name">read_file</span>');
   });
 });
 

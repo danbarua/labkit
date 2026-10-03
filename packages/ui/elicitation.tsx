@@ -377,6 +377,68 @@ export function hostParts(url: URL): [string, string] {
   return [url.href.slice(0, end - url.host.length), url.href.slice(end)];
 }
 
+/** A value the person gave, as they would read it back. */
+const shownValue = (value: unknown): string =>
+  Array.isArray(value)
+    ? value.join(", ")
+    : typeof value === "boolean"
+      ? value
+        ? "Yes"
+        : "No"
+      : String(value);
+
+/**
+ * A question the person has answered, as a record of the answer: what was sent (each field by its
+ * title), or that they declined or cancelled. For a page to open, that it was opened, and whether
+ * the agent has said the interaction behind it finished.
+ */
+export function ElicitationReceipt({
+  request,
+  response,
+  completed = false,
+}: {
+  request: CreateElicitationRequest;
+  response: CreateElicitationResponse;
+  completed?: boolean;
+}) {
+  const fields = CreateElicitationRequest.isForm(request)
+    ? (request.requestedSchema.properties ?? {})
+    : {};
+  const sent =
+    response.action === "accept" && response.content
+      ? Object.entries(response.content).map(([name, value]) => [
+          (fields[name] as { title?: string } | undefined)?.title ?? name,
+          shownValue(value),
+        ])
+      : [];
+  const outcome =
+    response.action === "decline"
+      ? "Declined"
+      : response.action === "cancel"
+        ? "Cancelled"
+        : CreateElicitationRequest.isUrl(request)
+          ? completed
+            ? "Opened, and finished"
+            : "Opened; waiting for the agent to say it has finished"
+          : "Sent";
+  return (
+    <section className="lk-elicitation answered" aria-label="Your answer">
+      <p className="lk-elicitation-message">{request.message}</p>
+      {sent.length === 0 ? null : (
+        <dl className="lk-fields">
+          {sent.map(([title, value]) => (
+            <div key={title}>
+              <dt>{title}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <p className="lk-caption">{outcome}</p>
+    </section>
+  );
+}
+
 /**
  * A question from the agent, answered in the conversation: a form drawn from the flat schema it
  * sent (form mode), or a page to open (URL mode). The answers are checked against the schema and

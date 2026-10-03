@@ -4,7 +4,10 @@ import { describe, expect, test } from "bun:test";
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
 import {
   initialState,
+  cancelledPrompt,
   mergeToolCall,
+  pendingElicitations,
+  phase,
   promptEnded,
   reduce,
   replay,
@@ -126,6 +129,21 @@ describe("plans", () => {
     expect(state.plans).toEqual({});
   });
 
+  test("a block added after plans are removed has an id no other block has", () => {
+    const state = replay([
+      plan("p", "pending"),
+      plan("q", "pending"),
+      said("first"),
+      update({ sessionUpdate: "plan_removed", planId: "p" }),
+      update({ sessionUpdate: "plan_removed", planId: "q" }),
+      update({ sessionUpdate: "tool_call", toolCallId: "t", title: "read_file" }),
+      said("second"),
+    ]);
+    const ids = state.blocks.flatMap((b) => ("id" in b ? [b.id] : []));
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+
   test("a plan given as markdown or a file is kept as sent", () => {
     const state = replay([
       update({
@@ -228,6 +246,72 @@ describe("a turn that stopped short", () => {
       type: "prompt_ended",
       stopReason: "end_turn",
     });
+  });
+});
+
+describe("the prompt of a cancelled turn", () => {
+  const started = (text: string): ViewEvent => ({
+    type: "prompt_started",
+    content: [{ type: "text", text }],
+  });
+
+  test("is there to send again after a cancellation, and only then", () => {
+    expect(
+      cancelledPrompt(
+        replay([started("Re-run every seed."), { type: "prompt_ended", stopReason: "cancelled" }]),
+      ),
+    ).toBe("Re-run every seed.");
+    expect(
+      cancelledPrompt(replay([started("Hello"), { type: "prompt_ended", stopReason: "end_turn" }])),
+    ).toBeUndefined();
+    expect(cancelledPrompt(replay([started("Still going")]))).toBeUndefined();
+  });
+});
+
+describe("a question from the agent", () => {
+  const ask = (requestId: string, mode: "form" | "url"): ViewEvent => ({
+    type: "elicitation_requested",
+    requestId,
+    request:
+      mode === "form"
+        ? {
+            mode: "form",
+            sessionId: "s",
+            message: "Settings",
+            requestedSchema: { type: "object", properties: {} },
+          }
+        : {
+            mode: "url",
+            sessionId: "s",
+            message: "Sign in",
+            url: "https://example.org/sign-in",
+            elicitationId: "e1",
+          },
+  });
+
+  test("is a block in the transcript, and the turn waits on the person until it is answered", () => {
+    const asked = replay([
+      { type: "prompt_started", content: [{ type: "text", text: "go" }] },
+      ask("q1", "form"),
+    ]);
+    expect(asked.blocks.at(-1)).toEqual({ kind: "elicitation", requestId: "q1" });
+    expect(pendingElicitations(asked).map((e) => e.requestId)).toEqual(["q1"]);
+    expect(phase(asked)).toBe("awaiting_permission");
+    const answered = reduce(asked, {
+      type: "elicitation_answered",
+      requestId: "q1",
+      response: { action: "decline" },
+    });
+    expect(pendingElicitations(answered)).toEqual([]);
+    expect(answered.elicitations[0]?.response).toEqual({ action: "decline" });
+    expect(phase(answered)).toBe("running");
+  });
+
+  test("a page to open is finished when the agent says so, and an unknown id changes nothing", () => {
+    const asked = replay([ask("q1", "url")]);
+    expect(reduce(asked, { type: "elicitation_completed", elicitationId: "other" })).toEqual(asked);
+    const done = reduce(asked, { type: "elicitation_completed", elicitationId: "e1" });
+    expect(done.elicitations[0]?.completed).toBe(true);
   });
 });
 

@@ -1,4 +1,4 @@
-import type { RequestPermissionOutcome } from "@agentclientprotocol/sdk";
+import type { CreateElicitationResponse, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import { connectSession, type SessionClient } from "@labkit/acp-client";
 import { SCENARIOS } from "@labkit/acp-scenarios";
 import { Conversation } from "@labkit/ui";
@@ -7,6 +7,7 @@ import "@labkit/ui/ui.css";
 import { initialState, reduce } from "@labkit/view-model";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
 import { Bar } from "./Bar";
 
 type Status = "connecting" | "ready" | "failed";
@@ -81,12 +82,17 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
       client.current?.answerPermission(requestId, outcome),
     [],
   );
+  const answerQuestion = useCallback(
+    (requestId: string, response: CreateElicitationResponse) =>
+      client.current?.answerQuestion(requestId, response),
+    [],
+  );
   const setConfig = useCallback(
     (configId: string, value: string | boolean) =>
       void client.current?.setConfigOption(configId, value),
     [],
   );
-  return { state, status, started, send, cancel, answer, setConfig };
+  return { state, status, started, send, cancel, answer, answerQuestion, setConfig };
 }
 
 /**
@@ -100,13 +106,9 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
 const HOST_COMMANDS = [{ name: "new", description: "Start a new session" }];
 
 export default function AgentSession({ sessionId }: { sessionId?: string }) {
-  const cwd = import.meta.env.VITE_LABKIT_ACP_CWD as string | undefined;
-  const real = cwd !== undefined;
-  const { state, status, started, send, cancel, answer, setConfig } = useAgentSession(
-    "/acp",
-    cwd,
-    sessionId,
-  );
+  const real = AGENT_CWD !== undefined;
+  const { state, status, started, send, cancel, answer, answerQuestion, setConfig } =
+    useAgentSession(AGENT_URL, AGENT_CWD, sessionId);
   // A session started here takes its own address, so reloading the page reopens it.
   const navigate = useNavigate();
   useEffect(() => {
@@ -148,6 +150,7 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
           }}
           onCancel={cancel}
           onAnswer={answer}
+          onAnswerQuestion={answerQuestion}
           onSetConfig={setConfig}
         />
       </div>

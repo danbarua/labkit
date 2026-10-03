@@ -15,7 +15,8 @@ import {
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { diffLines, STATUS_LABEL } from "./format";
+import { useMemo, useState } from "react";
+import { type DiffLine, diffLines, foldUnchanged, STATUS_LABEL } from "./format";
 import { CodeView } from "./code";
 import { toolTally } from "./grouping";
 import { useLink } from "./links";
@@ -151,20 +152,38 @@ function DiffView({
   before?: string | null;
   after: string;
 }) {
-  const lines = diffLines(before ?? "", after);
+  const rows = useMemo(() => foldUnchanged(diffLines(before ?? "", after)), [before, after]);
+  // Folds the reader has opened, by where their hidden lines start.
+  const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set());
   const marker = { same: "  ", add: "+ ", remove: "- " } as const;
+  const line = (l: DiffLine, key: string) => (
+    <code key={key} className={`lk-diff-line ${l.kind}`}>
+      {marker[l.kind] + l.text}
+    </code>
+  );
   return (
     <div className="lk-diff">
       <div className="lk-diff-path" title={title}>
         {path}
       </div>
-      {lines.map((line, i) => (
-        // A diff has no stable ids: the same text can appear on many lines.
-        // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
-        <code key={i} className={`lk-diff-line ${line.kind}`}>
-          {marker[line.kind] + line.text}
-        </code>
-      ))}
+      {/* A diff has no ids: the same text can appear on many lines, so lines are keyed by
+          where they stand in it. */}
+      {rows.flatMap((row) =>
+        row.kind === "line"
+          ? [line(row.line, String(row.at))]
+          : opened.has(row.from)
+            ? row.lines.map((l, j) => line(l, String(row.from + j)))
+            : [
+                <button
+                  key={`fold:${row.from}`}
+                  type="button"
+                  className="lk-diff-fold"
+                  onClick={() => setOpened(new Set([...opened, row.from]))}
+                >
+                  ⋯ {row.lines.length} unchanged lines
+                </button>,
+              ],
+      )}
     </div>
   );
 }
@@ -440,14 +459,20 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
 }
 
 /**
- * A run of consecutive tool calls as one row: how many, which tools, and how they went. Opened, it
- * is the calls' own rows. It shows the spinner while any call is still going.
+ * A run of consecutive tool calls. A run of one is that call's card alone. A longer run is one row:
+ * how many, which tools, and how they went; opened, it is the calls' own rows. It shows the spinner
+ * while any call is still going.
+ *
+ * Both are one `<details>`, so a card that a second call joins folds up into the group's row
+ * rather than being swapped for it: the run of one is held open with its row hidden, and closes
+ * when the row appears.
  */
-export function ToolGroup({
+export function ToolRun({
   calls,
 }: {
   calls: readonly { call: ToolCall; permission?: PermissionEntry | undefined }[];
 }) {
+  const lone = calls.length === 1;
   const outcomes = calls.map(({ call, permission }) => {
     const status = call.status ?? "pending";
     const decision = permission === undefined ? undefined : decisionOf(permission);
@@ -465,12 +490,17 @@ export function ToolGroup({
     running > 0 ? "in_progress" : count("completed") === 0 ? "failed" : "completed";
   return (
     <details
-      className="lk-tool lk-tool-group"
+      className={lone ? "lk-tool-run" : "lk-tool lk-tool-group"}
       data-status={overall}
+      // Set only when the run grows from one call to two; after that the person opens and closes it.
+      open={lone}
       onToggle={(event) => {
-        if (event.currentTarget.open) revealBody(event.currentTarget);
+        // A run of one opens as it is drawn, which is not the person asking to see it.
+        if (!lone && event.currentTarget.open) revealBody(event.currentTarget);
       }}
     >
+      {/* A run of one hides its row rather than leaving it out: a <details> with no <summary>
+          draws one of its own. */}
       <summary className="lk-tool-head">
         <CaretRightIcon className="lk-tool-caret" aria-hidden="true" />
         <span className="lk-tool-count">{calls.length} tool calls</span>

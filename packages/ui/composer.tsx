@@ -62,6 +62,11 @@ export interface ComposerProps {
   attach?: AttachLimits | undefined;
   /** What the agent is doing, shown by the loader just above the box's top-right corner. */
   loader?: LoaderMood | undefined;
+  /**
+   * The prompt of a run that was cancelled, which Up brings back into an empty box to edit and
+   * send again. Unset when the last run was not cancelled: a finished run has nothing to redo.
+   */
+  recall?: string | undefined;
 }
 
 /**
@@ -82,6 +87,7 @@ export function Composer({
   initialText = "",
   attach,
   loader,
+  recall,
 }: ComposerProps) {
   const attachments = useAttachments(attach);
   const [dragging, setDragging] = useState(false);
@@ -154,6 +160,17 @@ export function Composer({
         return;
       }
       if (nav.onKeyDown(event)) return;
+    }
+    // Up in an empty box brings back a cancelled run's prompt; Down, before any edit, puts it away.
+    if (event.key === "ArrowUp" && text === "" && recall) {
+      event.preventDefault();
+      place({ text: recall, caret: recall.length });
+      return;
+    }
+    if (event.key === "ArrowDown" && recall && text === recall) {
+      event.preventDefault();
+      place({ text: "", caret: 0 });
+      return;
     }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
