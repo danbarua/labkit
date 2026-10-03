@@ -137,6 +137,17 @@ describe("a live session reduces to what the corpus says", () => {
   }
 });
 
+describe("a turn that stops short", () => {
+  test("carries the agent's reason from the answer's _meta to the prompt_ended event", async () => {
+    const fixture = fixtureNamed("answer-cut-short");
+    const { events, client } = await playFixture(fixture);
+    expect(events.filter((event) => event.type === "prompt_ended")).toEqual([
+      { type: "prompt_ended", stopReason: "max_tokens", reason: fixture.scenario.stopDetail },
+    ]);
+    await client.close();
+  });
+});
+
 describe("a turn waiting on the person", () => {
   test("holds until answered, then finishes as if it had been granted", async () => {
     const server = createFakeAcpServer();
