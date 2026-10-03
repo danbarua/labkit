@@ -64,6 +64,8 @@ describe("the transcript", () => {
   test("a plan shows each step's state, and a diff marks what changed", async () => {
     const html = await draw("plan-and-diff");
     expect(html).toContain('class="completed"><span>Read the current config</span>');
+    expect(html).toContain('<span class="lk-plan-priority high">high</span>');
+    expect(html).toContain('<span class="lk-plan-priority medium">medium</span>');
     expect(html).toContain('class="in_progress"><span>Add the control run</span>');
     expect(html).toContain("lk-diff-line add");
     expect(html).toContain("+ control_seed = 7");

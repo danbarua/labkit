@@ -18,6 +18,7 @@ import {
 import { diffLines, STATUS_LABEL } from "./format";
 import { CodeView } from "./code";
 import { toolTally } from "./grouping";
+import { useLink } from "./links";
 import { isVegaLite, VegaLitePlot } from "./plot";
 import { toolView } from "./tool-views";
 import {
@@ -31,32 +32,93 @@ import {
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
 
+type Kind<T extends ContentBlock["type"]> = Extract<ContentBlock, { type: T }>;
+
+/** An image: from its bytes when the block carries them, else from its link once the host resolves it. */
+function ImageView({ block }: { block: Kind<"image"> }) {
+  const linked = useLink(block.data === "" ? block.uri : undefined);
+  const src = block.data === "" ? linked : dataUri(block.mimeType, block.data);
+  return (
+    <figure style={{ margin: 0 }}>
+      {src === undefined ? null : <img className="lk-img" alt="" src={src} />}
+      {block.uri ? <figcaption className="lk-caption">{block.uri}</figcaption> : null}
+    </figure>
+  );
+}
+
+/** Audio: from its bytes when the block carries them, else from its link once the host resolves it. */
+function AudioView({ block }: { block: Kind<"audio"> }) {
+  const linked = useLink(block.data === "" ? (block as { uri?: string }).uri : undefined);
+  const src = block.data === "" ? linked : dataUri(block.mimeType, block.data);
+  return src === undefined ? (
+    <div className="lk-caption">audio {block.mimeType}</div>
+  ) : (
+    <audio controls src={src}>
+      <track kind="captions" />
+    </audio>
+  );
+}
+
+/**
+ * A link to something the agent holds: an image is shown, anything else is a link to open or
+ * save, once the host resolves it. Unresolved, it is its name and link as text.
+ */
+function ResourceLinkView({ block }: { block: Kind<"resource_link"> }) {
+  const href = useLink(block.uri);
+  const name = block.title ?? block.name;
+  if (href === undefined)
+    return (
+      <div className="lk-caption">
+        {name} {block.uri}
+      </div>
+    );
+  return (
+    <figure className="lk-link" style={{ margin: 0 }}>
+      {block.mimeType?.startsWith("image/") ? (
+        <img className="lk-img" alt={name} src={href} />
+      ) : null}
+      <figcaption className="lk-caption">
+        <a href={href} target="_blank" rel="noopener noreferrer" download={name}>
+          {name}
+        </a>
+        {block.size == null ? null : ` · ${compactBytes(Number(block.size))}`}
+      </figcaption>
+    </figure>
+  );
+}
+
+/** A size as people read it: 512 B, 3.4 KB, 12 MB. */
+function compactBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  const [value, unit] = n < 1024 ** 2 ? [n / 1024, "KB"] : [n / 1024 ** 2, "MB"];
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${unit}`;
+}
+
+/** Binary content embedded by link only: a link to open or save once the host resolves it. */
+function BinaryResource({ uri }: { uri: string }) {
+  const href = useLink(uri);
+  return href === undefined ? (
+    <div className="lk-caption">binary resource {uri}</div>
+  ) : (
+    <div className="lk-caption">
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {uri}
+      </a>
+    </div>
+  );
+}
+
 /** One content block a tool returned: text as it is, media as media, anything else by its name. */
 export function ContentView({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case "text":
       return <pre className="lk-pre">{block.text}</pre>;
     case "image":
-      return (
-        <figure style={{ margin: 0 }}>
-          {block.data === "" ? null : (
-            <img className="lk-img" alt="" src={dataUri(block.mimeType, block.data)} />
-          )}
-          {block.uri ? <figcaption className="lk-caption">{block.uri}</figcaption> : null}
-        </figure>
-      );
+      return <ImageView block={block} />;
     case "audio":
-      return (
-        <audio controls src={dataUri(block.mimeType, block.data)}>
-          <track kind="captions" />
-        </audio>
-      );
+      return <AudioView block={block} />;
     case "resource_link":
-      return (
-        <div className="lk-caption">
-          {block.title ?? block.name} {block.uri}
-        </div>
-      );
+      return <ResourceLinkView block={block} />;
     case "resource": {
       const { resource } = block;
       if ("text" in resource && isVegaLite(resource.mimeType))
@@ -67,7 +129,7 @@ export function ContentView({ block }: { block: ContentBlock }) {
           <pre className="lk-pre">{resource.text}</pre>
         </>
       ) : (
-        <div className="lk-caption">binary resource {resource.uri}</div>
+        <BinaryResource uri={resource.uri} />
       );
     }
     default: {

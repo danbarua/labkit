@@ -860,6 +860,20 @@
   border: 2px solid var(--lk-faint);
   border-radius: 50%;
 }
+/* How much a step matters, as the agent ranked it: quiet unless it is high. */
+.lk-plan-priority {
+  flex: none;
+  margin-left: auto;
+  color: var(--lk-faint);
+  font-size: 11px;
+}
+.lk-plan-priority.high {
+  color: var(--lk-warn);
+}
+/* Once a step is done, how much it mattered no longer does. */
+.lk-plan li.completed .lk-plan-priority {
+  display: none;
+}
 .lk-plan li.in_progress::before {
   border-color: var(--lk-accent);
   background: radial-gradient(var(--lk-accent) 40%, transparent 45%);

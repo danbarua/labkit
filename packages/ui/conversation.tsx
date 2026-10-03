@@ -32,6 +32,7 @@ import { type RecordsConfig, RecordsContext } from "./records-context";
 import { SessionControls } from "./session-controls";
 import { ICONS } from "./surface";
 import { drawnBlocks } from "./grouping";
+import { LinksContext, type ResolveLink } from "./links";
 import { ToolCard, ToolGroup } from "./tool";
 
 const PHASE_LABEL: Record<Phase, string> = {
@@ -59,6 +60,11 @@ export interface ConversationProps {
   readonly onSetConfig?: (configId: string, value: string | boolean) => void;
   /** The records prose may name, so a handle in a message becomes a chip. */
   readonly records?: RecordsConfig;
+  /**
+   * Where this page can fetch a link the agent sent (`blob://…`). Without it only HTTP(S) links
+   * are fetched; any other link is shown as text.
+   */
+  readonly resolveLink?: ResolveLink;
   /** What the composer's `@` can name. Without it the composer has no `@`. */
   readonly mentions?: readonly PickItem[];
   /**
@@ -180,6 +186,7 @@ export function Conversation({
   onAnswer,
   theme,
   records,
+  resolveLink,
   onSetConfig,
   mentions,
   onMessageAction,
@@ -195,91 +202,93 @@ export function Conversation({
 
   return (
     <RecordsContext.Provider value={records}>
-      <IconContext.Provider value={ICONS}>
-        <section className="lk-root" {...(theme ? { "data-theme": theme } : {})}>
-          <ToastProvider>
-            <header className="lk-header">
-              <h2 className="lk-title">{state.title ?? "New session"}</h2>
-              {/* A turn that ended in an error was stopped, not finished: it needs the person. */}
-              {activity?.kind === "failed" ? (
-                <span className="lk-badge stopped">Stopped</span>
-              ) : (
-                <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
-              )}
-              <div className="lk-header-end">
-                {usage === undefined ? null : (
-                  <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>
-                    <span className="lk-meter-bar">
-                      <span style={{ width: `${fillPercent(usage.used, usage.size)}%` }} />
+      <LinksContext.Provider value={resolveLink}>
+        <IconContext.Provider value={ICONS}>
+          <section className="lk-root" {...(theme ? { "data-theme": theme } : {})}>
+            <ToastProvider>
+              <header className="lk-header">
+                <h2 className="lk-title">{state.title ?? "New session"}</h2>
+                {/* A turn that ended in an error was stopped, not finished: it needs the person. */}
+                {activity?.kind === "failed" ? (
+                  <span className="lk-badge stopped">Stopped</span>
+                ) : (
+                  <span className={`lk-badge ${current}`}>{PHASE_LABEL[current]}</span>
+                )}
+                <div className="lk-header-end">
+                  {usage === undefined ? null : (
+                    <span className="lk-meter" title={`${usage.used} of ${usage.size} tokens`}>
+                      <span className="lk-meter-bar">
+                        <span style={{ width: `${fillPercent(usage.used, usage.size)}%` }} />
+                      </span>
+                      {fillPercent(usage.used, usage.size)}%
+                      {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
                     </span>
-                    {fillPercent(usage.used, usage.size)}%
-                    {usage.cost ? <span>{formatCost(usage.cost)}</span> : null}
-                  </span>
-                )}
-              </div>
-            </header>
+                  )}
+                </div>
+              </header>
 
-            <div className="lk-log" ref={ref} onScroll={onScroll} role="log" aria-live="polite">
-              <div className="lk-blocks">
-                {state.blocks.length === 0 ? (
-                  <div className="lk-empty">Nothing here yet.</div>
-                ) : null}
-                {drawn.map((item) =>
-                  item.kind === "block" ? (
-                    <BlockView
-                      key={item.index}
-                      block={item.block}
-                      state={state}
-                      last={item === drawn.at(-1)}
-                      onMessageAction={onMessageAction}
-                    />
-                  ) : (
-                    <ToolGroup
-                      key={item.index}
-                      calls={item.blocks.flatMap((block) => {
-                        const call = state.toolCalls[block.toolCallId];
-                        return call === undefined
-                          ? []
-                          : [{ call, permission: permissionFor(state, block.toolCallId) }];
-                      })}
-                    />
-                  ),
-                )}
-                <WorkingIndicator {...indicator} loader={onSend === undefined} />
+              <div className="lk-log" ref={ref} onScroll={onScroll} role="log" aria-live="polite">
+                <div className="lk-blocks">
+                  {state.blocks.length === 0 ? (
+                    <div className="lk-empty">Nothing here yet.</div>
+                  ) : null}
+                  {drawn.map((item) =>
+                    item.kind === "block" ? (
+                      <BlockView
+                        key={item.index}
+                        block={item.block}
+                        state={state}
+                        last={item === drawn.at(-1)}
+                        onMessageAction={onMessageAction}
+                      />
+                    ) : (
+                      <ToolGroup
+                        key={item.index}
+                        calls={item.blocks.flatMap((block) => {
+                          const call = state.toolCalls[block.toolCallId];
+                          return call === undefined
+                            ? []
+                            : [{ call, permission: permissionFor(state, block.toolCallId) }];
+                        })}
+                      />
+                    ),
+                  )}
+                  <WorkingIndicator {...indicator} loader={onSend === undefined} />
+                </div>
               </div>
-            </div>
 
-            {pending.length > 0 ? (
-              <div className="lk-permissions">
-                {pending.length > 1 ? (
-                  <PermissionBatch entries={pending} onAnswer={onAnswer} />
-                ) : null}
-                {pending.map((entry) => (
-                  <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
-                ))}
-              </div>
-            ) : null}
+              {pending.length > 0 ? (
+                <div className="lk-permissions">
+                  {pending.length > 1 ? (
+                    <PermissionBatch entries={pending} onAnswer={onAnswer} />
+                  ) : null}
+                  {pending.map((entry) => (
+                    <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
+                  ))}
+                </div>
+              ) : null}
 
-            {onSend ? (
-              <Composer
-                running={state.running}
-                commands={[...hostCommands, ...state.commands]}
-                configOptions={state.configOptions ?? []}
-                onSend={onSend}
-                onCancel={onCancel}
-                onSetConfig={onSetConfig}
-                mentions={mentions}
-                attach={attach}
-                loader={moodOf(indicator)}
-              />
-            ) : state.configOptions && state.configOptions.length > 0 ? (
-              <div className="lk-session-summary">
-                <SessionControls options={state.configOptions} />
-              </div>
-            ) : null}
-          </ToastProvider>
-        </section>
-      </IconContext.Provider>
+              {onSend ? (
+                <Composer
+                  running={state.running}
+                  commands={[...hostCommands, ...state.commands]}
+                  configOptions={state.configOptions ?? []}
+                  onSend={onSend}
+                  onCancel={onCancel}
+                  onSetConfig={onSetConfig}
+                  mentions={mentions}
+                  attach={attach}
+                  loader={moodOf(indicator)}
+                />
+              ) : state.configOptions && state.configOptions.length > 0 ? (
+                <div className="lk-session-summary">
+                  <SessionControls options={state.configOptions} />
+                </div>
+              ) : null}
+            </ToastProvider>
+          </section>
+        </IconContext.Provider>
+      </LinksContext.Provider>
     </RecordsContext.Provider>
   );
 }
