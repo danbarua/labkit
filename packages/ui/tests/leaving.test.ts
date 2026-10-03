@@ -36,9 +36,21 @@ describe("an item that has gone", () => {
     ]);
   });
 
+  test("is not kept when every item went at once: the transcript was replaced", () => {
+    expect(drawn(step(["a", "b", "c"], []))).toEqual([]);
+    expect(drawn(step(["a", "b"], ["x"]))).toEqual(["x"]);
+  });
+
   test("keeps the value it was last drawn with", () => {
-    const before = [{ key: "plan", value: { key: "plan", entries: 2 }, leaving: false }];
-    const [left] = withLeaving(before, []);
-    expect(left).toEqual({ key: "plan", value: { key: "plan", entries: 2 }, leaving: true });
+    const a = { key: "a", entries: 0 };
+    const before = [
+      { key: "a", value: a, leaving: false },
+      { key: "plan", value: { key: "plan", entries: 2 }, leaving: false },
+    ];
+    expect(withLeaving(before, [a])[1]).toEqual({
+      key: "plan",
+      value: { key: "plan", entries: 2 },
+      leaving: true,
+    });
   });
 });

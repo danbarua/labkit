@@ -10,12 +10,17 @@ export interface Shown<T> {
 /**
  * The items present now, with each item shown last time that has since gone kept as leaving,
  * after the item that came before it. An item that comes back while leaving is present again.
+ * When none of the items that were present are present now, the transcript was replaced (played
+ * again from the start, a new session), and nothing is kept.
  */
 export function withLeaving<T extends { readonly key: string }>(
   previous: readonly Shown<T>[],
   current: readonly T[],
 ): Shown<T>[] {
   const present = new Set(current.map((item) => item.key));
+  const were = previous.filter((item) => !item.leaving);
+  if (were.length > 0 && !were.some((item) => present.has(item.key)))
+    return current.map((value) => ({ key: value.key, value, leaving: false }));
   const gone = new Map<string | undefined, Shown<T>[]>();
   let anchor: string | undefined;
   for (const item of previous) {
