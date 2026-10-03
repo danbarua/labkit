@@ -313,30 +313,14 @@ export interface HistoryOptions {
   readonly fetch?: typeof fetch;
 }
 
-/** How long the history must stop arriving before it is taken as complete. */
-const QUIET_MS = 300;
-
 /**
- * Everything the agent sends while reopening `sessionId`, then the connection closed. The agent
- * answers the reopen on the connection's stream and replays the history on the session's, and
- * nothing orders the two, so history can still be arriving after the answer: it is taken as
- * complete once nothing has come for `QUIET_MS`.
+ * Everything the agent sends while reopening `sessionId`, then the connection closed. The reopen
+ * completes once the replayed history has been handled (effective-acp counts it, or waits for it
+ * to stop arriving with an agent that sends no count), so what was collected by then is all of it.
  */
 export async function sessionHistory(options: HistoryOptions): Promise<readonly ViewEvent[]> {
   const events: ViewEvent[] = [];
-  let last = Date.now();
-  const client = await connectSession({
-    ...options,
-    onEvent: (event) => {
-      events.push(event);
-      last = Date.now();
-    },
-  });
-  try {
-    while (Date.now() - last < QUIET_MS)
-      await new Promise((resolve) => setTimeout(resolve, QUIET_MS));
-    return events;
-  } finally {
-    await client.close();
-  }
+  const client = await connectSession({ ...options, onEvent: (event) => events.push(event) });
+  await client.close();
+  return events;
 }

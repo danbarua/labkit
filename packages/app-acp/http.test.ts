@@ -795,3 +795,42 @@ test("the CLI serves --http until SIGTERM with stdout empty, and exits 1 without
     await rm(fixture.directory, { recursive: true, force: true });
   }
 }, 30_000);
+
+test("serveAcpHttp opens an event stream at once, not at the SDK's first 15 s keepalive", async () => {
+  const server = serveAcpHttp(setup().options, { port: 0, token });
+  try {
+    const json = {
+      ...authorization,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    };
+    const initialized = await fetch(server.url, {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 0,
+        method: "initialize",
+        params: {
+          protocolVersion: 1,
+          clientCapabilities: {},
+          clientInfo: { name: "test", version: "0" },
+        },
+      }),
+    });
+    const connectionId = initialized.headers.get("acp-connection-id") ?? "";
+    await initialized.text();
+    const stopped = new AbortController();
+    const started = performance.now();
+    const stream = await fetch(server.url, {
+      headers: { ...authorization, accept: "text/event-stream", "acp-connection-id": connectionId },
+      signal: stopped.signal,
+    });
+    const openedMs = performance.now() - started;
+    stopped.abort();
+    expect(stream.status).toBe(200);
+    expect(openedMs).toBeLessThan(2000);
+  } finally {
+    await server.close();
+  }
+});
