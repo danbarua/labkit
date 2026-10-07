@@ -1,19 +1,37 @@
 /**
  * A session with the dev agent end to end over HTTP: start one, send a prompt and see the turn end,
  * reopen it and see what the live session showed, and find it in the agent's list. It uses the
- * real agent and model, so it is not in `bun run check`. `bun run e2e:agent [--url <acp url>]`
- * (default :8850's `/acp`); exits 1 if a check fails, printing what it got.
+ * real agent and model, so it is not in `bun run check`.
+ * `bun run e2e:agent [--url <acp url>] [--cwd <folder>]` (default :8850's `/acp`, and the folder
+ * `dev-with-agent.ts` gives the agent); exits 1 if a check fails, printing what it got.
  */
 
 import path from "node:path";
+import { parseArgs } from "node:util";
 import { connectSession, listSessions, sessionHistory } from "@labkit/acp-client";
 import { replay, textOf, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 
-const urlFlag = process.argv.indexOf("--url");
-const url = urlFlag === -1 ? "http://127.0.0.1:8850/acp" : process.argv[urlFlag + 1];
-if (url === undefined) throw new Error("--url needs a value");
-/** The directory the dev agent keeps its sessions for, as `dev-with-agent.ts` sets it. */
-const cwd = path.resolve(import.meta.dirname, "../../../.labkit-dev/agent-workspace");
+const { values } = parseArgs({
+  options: { url: { type: "string" }, cwd: { type: "string" } },
+});
+const url = values.url ?? "http://127.0.0.1:8850/acp";
+/** The folder the dev agent works in, as `dev-with-agent.ts` sets it. */
+const cwd = path.resolve(
+  values.cwd ?? path.join(import.meta.dirname, "../../../.labkit-dev/labkit-effect/workspace"),
+);
+// With the token set, requests carry it as the dev server's proxy adds it, so --url can name the agent's port.
+const token = process.env.LABKIT_ACP_HTTP_TOKEN;
+const fetch: typeof globalThis.fetch =
+  token === undefined || token === ""
+    ? globalThis.fetch
+    : Object.assign(
+        (input: string | URL | Request, init?: RequestInit) => {
+          const request = new Request(input instanceof Request ? input : String(input), init);
+          request.headers.set("authorization", `Bearer ${token}`);
+          return globalThis.fetch(request);
+        },
+        { preconnect: globalThis.fetch.preconnect },
+      );
 const PROMPT = "Reply with the single word: ready. Do not use any tools.";
 
 const failures: string[] = [];
@@ -37,7 +55,7 @@ const seen = (state: TranscriptState) =>
 
 const live: ViewEvent[] = [];
 let started = Date.now();
-const client = await connectSession({ url, cwd, onEvent: (event) => live.push(event) });
+const client = await connectSession({ url, fetch, cwd, onEvent: (event) => live.push(event) });
 console.log(`session ${client.sessionId} opened in ${since(started)}`);
 
 started = Date.now();
@@ -63,7 +81,7 @@ check(
 await client.close();
 
 started = Date.now();
-const history = await sessionHistory({ url, cwd, sessionId: client.sessionId });
+const history = await sessionHistory({ url, fetch, cwd, sessionId: client.sessionId });
 console.log(`reopened in ${since(started)}: ${history.length} events`);
 const reopened = seen(replay(history));
 // Thinking is shown live and is not kept by every agent, so the comparison is of what remains.
@@ -76,7 +94,7 @@ check(
 );
 
 started = Date.now();
-const sessions = await listSessions({ url, cwd });
+const sessions = await listSessions({ url, fetch, cwd });
 console.log(`listed in ${since(started)}: ${sessions?.length ?? "not offered"}`);
 check(
   "the agent lists the session",

@@ -7,8 +7,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "catalog:",
     "@labkit/view-model": "workspace:*",
-    "effect": "4.0.0",
-    "effective-acp": "0.3.0"
+    "effect": "catalog:",
+    "effective-acp": "catalog:"
   },
   "devDependencies": {
     "@labkit/acp-fake": "workspace:*",
