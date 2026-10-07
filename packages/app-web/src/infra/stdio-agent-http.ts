@@ -20,6 +20,9 @@ export const minimumTokenLength = 32;
 /** How long a stopped connection's agent process has to exit after its stdin closes, before SIGTERM. */
 export const stopGraceMs = 5000;
 
+/** How long a connection may have no event stream open before the bridge ends it, by default. */
+export const abandonedAfterMs = 60_000;
+
 export interface StdioAgentHttpOptions {
   /** The agent's command line: the program, then its arguments. One process runs per ACP connection. */
   readonly command: readonly [string, ...string[]];
@@ -29,6 +32,8 @@ export interface StdioAgentHttpOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
   /** The bearer token that every request must carry: at least `minimumTokenLength` characters. */
   readonly token: string;
+  /** How long a connection may have no event stream open before the bridge ends it. Default `abandonedAfterMs`. */
+  readonly abandonedAfterMs?: number;
 }
 
 export interface StdioAgentHttp {
@@ -52,14 +57,24 @@ const isSingleMessage = (value: unknown): value is JsonRpcMessage =>
 const isMessage = (value: unknown): value is JsonRpcMessage | ReadonlyArray<JsonRpcMessage> =>
   Array.isArray(value) ? value.length > 0 && value.every(isSingleMessage) : isSingleMessage(value);
 
-/** Writes each message that `from` reads to `to`, until `from` ends or either side fails. */
-const relay = (from: Wire, to: Wire, side: Side): Effect.Effect<void> =>
+/**
+ * Writes each message that `from` reads to `to`, until `from` ends or either side fails. `noted`
+ * runs before each JSON-RPC message is written.
+ */
+const relay = (
+  from: Wire,
+  to: Wire,
+  side: Side,
+  noted: (message: JsonRpcMessage) => Effect.Effect<void>,
+): Effect.Effect<void> =>
   from.read.pipe(
     Stream.runForEach(
       WireInput.$match({
         Json: ({ value }) =>
           isMessage(value)
-            ? to.write(value)
+            ? Effect.forEach(Array.isArray(value) ? value : [value], noted, {
+                discard: true,
+              }).pipe(Effect.andThen(to.write(value)))
             : Effect.logWarning("agent-http.message.not-relayed", {
                 from: side,
                 reason: "the value is not a JSON-RPC 2.0 message",
@@ -115,14 +130,18 @@ const closeStdin = (child: AgentProcess): Effect.Effect<void> =>
     );
   });
 
-/** Closes stdin, waits up to `stopGraceMs` for the process to exit, then sends SIGTERM. */
+const exitWithin = (child: AgentProcess) =>
+  Effect.promise(() => child.exited).pipe(Effect.timeoutOption(stopGraceMs));
+
+/**
+ * Closes stdin and waits up to `stopGraceMs` for the process to exit. If it has not, sends SIGTERM
+ * and waits as long again, then sends SIGKILL. Returns once the process has exited.
+ */
 const stop = (child: AgentProcess): Effect.Effect<void> =>
   Effect.gen(function* () {
     if (hasExited(child)) return;
     yield* closeStdin(child);
-    const exited = yield* Effect.promise(() => child.exited).pipe(
-      Effect.timeoutOption(stopGraceMs),
-    );
+    const exited = yield* exitWithin(child);
     if (exited._tag === "Some") {
       yield* Effect.logInfo("agent-http.agent.stopped", {
         pid: child.pid,
@@ -132,11 +151,23 @@ const stop = (child: AgentProcess): Effect.Effect<void> =>
       return;
     }
     child.kill("SIGTERM");
+    const terminated = yield* exitWithin(child);
+    if (terminated._tag === "None") child.kill("SIGKILL");
     yield* Effect.logWarning("agent-http.agent.stopped", {
       pid: child.pid,
-      how: `sent SIGTERM: it had not exited ${stopGraceMs} ms after its stdin was closed`,
+      how:
+        terminated._tag === "Some"
+          ? `sent SIGTERM: it had not exited ${stopGraceMs} ms after its stdin was closed`
+          : `sent SIGKILL: it had not exited ${stopGraceMs} ms after SIGTERM`,
     });
+    yield* Effect.promise(() => child.exited);
   });
+
+interface AgentRun {
+  readonly child: AgentProcess;
+  /** Stops the process (`stop`); every run after the first waits for the first. */
+  readonly stop: Effect.Effect<void>;
+}
 
 /** Starts the agent process for one connection; the scope stops it. */
 const started = (options: StdioAgentHttpOptions) =>
@@ -151,9 +182,69 @@ const started = (options: StdioAgentHttpOptions) =>
           stderr: "pipe",
         }),
       catch: (cause) => cause,
-    }),
-    stop,
+    }).pipe(
+      Effect.flatMap((child) =>
+        Effect.map(Effect.cached(stop(child)), (stopOnce): AgentRun => ({ child, stop: stopOnce })),
+      ),
+    ),
+    (run) => run.stop,
   );
+
+/** The connection whose agent process has a session open, and how to stop that process. */
+interface SessionHolder {
+  readonly connection: string;
+  readonly stop: Effect.Effect<void>;
+}
+
+/** Each session's holder. An agent process locks the sessions it has open. */
+type Holders = Map<string, SessionHolder>;
+
+const sessionIdOf = (params: unknown): string | undefined =>
+  Predicate.isObject(params) && typeof params.sessionId === "string" ? params.sessionId : undefined;
+
+/**
+ * Notes, for one connection, which sessions its agent process holds: those it creates and those it
+ * is asked to load or resume. When a session is held by another connection's process, that process
+ * is stopped before the request is relayed, because labkit-effect refuses to open a session that
+ * another running process has open. The newest connection to ask for a session wins, as when a page
+ * is reloaded without its old connection having been deleted.
+ */
+const sessionClaims = (holders: Holders, holder: SessionHolder) => {
+  const creating = new Set<unknown>();
+  const claim = (sessionId: string) =>
+    Effect.gen(function* () {
+      const previous = holders.get(sessionId);
+      holders.set(sessionId, holder);
+      if (previous === undefined || previous.connection === holder.connection) return;
+      yield* Effect.logWarning("agent-http.session.taken-over", {
+        session: sessionId,
+        from: previous.connection,
+        reason: "a newer connection asked for the session, and one agent process may hold it",
+        action: "stopped the older connection's agent process before relaying the request",
+      });
+      yield* previous.stop;
+    });
+  return {
+    fromClient: (message: JsonRpcMessage): Effect.Effect<void> => {
+      if (!("method" in message) || !("id" in message)) return Effect.void;
+      if (message.method === "session/new") creating.add(message.id);
+      const asked = sessionIdOf(message.params);
+      return (message.method === "session/load" || message.method === "session/resume") &&
+        asked !== undefined
+        ? claim(asked)
+        : Effect.void;
+    },
+    fromAgent: (message: JsonRpcMessage): Effect.Effect<void> => {
+      if ("method" in message || !creating.delete(message.id) || !("result" in message))
+        return Effect.void;
+      const created = sessionIdOf(message.result);
+      return created === undefined ? Effect.void : claim(created);
+    },
+    release: Effect.sync(() => {
+      for (const [sessionId, current] of holders) if (current === holder) holders.delete(sessionId);
+    }),
+  };
+};
 
 const logLines = (child: AgentProcess): Effect.Effect<void> =>
   Stream.fromReadableStream({ evaluate: () => child.stderr, onError: (cause) => cause }).pipe(
@@ -172,7 +263,12 @@ const logLines = (child: AgentProcess): Effect.Effect<void> =>
  * process exits first, the connection ends, and a non-zero exit code is logged as an error. When
  * the client deletes the connection, or the bridge closes, the scope stops the process (`stop`).
  */
-const connection = (options: StdioAgentHttpOptions, client: Wire) =>
+const connection = (
+  options: StdioAgentHttpOptions,
+  client: Wire,
+  connectionId: string,
+  holders: Holders,
+) =>
   Effect.gen(function* () {
     const spawned = yield* Effect.result(started(options));
     if (spawned._tag === "Failure") {
@@ -183,7 +279,9 @@ const connection = (options: StdioAgentHttpOptions, client: Wire) =>
       });
       return;
     }
-    const child = spawned.success;
+    const { child } = spawned.success;
+    const claims = sessionClaims(holders, { connection: connectionId, stop: spawned.success.stop });
+    yield* Effect.addFinalizer(() => claims.release);
     yield* Effect.logInfo("agent-http.agent.started", {
       pid: child.pid,
       command: options.command,
@@ -193,9 +291,9 @@ const connection = (options: StdioAgentHttpOptions, client: Wire) =>
     yield* Effect.forkScoped(logLines(child));
     // The client's side ends on DELETE: closing stdin is how an editor tells the agent to exit.
     yield* Effect.forkScoped(
-      relay(client, agent, "client").pipe(Effect.ensuring(closeStdin(child))),
+      relay(client, agent, "client", claims.fromClient).pipe(Effect.ensuring(closeStdin(child))),
     );
-    yield* relay(agent, client, "agent");
+    yield* relay(agent, client, "agent", claims.fromAgent);
     const exitCode = yield* Effect.promise(() => child.exited);
     const exited = { pid: child.pid, exitCode, signal: child.signalCode };
     yield* exitCode === 0
@@ -204,6 +302,96 @@ const connection = (options: StdioAgentHttpOptions, client: Wire) =>
   });
 
 const digest = (text: string): Buffer => createHash("sha256").update(text).digest();
+
+/** `body`, calling `ended` once when it is read to its end or cancelled (the client went away). */
+const watched = (
+  body: ReadableStream<Uint8Array>,
+  ended: () => void,
+): ReadableStream<Uint8Array> => {
+  const reader = body.getReader();
+  let done = false;
+  const end = () => {
+    if (done) return;
+    done = true;
+    ended();
+  };
+  return new ReadableStream<Uint8Array>({
+    pull: async (controller) => {
+      const next = await reader.read();
+      if (!next.done) return controller.enqueue(next.value);
+      end();
+      controller.close();
+    },
+    cancel: async (reason) => {
+      end();
+      await reader.cancel(reason);
+    },
+  });
+};
+
+/**
+ * Ends each connection that has had no event stream open for `afterMs`, by sending DELETE for it.
+ * effective-acp's `Http.serve` keeps a connection, and so its agent process, until the client sends
+ * DELETE, which a closed or reloaded page does not send. The clock starts when `initialize` is
+ * answered and whenever the connection's last open event stream ends.
+ */
+const abandonment = (afterMs: number, deleteConnection: (id: string) => Promise<Response>) => {
+  const open = new Map<string, number>();
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const forget = (id: string) => {
+    clearTimeout(timers.get(id));
+    timers.delete(id);
+    open.delete(id);
+  };
+  const end = async (id: string) => {
+    forget(id);
+    const { status } = await deleteConnection(id);
+    await Effect.runPromise(
+      status === 202
+        ? Effect.logWarning("agent-http.connection.abandoned", {
+            connection: id,
+            reason: `no event stream was open for ${afterMs} ms`,
+            action: "sent DELETE for the connection, which stops its agent process",
+          })
+        : Effect.logInfo("agent-http.connection.already-ended", {
+            connection: id,
+            deleteStatus: status,
+          }),
+    );
+  };
+  const idle = (id: string) => {
+    clearTimeout(timers.get(id));
+    const timer = setTimeout(() => void end(id), afterMs);
+    timer.unref();
+    timers.set(id, timer);
+  };
+  const streamEnded = (id: string) => {
+    const left = (open.get(id) ?? 1) - 1;
+    open.set(id, left);
+    if (left === 0) idle(id);
+  };
+  return {
+    /** Notes what `response` opens or ends, and returns it, with an event stream's body watched. */
+    observe: (request: Request, response: Response): Response => {
+      const named = request.headers.get("acp-connection-id");
+      const answered = response.headers.get("acp-connection-id");
+      if (request.method === "POST" && named === null && answered !== null) idle(answered);
+      if (request.method === "DELETE" && named !== null) forget(named);
+      if (request.method !== "GET" || named === null || !response.ok || response.body === null)
+        return response;
+      clearTimeout(timers.get(named));
+      timers.delete(named);
+      open.set(named, (open.get(named) ?? 0) + 1);
+      return new Response(
+        watched(response.body, () => streamEnded(named)),
+        response,
+      );
+    },
+    stop: () => {
+      for (const id of [...timers.keys()]) forget(id);
+    },
+  };
+};
 
 /**
  * Serves the agent that `options.command` starts, one process per ACP connection. A request without
@@ -215,11 +403,18 @@ export function stdioAgentHttp(options: StdioAgentHttpOptions): StdioAgentHttp {
       `The bridge's bearer token has ${options.token.length} characters; it needs at least ${minimumTokenLength}`,
     );
   const expected = digest(options.token);
+  const holders: Holders = new Map();
   const { handler, dispose } = HttpRouter.toWebHandler(
     Http.serve({
       onConnection: (client, { id }) =>
-        connection(options, client).pipe(Effect.annotateLogs({ connection: id })),
+        connection(options, client, id, holders).pipe(Effect.annotateLogs({ connection: id })),
     }),
+  );
+
+  const abandoned = abandonment(options.abandonedAfterMs ?? abandonedAfterMs, (id) =>
+    handler(
+      new Request("http://bridge/acp", { method: "DELETE", headers: { "acp-connection-id": id } }),
+    ),
   );
 
   const refusal = (header: string | null): string | undefined => {
@@ -233,7 +428,7 @@ export function stdioAgentHttp(options: StdioAgentHttpOptions): StdioAgentHttp {
   return {
     fetch: async (request) => {
       const refused = refusal(request.headers.get("authorization"));
-      if (refused === undefined) return handler(request);
+      if (refused === undefined) return abandoned.observe(request, await handler(request));
       await Effect.runPromise(
         Effect.logWarning("agent-http.request.refused", {
           method: request.method,
@@ -247,6 +442,9 @@ export function stdioAgentHttp(options: StdioAgentHttpOptions): StdioAgentHttp {
         headers: { "WWW-Authenticate": "Bearer" },
       });
     },
-    close: dispose,
+    close: () => {
+      abandoned.stop();
+      return dispose();
+    },
   };
 }

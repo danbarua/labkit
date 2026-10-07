@@ -40,12 +40,17 @@ afterEach(async () => {
   await Promise.all(bridges.splice(0).map((bridge) => bridge.close()));
 });
 
-function bridgeTo(command: readonly [string, ...string[]], env: Record<string, string> = {}) {
+function bridgeTo(
+  command: readonly [string, ...string[]],
+  env: Record<string, string> = {},
+  abandonedAfterMs?: number,
+) {
   const bridge = stdioAgentHttp({
     command,
     cwd: import.meta.dir,
     env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ...env },
     token: TOKEN,
+    ...(abandonedAfterMs === undefined ? {} : { abandonedAfterMs }),
   });
   bridges.push(bridge);
   return bridge;
@@ -130,6 +135,77 @@ describe("the agent process", () => {
     await expect(
       connectSession({ url: URL, fetch: fetchVia(bridge), onEvent: () => {} }),
     ).rejects.toBeInstanceOf(Error);
+  });
+});
+
+/** Sends `initialize` and opens the connection's event stream, as a client does; returns the stream's reader. */
+async function openRaw(bridge: StdioAgentHttp) {
+  const send = fetchVia(bridge);
+  const initialized = await send(URL, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 0,
+      method: "initialize",
+      params: { protocolVersion: 1, clientCapabilities: {} },
+    }),
+  });
+  const connectionId = initialized.headers.get("acp-connection-id");
+  if (connectionId === null)
+    throw new Error(`initialize answered ${initialized.status}, no connection id`);
+  const stream = await send(URL, {
+    headers: { accept: "text/event-stream", "acp-connection-id": connectionId },
+  });
+  if (stream.body === null)
+    throw new Error(`the event stream answered ${stream.status} with no body`);
+  const reader = stream.body.getReader();
+  await reader.read();
+  return reader;
+}
+
+describe("a connection whose client goes away without DELETE", () => {
+  test("is ended, and its agent process exits, once no event stream has been open for the set time", async () => {
+    const exitFile = path.join(mkdtempSync(path.join(tmpdir(), "stdio-agent-http-")), "exited");
+    const bridge = bridgeTo(["bun", FAKE_AGENT], { FAKE_AGENT_EXIT_FILE: exitFile }, 200);
+    const reader = await openRaw(bridge);
+
+    await reader.cancel();
+
+    await until(() => existsSync(exitFile), "the abandoned connection's agent process to exit");
+  });
+
+  test("is kept while one of its event streams is open", async () => {
+    const exitFile = path.join(mkdtempSync(path.join(tmpdir(), "stdio-agent-http-")), "exited");
+    const bridge = bridgeTo(["bun", FAKE_AGENT], { FAKE_AGENT_EXIT_FILE: exitFile }, 200);
+    const reader = await openRaw(bridge);
+
+    await Bun.sleep(800);
+
+    expect(existsSync(exitFile)).toBe(false);
+    await reader.cancel();
+  });
+});
+
+describe("a session asked for by a newer connection", () => {
+  test("is taken from the older connection: its agent process exits before the load is relayed", async () => {
+    const exitFile = path.join(mkdtempSync(path.join(tmpdir(), "stdio-agent-http-")), "exited");
+    const bridge = bridgeTo(["bun", FAKE_AGENT], {
+      FAKE_AGENT_EXIT_FILE: exitFile,
+      FAKE_AGENT_SESSIONS: "fake-1",
+    });
+    const older = await connectSession({ url: URL, fetch: fetchVia(bridge), onEvent: () => {} });
+    expect(older.sessionId).toBe("fake-1");
+
+    const newer = await connectSession({
+      url: URL,
+      fetch: fetchVia(bridge),
+      sessionId: older.sessionId,
+      onEvent: () => {},
+    });
+
+    expect(existsSync(exitFile)).toBe(true);
+    await newer.close();
   });
 });
 
