@@ -9,6 +9,7 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { connectSession, type SessionClient } from "@labkit/acp-client";
+import type { Duration } from "effect";
 import { type Fixture, FIXTURES } from "@labkit/acp-scenarios";
 import { replay, type ViewEvent } from "@labkit/view-model";
 import { eventsOfFixture, stateOfFixture } from "@labkit/view-model/fixtures";
@@ -43,14 +44,14 @@ afterEach(async () => {
 function bridgeTo(
   command: readonly [string, ...string[]],
   env: Record<string, string> = {},
-  abandonedAfterMs?: number,
+  abandonedAfter?: Duration.Input,
 ) {
   const bridge = stdioAgentHttp({
     command,
     cwd: import.meta.dir,
     env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", ...env },
     token: TOKEN,
-    ...(abandonedAfterMs === undefined ? {} : { abandonedAfterMs }),
+    ...(abandonedAfter === undefined ? {} : { abandonedAfter }),
   });
   bridges.push(bridge);
   return bridge;
@@ -167,7 +168,7 @@ async function openRaw(bridge: StdioAgentHttp) {
 describe("a connection whose client goes away without DELETE", () => {
   test("is ended, and its agent process exits, once no event stream has been open for the set time", async () => {
     const exitFile = path.join(mkdtempSync(path.join(tmpdir(), "stdio-agent-http-")), "exited");
-    const bridge = bridgeTo(["bun", FAKE_AGENT], { FAKE_AGENT_EXIT_FILE: exitFile }, 200);
+    const bridge = bridgeTo(["bun", FAKE_AGENT], { FAKE_AGENT_EXIT_FILE: exitFile }, "200 millis");
     const reader = await openRaw(bridge);
 
     await reader.cancel();
@@ -177,7 +178,7 @@ describe("a connection whose client goes away without DELETE", () => {
 
   test("is kept while one of its event streams is open", async () => {
     const exitFile = path.join(mkdtempSync(path.join(tmpdir(), "stdio-agent-http-")), "exited");
-    const bridge = bridgeTo(["bun", FAKE_AGENT], { FAKE_AGENT_EXIT_FILE: exitFile }, 200);
+    const bridge = bridgeTo(["bun", FAKE_AGENT], { FAKE_AGENT_EXIT_FILE: exitFile }, "200 millis");
     const reader = await openRaw(bridge);
 
     await Bun.sleep(800);

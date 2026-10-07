@@ -8,7 +8,7 @@
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
-import { Effect, Predicate, Stream } from "effect";
+import { type Duration, Effect, Predicate, Stream } from "effect";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as Http from "effective-acp/http";
 import { type JsonRpcMessage, type Wire, WireInput } from "effective-acp/json-rpc";
@@ -20,9 +20,6 @@ export const minimumTokenLength = 32;
 /** How long a stopped connection's agent process has to exit after its stdin closes, before SIGTERM. */
 export const stopGraceMs = 5000;
 
-/** How long a connection may have no event stream open before the bridge ends it, by default. */
-export const abandonedAfterMs = 60_000;
-
 export interface StdioAgentHttpOptions {
   /** The agent's command line: the program, then its arguments. One process runs per ACP connection. */
   readonly command: readonly [string, ...string[]];
@@ -32,8 +29,11 @@ export interface StdioAgentHttpOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
   /** The bearer token that every request must carry: at least `minimumTokenLength` characters. */
   readonly token: string;
-  /** How long a connection may have no event stream open before the bridge ends it. Default `abandonedAfterMs`. */
-  readonly abandonedAfterMs?: number;
+  /**
+   * How long a connection may have no event stream open before it is ended, which stops its agent
+   * process: effective-acp's `abandonedAfter`, whose default is 60 seconds.
+   */
+  readonly abandonedAfter?: Duration.Input;
 }
 
 export interface StdioAgentHttp {
@@ -303,96 +303,6 @@ const connection = (
 
 const digest = (text: string): Buffer => createHash("sha256").update(text).digest();
 
-/** `body`, calling `ended` once when it is read to its end or cancelled (the client went away). */
-const watched = (
-  body: ReadableStream<Uint8Array>,
-  ended: () => void,
-): ReadableStream<Uint8Array> => {
-  const reader = body.getReader();
-  let done = false;
-  const end = () => {
-    if (done) return;
-    done = true;
-    ended();
-  };
-  return new ReadableStream<Uint8Array>({
-    pull: async (controller) => {
-      const next = await reader.read();
-      if (!next.done) return controller.enqueue(next.value);
-      end();
-      controller.close();
-    },
-    cancel: async (reason) => {
-      end();
-      await reader.cancel(reason);
-    },
-  });
-};
-
-/**
- * Ends each connection that has had no event stream open for `afterMs`, by sending DELETE for it.
- * effective-acp's `Http.serve` keeps a connection, and so its agent process, until the client sends
- * DELETE, which a closed or reloaded page does not send. The clock starts when `initialize` is
- * answered and whenever the connection's last open event stream ends.
- */
-const abandonment = (afterMs: number, deleteConnection: (id: string) => Promise<Response>) => {
-  const open = new Map<string, number>();
-  const timers = new Map<string, ReturnType<typeof setTimeout>>();
-  const forget = (id: string) => {
-    clearTimeout(timers.get(id));
-    timers.delete(id);
-    open.delete(id);
-  };
-  const end = async (id: string) => {
-    forget(id);
-    const { status } = await deleteConnection(id);
-    await Effect.runPromise(
-      status === 202
-        ? Effect.logWarning("agent-http.connection.abandoned", {
-            connection: id,
-            reason: `no event stream was open for ${afterMs} ms`,
-            action: "sent DELETE for the connection, which stops its agent process",
-          })
-        : Effect.logInfo("agent-http.connection.already-ended", {
-            connection: id,
-            deleteStatus: status,
-          }),
-    );
-  };
-  const idle = (id: string) => {
-    clearTimeout(timers.get(id));
-    const timer = setTimeout(() => void end(id), afterMs);
-    timer.unref();
-    timers.set(id, timer);
-  };
-  const streamEnded = (id: string) => {
-    const left = (open.get(id) ?? 1) - 1;
-    open.set(id, left);
-    if (left === 0) idle(id);
-  };
-  return {
-    /** Notes what `response` opens or ends, and returns it, with an event stream's body watched. */
-    observe: (request: Request, response: Response): Response => {
-      const named = request.headers.get("acp-connection-id");
-      const answered = response.headers.get("acp-connection-id");
-      if (request.method === "POST" && named === null && answered !== null) idle(answered);
-      if (request.method === "DELETE" && named !== null) forget(named);
-      if (request.method !== "GET" || named === null || !response.ok || response.body === null)
-        return response;
-      clearTimeout(timers.get(named));
-      timers.delete(named);
-      open.set(named, (open.get(named) ?? 0) + 1);
-      return new Response(
-        watched(response.body, () => streamEnded(named)),
-        response,
-      );
-    },
-    stop: () => {
-      for (const id of [...timers.keys()]) forget(id);
-    },
-  };
-};
-
 /**
  * Serves the agent that `options.command` starts, one process per ACP connection. A request without
  * `Authorization: Bearer <token>` is answered 401 and logged as a warning.
@@ -406,15 +316,10 @@ export function stdioAgentHttp(options: StdioAgentHttpOptions): StdioAgentHttp {
   const holders: Holders = new Map();
   const { handler, dispose } = HttpRouter.toWebHandler(
     Http.serve({
+      abandonedAfter: options.abandonedAfter,
       onConnection: (client, { id }) =>
         connection(options, client, id, holders).pipe(Effect.annotateLogs({ connection: id })),
     }),
-  );
-
-  const abandoned = abandonment(options.abandonedAfterMs ?? abandonedAfterMs, (id) =>
-    handler(
-      new Request("http://bridge/acp", { method: "DELETE", headers: { "acp-connection-id": id } }),
-    ),
   );
 
   const refusal = (header: string | null): string | undefined => {
@@ -428,7 +333,7 @@ export function stdioAgentHttp(options: StdioAgentHttpOptions): StdioAgentHttp {
   return {
     fetch: async (request) => {
       const refused = refusal(request.headers.get("authorization"));
-      if (refused === undefined) return abandoned.observe(request, await handler(request));
+      if (refused === undefined) return handler(request);
       await Effect.runPromise(
         Effect.logWarning("agent-http.request.refused", {
           method: request.method,
@@ -442,9 +347,6 @@ export function stdioAgentHttp(options: StdioAgentHttpOptions): StdioAgentHttp {
         headers: { "WWW-Authenticate": "Bearer" },
       });
     },
-    close: () => {
-      abandoned.stop();
-      return dispose();
-    },
+    close: dispose,
   };
 }
