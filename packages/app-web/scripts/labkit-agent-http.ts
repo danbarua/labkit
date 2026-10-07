@@ -79,6 +79,11 @@ console.error(
       .join(", ") || "none"
   }`,
 );
+console.error(
+  `  variables withheld from the agent  ${
+    BRIDGE_VARIABLES.filter((name) => process.env[name] !== undefined).join(", ") || "none"
+  }`,
+);
 
 const stop = async () => {
   await bridge.close();
