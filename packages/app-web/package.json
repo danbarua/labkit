@@ -22,6 +22,7 @@
     "dev:with-agent": "bash scripts/with-ports.sh bun scripts/dev-with-agent.ts"
   },
   "dependencies": {
+    "@effect/platform-bun": "4.0.0",
     "@labkit/acp-client": "workspace:*",
     "@labkit/acp-transcripts": "workspace:*",
     "@labkit/core-db": "workspace:*",
@@ -33,6 +34,9 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@tanstack/react-router": "^1.170.38",
+    "effect": "catalog:",
+    "effective-acp": "catalog:",
+    "labkit-effect": "github:danbarua/labkit-effect#6029cf3add84dd7dde4d2519332b6e8ee0b71ab9",
     "pg": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

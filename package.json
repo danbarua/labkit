@@ -134,7 +134,9 @@
 			"typescript": "^7.0.2",
 			"zod": "^4.6.5",
 			"vite": "^7.1.5",
-			"@vitejs/plugin-react": "^5.0.2"
+			"@vitejs/plugin-react": "^5.0.2",
+			"effect": "4.0.0",
+			"effective-acp": "0.3.0"
 		}
 	}
 }
