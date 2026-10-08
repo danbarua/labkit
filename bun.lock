@@ -136,7 +136,7 @@
         "@tanstack/react-router": "^1.170.38",
         "effect": "catalog:",
         "effective-acp": "catalog:",
-        "labkit-effect": "github:danbarua/labkit-effect#66e9003e2de0abdd1c1bca653fb0aca32d870dc5",
+        "labkit-effect": "github:danbarua/labkit-effect#6be9eb3af2102b573c40ccbabd491d06d44efbe3",
         "pg": "catalog:",
         "react": "catalog:",
         "react-dom": "catalog:",
@@ -1213,7 +1213,7 @@
 
     "kleur": ["kleur@3.0.3", "", {}, "sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w=="],
 
-    "labkit-effect": ["labkit-effect@github:danbarua/labkit-effect#66e9003", { "dependencies": { "@effect/ai-anthropic": "4.0.0", "@effect/ai-openai": "4.0.0", "@effect/ai-openai-compat": "4.0.0", "@logtape/logtape": "^2.3.9", "effect": "^4.0.0", "effective-acp": "0.4.0", "es-git": "^0.7.0", "yaml": "2.9.1" }, "peerDependencies": { "typescript": "^7" }, "bin": { "labkit": "bin/labkit.ts" } }, "danbarua-labkit-effect-66e9003", "sha512-RgLQRtWl5pc6teG+BJCX61HdbmSKAvLW7Z/SFUU0AKyv9saY4r5JhdsaIA6Duu7N8fM++c/F3LBtv8S/wm6fHg=="],
+    "labkit-effect": ["labkit-effect@github:danbarua/labkit-effect#6be9eb3", { "dependencies": { "@effect/ai-anthropic": "4.0.0", "@effect/ai-openai": "4.0.0", "@effect/ai-openai-compat": "4.0.0", "@effect/platform-bun": "4.0.0", "@logtape/logtape": "^2.3.9", "effect": "^4.0.0", "effective-acp": "0.4.0", "es-git": "^0.7.0", "yaml": "2.9.1" }, "peerDependencies": { "typescript": "^7" }, "bin": { "labkit": "bin/labkit.ts" } }, "danbarua-labkit-effect-6be9eb3", "sha512-r0neNtw/3BtFWYCyc2kAhLMimfd0bqPY6ROeR/RRXPYjYhSz8+bMQ5SLgaua8ABVG+TA6ZDyUZl/PFDFvuemVw=="],
 
     "lodash.includes": ["lodash.includes@4.3.0", "", {}, "sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w=="],
 
