@@ -392,8 +392,8 @@ Elicitation lets the agent ask the user something through the client.
 - **Custom data.** It goes in `_meta`. The page's examples use namespaced keys such as
   `zed.dev/debugMode`; no rule requires them. Implementations MUST NOT add custom fields at the
   root of a specified type, because every root name is reserved.
-- **Reserved `_meta` keys.** `traceparent`, `tracestate` and `baggage` are reserved for W3C trace
-  context.
+- **Reserved `_meta` keys.** The root-level keys `traceparent`, `tracestate` and `baggage` SHOULD
+  be reserved for W3C trace context.
 - **Method names.** A method name that starts with `_` is an extension. Method names without it
   are reserved for the protocol. `$/` prefixes protocol-level methods such as `$/cancel_request`.
 - **Unknown methods and notifications.** An unknown request gets `-32601`. Notifications SHOULD be
