@@ -151,8 +151,9 @@ JSON-RPC id. Supporting it is optional on both sides.
 ## A prompt turn
 
 - **A turn is one `session/prompt` request and its response.** Everything the agent reports in
-  between is `session/update` notifications. The response carries a `StopReason` and is the last
-  message of the turn: no update for that turn may follow it.
+  between is `session/update` notifications. The response carries a `StopReason`. The
+  specification says that updates come before the response only for a cancelled turn (see
+  Cancellation below); it also says that updates "are not limited to active prompt turns".
 - **Stop reasons.** There are exactly five in v1:
 
   | reason              | meaning                                                              |
