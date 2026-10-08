@@ -134,7 +134,17 @@ export function createFakeAgent(world: FakeWorld = createFakeWorld()) {
               ...request,
             });
             const settled = await Promise.race([asked, whenAborted(cancel.signal)]);
-            if (settled === "cancel" || settled.outcome.outcome === "cancelled") return "cancel";
+            if (settled === "cancel") return "cancel";
+            // `cancelled` says that the client cancelled the turn (`session/cancel`); it is not an
+            // answer the person gives. Only `session/cancel` stops the turn, so this answer to a
+            // turn still running is refused, and the prompt fails with the reason.
+            if (settled.outcome.outcome === "cancelled") {
+              if (cancel.signal.aborted) return "cancel";
+              throw acp.RequestError.invalidParams(
+                { outcome: settled.outcome },
+                "a permission request was answered cancelled, but the turn was not cancelled (session/cancel)",
+              );
+            }
             return { optionId: settled.outcome.optionId };
           },
           question: async (request): Promise<QuestionAnswer> => {

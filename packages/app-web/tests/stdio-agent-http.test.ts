@@ -80,13 +80,14 @@ async function open(bridge: StdioAgentHttp, fixture: Fixture) {
       if (event.type !== "permission_requested" || fixture.decide === undefined) return;
       const answer = fixture.decide(event.request);
       if (answer === "hold") return;
+      // A fixture's "cancel" is the person cancelling the turn while the request is open.
       queueMicrotask(() =>
-        holder.client?.answerPermission(
-          event.requestId,
-          answer === "cancel"
-            ? { outcome: "cancelled" }
-            : { outcome: "selected", optionId: answer.optionId },
-        ),
+        answer === "cancel"
+          ? void holder.client?.cancel()
+          : holder.client?.answerPermission(event.requestId, {
+              outcome: "selected",
+              optionId: answer.optionId,
+            }),
       );
     },
   });

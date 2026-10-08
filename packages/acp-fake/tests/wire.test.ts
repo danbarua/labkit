@@ -163,15 +163,16 @@ describe("permission over the wire", () => {
     });
   });
 
-  test("answering 'cancelled' ends the turn as cancelled", async () => {
+  test("a 'cancelled' answer while the turn was not cancelled fails the prompt, naming why", async () => {
     const server = createFakeAcpServer();
     await withClient(
       server,
       async () => ({ outcome: { outcome: "cancelled" } }),
       async (client) => {
         const sessionId = await newSession(client);
-        const done = await say(client, sessionId, permissionRequired.prompt);
-        expect(done.stopReason).toBe("cancelled");
+        await expect(say(client, sessionId, permissionRequired.prompt)).rejects.toThrow(
+          "the turn was not cancelled (session/cancel)",
+        );
       },
     );
   });
