@@ -39,7 +39,11 @@ export interface SessionClient {
    * turn has ended; what happened arrives through `onEvent`, as does a file the agent does not take.
    */
   prompt(text: string, files?: readonly PromptFile[]): Promise<void>;
-  /** Asks the agent to stop the turn. The prompt then resolves as `cancelled`. */
+  /**
+   * Asks the agent to stop the turn (`session/cancel`), then answers every permission request still
+   * open as `cancelled`, as ACP requires of a client that cancels a turn. The prompt then resolves
+   * as `cancelled`.
+   */
   cancel(): Promise<void>;
   /** Answers a permission request the agent is waiting on. */
   answerPermission(requestId: string, outcome: acp.RequestPermissionOutcome): void;
@@ -285,7 +289,10 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
         onEvent({ type: "failed", message: describeError(err) });
       }
     },
-    cancel: () => runtime.runPromise(connection.notify("session/cancel", { sessionId: id })),
+    async cancel() {
+      await runtime.runPromise(connection.notify("session/cancel", { sessionId: id }));
+      for (const requestId of [...waiting.keys()]) answer(requestId, { outcome: "cancelled" });
+    },
     answerPermission: answer,
     answerQuestion,
     async setConfigOption(configId, value) {

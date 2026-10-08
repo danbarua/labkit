@@ -304,7 +304,12 @@ export function Conversation({
                     <PermissionBatch entries={pending} onAnswer={onAnswer} />
                   ) : null}
                   {pending.map((entry) => (
-                    <PermissionPrompt key={entry.requestId} entry={entry} onAnswer={onAnswer} />
+                    <PermissionPrompt
+                      key={entry.requestId}
+                      entry={entry}
+                      onAnswer={onAnswer}
+                      onCancel={onCancel}
+                    />
                   ))}
                 </div>
               ) : null}

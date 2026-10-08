@@ -104,3 +104,43 @@ describe("the heading over a tool call's content", () => {
       expect(renderToStaticMarkup(<ToolCard call={call(status)} />)).toContain("<h4>Result</h4>");
   });
 });
+
+/** The `<button>` element among `node`'s descendants whose text is `label`. */
+function buttonNamed(node: unknown, label: string): { props: Record<string, unknown> } | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = buttonNamed(child, label);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+  if (typeof node !== "object" || node === null || !("props" in node)) return undefined;
+  const element = node as { type: unknown; props: Record<string, unknown> };
+  if (element.type === "button" && element.props.children === label) return element;
+  return buttonNamed(element.props.children, label);
+}
+
+describe("cancelling the turn from a permission request", () => {
+  test("Cancel turn cancels the turn, and does not answer the request", () => {
+    const answers: unknown[] = [];
+    let cancels = 0;
+    const card = PermissionPrompt({
+      entry: asking(undefined),
+      onAnswer: (requestId, outcome) => answers.push([requestId, outcome]),
+      onCancel: () => {
+        cancels += 1;
+      },
+    });
+    const cancel = buttonNamed(card, "Cancel turn");
+    if (cancel === undefined) throw new Error("no Cancel turn button");
+    (cancel.props.onClick as () => void)();
+    expect(cancels).toBe(1);
+    expect(answers).toEqual([]);
+  });
+
+  test("with no way to cancel the turn, Cancel turn is disabled though the options can be answered", () => {
+    const html = draw(asking(undefined));
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Cancel turn<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Allow once<\/button>/);
+  });
+});
