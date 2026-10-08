@@ -101,13 +101,6 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   sessionManager.on("session-load-end", (_sessionId: string, _agentName: string, ok: boolean) => {
     chatWebviewProvider.notifyLoadSessionEnd(ok);
-    if (ok) {
-      // The loadSession response carries modes/models/configOptions for the
-      // restored session. Re-send the state so the pickers pick them up
-      // (the original `active-session-changed` was emitted before the RPC
-      // resolved, when those fields were still null).
-      chatWebviewProvider.notifyActiveSessionChanged();
-    }
   });
 
   // Session metadata (title) update — forward to chat banner.
