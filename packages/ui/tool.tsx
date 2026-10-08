@@ -1,11 +1,12 @@
 import type {
   ContentBlock,
   PermissionOptionKind,
+  RequestPermissionOutcome,
   ToolCall,
   ToolCallContent,
   ToolCallStatus,
 } from "@agentclientprotocol/sdk";
-import { type AnsweredOption, type PermissionEntry, recordedAnswer } from "@labkit/view-model";
+import { type PermissionEntry, type RecordedOutcome, recordedAnswer } from "@labkit/view-model";
 import {
   CaretRightIcon,
   CheckCircleIcon,
@@ -257,30 +258,46 @@ interface Decision {
   readonly option?: string;
 }
 
-/** The receipt for an option picked: past tense from its kind, its own name as the hover text. */
-const receiptOf = (option: AnsweredOption): Decision => ({
-  label: RECEIPT[option.kind],
-  tone: option.kind.startsWith("allow") ? "allow" : "reject",
-  option: option.name,
-});
-
 /**
- * What the person decided about a call, as a receipt ("Allowed once", "Denied"). The answer the
- * agent recorded with the call is drawn first, so a call reads the same live and once its session
- * is loaded again, where no question is asked. The request this client was sent supplies a question
- * still waiting, one cancelled before anyone answered (never a denial), and the answer when the
- * agent records none.
+ * The receipt for an outcome. A selected option reads in the past tense from its kind, with its
+ * own name as the hover text; an option with no kind (one the question did not offer) reads as its
+ * id. A cancelled request means that its turn was cancelled, never a denial.
  */
-function decisionOf(call: ToolCall, entry: PermissionEntry | undefined): Decision | undefined {
-  const recorded = recordedAnswer(call);
-  if (entry === undefined) return recorded === undefined ? undefined : receiptOf(recorded);
-  const { outcome } = entry;
-  if (outcome === undefined) return { label: "Waiting for you", tone: "waiting" };
-  if (recorded !== undefined) return receiptOf(recorded);
+const receiptOf = (outcome: RecordedOutcome): Decision => {
   if (outcome.outcome === "cancelled")
     return { label: "Cancelled before a decision", tone: "cancelled" };
-  const option = entry.request.options.find((o) => o.optionId === outcome.optionId);
-  return option === undefined ? { label: outcome.optionId, tone: "reject" } : receiptOf(option);
+  const { optionId, name, kind } = outcome;
+  if (kind === undefined) return { label: optionId, tone: "reject" };
+  return {
+    label: RECEIPT[kind],
+    tone: kind.startsWith("allow") ? "allow" : "reject",
+    option: name ?? optionId,
+  };
+};
+
+/** The outcome this client gave a request, with the option it picked as the request offered it. */
+function outcomeOf(entry: PermissionEntry, given: RequestPermissionOutcome): RecordedOutcome {
+  if (given.outcome === "cancelled") return { outcome: "cancelled" };
+  const option = entry.request.options.find((o) => o.optionId === given.optionId);
+  return option === undefined
+    ? { outcome: "selected", optionId: given.optionId }
+    : { outcome: "selected", optionId: option.optionId, name: option.name, kind: option.kind };
+}
+
+/**
+ * What the person decided about a call, as a receipt ("Allowed once", "Denied"). The outcome the
+ * agent recorded with the call is drawn first, so a call reads the same live and once its session
+ * is loaded again, where no question is asked. The request this client was sent supplies a question
+ * still waiting, and the outcome when the agent records none.
+ */
+function decisionOf(call: ToolCall, entry: PermissionEntry | undefined): Decision | undefined {
+  const given = entry?.outcome;
+  if (entry !== undefined && given === undefined)
+    return { label: "Waiting for you", tone: "waiting" };
+  const outcome =
+    recordedAnswer(call) ??
+    (entry === undefined || given === undefined ? undefined : outcomeOf(entry, given));
+  return outcome === undefined ? undefined : receiptOf(outcome);
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
