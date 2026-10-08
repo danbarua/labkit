@@ -4,12 +4,14 @@
  * `bun scripts/labkit-agent-http.ts --port <port> --cwd <folder> --sessions-dir <folder>`.
  * Each ACP connection runs the installed `labkit-effect` package's `src/agent-acp/main.ts` as an
  * editor launches it (`src/infra/stdio-agent-http.ts`), in the `--cwd` folder, keeping its sessions
- * in `--sessions-dir`. Every request must carry `Authorization: Bearer $LABKIT_ACP_HTTP_TOKEN`.
+ * in `--sessions-dir`, and serves the files those sessions stored at `/blob/<sha256>.<ext>`
+ * (`src/infra/labkit-blobs.ts`). Every request must carry `Authorization: Bearer $LABKIT_ACP_HTTP_TOKEN`.
  */
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { blobPath, labkitBlobs } from "../src/infra/labkit-blobs";
 import { stdioAgentHttp } from "../src/infra/stdio-agent-http";
 
 const { values } = parseArgs({
@@ -58,6 +60,7 @@ const bridge = stdioAgentHttp({
   cwd,
   env,
   token,
+  routes: { [blobPath]: labkitBlobs(sessionsDir) },
 });
 
 const server = Bun.serve({
@@ -72,6 +75,7 @@ console.error(`labkit-effect agent http://127.0.0.1:${server.port}/acp`);
 console.error(`  agent  ${main}`);
 console.error(`  cwd  ${cwd}`);
 console.error(`  sessions  ${sessionsDir}`);
+console.error(`  stored files  http://127.0.0.1:${server.port}${blobPath}<sha256>.<ext>`);
 console.error(
   `  LABKIT_* variables passed to the agent  ${
     Object.keys(env)

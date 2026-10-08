@@ -226,6 +226,26 @@ describe("a request without the bridge's token", () => {
   });
 });
 
+describe("a route served beside the transport", () => {
+  test("is reached only with the bridge's token, by its path prefix", async () => {
+    const bridge = stdioAgentHttp({
+      command: ["bun", FAKE_AGENT],
+      cwd: import.meta.dir,
+      env: {},
+      token: TOKEN,
+      routes: {
+        "/blob/": async (request) => new Response(new globalThis.URL(request.url).pathname),
+      },
+    });
+    bridges.push(bridge);
+    const at = "http://bridge.test/blob/abc.png";
+    expect((await fetchVia(bridge, "w".repeat(40))(at)).status).toBe(401);
+    const answered = await fetchVia(bridge)(at);
+    expect(answered.status).toBe(200);
+    expect(await answered.text()).toBe("/blob/abc.png");
+  });
+});
+
 describe("the bridge's token", () => {
   test("shorter than 32 characters makes construction throw", () => {
     expect(() =>

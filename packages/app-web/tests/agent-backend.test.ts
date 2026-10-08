@@ -16,16 +16,17 @@ describe("agentBackend", () => {
     expect(agentBackend({ LABKIT_ACP_AGENT_URL: "" }).plugins).toHaveLength(1);
   });
 
-  test("a named agent is proxied to with the bearer token, and the fake is not mounted", () => {
+  test("a named agent's /acp and /blob/ are proxied to with the bearer token, and the fake is not mounted", () => {
     const backend = agentBackend({
       LABKIT_ACP_AGENT_URL: "http://127.0.0.1:8951",
       LABKIT_ACP_HTTP_TOKEN: TOKEN,
     });
     expect(backend.plugins).toEqual([]);
-    expect(backend.proxy["/acp"]).toMatchObject({
-      target: "http://127.0.0.1:8951",
-      headers: { authorization: `Bearer ${TOKEN}` },
-    });
+    for (const path of ["/acp", "/blob/"])
+      expect(backend.proxy[path]).toMatchObject({
+        target: "http://127.0.0.1:8951",
+        headers: { authorization: `Bearer ${TOKEN}` },
+      });
   });
 
   test("a named agent without a token is refused, and the message names both variables", () => {

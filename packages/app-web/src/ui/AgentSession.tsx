@@ -5,7 +5,7 @@ import type {
 } from "@agentclientprotocol/sdk";
 import { connectSession, type SessionClient } from "@labkit/acp-client";
 import { SCENARIOS } from "@labkit/acp-scenarios";
-import { type AttachLimits, Conversation } from "@labkit/ui";
+import { type AttachLimits, Conversation, type ResolveLink } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import { initialState, reduce } from "@labkit/view-model";
@@ -29,6 +29,13 @@ function attachLimits(takes: PromptCapabilities | undefined): AttachLimits | und
   if (takes?.image) return { ...most, accept: ["image/*"] };
   return undefined;
 }
+
+/**
+ * Where the page fetches a file the agent links to as `blob://<sha256>.<ext>`: the dev server's
+ * `/blob/` route, which the agent's HTTP host answers from the files its sessions stored.
+ */
+const resolveLink: ResolveLink = (uri) =>
+  uri.startsWith("blob://") ? `/blob/${uri.slice("blob://".length)}` : undefined;
 
 /** The view of a session, emptied when another session is opened in its place. */
 const reduceView = (state: typeof initialState, action: ViewAction) =>
@@ -179,6 +186,7 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
           onAnswer={answer}
           onAnswerQuestion={answerQuestion}
           onSetConfig={setConfig}
+          resolveLink={resolveLink}
         />
       </div>
     </>
