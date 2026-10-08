@@ -63,6 +63,14 @@ const collector = await fetch(otlpEndpoint, { signal: AbortSignal.timeout(2000) 
     `WARN no collector answered (${err instanceof Error ? err.message : String(err)}); the agent's telemetry is lost until one runs: labkit-effect's scripts/observability/lgtm-stack.sh starts one`,
 );
 console.error(`labkit-web agent telemetry  ${otlpEndpoint}  ${collector}`);
+
+// At the debug level the agent also writes the body of each model request and response to
+// ~/.local/share/labkit/logs/http-captures/, which Grafana's "Body" links open. The dev stack sets
+// it unless the environment names a level. The agent's own LABKIT_ACP_LOG_LEVEL wins over it.
+const logLevel = process.env.LABKIT_LOG_LEVEL ?? "debug";
+console.error(
+  `labkit-web agent log level  LABKIT_LOG_LEVEL=${logLevel}${process.env.LABKIT_ACP_LOG_LEVEL === undefined ? "" : `, overridden by LABKIT_ACP_LOG_LEVEL=${process.env.LABKIT_ACP_LOG_LEVEL}`}`,
+);
 const acp = Bun.spawn(
   [
     "bun",
@@ -74,7 +82,10 @@ const acp = Bun.spawn(
     "--sessions-dir",
     SESSIONS_DIR.pathname,
   ],
-  { ...inherit, env: { ...env, OTEL_EXPORTER_OTLP_ENDPOINT: otlpEndpoint } },
+  {
+    ...inherit,
+    env: { ...env, OTEL_EXPORTER_OTLP_ENDPOINT: otlpEndpoint, LABKIT_LOG_LEVEL: logLevel },
+  },
 );
 
 // The bridge prints its address once it is listening. If it exits before that (a port already in
