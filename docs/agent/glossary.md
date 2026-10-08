@@ -8,7 +8,8 @@ naming debt, not alternative definitions.
 
 **Turn.** Everything from a user prompt until the model stops. After that the conversation waits for
 the next prompt. One turn can contain hundreds of steps and last an hour.
-Code today: `TurnState` (`packages/core-agent/agent/agent-fsm.ts`). ACP and VS Code call a turn a "prompt".
+Code today: `TurnState` (`packages/core-agent/agent/agent-fsm.ts`). ACP calls a turn a "prompt turn":
+one `session/prompt` request and everything up to its response. VS Code calls it a "prompt".
 Not to be confused with the provider stop reason `end_turn`.
 
 **Step.** One LLM call. The model emits narrative and tool-call decisions. The harness dispatches those
