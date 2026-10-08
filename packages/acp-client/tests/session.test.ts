@@ -93,11 +93,13 @@ async function playFixture(fixture: Fixture, server = createFakeAcpServer()) {
 
 /**
  * Connects to a fake agent through a fetch that records what the client sends, in order: each
- * request's method, or `answered <outcome>` for a response to a permission request.
+ * request's method, or `answered <outcome>` for a response to a permission request. `keptAlive`
+ * records the same for each request sent with `keepalive`.
  */
 async function openRecording() {
   const deliver = inProcessFetch(createFakeAcpServer());
   const sent: string[] = [];
+  const keptAlive: string[] = [];
   const recording = Object.assign(
     async (input: string | URL | Request, init?: RequestInit) => {
       const request =
@@ -107,7 +109,9 @@ async function openRecording() {
           method?: string;
           result?: { outcome?: { outcome?: string } };
         };
-        sent.push(message.method ?? `answered ${message.result?.outcome?.outcome}`);
+        const what = message.method ?? `answered ${message.result?.outcome?.outcome}`;
+        sent.push(what);
+        if (init?.keepalive === true) keptAlive.push(what);
       }
       return deliver(request);
     },
@@ -119,7 +123,7 @@ async function openRecording() {
     fetch: recording,
     onEvent: (event) => events.push(event),
   });
-  return { client, events, sent };
+  return { client, events, sent, keptAlive };
 }
 
 const COMPLETED = [
@@ -253,6 +257,29 @@ describe("a turn waiting on the person", () => {
     const cancelled = sent.indexOf("session/cancel");
     expect(cancelled).toBeGreaterThan(-1);
     expect(sent.indexOf("answered cancelled")).toBeGreaterThan(cancelled);
+  });
+
+  test("leaving during a turn sends session/cancel once, with keepalive, however often it is called", async () => {
+    const { client, events, sent, keptAlive } = await openRecording();
+    void client.prompt(fixtureNamed("permission-pending").scenario.prompt);
+    await until(() => events.some((e) => e.type === "permission_requested"), "the request");
+    const before = sent.length;
+
+    client.leave();
+    client.leave();
+
+    await until(() => sent.length > before, "the request leave sends");
+    await Bun.sleep(50);
+    expect(sent.slice(before)[0]).toBe("session/cancel");
+    expect(sent.filter((what) => what === "session/cancel")).toHaveLength(1);
+    expect(keptAlive[0]).toBe("session/cancel");
+  });
+
+  test("a request sent before leaving is sent without keepalive", async () => {
+    const { client, keptAlive } = await openRecording();
+    await client.prompt(fixtureNamed("plain-answer").scenario.prompt);
+    expect(keptAlive).toEqual([]);
+    await client.close();
   });
 
   test("closing after the turn has ended sends no session/cancel", async () => {
