@@ -168,3 +168,24 @@ test("clearChat resets the webview and drops hasChatContent", async () => {
   expect(f.provider.hasChatContent).toBe(false);
   expect(f.posted).toContainEqual({ kind: "reset" });
 });
+
+test("a load that succeeds keeps the history it replayed, and sends the configuration its answer carried", () => {
+  const f = fixture();
+  f.provider.notifyActiveSessionChanged();
+  f.provider.notifyLoadSessionStart();
+  const replayed = { sessionUpdate: "user_message_chunk", content: { type: "text", text: "hi" } };
+  f.emitSessionUpdate(replayed);
+  const afterReplay = f.posted.length;
+  f.provider.notifyLoadSessionEnd(true);
+  expect(f.posted.slice(afterReplay)).toEqual([
+    { kind: "loadEnd", ok: true },
+    { kind: "ready", configOptions: [{ id: "model", type: "select" }] },
+  ]);
+});
+
+test("a load that fails says so, and sends no configuration", () => {
+  const f = fixture();
+  f.provider.notifyLoadSessionStart();
+  f.provider.notifyLoadSessionEnd(false);
+  expect(f.posted).toEqual([{ kind: "loadStart" }, { kind: "loadEnd", ok: false }]);
+});

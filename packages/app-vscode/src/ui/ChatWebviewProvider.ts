@@ -257,8 +257,10 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 
   /**
    * Notify webview that a `session/load` replay is starting or has finished. The replayed history
-   * arrives as ordinary session updates through {@link handleSessionUpdate}; these two only gate
-   * whether the composer accepts input meanwhile.
+   * arrives as ordinary session updates through {@link handleSessionUpdate}, after the transcript
+   * was started over for the session (`notifyActiveSessionChanged`), and before the load's answer.
+   * A load that succeeded sends the configuration options its answer carried, and does not start
+   * the transcript over, which would discard the history just replayed.
    */
   notifyLoadSessionStart(): void {
     this.postMessage({ kind: "loadStart" });
@@ -266,6 +268,7 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 
   notifyLoadSessionEnd(ok: boolean): void {
     this.postMessage({ kind: "loadEnd", ok });
+    if (ok) this.sendReady();
   }
 
   notifySessionInfoUpdate(_title: string | undefined | null): void {
