@@ -19,7 +19,7 @@ import {
 
 /**
  * What can happen to a session's view. Agent updates arrive as they were sent; the rest are the
- * client's own acts, which the protocol does not echo back.
+ * client's own acts, which ACP does not require the agent to send back.
  */
 export type ViewEvent =
   | { readonly type: "update"; readonly update: SessionUpdate }
