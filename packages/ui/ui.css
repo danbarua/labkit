@@ -1360,6 +1360,28 @@ button.lk-handle:hover {
   flex: none;
   color: var(--lk-muted);
 }
+/* files a sent message carries */
+.lk-message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lk-message-image {
+  display: block;
+  max-width: 240px;
+  max-height: 180px;
+  border: 1px solid var(--lk-line);
+  border-radius: 6px;
+  object-fit: contain;
+  background: var(--lk-bg);
+}
+.lk-attachment a.lk-attachment-name {
+  color: inherit;
+}
 .lk-attachment-refused {
   margin: 0;
   color: var(--lk-danger);
