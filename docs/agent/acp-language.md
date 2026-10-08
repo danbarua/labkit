@@ -128,7 +128,8 @@ JSON-RPC id. Supporting it is optional on both sides.
 - **`session/resume`** restores a session without replay. The agent MUST NOT replay history, so the
   client keeps its own copy.
 - **`session/close`** ends the live session. The agent MUST cancel any ongoing work "as if
-  `session/cancel` had been called" and free its resources. Stored history is not deleted.
+  `session/cancel` had been called" and free its resources. The page says nothing about stored
+  history; `session/delete` is the method that removes a session from `session/list`.
 - **`session/delete`** removes a session from later `session/list` results. Deleting a session
   that is already gone SHOULD succeed.
 - **`session/list`** is discovery only: it restores nothing.
