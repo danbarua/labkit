@@ -1,6 +1,10 @@
 import type { ToolCall, ToolCallUpdate } from "@agentclientprotocol/sdk";
 
-/** ACP updates replace supplied fields; null and omission do not erase prior values. */
+/**
+ * Applies a tool call update. ACP has an update carry only the fields that changed, and says that
+ * omission and `null` leave `name`, `rawInput` and `rawOutput` unchanged. ACP does not say what
+ * `null` means for the other fields; this merge keeps their previous values too.
+ */
 export function mergeToolCall(previous: ToolCall | undefined, update: ToolCallUpdate): ToolCall {
   return {
     toolCallId: update.toolCallId,
