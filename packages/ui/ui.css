@@ -1419,6 +1419,11 @@ button.lk-handle:hover {
 .lk-composer-box textarea::placeholder {
   color: var(--lk-faint);
 }
+/* An empty box has nothing to scroll. In some browsers its placeholder alone overflowed it, which
+   drew both scrollbars around an empty box. */
+.lk-composer-box textarea:placeholder-shown {
+  overflow: hidden;
+}
 .lk-composer-hint {
   padding: 10px 14px 0;
   color: var(--lk-muted);
