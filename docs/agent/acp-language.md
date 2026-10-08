@@ -255,7 +255,8 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
 - **A diff** is `{ path, oldText, newText }`.
   - `path` is absolute.
   - A null or absent `oldText` means a new file.
-  - `newText` is required, so a deletion looks like emptying the file (`newText: ""`).
+  - `newText` is required, and v1 defines no diff for a deleted file. An agent that reports one
+    as `newText: ""` makes it look like an emptied file.
   - v1 has no way to show a move.
 - **A terminal item** embeds a terminal created with `terminal/create`. The agent adds it before it
   releases the terminal, and the client keeps showing its output after release.
