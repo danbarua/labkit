@@ -55,6 +55,10 @@ export interface SessionClient {
    * applies the selection.
    */
   setConfigOption(configId: string, value: string | boolean): Promise<void>;
+  /**
+   * Shuts the connection. A turn still running is cancelled first, as `cancel` does, so leaving a
+   * session stops its turn. Questions still open are answered with the `cancel` action.
+   */
   close(): Promise<void>;
 }
 
@@ -267,6 +271,15 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
   const promptCapabilities = (connection.profile.agent.capabilities.promptCapabilities ??
     {}) as acp.PromptCapabilities;
 
+  /** Prompts sent and not yet answered: a turn is running while this is above zero. */
+  let prompting = 0;
+  // ACP's order for cancelling a turn: `session/cancel` first, then each open permission request
+  // is answered cancelled.
+  const cancelTurn = async (): Promise<void> => {
+    await runtime.runPromise(connection.notify("session/cancel", { sessionId: id }));
+    for (const requestId of [...waiting.keys()]) answer(requestId, { outcome: "cancelled" });
+  };
+
   return {
     sessionId: id,
     promptCapabilities,
@@ -279,6 +292,7 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
         return;
       }
       onEvent({ type: "prompt_started", content });
+      prompting++;
       try {
         const response = await runtime.runPromise(
           connection.agent["session/prompt"]({
@@ -289,12 +303,11 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
         onEvent(promptEnded(response as unknown as acp.PromptResponse));
       } catch (err) {
         onEvent({ type: "failed", message: describeError(err) });
+      } finally {
+        prompting--;
       }
     },
-    async cancel() {
-      await runtime.runPromise(connection.notify("session/cancel", { sessionId: id }));
-      for (const requestId of [...waiting.keys()]) answer(requestId, { outcome: "cancelled" });
-    },
+    cancel: cancelTurn,
     answerPermission: answer,
     answerQuestion,
     async setConfigOption(configId, value) {
@@ -321,8 +334,16 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
       }
     },
     async close() {
-      // Answered here, so the agent hears it before the connection goes; closing would otherwise
-      // answer each as cancelled itself, once.
+      // The agent hears `session/cancel` and the answers before the connection goes. If
+      // `session/cancel` cannot be sent, the error is logged and the connection is still shut.
+      try {
+        if (prompting > 0) await cancelTurn();
+      } catch (err) {
+        console.warn("closing the session could not cancel its turn", {
+          sessionId: id,
+          error: describeError(err),
+        });
+      }
       for (const requestId of [...waiting.keys()]) answer(requestId, { outcome: "cancelled" });
       for (const requestId of [...asked.keys()]) answerQuestion(requestId, { action: "cancel" });
       await shut(runtime, scope);
