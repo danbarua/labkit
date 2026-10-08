@@ -352,6 +352,10 @@ function revealBody(row: HTMLElement): void {
   row.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "auto" });
 }
 
+/** A text block of a call's content. */
+const isText = (item: ToolCallContent): boolean =>
+  item.type === "content" && item.content.type === "text";
+
 /** A result that is seen rather than read, so its card is not closed over it. */
 const isShownNotRead = (item: ToolCallContent): boolean =>
   item.type === "diff" ||
@@ -381,6 +385,10 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   // A result to look at (a chart, an image, a diff) comes before the input that made it, so a
   // plot is not pushed out of view by its own data.
   const seenFirst = content.some(isShownNotRead);
+  // Before a call ends, its content is what the agent said about it, such as why it asks.
+  const contentHeading = status === "completed" || status === "failed" ? "Result" : "Details";
+  // While the person decides, the permission request draws the call's text (`PermissionPrompt`).
+  const drawn = waiting ? content.filter((item) => !isText(item)) : content;
   const inputSection =
     input === undefined ? null : (
       <section className="lk-tool-section">
@@ -427,7 +435,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         {seenFirst ? null : inputSection}
         {view !== undefined ? (
           <section className="lk-tool-section">
-            <h4>Result</h4>
+            <h4>{contentHeading}</h4>
             {view}
             {/* A diff the agent sent still draws: the view says what was done, the diff shows it. */}
             {content
@@ -437,10 +445,10 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
                 <ToolContentView key={i} item={item} input={namedBy} />
               ))}
           </section>
-        ) : content.length === 0 ? null : (
+        ) : drawn.length === 0 ? null : (
           <section className="lk-tool-section">
-            <h4>Result</h4>
-            {content.map((item, i) => (
+            <h4>{contentHeading}</h4>
+            {drawn.map((item, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
               <ToolContentView key={i} item={item} input={namedBy} />
             ))}

@@ -984,6 +984,14 @@
   color: var(--lk-muted);
   font-size: 13px;
 }
+/* A long explanation scrolls inside the card, so the buttons stay above the composer. */
+.lk-permission-why {
+  margin-top: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
 .lk-actions {
   display: flex;
   flex-wrap: wrap;
