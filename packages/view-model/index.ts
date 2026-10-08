@@ -1,6 +1,6 @@
 export { mergeToolCall } from "./merge-tool-call";
 export {
-  type AnsweredOption,
+  type RecordedOutcome,
   PERMISSION_ANSWER_KEY,
   recordedAnswer,
 } from "./permission-answer";
