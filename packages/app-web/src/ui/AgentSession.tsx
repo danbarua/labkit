@@ -110,6 +110,20 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
     };
   }, [url, cwd, reopen]);
 
+  // A reload or a closed tab runs no effect cleanup, so the session is left as the page unloads.
+  // By `pagehide` the browser has already ended the prompt's request on a reload, so the client
+  // no longer counts the turn as running; `beforeunload` comes before that. `pagehide` covers a
+  // browser that does not fire `beforeunload`.
+  useEffect(() => {
+    const leave = () => client.current?.leave();
+    window.addEventListener("beforeunload", leave);
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.removeEventListener("beforeunload", leave);
+      window.removeEventListener("pagehide", leave);
+    };
+  }, []);
+
   const send = useCallback((text: string, files: readonly File[]) => {
     if (client.current === null) {
       dispatch({

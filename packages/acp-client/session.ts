@@ -60,6 +60,13 @@ export interface SessionClient {
    * session stops its turn. Questions still open are answered with the `cancel` action.
    */
   close(): Promise<void>;
+  /**
+   * Closes the session as the page unloads, as `close` does. Every request from then on is sent
+   * with `keepalive`, so the browser delivers it after the page is gone. `session/cancel` is sent
+   * at once. The answers to open permission requests wait for its response, which can arrive after
+   * the page has gone. A second call does nothing.
+   */
+  leave(): void;
 }
 
 const CLIENT_INFO = { name: "labkit-view", version: "0.0.0" };
@@ -170,7 +177,14 @@ export async function listSessions(
 export async function connectSession(options: ConnectOptions): Promise<SessionClient> {
   const { onEvent } = options;
   const cwd = options.cwd ?? "/";
-  const runtime = runtimeFor(options.fetch);
+  /** Set by `leave`: from then on each request is sent with `keepalive`. */
+  let unloading = false;
+  const keptAlive = Object.assign(
+    (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+      (options.fetch ?? fetch)(input, unloading ? { ...init, keepalive: true } : init),
+    { preconnect: fetch.preconnect },
+  );
+  const runtime = runtimeFor(keptAlive);
   const scope = await runtime.runPromise(Scope.make());
 
   /** Requests the agent is waiting on, by the id the view knows them by. */
@@ -280,6 +294,22 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
     for (const requestId of [...waiting.keys()]) answer(requestId, { outcome: "cancelled" });
   };
 
+  const closeSession = async (): Promise<void> => {
+    // The agent hears `session/cancel` and the answers before the connection goes. If
+    // `session/cancel` cannot be sent, the error is logged and the connection is still shut.
+    try {
+      if (prompting > 0) await cancelTurn();
+    } catch (err) {
+      console.warn("closing the session could not cancel its turn", {
+        sessionId: id,
+        error: describeError(err),
+      });
+    }
+    for (const requestId of [...waiting.keys()]) answer(requestId, { outcome: "cancelled" });
+    for (const requestId of [...asked.keys()]) answerQuestion(requestId, { action: "cancel" });
+    await shut(runtime, scope);
+  };
+
   return {
     sessionId: id,
     promptCapabilities,
@@ -333,20 +363,11 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
         onEvent({ type: "failed", message: describeError(err) });
       }
     },
-    async close() {
-      // The agent hears `session/cancel` and the answers before the connection goes. If
-      // `session/cancel` cannot be sent, the error is logged and the connection is still shut.
-      try {
-        if (prompting > 0) await cancelTurn();
-      } catch (err) {
-        console.warn("closing the session could not cancel its turn", {
-          sessionId: id,
-          error: describeError(err),
-        });
-      }
-      for (const requestId of [...waiting.keys()]) answer(requestId, { outcome: "cancelled" });
-      for (const requestId of [...asked.keys()]) answerQuestion(requestId, { action: "cancel" });
-      await shut(runtime, scope);
+    close: closeSession,
+    leave() {
+      if (unloading) return;
+      unloading = true;
+      void closeSession();
     },
   };
 }
