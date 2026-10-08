@@ -328,7 +328,9 @@ Elicitation lets the agent ask the user something through the client.
 - **Secrets.** Form mode MUST NOT ask for secrets: passwords, API keys, tokens, payment
   credentials. Those go through URL mode. If the client lacks URL mode, the agent MUST NOT fall
   back to a form.
-- **Patterns.** An agent-supplied `pattern` MUST be evaluated with bounded time and resources.
+- **Patterns.** A string property's `pattern` is the "Pattern the string must match". ACP sets no
+  rule for evaluating it. The agent supplies it, so a client does well to bound the time and
+  resources it spends on one.
 - **Unknown values.** An unknown `mode`, property `type` or multi-select `items.type` MUST NOT be
   rendered as a known control.
 - **`date-time`.**
