@@ -1,5 +1,7 @@
+import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { FileIcon, XIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useLink } from "./links";
 
 /** What a composer accepts as attachments. Without these a composer takes no files. */
 export interface AttachLimits {
@@ -74,12 +76,22 @@ export function useAttachments(limits: AttachLimits | undefined) {
   };
 }
 
+/**
+ * An image file's thumbnail, from an object URL the effect creates and its cleanup revokes. React's
+ * development mode runs an effect, its cleanup and the effect again, so a URL made outside the
+ * effect would be revoked while it is still shown.
+ */
 function Preview({ file }: { file: File }) {
-  const url = useMemo(
-    () => (file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined),
-    [file],
-  );
-  useEffect(() => () => (url ? URL.revokeObjectURL(url) : undefined), [url]);
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    if (!file.type.startsWith("image/")) return;
+    const created = URL.createObjectURL(file);
+    setUrl(created);
+    return () => {
+      URL.revokeObjectURL(created);
+      setUrl(undefined);
+    };
+  }, [file]);
   return url ? (
     <img className="lk-attachment-thumb" src={url} alt="" />
   ) : (
@@ -127,5 +139,113 @@ export function AttachmentChips({
         </p>
       ))}
     </div>
+  );
+}
+
+type Sent<T extends ContentBlock["type"]> = Extract<ContentBlock, { type: T }>;
+
+/** The file name a URI ends in, as an agent reads it: the last segment, percent-decoded. */
+function nameIn(uri: string | null | undefined): string | undefined {
+  const last = uri
+    ?.split(/[/\\]/)
+    .filter((part) => part !== "")
+    .at(-1);
+  if (last === undefined) return undefined;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
+}
+
+/** How many bytes base64 `data` holds. */
+const base64Size = (data: string): number =>
+  Math.floor((data.length * 3) / 4) - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0);
+
+function FileChip({ name, size, href }: { name: string; size?: number; href?: string }) {
+  return (
+    <span className="lk-attachment">
+      <FileIcon className="lk-attachment-icon" aria-hidden="true" />
+      {href === undefined ? (
+        <span className="lk-attachment-name">{name}</span>
+      ) : (
+        <a
+          className="lk-attachment-name"
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          download={name}
+        >
+          {name}
+        </a>
+      )}
+      {size === undefined ? null : <span className="lk-attachment-size">{formatBytes(size)}</span>}
+    </span>
+  );
+}
+
+function SentImage({ block }: { block: Sent<"image"> }) {
+  const linked = useLink(block.data === "" ? block.uri : undefined);
+  const src = block.data === "" ? linked : `data:${block.mimeType};base64,${block.data}`;
+  const name = nameIn(block.uri) ?? block.mimeType;
+  if (src === undefined) return <FileChip name={name} />;
+  return <img className="lk-message-image" src={src} alt={name} title={name} />;
+}
+
+function SentLink({ block }: { block: Sent<"resource_link"> }) {
+  const href = useLink(block.uri);
+  const name = block.title ?? block.name;
+  if (block.mimeType?.startsWith("image/") && href !== undefined)
+    return <img className="lk-message-image" src={href} alt={name} title={name} />;
+  return (
+    <FileChip
+      name={name}
+      {...(block.size == null ? {} : { size: Number(block.size) })}
+      {...(href === undefined ? {} : { href })}
+    />
+  );
+}
+
+function SentFile({ block }: { block: ContentBlock }) {
+  switch (block.type) {
+    case "image":
+      return <SentImage block={block} />;
+    case "resource_link":
+      return <SentLink block={block} />;
+    case "resource": {
+      const { resource } = block;
+      const name = nameIn(resource.uri) ?? resource.uri;
+      const size =
+        "text" in resource
+          ? new TextEncoder().encode(resource.text).byteLength
+          : base64Size(resource.blob);
+      return <FileChip name={name} size={size} />;
+    }
+    case "audio":
+      return <FileChip name={block.mimeType} size={base64Size(block.data)} />;
+    case "text":
+      return null;
+    default:
+      return block satisfies never;
+  }
+}
+
+/**
+ * The files a person's message carries, below its text: an image as a picture, any other file as
+ * its name and size. A block that carries its bytes is drawn from them; a block that links to
+ * them is drawn once the host resolves the link (`useLink`), and as its name until then.
+ */
+export function MessageAttachments({ content }: { content: readonly ContentBlock[] }) {
+  const files = content.filter((block) => block.type !== "text");
+  if (files.length === 0) return null;
+  return (
+    <ul className="lk-message-attachments" aria-label="Attachments">
+      {files.map((block, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a message's blocks have no ids
+        <li key={i}>
+          <SentFile block={block} />
+        </li>
+      ))}
+    </ul>
   );
 }

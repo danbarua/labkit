@@ -34,6 +34,11 @@ export interface StdioAgentHttpOptions {
    * process: effective-acp's `abandonedAfter`, whose default is 60 seconds.
    */
   readonly abandonedAfter?: Duration.Input;
+  /**
+   * Other routes served behind the same token, by path prefix: a request whose path starts with a
+   * key goes to that handler instead of the ACP transport.
+   */
+  readonly routes?: Readonly<Record<string, (request: Request) => Promise<Response>>>;
 }
 
 export interface StdioAgentHttp {
@@ -333,7 +338,13 @@ export function stdioAgentHttp(options: StdioAgentHttpOptions): StdioAgentHttp {
   return {
     fetch: async (request) => {
       const refused = refusal(request.headers.get("authorization"));
-      if (refused === undefined) return handler(request);
+      if (refused === undefined) {
+        const path = new URL(request.url).pathname;
+        const route = Object.entries(options.routes ?? {}).find(([prefix]) =>
+          path.startsWith(prefix),
+        );
+        return route === undefined ? handler(request) : route[1](request);
+      }
       await Effect.runPromise(
         Effect.logWarning("agent-http.request.refused", {
           method: request.method,

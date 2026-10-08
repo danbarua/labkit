@@ -40,7 +40,7 @@ const acpPort = process.env.LABKIT_PORT_ACP ?? "8951";
 const agentUrl = `http://127.0.0.1:${acpPort}`;
 
 console.error(
-  `labkit-web agent  ${agentUrl}/acp  (proxied at /acp, where the dev server adds the token)`,
+  `labkit-web agent  ${agentUrl}/acp and ${agentUrl}/blob/  (proxied at /acp and /blob/, where the dev server adds the Authorization header with the token)`,
 );
 console.error(`labkit-web agent cwd  ${WORKSPACE_DIR.pathname}`);
 

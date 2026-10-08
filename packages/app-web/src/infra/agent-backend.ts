@@ -9,9 +9,10 @@ export interface AgentBackend {
 
 /**
  * `/acp` goes to the real agent when `LABKIT_ACP_AGENT_URL` names one, and to the built-in fake
- * agent otherwise. The agent's HTTP host requires a bearer token and sends no CORS headers, so
- * the proxy adds the token to each request from `LABKIT_ACP_HTTP_TOKEN` and page script never
- * holds it. A URL without a token is refused at startup rather than proxied to answer 401.
+ * agent otherwise; `/blob/`, the files a real agent's sessions stored, goes to the real agent's
+ * host too. The host requires a bearer token and sends no CORS headers, so the proxy adds the
+ * token to each request from `LABKIT_ACP_HTTP_TOKEN` and page script never holds it. A URL
+ * without a token is refused at startup rather than proxied to answer 401.
  */
 export function agentBackend(env: NodeJS.ProcessEnv): AgentBackend {
   const url = env.LABKIT_ACP_AGENT_URL;
@@ -23,10 +24,10 @@ export function agentBackend(env: NodeJS.ProcessEnv): AgentBackend {
       `LABKIT_ACP_AGENT_URL is ${url} but LABKIT_ACP_HTTP_TOKEN is not set: the agent's HTTP host rejects every request without its token`,
     );
   }
-  return {
-    plugins: [],
-    proxy: {
-      "/acp": { target: url, changeOrigin: false, headers: { authorization: `Bearer ${token}` } },
-    },
+  const toAgent = {
+    target: url,
+    changeOrigin: false,
+    headers: { authorization: `Bearer ${token}` },
   };
+  return { plugins: [], proxy: { "/acp": toAgent, "/blob/": toAgent } };
 }

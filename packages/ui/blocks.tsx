@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Activity, activityLabel, activityMood } from "./activity";
+import { MessageAttachments } from "./attachments";
 import { MarkdownText } from "./markdown";
 import { Loader, type LoaderMood } from "./loader";
 import { ContentView } from "./tool";
@@ -113,13 +114,15 @@ export function UserMessage({
   streaming?: boolean;
   onAction?: ((action: MessageAction, block: Block) => void) | undefined;
 }) {
+  const text = textOf(block.content);
   return (
     <div
       className="lk-message user"
       data-last={last || undefined}
       data-streaming={streaming || undefined}
     >
-      <div className="lk-user">{textOf(block.content)}</div>
+      {text === "" ? null : <div className="lk-user">{text}</div>}
+      <MessageAttachments content={block.content} />
       <MessageToolbar block={block} actions={["edit", "fork"]} onAction={onAction} />
     </div>
   );

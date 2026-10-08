@@ -2,8 +2,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { admit, formatBytes } from "../attachments";
+import { admit, formatBytes, MessageAttachments } from "../attachments";
+import { UserMessage } from "../blocks";
 import { Composer } from "../composer";
+import { LinksContext } from "../links";
 
 const file = (name: string, type: string, size: number) => ({ name, type, size });
 
@@ -59,5 +61,49 @@ describe("the composer's paperclip", () => {
     );
     expect(withFiles).toContain('aria-label="Attach files"');
     expect(withFiles).toContain('accept="image/*"');
+  });
+});
+
+describe("a sent message's files", () => {
+  const png = {
+    type: "image" as const,
+    data: "iVBORw0K",
+    mimeType: "image/png",
+    uri: "attachment:///a%20b.png",
+  };
+  const csv = {
+    type: "resource" as const,
+    resource: { uri: "attachment:///runs.csv", text: "run,loss\n" },
+  };
+
+  test("an image is drawn from its bytes, named by the end of its URI", () => {
+    const html = renderToStaticMarkup(<MessageAttachments content={[png]} />);
+    expect(html).toContain('src="data:image/png;base64,iVBORw0K"');
+    expect(html).toContain('alt="a b.png"');
+  });
+
+  test("an embedded file is its name and size", () => {
+    const html = renderToStaticMarkup(<MessageAttachments content={[csv]} />);
+    expect(html).toContain("runs.csv");
+    expect(html).toContain("9 B");
+  });
+
+  test("an image that only links to its bytes is its name until the host resolves the link", () => {
+    const linked = { ...png, data: "", uri: "blob://abc.png" };
+    expect(renderToStaticMarkup(<MessageAttachments content={[linked]} />)).not.toContain("<img");
+    const resolved = renderToStaticMarkup(
+      <LinksContext.Provider value={(uri) => uri.replace("blob://", "/blob/")}>
+        <MessageAttachments content={[linked]} />
+      </LinksContext.Provider>,
+    );
+    expect(resolved).toContain('src="/blob/abc.png"');
+  });
+
+  test("a message of files alone has no empty text box", () => {
+    const html = renderToStaticMarkup(
+      <UserMessage block={{ kind: "user", id: "user:0", content: [csv] }} />,
+    );
+    expect(html).not.toContain("lk-user");
+    expect(html).toContain("runs.csv");
   });
 });

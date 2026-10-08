@@ -4,12 +4,16 @@
  * `bun scripts/labkit-agent-http.ts --port <port> --cwd <folder> --sessions-dir <folder>`.
  * Each ACP connection runs the installed `labkit-effect` package's `src/agent-acp/main.ts` as an
  * editor launches it (`src/infra/stdio-agent-http.ts`), in the `--cwd` folder, keeping its sessions
- * in `--sessions-dir`. Every request must carry `Authorization: Bearer $LABKIT_ACP_HTTP_TOKEN`.
+ * in `--sessions-dir`, and serves the files those sessions stored at `/blob/<sha256>.<ext>`
+ * (`src/infra/labkit-blobs.ts`). Every request must carry `Authorization: Bearer $LABKIT_ACP_HTTP_TOKEN`.
  */
 
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { brandFrom } from "labkit-effect/src/agent-host/brand.ts";
+import { brandFoldersOf } from "labkit-effect/src/agent-host/brand-folders.ts";
+import { blobPath, labkitBlobs } from "../src/infra/labkit-blobs";
 import { stdioAgentHttp } from "../src/infra/stdio-agent-http";
 
 const { values } = parseArgs({
@@ -40,6 +44,10 @@ const env = Object.fromEntries(
 );
 
 const main = Bun.resolveSync("labkit-effect/src/agent-acp/main.ts", import.meta.dir);
+// Where the agent stores files: its data folder's `blobs/`, `~/.local/share/<brand>/blobs` for the
+// brand its environment names, since the agent is given no `--data-dir`. `--sessions-dir` does not
+// move it; a `LABKIT_ACP_DATA_DIR` in the environment moves the agent's but not this one.
+const blobsDir = brandFoldersOf(brandFrom(env)).blobs;
 await mkdir(cwd, { recursive: true });
 await mkdir(sessionsDir, { recursive: true });
 
@@ -58,6 +66,7 @@ const bridge = stdioAgentHttp({
   cwd,
   env,
   token,
+  routes: { [blobPath]: labkitBlobs({ blobs: blobsDir, sessions: sessionsDir }) },
 });
 
 const server = Bun.serve({
@@ -72,6 +81,8 @@ console.error(`labkit-effect agent http://127.0.0.1:${server.port}/acp`);
 console.error(`  agent  ${main}`);
 console.error(`  cwd  ${cwd}`);
 console.error(`  sessions  ${sessionsDir}`);
+console.error(`  stored files  http://127.0.0.1:${server.port}${blobPath}<sha256>.<ext>`);
+console.error(`  blobs  ${blobsDir}, then each session's blobs/`);
 console.error(
   `  LABKIT_* variables passed to the agent  ${
     Object.keys(env)
