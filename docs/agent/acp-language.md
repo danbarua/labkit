@@ -376,7 +376,8 @@ Elicitation lets the agent ask the user something through the client.
   - The client starts the agent as a subprocess.
   - Messages are JSON-RPC separated by newlines. A message MUST NOT contain a newline, so no
     pretty-printing.
-  - The agent MUST NOT write anything but ACP messages to stdout. Logs go to stderr.
+  - The agent MUST NOT write anything but ACP messages to stdout. It MAY write UTF-8 log text to
+    stderr, which the client MAY capture, forward or ignore.
 - **Streamable HTTP** is an RFD (status Active), and the SDK ships it under `experimental/`.
   - Every request goes to `/acp`. `initialize` is a POST that returns its result in the body,
     with an `Acp-Connection-Id` header.
