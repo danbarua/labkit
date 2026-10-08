@@ -17,6 +17,15 @@ import { useSavedTheme } from "./saved-theme";
 
 type Status = "connecting" | "ready" | "failed";
 
+/**
+ * Why the composer takes no input before the session is open: there is no session to send to, and
+ * the files, commands and settings it offers come from what the agent answers.
+ */
+const UNAVAILABLE: Record<Exclude<Status, "ready">, string> = {
+  connecting: "Connecting to the agent…",
+  failed: "Not connected to the agent",
+};
+
 type ViewAction = Parameters<typeof reduce>[1] | { type: "reset" };
 
 /**
@@ -101,10 +110,16 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
     };
   }, [url, cwd, reopen]);
 
-  const send = useCallback(
-    (text: string, files: readonly File[]) => void client.current?.prompt(text, files),
-    [],
-  );
+  const send = useCallback((text: string, files: readonly File[]) => {
+    if (client.current === null) {
+      dispatch({
+        type: "failed",
+        message: "The message was not sent: the agent is not connected.",
+      });
+      return;
+    }
+    void client.current.prompt(text, files);
+  }, []);
   const cancel = useCallback(() => void client.current?.cancel(), []);
   const answer = useCallback(
     (requestId: string, outcome: RequestPermissionOutcome) =>
@@ -171,6 +186,7 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
           onThemeChange={setTheme}
           hostCommands={HOST_COMMANDS}
           {...(attach === undefined ? {} : { attach })}
+          composerUnavailable={status === "ready" ? undefined : UNAVAILABLE[status]}
           onSend={(text, files) => {
             // A full page load: the page keeps the session it has open, and this starts one.
             if (text.trim() === "/new")

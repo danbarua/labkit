@@ -2,7 +2,15 @@ import type { AvailableCommand, SessionConfigOption } from "@agentclientprotocol
 import { ArrowUpIcon, AtIcon, PaperclipIcon, StopIcon } from "@phosphor-icons/react";
 import { type AttachLimits, AttachmentChips, useAttachments } from "./attachments";
 import { Loader, type LoaderMood } from "./loader";
-import { type KeyboardEvent, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   filterItems,
   inDrawnOrder,
@@ -67,6 +75,12 @@ export interface ComposerProps {
    * send again. Unset when the last run was not cancelled: a finished run has nothing to redo.
    */
   recall?: string | undefined;
+  /**
+   * Why the composer takes no input yet, such as the session still connecting, shown in place of
+   * the placeholder. While it is set, the box, the send button and the buttons that add files,
+   * commands or mentions are disabled, so nothing is written that could not be sent.
+   */
+  unavailable?: string | undefined;
 }
 
 /**
@@ -88,6 +102,7 @@ export function Composer({
   attach,
   loader,
   recall,
+  unavailable,
 }: ComposerProps) {
   const attachments = useAttachments(attach);
   const [dragging, setDragging] = useState(false);
@@ -143,9 +158,18 @@ export function Composer({
   });
   const listOpen = suggestion !== null;
 
+  // The box takes focus when it becomes available, unless the person has put focus elsewhere.
+  const available = unavailable === undefined;
+  const wasAvailable = useRef(available);
+  useEffect(() => {
+    if (available && !wasAvailable.current && document.activeElement === document.body)
+      box.current?.focus();
+    wasAvailable.current = available;
+  }, [available]);
+
   const send = () => {
     const trimmed = text.trim();
-    if ((trimmed === "" && attachments.files.length === 0) || running) return;
+    if (!available || (trimmed === "" && attachments.files.length === 0) || running) return;
     onSend(trimmed, attachments.files);
     setText("");
     setCaret(0);
@@ -297,7 +321,7 @@ export function Composer({
         send();
       }}
       onDragOver={(event) => {
-        if (!hasFiles(event.dataTransfer.types)) return;
+        if (!available || !hasFiles(event.dataTransfer.types)) return;
         event.preventDefault();
         setDragging(true);
       }}
@@ -305,7 +329,7 @@ export function Composer({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
       }}
       onDrop={(event) => {
-        if (!hasFiles(event.dataTransfer.types)) return;
+        if (!available || !hasFiles(event.dataTransfer.types)) return;
         event.preventDefault();
         setDragging(false);
         attachments.add([...event.dataTransfer.files]);
@@ -351,10 +375,12 @@ export function Composer({
             listOpen && nav.active >= 0 ? optionId(listId, nav.active) : undefined
           }
           placeholder={
-            mentions === undefined
+            unavailable ??
+            (mentions === undefined
               ? "Message the agent · / for commands"
-              : "Message the agent · / for commands · @ to mention"
+              : "Message the agent · / for commands · @ to mention")
           }
+          disabled={!available}
           rows={1}
           value={text}
           onChange={(event) => {
@@ -382,6 +408,7 @@ export function Composer({
                 className="lk-icon-btn"
                 aria-label="Attach files"
                 title="Attach files"
+                disabled={!available}
                 onClick={() => picker.current?.click()}
               >
                 <PaperclipIcon aria-hidden="true" />
@@ -406,6 +433,7 @@ export function Composer({
               aria-haspopup="dialog"
               aria-label="Commands"
               title="Commands"
+              disabled={!available}
               onClick={() => setOverlay("commands")}
             >
               /
@@ -418,6 +446,7 @@ export function Composer({
               aria-haspopup="dialog"
               aria-label="Mention"
               title="Mention"
+              disabled={!available}
               onClick={() => setOverlay("mentions")}
             >
               <AtIcon aria-hidden="true" />
@@ -446,7 +475,7 @@ export function Composer({
                 className="lk-send"
                 aria-label="Send"
                 title="Send (Enter)"
-                disabled={text.trim() === "" && attachments.files.length === 0}
+                disabled={!available || (text.trim() === "" && attachments.files.length === 0)}
               >
                 <ArrowUpIcon size={16} weight="bold" aria-hidden="true" />
               </button>
