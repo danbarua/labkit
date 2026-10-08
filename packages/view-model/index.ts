@@ -1,4 +1,9 @@
 export { mergeToolCall } from "./merge-tool-call";
+export {
+  type AnsweredOption,
+  PERMISSION_ANSWER_KEY,
+  recordedAnswer,
+} from "./permission-answer";
 export { promptEnded, reduce, replay, type ViewEvent } from "./reduce";
 export {
   cancelledPrompt,

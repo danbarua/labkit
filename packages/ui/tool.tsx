@@ -1,10 +1,11 @@
 import type {
   ContentBlock,
+  PermissionOptionKind,
   ToolCall,
   ToolCallContent,
   ToolCallStatus,
 } from "@agentclientprotocol/sdk";
-import type { PermissionEntry } from "@labkit/view-model";
+import { type AnsweredOption, type PermissionEntry, recordedAnswer } from "@labkit/view-model";
 import {
   CaretRightIcon,
   CheckCircleIcon,
@@ -243,27 +244,43 @@ function ToolContentView({ item, input }: { item: ToolCallContent; input: unknow
 }
 
 /** A receipt's words for each kind of option, whatever the agent named the option itself. */
-const RECEIPT: Record<string, string> = {
+const RECEIPT: Record<PermissionOptionKind, string> = {
   allow_once: "Allowed once",
   allow_always: "Allowed always",
   reject_once: "Denied",
   reject_always: "Denied always",
 };
 
+interface Decision {
+  readonly label: string;
+  readonly tone: string;
+  readonly option?: string;
+}
+
+/** The receipt for an option picked: past tense from its kind, its own name as the hover text. */
+const receiptOf = (option: AnsweredOption): Decision => ({
+  label: RECEIPT[option.kind],
+  tone: option.kind.startsWith("allow") ? "allow" : "reject",
+  option: option.name,
+});
+
 /**
- * What the person decided about a call, as a receipt: past tense from the kind of option they
- * chose ("Allowed once", "Denied"), with the agent's own name for the option as the hover text.
- * A request cancelled before anyone answered is its own case, never a denial.
+ * What the person decided about a call, as a receipt ("Allowed once", "Denied"). The answer the
+ * agent recorded with the call is drawn first, so a call reads the same live and once its session
+ * is loaded again, where no question is asked. The request this client was sent supplies a question
+ * still waiting, one cancelled before anyone answered (never a denial), and the answer when the
+ * agent records none.
  */
-function decisionOf(entry: PermissionEntry): { label: string; tone: string; option?: string } {
+function decisionOf(call: ToolCall, entry: PermissionEntry | undefined): Decision | undefined {
+  const recorded = recordedAnswer(call);
+  if (entry === undefined) return recorded === undefined ? undefined : receiptOf(recorded);
   const { outcome } = entry;
   if (outcome === undefined) return { label: "Waiting for you", tone: "waiting" };
+  if (recorded !== undefined) return receiptOf(recorded);
   if (outcome.outcome === "cancelled")
     return { label: "Cancelled before a decision", tone: "cancelled" };
   const option = entry.request.options.find((o) => o.optionId === outcome.optionId);
-  const tone = option?.kind.startsWith("allow") ? "allow" : "reject";
-  const label = (option && RECEIPT[option.kind]) ?? option?.name ?? outcome.optionId;
-  return { label, tone, ...(option ? { option: option.name } : {}) };
+  return option === undefined ? { label: outcome.optionId, tone: "reject" } : receiptOf(option);
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -352,6 +369,10 @@ function revealBody(row: HTMLElement): void {
   row.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "auto" });
 }
 
+/** A text block of a call's content. */
+const isText = (item: ToolCallContent): boolean =>
+  item.type === "content" && item.content.type === "text";
+
 /** A result that is seen rather than read, so its card is not closed over it. */
 const isShownNotRead = (item: ToolCallContent): boolean =>
   item.type === "diff" ||
@@ -367,7 +388,7 @@ const isShownNotRead = (item: ToolCallContent): boolean =>
 export function ToolCard({ call, permission }: { call: ToolCall; permission?: PermissionEntry }) {
   const status = call.status ?? "pending";
   const content = call.content ?? [];
-  const decision = permission === undefined ? undefined : decisionOf(permission);
+  const decision = decisionOf(call, permission);
   const input = inputNotDrawn(content, call.rawInput);
   const args = input === undefined ? undefined : inlineArguments(input);
   const preview = call.rawInput === undefined ? undefined : inputPreview(call.rawInput);
@@ -381,6 +402,10 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
   // A result to look at (a chart, an image, a diff) comes before the input that made it, so a
   // plot is not pushed out of view by its own data.
   const seenFirst = content.some(isShownNotRead);
+  // Before a call ends, its content is what the agent said about it, such as why it asks.
+  const contentHeading = status === "completed" || status === "failed" ? "Result" : "Details";
+  // While the person decides, the permission request draws the call's text (`PermissionPrompt`).
+  const drawn = waiting ? content.filter((item) => !isText(item)) : content;
   const inputSection =
     input === undefined ? null : (
       <section className="lk-tool-section">
@@ -427,7 +452,7 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
         {seenFirst ? null : inputSection}
         {view !== undefined ? (
           <section className="lk-tool-section">
-            <h4>Result</h4>
+            <h4>{contentHeading}</h4>
             {view}
             {/* A diff the agent sent still draws: the view says what was done, the diff shows it. */}
             {content
@@ -437,10 +462,10 @@ export function ToolCard({ call, permission }: { call: ToolCall; permission?: Pe
                 <ToolContentView key={i} item={item} input={namedBy} />
               ))}
           </section>
-        ) : content.length === 0 ? null : (
+        ) : drawn.length === 0 ? null : (
           <section className="lk-tool-section">
-            <h4>Result</h4>
-            {content.map((item, i) => (
+            <h4>{contentHeading}</h4>
+            {drawn.map((item, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: a tool's content has no ids
               <ToolContentView key={i} item={item} input={namedBy} />
             ))}
@@ -475,7 +500,7 @@ export function ToolRun({
   const lone = calls.length === 1;
   const outcomes = calls.map(({ call, permission }) => {
     const status = call.status ?? "pending";
-    const decision = permission === undefined ? undefined : decisionOf(permission);
+    const decision = decisionOf(call, permission);
     if (decision?.tone === "cancelled") return "cancelled";
     return wasRefused(call, decision) ? "refused" : status;
   });

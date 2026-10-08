@@ -1,5 +1,6 @@
 import type { PermissionOption, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
+import { MarkdownText } from "./markdown";
 import { ValueView } from "./value";
 
 const buttonClass = (kind: PermissionOption["kind"]): string => {
@@ -74,6 +75,9 @@ export function PermissionPrompt({
 }) {
   const { toolCall, options } = entry.request;
   const answer = (outcome: RequestPermissionOutcome) => onAnswer?.(entry.requestId, outcome);
+  const why = (toolCall.content ?? []).flatMap((item) =>
+    item.type === "content" && item.content.type === "text" ? [item.content.text] : [],
+  );
   return (
     <section className="lk-permission" aria-label="Permission needed">
       <p className="lk-permission-title">{toolCall.title ?? "A tool wants to run"}</p>
@@ -95,6 +99,16 @@ export function PermissionPrompt({
         </ul>
       ) : null}
       {toolCall.rawInput === undefined ? null : <ValueView value={toolCall.rawInput} />}
+      {/* Why the agent asks, sent as the call's text: for a command, each program that needs
+          permission and what it does, as Markdown. The call's card draws its diffs. */}
+      {why.length === 0 ? null : (
+        <div className="lk-permission-why">
+          {why.map((text, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a call's content has no ids
+            <MarkdownText key={i} text={text} />
+          ))}
+        </div>
+      )}
       <div className="lk-actions">
         {options.map((option) => (
           <button
