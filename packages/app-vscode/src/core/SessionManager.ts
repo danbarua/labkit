@@ -554,7 +554,7 @@ export class SessionManager extends EventEmitter {
     }
 
     // Prefer configOptions if available (spec: clients that support
-    // configOptions MUST use it exclusively when both are present)
+    // configOptions SHOULD use it exclusively when both are present)
     if (session.configOptions && session.configOptions.length > 0) {
       const modeOpt = session.configOptions.find((o) => o.category === "mode");
       if (modeOpt) {
