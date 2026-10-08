@@ -112,9 +112,9 @@ JSON-RPC id. Supporting it is optional on both sides.
   relative name the model used can still appear in free-form fields such as `title` or `rawInput`.
 - **The session's `cwd` is the base for relative paths**, whatever directory the agent process was
   started in.
-- **Line numbers are 1-based**, as stated globally and again for `fs/read_text_file`. A tool
-  location's `line` is an exception in practice: the schema gives it minimum 0 and no page says
-  which base it uses.
+- **Line numbers are 1-based**, as stated globally and again for `fs/read_text_file`. The global
+  rule covers a tool location's `line` too. The schema types that field as an unsigned 32-bit
+  integer with minimum 0, so the type alone does not exclude 0.
 
 ## Sessions
 
@@ -413,7 +413,6 @@ Elicitation lets the agent ask the user something through the client.
 - **What `$/cancel_request` obliges.** The stable page says a receiver MAY cancel the work; the
   completed RFD says MUST.
 - **What the specification does not settle.**
-  - the base of a tool location's `line`;
   - what happens to a `session/prompt` sent while a turn is running;
   - the status of a tool call after a refused permission;
   - how to clear a plan (sending one with no entries is the only way available);
