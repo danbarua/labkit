@@ -25,8 +25,6 @@ all three as “still running” would send an operator to the wrong component.
 For HTTP or parse failures, follow the provider request ID and operation into an opt-in
 [traffic capture](../environment/README.md#retained-provider-traffic). Do not reconstruct a supposed
 HTTP request from projected journal messages: encoding, streaming, and response failure matter.
-The ACP CLI already writes rotating logs under `~/.labkit/logs`; see its
-[retrieval and retention settings](../../../docs/vscode-acp.md#runtime-diagnostics).
 
 ## Configure delivery
 

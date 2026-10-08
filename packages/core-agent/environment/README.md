@@ -73,6 +73,4 @@ opened from it shares the current run until it rotates to a fresh directory afte
 (default 64 MiB), pruning old runs again at each rotation. Only directories `pruneProviderCaptures`
 recognizes as capture runs (a run-shaped name, a directory, holding `manifest.json` or
 `manifest.jsonl`) are ever candidates for removal; anything else under `root` is left untouched.
-Call `pruneProviderCaptures(root, keep)` directly to reclaim space without opening a new run. See
-the [ACP launcher wiring](../../app-acp/README.md#find-an-operational-failure) for the
-`LABKIT_HTTP_TRACE_DIR` environment variable that gates this in the shipped launcher.
+Call `pruneProviderCaptures(root, keep)` directly to reclaim space without opening a new run.
