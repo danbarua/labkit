@@ -331,8 +331,8 @@ Elicitation lets the agent ask the user something through the client.
 - **Patterns.** A string property's `pattern` is the "Pattern the string must match". ACP sets no
   rule for evaluating it. The agent supplies it, so a client does well to bound the time and
   resources it spends on one.
-- **Unknown values.** An unknown `mode`, property `type` or multi-select `items.type` MUST NOT be
-  rendered as a known control.
+- **Unknown values.** ACP sets no rule for an unknown `mode`, property `type` or multi-select
+  `items.type`. Rendering one as a known control would show a field the agent did not describe.
 - **`date-time`.**
   - The v1 schema text says ISO 8601; the v2 schema says RFC 3339.
   - JSON Schema's own `date-time` format is RFC 3339.
