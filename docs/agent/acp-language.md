@@ -262,8 +262,7 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
   output as it's generated and continues to display it even after the terminal is released".
   The specification does not say whether an agent may embed a terminal it has already released.
 - **`locations`** are `{ path, line? }` with an absolute path. They let a client follow which files
-  the agent is reading or changing, and are the only structured statement of the files a call
-  touches.
+  the agent is reading or changing. A diff's `path` also names a file the call changes.
 
 ## Permission
 
