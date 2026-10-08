@@ -108,8 +108,8 @@ JSON-RPC id. Supporting it is optional on both sides.
 ## Paths and positions
 
 - **Every file path in the protocol MUST be absolute.** That includes `cwd`, `additionalDirectories`,
-  a diff's `path`, a tool location's `path`, and the paths in `fs/*` and `terminal/create`. The
-  short name a model used for a file appears only in the tool call's `rawInput`, if anywhere.
+  a diff's `path`, a tool location's `path`, and the paths in `fs/*` and `terminal/create`. A
+  relative name the model used can still appear in free-form fields such as `title` or `rawInput`.
 - **The session's `cwd` is the base for relative paths**, whatever directory the agent process was
   started in.
 - **Line numbers are 1-based**, as stated globally and again for `fs/read_text_file`. A tool
