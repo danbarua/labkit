@@ -60,8 +60,9 @@ export interface SessionClient {
 const CLIENT_INFO = { name: "labkit-view", version: "0.0.0" };
 
 /**
- * What this client draws. An agent sends a plan, a notice, a compaction or a yes/no setting only
- * to a client that says it can show one; the client library also drops one that arrives unasked.
+ * What this client draws. An agent sends a notice, a compaction update or a boolean option only to
+ * a client that advertises it. `plan` advertises `plan_update` and `plan_removed`; a `plan` update
+ * needs no capability. The client library also drops a gated update that arrives unasked.
  * Questions are drawn in both modes.
  */
 const CAPABILITIES: V1.ClientCapabilities = {
