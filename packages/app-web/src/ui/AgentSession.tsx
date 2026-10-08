@@ -144,7 +144,8 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
  * A live session with the agent the dev server mounts at `/acp`: the fake agent by default, or a
  * real one when `LABKIT_ACP_AGENT_URL` names it. A real agent needs an absolute, writable `cwd`
  * for its session store; `VITE_LABKIT_ACP_CWD` (set by `dev-with-agent.ts`) supplies one, and the
- * fake agent ignores it. Without either, ACP's own default of `/` fails on a read-only root.
+ * fake agent ignores it. Without either, `connectSession` sends its own default `cwd` of `/`, which
+ * fails on a read-only root. ACP has no default `cwd`.
  * `/agent` starts a session and `/agent/{sessionId}` reopens one the agent still has.
  */
 /** Commands this page carries out itself. */
