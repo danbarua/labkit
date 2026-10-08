@@ -418,8 +418,9 @@ Elicitation lets the agent ask the user something through the client.
   `$/cancel_request`. Accept both.
 - **How many `session/update` kinds there are.** The stable page calls its eleven "the complete
   set". SDK 1.5.0 has sixteen; the other five are unstable, and each has a client capability.
-- **The `session/load` response.** The stable page shows `{}`. The SDK's `LoadSessionResponse` can
-  carry `modes` and `configOptions`, and the draft page says it MAY.
+- **The `session/load` response.** The Session Setup page's example shows `{}`. The SDK's
+  `LoadSessionResponse` can carry `modes` and `configOptions`, and the stable Session Modes and
+  Session Config Options pages say the agent MAY return them "During Session Setup".
 - **Which `mcpServers` fields are required.** The SDK requires `mcpServers` on new and load but not
   on resume or fork. The page calls a stdio server's `env` optional, but the SDK requires it. Send
   `mcpServers: []` and `env: []`.
