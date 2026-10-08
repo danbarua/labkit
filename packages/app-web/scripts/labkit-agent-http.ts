@@ -11,6 +11,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { blobsFolderOf, brandFrom } from "labkit-effect/src/agent-host/brand.ts";
 import { blobPath, labkitBlobs } from "../src/infra/labkit-blobs";
 import { stdioAgentHttp } from "../src/infra/stdio-agent-http";
 
@@ -42,6 +43,9 @@ const env = Object.fromEntries(
 );
 
 const main = Bun.resolveSync("labkit-effect/src/agent-acp/main.ts", import.meta.dir);
+// Where the agent stores files: `~/.local/share/<brand>/blobs`, for the brand its environment names.
+// `--sessions-dir` does not change this folder.
+const blobsDir = blobsFolderOf(brandFrom(env));
 await mkdir(cwd, { recursive: true });
 await mkdir(sessionsDir, { recursive: true });
 
@@ -60,7 +64,7 @@ const bridge = stdioAgentHttp({
   cwd,
   env,
   token,
-  routes: { [blobPath]: labkitBlobs(sessionsDir) },
+  routes: { [blobPath]: labkitBlobs({ blobs: blobsDir, sessions: sessionsDir }) },
 });
 
 const server = Bun.serve({
@@ -76,6 +80,7 @@ console.error(`  agent  ${main}`);
 console.error(`  cwd  ${cwd}`);
 console.error(`  sessions  ${sessionsDir}`);
 console.error(`  stored files  http://127.0.0.1:${server.port}${blobPath}<sha256>.<ext>`);
+console.error(`  blobs  ${blobsDir}, then each session's blobs/`);
 console.error(
   `  LABKIT_* variables passed to the agent  ${
     Object.keys(env)

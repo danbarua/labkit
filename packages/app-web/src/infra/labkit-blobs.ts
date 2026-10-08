@@ -1,26 +1,32 @@
 /**
  * labkit-effect's stored files over HTTP, for the page to draw what an agent links to as
- * `blob://<sha256>.<ext>`. `GET /blob/<sha256>.<ext>` answers the bytes with that id that a session
- * in `sessionsDir` stored, read through labkit-effect's own blob store, which checks the bytes
- * against the id. An id names the same bytes in every session, so the newest session that holds it
- * answers. The extension sets the Content-Type; a path without one is answered as bytes.
+ * `blob://<sha256>.<ext>`. `GET /blob/<sha256>.<ext>` returns the bytes the agent stored under that
+ * name, read through labkit-effect's own blob store, which checks the bytes against the id. The
+ * store reads the brand's blobs folder, which every session shares, then the `blobs/` folder of each
+ * session in the sessions folder, where a session kept its blobs before there was a shared folder.
+ * The extension sets the Content-Type; a path without one returns `application/octet-stream`.
  */
 
 import { BunServices } from "@effect/platform-bun";
 import { Effect } from "effect";
 import { sessionFolderOf, storedSessions } from "labkit-effect/src/agent-host/directory.ts";
-import { Blobs, BlobsInFolder } from "labkit-effect/src/agent-session/blobs.ts";
-import { BlobId } from "labkit-effect/src/agent-machine/blob.ts";
+import type { BlobId } from "labkit-effect/src/agent-machine/blob.ts";
+import { Blobs, BlobsInFolder, parseBlobUri } from "labkit-effect/src/agent-session/blobs.ts";
 
 /** The path prefix the blob route answers under. */
 export const blobPath = "/blob/";
 
-/** `/blob/<64 lowercase hex digits>`, then an optional extension of letters and digits. */
-const BLOB_PATH = /^\/blob\/([0-9a-f]{64})(?:\.([A-Za-z0-9]{1,16}))?$/;
+/** Where the agent keeps the files its sessions stored. */
+export interface BlobFolders {
+  /** The brand's blobs folder (labkit-effect's `blobsFolderOf`), shared by every session. */
+  readonly blobs: string;
+  /** The sessions folder the agent was started with (`--sessions-dir`). */
+  readonly sessions: string;
+}
 
-/** The media type for a file name's extension, as Bun serves files; `application/octet-stream` for one it does not know. */
-const mediaTypeOf = (extension: string | undefined): string =>
-  extension === undefined ? "application/octet-stream" : Bun.file(`blob.${extension}`).type;
+/** The media type for an extension, as Bun serves files; `application/octet-stream` for none or one it does not know. */
+const mediaTypeOf = (extension: string): string =>
+  extension === "" ? "application/octet-stream" : Bun.file(`blob.${extension}`).type;
 
 /**
  * On every response: the bytes are the agent's and the person's, not this site's, so a browser
@@ -37,25 +43,25 @@ const FOUND = { "Cache-Control": "private, max-age=31536000, immutable" };
 
 const notFound = () => new Response("Not Found", { status: 404, headers: HEADERS });
 
-/** The bytes with `id` from the newest session in `sessionsDir` that holds them, or undefined. */
-const stored = (sessionsDir: string, id: BlobId) =>
+/** The bytes named `<id>.<extension>` in `folders`, or undefined, with how many sessions' folders were searched. */
+const stored = (folders: BlobFolders, id: BlobId, extension: string) =>
   Effect.gen(function* () {
-    const sessions = yield* storedSessions(sessionsDir);
-    for (const { sessionId } of sessions) {
-      const folder = `${sessionFolderOf(sessionsDir, sessionId)}/blobs`;
-      const bytes = yield* Effect.gen(function* () {
-        return yield* (yield* Blobs).read(id);
-      }).pipe(Effect.provide(BlobsInFolder(folder)));
-      if (bytes !== undefined) return { bytes, sessionId, searched: sessions.length };
-    }
-    return { bytes: undefined, searched: sessions.length };
+    const sessions = yield* storedSessions(folders.sessions);
+    const readAlso = sessions.map(
+      ({ sessionId }) => `${sessionFolderOf(folders.sessions, sessionId)}/blobs`,
+    );
+    const bytes = yield* Effect.gen(function* () {
+      return yield* (yield* Blobs).read(id, extension);
+    }).pipe(Effect.provide(BlobsInFolder(folders.blobs, readAlso)));
+    return { bytes, sessionsSearched: sessions.length };
   });
 
 /**
  * Answers a request under `blobPath`: 200 with the bytes, 404 for a path that names no blob or a
- * blob no session holds, 405 for a method other than GET or HEAD. Each 404 is logged as a warning.
+ * blob the folders do not hold, 405 for a method other than GET or HEAD. Each 404 is logged as a
+ * warning.
  */
-export function labkitBlobs(sessionsDir: string): (request: Request) => Promise<Response> {
+export function labkitBlobs(folders: BlobFolders): (request: Request) => Promise<Response> {
   return (request) =>
     Effect.runPromise(
       Effect.gen(function* () {
@@ -65,29 +71,31 @@ export function labkitBlobs(sessionsDir: string): (request: Request) => Promise<
             status: 405,
             headers: { ...HEADERS, Allow: "GET, HEAD" },
           });
-        const named = BLOB_PATH.exec(path);
-        if (named?.[1] === undefined) {
+        const pointer = path.startsWith(blobPath)
+          ? parseBlobUri(`blob://${path.slice(blobPath.length)}`)
+          : undefined;
+        if (pointer === undefined) {
           yield* Effect.logWarning("agent-http.blob.not-found", {
             path,
             reason: "the path is not /blob/<sha256>[.<extension>]",
           });
           return notFound();
         }
-        const id = BlobId.make(named[1]);
-        const found = yield* stored(sessionsDir, id);
+        const found = yield* stored(folders, pointer.id, pointer.extension);
         if (found.bytes === undefined) {
           yield* Effect.logWarning("agent-http.blob.not-found", {
             path,
-            sessionsDir,
-            sessionsSearched: found.searched,
-            reason: "no session holds a blob with this id",
+            blobsFolder: folders.blobs,
+            sessionsFolder: folders.sessions,
+            sessionsSearched: found.sessionsSearched,
+            reason: "no file with this id and extension in the blobs folder or a session's blobs/",
           });
           return notFound();
         }
         // A copy, so the body is backed by an ArrayBuffer as `Response` requires.
         const body = request.method === "HEAD" ? null : found.bytes.slice();
         return new Response(body, {
-          headers: { ...HEADERS, ...FOUND, "Content-Type": mediaTypeOf(named[2]) },
+          headers: { ...HEADERS, ...FOUND, "Content-Type": mediaTypeOf(pointer.extension) },
         });
       }).pipe(Effect.provide(BunServices.layer)),
     );

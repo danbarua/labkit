@@ -160,7 +160,7 @@
         "@tanstack/react-router": "^1.170.38",
         "effect": "catalog:",
         "effective-acp": "catalog:",
-        "labkit-effect": "github:danbarua/labkit-effect#6029cf3add84dd7dde4d2519332b6e8ee0b71ab9",
+        "labkit-effect": "github:danbarua/labkit-effect#b2c0b6b6036265fe9e742fcb4fc59950c73adc29",
         "pg": "catalog:",
         "react": "catalog:",
         "react-dom": "catalog:",
@@ -1239,7 +1239,7 @@
 
     "kleur": ["kleur@3.0.3", "", {}, "sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w=="],
 
-    "labkit-effect": ["labkit-effect@github:danbarua/labkit-effect#6029cf3", { "dependencies": { "@effect/ai-anthropic": "4.0.0", "@effect/ai-openai": "4.0.0", "@effect/ai-openai-compat": "4.0.0", "@logtape/logtape": "^2.3.9", "effect": "^4.0.0", "effective-acp": "0.2.1", "es-git": "^0.7.0", "yaml": "2.9.1" }, "peerDependencies": { "typescript": "^7" }, "bin": { "labkit": "bin/labkit.ts" } }, "danbarua-labkit-effect-6029cf3", "sha512-JzVsrbejIcfH/QClTQFFIZAMJVCAgudDi/lxCdfylK7FnzZBuwwzCYftyGSEo4wEaH9FxticNeQUDvxUtjd+5w=="],
+    "labkit-effect": ["labkit-effect@github:danbarua/labkit-effect#b2c0b6b", { "dependencies": { "@effect/ai-anthropic": "4.0.0", "@effect/ai-openai": "4.0.0", "@effect/ai-openai-compat": "4.0.0", "@logtape/logtape": "^2.3.9", "effect": "^4.0.0", "effective-acp": "0.4.0", "es-git": "^0.7.0", "yaml": "2.9.1" }, "peerDependencies": { "typescript": "^7" }, "bin": { "labkit": "bin/labkit.ts" } }, "danbarua-labkit-effect-b2c0b6b", "sha512-RPoNP1kUs5hrSZbazM7UreaUXuqkLUBFu98AuXMPC2Wrx7aVaF1rlfl8ouBGfMWnNbXiQJvTopP4GXz4n6Ts9Q=="],
 
     "lodash.includes": ["lodash.includes@4.3.0", "", {}, "sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w=="],
 
@@ -1784,8 +1784,6 @@
     "d3-dsv/iconv-lite": ["iconv-lite@0.6.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw=="],
 
     "d3-geo-projection/commander": ["commander@7.2.0", "", {}, "sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw=="],
-
-    "labkit-effect/effective-acp": ["effective-acp@0.2.1", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-/t5u8a6JcYQVvJPLumNGq8kkYAD2zkufkqTDN1s1i7XdNJ0Zvyjhlw21GNSXhUf7f54kdSy2MdNVGsvPf/o66g=="],
 
     "negotiator/content-type": ["content-type@2.1.0", "", {}, "sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag=="],
 
