@@ -258,8 +258,9 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
   - `newText` is required, and v1 defines no diff for a deleted file. An agent that reports one
     as `newText: ""` makes it look like an emptied file.
   - v1 has no way to show a move.
-- **A terminal item** embeds a terminal created with `terminal/create`. The agent adds it before it
-  releases the terminal, and the client keeps showing its output after release.
+- **A terminal item** embeds a terminal created with `terminal/create`. The client "displays live
+  output as it's generated and continues to display it even after the terminal is released".
+  The specification does not say whether an agent may embed a terminal it has already released.
 - **`locations`** are `{ path, line? }` with an absolute path. They let a client follow which files
   the agent is reading or changing, and are the only structured statement of the files a call
   touches.
