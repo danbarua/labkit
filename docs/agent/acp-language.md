@@ -329,8 +329,8 @@ Elicitation lets the agent ask the user something through the client.
   credentials. Those go through URL mode. If the client lacks URL mode, the agent MUST NOT fall
   back to a form.
 - **Patterns.** A string property's `pattern` is the "Pattern the string must match". ACP sets no
-  rule for evaluating it. The agent supplies it, so a client does well to bound the time and
-  resources it spends on one.
+  rule for evaluating it. The agent supplies the pattern, so a client should limit the time and
+  memory it spends evaluating one.
 - **Unknown values.** ACP sets no rule for an unknown `mode`, property `type` or multi-select
   `items.type`. Rendering one as a known control would show a field the agent did not describe.
 - **`date-time`.**
