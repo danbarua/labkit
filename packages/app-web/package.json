@@ -36,7 +36,7 @@
     "@tanstack/react-router": "^1.170.38",
     "effect": "catalog:",
     "effective-acp": "catalog:",
-    "labkit-effect": "github:danbarua/labkit-effect#b2c0b6b6036265fe9e742fcb4fc59950c73adc29",
+    "labkit-effect": "github:danbarua/labkit-effect#2e8025902146e196787975a84dca2407d066c5fc",
     "pg": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
