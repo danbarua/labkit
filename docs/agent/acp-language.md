@@ -219,8 +219,11 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
   counts", so an agent that has no meaningful context size has no valid `usage_update` to send.
   The update itself is optional: the agent "MAY" send it.
 - **Five more kinds are unstable.** SDK 1.5.0 also types `plan_update`, `plan_removed`, `notice`,
-  `compaction_update` and `compaction_summary_chunk`. Each is unstable, and an agent MUST NOT send
-  one unless the client advertised the matching capability.
+  `compaction_update` and `compaction_summary_chunk`. Each is unstable, and each has a client
+  capability. For `notice` and both compaction kinds, "Agents MUST only send" them when the client
+  advertised `session.notices` or `session.compaction`. The `plan` capability, for `plan_update`
+  and `plan_removed`, says only that the client "can receive both update types"; no MUST is
+  attached.
 
 ## Tool calls
 
@@ -408,7 +411,7 @@ Elicitation lets the agent ask the user something through the client.
   `cancelled`. The cancellation page's example answers with error `-32800` after a
   `$/cancel_request`. Accept both.
 - **How many `session/update` kinds there are.** The stable page calls its eleven "the complete
-  set". SDK 1.5.0 has sixteen; the other five are unstable and gated by client capabilities.
+  set". SDK 1.5.0 has sixteen; the other five are unstable, and each has a client capability.
 - **The `session/load` response.** The stable page shows `{}`. The SDK's `LoadSessionResponse` can
   carry `modes` and `configOptions`, and the draft page says it MAY.
 - **Which `mcpServers` fields are required.** The SDK requires `mcpServers` on new and load but not
