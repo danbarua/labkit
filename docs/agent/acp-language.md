@@ -140,7 +140,9 @@ JSON-RPC id. Supporting it is optional on both sides.
   - Every agent MUST support stdio servers.
   - A client sends `http` or `sse` servers only if the agent advertised
     `mcpCapabilities.http` or `.sse`.
-  - The agent SHOULD connect to every listed server before it answers.
+  - The agent SHOULD connect to every listed server. The page sets no time for that on
+    `session/new` or `session/load`; on `session/resume` the agent reconnects to the servers and
+    "returns once the session is ready to continue".
   - Clients re-send the list on load and resume.
 - **`additionalDirectories`** is sent only when the agent advertised it.
   - On load and resume the client resends the full list; stored roots are not restored for it.
