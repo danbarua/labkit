@@ -389,8 +389,9 @@ Elicitation lets the agent ask the user something through the client.
 
 ## Extensibility and errors
 
-- **Custom data.** It goes in `_meta`, under a namespaced key. Implementations MUST NOT add custom
-  fields at the root of a specified type, because every root name is reserved.
+- **Custom data.** It goes in `_meta`. The page's examples use namespaced keys such as
+  `zed.dev/debugMode`; no rule requires them. Implementations MUST NOT add custom fields at the
+  root of a specified type, because every root name is reserved.
 - **Reserved `_meta` keys.** `traceparent`, `tracestate` and `baggage` are reserved for W3C trace
   context.
 - **Method names.** A method name that starts with `_` is an extension. Method names without it
