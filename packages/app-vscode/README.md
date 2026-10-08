@@ -101,5 +101,5 @@ are redacted. Local lifecycle events replace upstream telemetry; no telemetry se
 The webview tests execute the actual generated script in a DOM implementation. They establish
 content/history behavior and injection handling, not native VS Code visual conformance. The native
 UI inspection tool currently fails to start. Actual extension-host/editor integration remains to
-be verified. The conformance ledger in `docs/acp-conformance.md` remains open: this source import
-and the new rendering paths are not proof that all inherited handlers meet the current ACP spec.
+be verified. This source import and the new rendering paths are not proof that all inherited
+handlers meet the current ACP spec.

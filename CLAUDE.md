@@ -61,11 +61,12 @@ packages/core-domain/   research actions. Verb-first: no createClaim(), only rec
 packages/app-mcp/       the agent surface.
 packages/app-cli/       the terminal surface. A composition root, nothing else.
 packages/core-agent/    durable, inspectable agent sessions: journal, projections, providers, effects.
-packages/app-acp/       the ACP agent: stdio and HTTP hosts, workspace tools, the launcher.
 ```
 
-The agent packages have their own guidance and reference in `docs/agent/`; start at
-`docs/agent/guidance.md`. `bun run test:agent` runs their tests.
+The dev stack runs labkit-effect's ACP agent behind the HTTP bridge `labkit-agent-http.ts` in
+`packages/app-web/scripts/`; the VS Code extension runs whichever agent its settings name.
+`packages/core-agent` has its own guidance in `docs/agent/`; start at `docs/agent/guidance.md`.
+`bun run test:agent` runs its tests.
 
 `packages/core-db/domain.ts` is the domain as graph structure — labels, edges, property
 shapes. `packages/core-domain/` is the domain as it matters to a researcher.

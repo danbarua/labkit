@@ -45,16 +45,15 @@
     // `!.claude/**` because a git worktree created under `.claude/worktrees/`
     // is a whole checkout of this repo, `biome.jsonc` included, and biome
     // refuses to run at all when it finds a second root config.
-    // `packages/app-acp/dist` is build output, gitignored the way `packages/app-web/dist` is: a
-    // nested `.gitignore` inside that package. Biome does not walk into either through `vcs`
-    // ignore-file resolution here -- only an explicit exclusion here does.
+    // `packages/app-vscode/dist` is build output, gitignored by a nested `.gitignore` inside that
+    // package. Biome does not walk into it through `vcs` ignore-file resolution here -- only an
+    // explicit exclusion here does.
     "includes": [
       "packages/**",
       "tests/**",
       "scripts/**",
       "*.ts",
       "!.claude/**",
-      "!packages/app-acp/dist/**",
       "!packages/app-vscode/dist/**"
     ],
     "ignoreUnknown": true

@@ -16,10 +16,10 @@ import { join } from "node:path";
 const MAX = 8;
 const ROOTS = ["packages", "tests"];
 
-// The agent packages arrived with longer comment blocks: 41 of them run past the bound. Their own
+// The agent packages arrived with longer comment blocks: 47 of them run past the bound. Their own
 // review is against this rule when they are next edited, and they are not rewritten in one pass.
 // retire-when: no block under these directories runs longer than eight lines.
-const EXEMPT = ["packages/core-agent/", "packages/app-acp/", "packages/app-vscode/"];
+const EXEMPT = ["packages/core-agent/", "packages/app-vscode/"];
 
 function tsFiles(dir: string): string[] {
   const found: string[] = [];

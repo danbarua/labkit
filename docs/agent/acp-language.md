@@ -4,9 +4,8 @@ This note covers what the words of the Agent Client Protocol (ACP) mean. It also
 obliges the other side to send back. It is written for whoever builds the bridge between ACP and an
 agent runtime: when this message arrives, what goes out, and in what order.
 
-It describes ACP itself, not labkit's implementation of it. For what `packages/app-acp` supports,
-see [protocol-reference.md](../../packages/app-acp/protocol-reference.md). For how far that
-implementation conforms, see [acp-conformance.md](acp-conformance.md).
+It describes ACP itself, not labkit's implementation of it. For what labkit's agent supports, see
+labkit-effect's `docs/agent-acp.md`.
 
 **Sources.**
 - The specification repository
@@ -18,7 +17,7 @@ implementation conforms, see [acp-conformance.md](acp-conformance.md).
 - MUST, SHOULD and MAY are quoted from the specification.
 - **Unstable** marks a rule that exists only in the SDK's UNSTABLE types, a draft page or an RFD.
 - ACP v2 is a separate draft with a different turn model. Nothing here applies to it.
-- "Agent" means the program that serves ACP; for labkit that is `packages/app-acp`. "Client" means
+- "Agent" means the program that serves ACP; for labkit that is labkit-effect's ACP host. "Client" means
   the editor or web app that talks to it.
 
 ## The types are in the SDK

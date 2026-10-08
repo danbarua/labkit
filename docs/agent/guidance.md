@@ -1,7 +1,7 @@
 # Agent runtime guidance
 
-Guidance for `packages/core-agent` and `packages/app-acp`: an experimental TypeScript runtime for
-durable, inspectable agent sessions, and the ACP host that serves it. The repository's own rules in
+Guidance for `packages/core-agent`: an experimental TypeScript runtime for durable, inspectable
+agent sessions. The repository's own rules in
 `CLAUDE.md` apply as well; where the two differ on formatting or checks, `CLAUDE.md` and the
 repository's checks win.
 
@@ -26,9 +26,6 @@ architecture belongs in `docs/agent/`.
 - `packages/core-agent/environment/`: asynchronous event sources and renderer bindings. See
   its `README.md`.
 - `packages/core-agent/logging/`: environment-owned diagnostic logging. See its `README.md`.
-- `packages/app-acp/`: the ACP host, its stdio and HTTP launchers and the workspace example. See
-  its `README.md` and `docs/agent/acp-http-hosting.md`. `labkit-tools.ts` offers the research verbs
-  to the agent as tools, built from the declarations in `packages/app-mcp/tools.ts`.
 
 Read `docs/agent/glossary.md` before writing plans, docs or code that name runtime concepts
 (turn, step, interjection, barge-in, configuration, load). Its definitions are canonical; code
@@ -40,10 +37,8 @@ points; where code or other docs disagree with it, the code is the divergence.
 
 Use `docs/agent/core-runtime.md` and `docs/agent/agent-flow-diagrams.md` for the underlying agent
 runtime. Use `docs/agent/session-runtime.md` for persistence and session flows.
-`docs/agent/host-protocol.md` is a design document with explicit implementation gaps; do not
-treat every protocol feature in it as shipped. `docs/agent/acp-language.md` says what ACP's
-messages mean and oblige, as the specification states them; `docs/agent/acp-conformance.md`
-tracks how far the agent conforms.
+`docs/agent/acp-language.md` says what ACP's messages mean and oblige, as the specification
+states them.
 
 When documentation and implementation differ, source and tests describe current
 behavior. Update the relevant module README for a local contract change and the
@@ -54,14 +49,10 @@ appropriate file in `docs/agent/` for a cross-module architecture change.
 Run commands from the repository root:
 
 ```sh
-bun run test:agent                 # the agent packages' tests
+bun run test:agent                 # core-agent's tests
 bun run test:agent:logs            # the same with debug diagnostics printed
 bun test path/to/file.test.ts      # scope tests to a file
 bun run typecheck
-bun run acp:dev                    # the ACP agent over stdio, from source
-bun run acp:build                  # bundle the launcher into packages/app-acp/dist
-bun run acp:debug                  # build, drive real stdio, keep failure and restore evidence
-bun run acp:logs                   # read the newest launch log
 bun run check                      # everything, before committing
 ```
 
