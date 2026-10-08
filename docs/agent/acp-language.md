@@ -262,7 +262,8 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
   - `reject_once`: reject it this time only.
   - `reject_always`: reject it and remember the choice.
 
-  "Remember" is the agent's job: the reply carries nothing but the chosen `optionId`.
+  The reply carries nothing but the chosen `optionId`. The specification does not say which side
+  remembers an `allow_always` or `reject_always` choice.
 - **The outcome** is either `{ outcome: "selected", optionId }` or `{ outcome: "cancelled" }`.
   There is no "rejected" outcome: a refusal is a selected `reject_*` option. `cancelled` means the
   turn was cancelled.
