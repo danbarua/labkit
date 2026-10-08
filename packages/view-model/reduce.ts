@@ -152,7 +152,8 @@ function applyUpdate(state: TranscriptState, update: SessionUpdate): TranscriptS
     case "tool_call":
     case "tool_call_update":
       return upsertToolCall(state, update);
-    // A plan of no entries is the protocol's way to clear the plan: it goes, heading and all.
+    // An empty plan removes the plan block, heading and all. ACP has the client replace the whole
+    // plan with each update; this view draws a plan with no entries as no plan.
     case "plan":
       return update.entries.length === 0
         ? removePlan(state, "plan")
