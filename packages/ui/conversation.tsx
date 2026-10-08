@@ -60,6 +60,8 @@ export interface ConversationProps {
   readonly onSend?: (text: string, files: readonly File[]) => void;
   /** The files the composer takes. Without this it takes none. */
   readonly attach?: AttachLimits;
+  /** Why the composer takes no input yet, such as the session still connecting (`Composer`'s `unavailable`). */
+  readonly composerUnavailable?: string | undefined;
   readonly onCancel?: () => void;
   readonly onAnswer?: (requestId: string, outcome: RequestPermissionOutcome) => void;
   /** Answers a question from the agent. Without it a question is shown and cannot be answered. */
@@ -220,6 +222,7 @@ export function Conversation({
   mentions,
   onMessageAction,
   attach,
+  composerUnavailable,
 }: ConversationProps) {
   const current = phase(state);
   const pending = pendingPermissions(state);
@@ -316,6 +319,7 @@ export function Conversation({
                   onSetConfig={onSetConfig}
                   mentions={mentions}
                   attach={attach}
+                  unavailable={composerUnavailable}
                   loader={moodOf(indicator)}
                   recall={cancelledPrompt(state)}
                 />
