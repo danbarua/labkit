@@ -42,6 +42,7 @@ describe("a stored file", () => {
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(response.headers.get("content-security-policy")).toBe("sandbox; default-src 'none'");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
   });
 
   test("without an extension is answered as application/octet-stream", async () => {
@@ -58,8 +59,12 @@ describe("a stored file", () => {
 });
 
 describe("a request that names no stored file", () => {
-  test("an id no session holds is 404", async () => {
-    expect((await get(`/blob/${"0".repeat(64)}.png`)).status).toBe(404);
+  test("an id no session holds is 404, with the same safety headers and no caching", async () => {
+    const response = await get(`/blob/${"0".repeat(64)}.png`);
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-security-policy")).toBe("sandbox; default-src 'none'");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("cache-control")).toBeNull();
   });
 
   test("a file whose bytes do not match its id is 404", async () => {

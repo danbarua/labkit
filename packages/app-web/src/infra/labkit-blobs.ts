@@ -23,15 +23,19 @@ const mediaTypeOf = (extension: string | undefined): string =>
   extension === undefined ? "application/octet-stream" : Bun.file(`blob.${extension}`).type;
 
 /**
- * The bytes are the agent's and the person's, not this site's: a browser that opens one as a page
- * runs it sandboxed with nothing allowed, and never guesses a type other than the one sent.
- * The id is the SHA-256 of the bytes, so a response never changes.
+ * On every response: the bytes are the agent's and the person's, not this site's, so a browser
+ * that opens one as a page runs it sandboxed with nothing allowed, and never guesses a type other
+ * than the one sent.
  */
 const HEADERS = {
   "Content-Security-Policy": "sandbox; default-src 'none'",
   "X-Content-Type-Options": "nosniff",
-  "Cache-Control": "private, max-age=31536000, immutable",
 };
+
+/** On a 200 only: the id is the SHA-256 of the bytes, so the bytes found for it never change. */
+const FOUND = { "Cache-Control": "private, max-age=31536000, immutable" };
+
+const notFound = () => new Response("Not Found", { status: 404, headers: HEADERS });
 
 /** The bytes with `id` from the newest session in `sessionsDir` that holds them, or undefined. */
 const stored = (sessionsDir: string, id: BlobId) =>
@@ -59,7 +63,7 @@ export function labkitBlobs(sessionsDir: string): (request: Request) => Promise<
         if (request.method !== "GET" && request.method !== "HEAD")
           return new Response("Method Not Allowed", {
             status: 405,
-            headers: { Allow: "GET, HEAD" },
+            headers: { ...HEADERS, Allow: "GET, HEAD" },
           });
         const named = BLOB_PATH.exec(path);
         if (named?.[1] === undefined) {
@@ -67,7 +71,7 @@ export function labkitBlobs(sessionsDir: string): (request: Request) => Promise<
             path,
             reason: "the path is not /blob/<sha256>[.<extension>]",
           });
-          return new Response("Not Found", { status: 404 });
+          return notFound();
         }
         const id = BlobId.make(named[1]);
         const found = yield* stored(sessionsDir, id);
@@ -78,12 +82,12 @@ export function labkitBlobs(sessionsDir: string): (request: Request) => Promise<
             sessionsSearched: found.searched,
             reason: "no session holds a blob with this id",
           });
-          return new Response("Not Found", { status: 404 });
+          return notFound();
         }
         // A copy, so the body is backed by an ArrayBuffer as `Response` requires.
         const body = request.method === "HEAD" ? null : found.bytes.slice();
         return new Response(body, {
-          headers: { ...HEADERS, "Content-Type": mediaTypeOf(named[2]) },
+          headers: { ...HEADERS, ...FOUND, "Content-Type": mediaTypeOf(named[2]) },
         });
       }).pipe(Effect.provide(BunServices.layer)),
     );
