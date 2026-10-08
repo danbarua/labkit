@@ -12,7 +12,8 @@ export type Activity =
 
 /**
  * Whether the last turn stopped short for a reason outside the person's hands: a refusal, a token
- * limit or the step limit. A cancelled turn was the person's own doing.
+ * limit or the step limit. A cancelled turn is not one: ACP's `cancelled` stop reason means that
+ * the client cancelled the turn.
  */
 const halted = (state: TranscriptState): boolean =>
   state.stopReason === "refusal" ||

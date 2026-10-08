@@ -160,10 +160,11 @@ export class ChatWebviewProvider implements vscode.WebviewViewProvider {
 
   /**
    * A generic config-option change from the webview's config bar (ACP "Session Config
-   * Options" — covers model, mode, thinking and any agent-defined option alike). The agent
-   * returns the full configOptions state, which arrives back as an ordinary
-   * `config_option_update` through `handleSessionUpdate`, so nothing further is posted here on
-   * success.
+   * Options" — covers model, mode, thinking and any agent-defined option alike). ACP has the
+   * agent answer with the full configOptions state; `SessionManager` stores that answer, and
+   * nothing is posted here on success. The webview changes only when the agent also sends a
+   * `config_option_update`, which arrives through `handleSessionUpdate`. ACP does not require
+   * that notification for a change the client made.
    */
   private async handleSetConfigOption(configId: string, value: string | boolean): Promise<void> {
     const activeId = this.sessionManager.getActiveSessionId();

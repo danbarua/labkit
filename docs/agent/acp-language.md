@@ -87,7 +87,9 @@ JSON-RPC id. Supporting it is optional on both sides.
 ## Capabilities
 
 - **Omitted means unsupported.** "Clients and Agents MUST treat all capabilities omitted in the
-  `initialize` request as UNSUPPORTED." Beyond the baseline, everything is gated by a capability.
+  `initialize` request as UNSUPPORTED." Beyond the baseline, the optional methods in the tables
+  above are gated by a capability, except `session/set_config_option` and `session/set_mode`,
+  which depend on what the session offered.
 - **Baseline.** Every agent MUST support `session/new`, `session/prompt`, `session/cancel` and
   `session/update`, and MUST accept `text` and `resource_link` blocks in a prompt.
 - **`null` and `{}`.** For an object-shaped capability, `null` is the same as omitted, and `{}`
@@ -105,13 +107,13 @@ JSON-RPC id. Supporting it is optional on both sides.
 ## Paths and positions
 
 - **Every file path in the protocol MUST be absolute.** That includes `cwd`, `additionalDirectories`,
-  a diff's `path`, a tool location's `path`, and the paths in `fs/*` and `terminal/create`. The
-  short name a model used for a file appears only in the tool call's `rawInput`, if anywhere.
+  a diff's `path`, a tool location's `path`, and the paths in `fs/*` and `terminal/create`. A
+  relative name the model used can still appear in free-form fields such as `title` or `rawInput`.
 - **The session's `cwd` is the base for relative paths**, whatever directory the agent process was
   started in.
-- **Line numbers are 1-based**, as stated globally and again for `fs/read_text_file`. A tool
-  location's `line` is an exception in practice: the schema gives it minimum 0 and no page says
-  which base it uses.
+- **Line numbers are 1-based**, as stated globally and again for `fs/read_text_file`. The global
+  rule covers a tool location's `line` too. The schema types that field as an unsigned 32-bit
+  integer with minimum 0, so the type alone does not exclude 0.
 
 ## Sessions
 
@@ -125,7 +127,8 @@ JSON-RPC id. Supporting it is optional on both sides.
 - **`session/resume`** restores a session without replay. The agent MUST NOT replay history, so the
   client keeps its own copy.
 - **`session/close`** ends the live session. The agent MUST cancel any ongoing work "as if
-  `session/cancel` had been called" and free its resources. Stored history is not deleted.
+  `session/cancel` had been called" and free its resources. The page says nothing about stored
+  history; `session/delete` is the method that removes a session from `session/list`.
 - **`session/delete`** removes a session from later `session/list` results. Deleting a session
   that is already gone SHOULD succeed.
 - **`session/list`** is discovery only: it restores nothing.
@@ -136,7 +139,9 @@ JSON-RPC id. Supporting it is optional on both sides.
   - Every agent MUST support stdio servers.
   - A client sends `http` or `sse` servers only if the agent advertised
     `mcpCapabilities.http` or `.sse`.
-  - The agent SHOULD connect to every listed server before it answers.
+  - The agent SHOULD connect to every listed server. The page sets no time for that on
+    `session/new` or `session/load`; on `session/resume` the agent reconnects to the servers and
+    "returns once the session is ready to continue".
   - Clients re-send the list on load and resume.
 - **`additionalDirectories`** is sent only when the agent advertised it.
   - On load and resume the client resends the full list; stored roots are not restored for it.
@@ -145,8 +150,9 @@ JSON-RPC id. Supporting it is optional on both sides.
 ## A prompt turn
 
 - **A turn is one `session/prompt` request and its response.** Everything the agent reports in
-  between is `session/update` notifications. The response carries a `StopReason` and is the last
-  message of the turn: no update for that turn may follow it.
+  between is `session/update` notifications. The response carries a `StopReason`. The
+  specification says that updates come before the response only for a cancelled turn (see
+  Cancellation below); it also says that updates "are not limited to active prompt turns".
 - **Stop reasons.** There are exactly five in v1:
 
   | reason              | meaning                                                              |
@@ -157,7 +163,8 @@ JSON-RPC id. Supporting it is optional on both sides.
   | `refusal`           | The agent refuses to continue.                                       |
   | `cancelled`         | The client cancelled the turn.                                       |
 
-  Any other failure is a JSON-RPC error response, not a stop reason.
+  The specification defines no stop reason for any other failure. The prompt-turn page mentions
+  an error response to `session/prompt` only as what an unhandled abort can become.
 - **Cancellation.** `session/cancel` is a notification, not a request.
   - **Client:** it SHOULD immediately show unfinished tool calls as cancelled. That is a local
     display state: `cancelled` is not a tool call status on the wire. It MUST answer every pending
@@ -207,11 +214,15 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
 
 - **`messageId`.** Chunks that carry the same optional `messageId` belong to one message, and a new
   `messageId` starts a new one. The id is opaque.
-- **`usage_update` needs a real size.** An agent that has no meaningful context size does not send
-  `usage_update` at all.
+- **`usage_update` needs a real size.** `used` and `size` are "required and non-null token
+  counts", so an agent that has no meaningful context size has no valid `usage_update` to send.
+  The update itself is optional: the agent "MAY" send it.
 - **Five more kinds are unstable.** SDK 1.5.0 also types `plan_update`, `plan_removed`, `notice`,
-  `compaction_update` and `compaction_summary_chunk`. Each is unstable, and an agent MUST NOT send
-  one unless the client advertised the matching capability.
+  `compaction_update` and `compaction_summary_chunk`. Each is unstable, and each has a client
+  capability. For `notice` and both compaction kinds, "Agents MUST only send" them when the client
+  advertised `session.notices` or `session.compaction`. The `plan` capability, for `plan_update`
+  and `plan_removed`, says only that the client "can receive both update types"; no MUST is
+  attached.
 
 ## Tool calls
 
@@ -243,13 +254,14 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
 - **A diff** is `{ path, oldText, newText }`.
   - `path` is absolute.
   - A null or absent `oldText` means a new file.
-  - `newText` is required, so a deletion looks like emptying the file (`newText: ""`).
+  - `newText` is required, and v1 defines no diff for a deleted file. An agent that reports one
+    as `newText: ""` makes it look like an emptied file.
   - v1 has no way to show a move.
-- **A terminal item** embeds a terminal created with `terminal/create`. The agent adds it before it
-  releases the terminal, and the client keeps showing its output after release.
+- **A terminal item** embeds a terminal created with `terminal/create`. The client "displays live
+  output as it's generated and continues to display it even after the terminal is released".
+  The specification does not say whether an agent may embed a terminal it has already released.
 - **`locations`** are `{ path, line? }` with an absolute path. They let a client follow which files
-  the agent is reading or changing, and are the only structured statement of the files a call
-  touches.
+  the agent is reading or changing. A diff's `path` also names a file the call changes.
 
 ## Permission
 
@@ -261,7 +273,8 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
   - `reject_once`: reject it this time only.
   - `reject_always`: reject it and remember the choice.
 
-  "Remember" is the agent's job: the reply carries nothing but the chosen `optionId`.
+  The reply carries nothing but the chosen `optionId`. The specification does not say which side
+  remembers an `allow_always` or `reject_always` choice.
 - **The outcome** is either `{ outcome: "selected", optionId }` or `{ outcome: "cancelled" }`.
   There is no "rejected" outcome: a refusal is a selected `reject_*` option. `cancelled` means the
   turn was cancelled.
@@ -306,16 +319,19 @@ Elicitation lets the agent ask the user something through the client.
   - `accept` means the user agreed to open the link, not that the flow behind it finished.
   - The agent MAY report completion later with the notification `elicitation/complete` and the
     request's `elicitationId`.
-  - The client MUST ignore an unknown or already-completed id. It SHOULD offer to retry or cancel
-    by hand if completion never arrives.
+  - The client MUST ignore an unknown or already-completed id. ACP sets no rule for a completion
+    that never arrives. MCP's draft elicitation page, on which ACP's is based, says clients
+    SHOULD provide manual controls to retry or cancel.
 - **URL safety.** The client MUST show the full URL before the user agrees, MUST NOT prefetch it,
   and MUST open it where neither the client nor the model can inspect it.
 - **Secrets.** Form mode MUST NOT ask for secrets: passwords, API keys, tokens, payment
   credentials. Those go through URL mode. If the client lacks URL mode, the agent MUST NOT fall
   back to a form.
-- **Patterns.** An agent-supplied `pattern` MUST be evaluated with bounded time and resources.
-- **Unknown values.** An unknown `mode`, property `type` or multi-select `items.type` MUST NOT be
-  rendered as a known control.
+- **Patterns.** A string property's `pattern` is the "Pattern the string must match". ACP sets no
+  rule for evaluating it. The agent supplies the pattern, so a client should limit the time and
+  memory it spends evaluating one.
+- **Unknown values.** ACP sets no rule for an unknown `mode`, property `type` or multi-select
+  `items.type`. Rendering one as a known control would show a field the agent did not describe.
 - **`date-time`.**
   - The v1 schema text says ISO 8601; the v2 schema says RFC 3339.
   - JSON Schema's own `date-time` format is RFC 3339.
@@ -359,7 +375,8 @@ Elicitation lets the agent ask the user something through the client.
   - The client starts the agent as a subprocess.
   - Messages are JSON-RPC separated by newlines. A message MUST NOT contain a newline, so no
     pretty-printing.
-  - The agent MUST NOT write anything but ACP messages to stdout. Logs go to stderr.
+  - The agent MUST NOT write anything but ACP messages to stdout. It MAY write UTF-8 log text to
+    stderr, which the client MAY capture, forward or ignore.
 - **Streamable HTTP** is an RFD (status Active), and the SDK ships it under `experimental/`.
   - Every request goes to `/acp`. `initialize` is a POST that returns its result in the body,
     with an `Acp-Connection-Id` header.
@@ -371,10 +388,11 @@ Elicitation lets the agent ask the user something through the client.
 
 ## Extensibility and errors
 
-- **Custom data.** It goes in `_meta`, under a namespaced key. Implementations MUST NOT add custom
-  fields at the root of a specified type, because every root name is reserved.
-- **Reserved `_meta` keys.** `traceparent`, `tracestate` and `baggage` are reserved for W3C trace
-  context.
+- **Custom data.** It goes in `_meta`. The page's examples use namespaced keys such as
+  `zed.dev/debugMode`; no rule requires them. Implementations MUST NOT add custom fields at the
+  root of a specified type, because every root name is reserved.
+- **Reserved `_meta` keys.** The root-level keys `traceparent`, `tracestate` and `baggage` SHOULD
+  be reserved for W3C trace context.
 - **Method names.** A method name that starts with `_` is an extension. Method names without it
   are reserved for the protocol. `$/` prefixes protocol-level methods such as `$/cancel_request`.
 - **Unknown methods and notifications.** An unknown request gets `-32601`. Notifications SHOULD be
@@ -398,9 +416,10 @@ Elicitation lets the agent ask the user something through the client.
   `cancelled`. The cancellation page's example answers with error `-32800` after a
   `$/cancel_request`. Accept both.
 - **How many `session/update` kinds there are.** The stable page calls its eleven "the complete
-  set". SDK 1.5.0 has sixteen; the other five are unstable and gated by client capabilities.
-- **The `session/load` response.** The stable page shows `{}`. The SDK's `LoadSessionResponse` can
-  carry `modes` and `configOptions`, and the draft page says it MAY.
+  set". SDK 1.5.0 has sixteen; the other five are unstable, and each has a client capability.
+- **The `session/load` response.** The Session Setup page's example shows `{}`. The SDK's
+  `LoadSessionResponse` can carry `modes` and `configOptions`, and the stable Session Modes and
+  Session Config Options pages say the agent MAY return them "During Session Setup".
 - **Which `mcpServers` fields are required.** The SDK requires `mcpServers` on new and load but not
   on resume or fork. The page calls a stdio server's `env` optional, but the SDK requires it. Send
   `mcpServers: []` and `env: []`.
@@ -409,7 +428,6 @@ Elicitation lets the agent ask the user something through the client.
 - **What `$/cancel_request` obliges.** The stable page says a receiver MAY cancel the work; the
   completed RFD says MUST.
 - **What the specification does not settle.**
-  - the base of a tool location's `line`;
   - what happens to a `session/prompt` sent while a turn is running;
   - the status of a tool call after a refused permission;
   - how to clear a plan (sending one with no entries is the only way available);

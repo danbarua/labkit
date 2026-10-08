@@ -37,8 +37,9 @@ export interface SessionInfo {
   modes: SessionModeState | null;
   models: null;
   /**
-   * Generic session config options (ACP "Session Config Options" — supersedes
-   * `modes` / `models`). `null` means the agent did not provide this field.
+   * Generic session config options (ACP "Session Config Options", which
+   * supersede `modes`; ACP v1 has no `models` field, so `models` is always
+   * `null`). `null` means the agent did not provide this field.
    * Per spec, when both `configOptions` and `modes` are present, clients
    * should use `configOptions` exclusively.
    */
@@ -554,7 +555,7 @@ export class SessionManager extends EventEmitter {
     }
 
     // Prefer configOptions if available (spec: clients that support
-    // configOptions MUST use it exclusively when both are present)
+    // configOptions SHOULD use it exclusively when both are present)
     if (session.configOptions && session.configOptions.length > 0) {
       const modeOpt = session.configOptions.find((o) => o.category === "mode");
       if (modeOpt) {
@@ -578,7 +579,8 @@ export class SessionManager extends EventEmitter {
   }
 
   /**
-   * Set the session model (experimental).
+   * Set the session model. ACP v1 has no method for this; the model is a
+   * config option.
    *
    * If the active session uses `configOptions`, this is transparently
    * routed to `setConfigOption` against the first option whose category is

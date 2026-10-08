@@ -3,8 +3,8 @@
  * advertises in `promptCapabilities`. An `image/*` file is an `image` block when the agent takes
  * images. Any other file, and an image the agent takes only as a file, is an embedded `resource`
  * when the agent takes embedded context: `text` when the bytes are text, `blob` otherwise.
- * A browser gives a file's name and no path, so each block's `uri` is `attachment:///<name>`;
- * an agent takes the file's name from the last segment of the URI.
+ * A browser gives a file's name and no path, so each block's `uri` is `attachment:///<name>`. The
+ * blocks have no name field, and ACP does not say how an agent learns the file's name.
  */
 
 import type * as acp from "@agentclientprotocol/sdk";

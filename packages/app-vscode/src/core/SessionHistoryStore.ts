@@ -3,8 +3,8 @@ import * as vscode from "vscode";
 /**
  * Persistent client-side cache of past sessions per agent. Used to render the
  * tree-tier-2 (sessions under an agent) for agents that support
- * `session/load` or `session/resume` but do NOT advertise the experimental
- * `session/list` capability.
+ * `session/load` or `session/resume` but do NOT advertise the `session/list`
+ * capability (`sessionCapabilities.list`).
  *
  * When the agent supports `session/list`, that is the source of truth and
  * this store is NOT consulted (to avoid divergence).

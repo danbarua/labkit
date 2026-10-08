@@ -66,9 +66,10 @@ its visible and queued prompts and answers later requests from that turn with `c
 explicit prompt resets that cancellation state; concurrent prompts for one session are rejected.
 Connection closure also settles pending prompts. The SDK request signal reaches the permission
 handler, so `$/cancel_request` dismisses the matching prompt without cancelling unrelated sessions.
-All four option kinds return the agent's exact option ID. The agent owns the meaning and retention
-of an “always” choice; the client does not invent a broader authorization scope. Configured
-`allowAll` cannot override cancellation. Refusal logs identify the tool, choice and consequence;
+All four option kinds return the agent's exact option ID. This client leaves the meaning and
+retention of an “always” choice to the agent and does not invent a broader authorization scope.
+ACP's answer carries only the chosen option ID, and ACP does not say which side remembers the
+choice. Configured `allowAll` cannot override cancellation. Refusal logs identify the tool, choice and consequence;
 `vscode.permission.*` events include session, tool-call and available RPC request IDs.
 
 The client uses the current SDK's typed connection/context API. Cancelling a terminal exit wait
