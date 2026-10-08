@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { rotatingFileSink } from "../../../app-acp/launcher-logging.ts";
+import { rotatingFileSink } from "./rotating-file-sink.ts";
 import { redactDiagnostics } from "@labkit/core-agent/logging";
 
 /** One bounded log set per extension storage directory, across restarts. */
