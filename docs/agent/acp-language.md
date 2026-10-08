@@ -164,7 +164,8 @@ JSON-RPC id. Supporting it is optional on both sides.
   | `refusal`           | The agent refuses to continue.                                       |
   | `cancelled`         | The client cancelled the turn.                                       |
 
-  Any other failure is a JSON-RPC error response, not a stop reason.
+  The specification defines no stop reason for any other failure. The prompt-turn page mentions
+  an error response to `session/prompt` only as what an unhandled abort can become.
 - **Cancellation.** `session/cancel` is a notification, not a request.
   - **Client:** it SHOULD immediately show unfinished tool calls as cancelled. That is a local
     display state: `cancelled` is not a tool call status on the wire. It MUST answer every pending
