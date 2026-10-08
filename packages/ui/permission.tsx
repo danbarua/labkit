@@ -65,13 +65,17 @@ export function PermissionBatch({
 /**
  * A request the agent's turn is waiting on. The person's choice is the only thing that lets the
  * turn go on, so every option the agent offered is a button and there is always a way to cancel.
+ * "Cancel turn" cancels the whole turn (`onCancel`), not this request: a `cancelled` answer means
+ * that the turn was cancelled, and the client gives it to every open request once it has.
  */
 export function PermissionPrompt({
   entry,
   onAnswer,
+  onCancel,
 }: {
   entry: PermissionEntry;
   onAnswer?: ((requestId: string, outcome: RequestPermissionOutcome) => void) | undefined;
+  onCancel?: (() => void) | undefined;
 }) {
   const { toolCall, options } = entry.request;
   const answer = (outcome: RequestPermissionOutcome) => onAnswer?.(entry.requestId, outcome);
@@ -124,8 +128,8 @@ export function PermissionPrompt({
         <button
           type="button"
           className="lk-btn"
-          disabled={onAnswer === undefined}
-          onClick={() => answer({ outcome: "cancelled" })}
+          disabled={onCancel === undefined}
+          onClick={onCancel}
         >
           Cancel turn
         </button>

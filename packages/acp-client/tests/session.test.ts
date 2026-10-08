@@ -189,6 +189,48 @@ describe("a turn waiting on the person", () => {
     await client.close();
   });
 
+  test("cancel tells the agent first, then answers the open request as cancelled, once", async () => {
+    const server = createFakeAcpServer();
+    const deliver = inProcessFetch(server);
+    // What the client sends, in order: each request's method, or the outcome a response carries.
+    const sent: string[] = [];
+    const recording = Object.assign(
+      async (input: string | URL | Request, init?: RequestInit) => {
+        const request =
+          input instanceof Request ? new Request(input, init) : new Request(String(input), init);
+        if (request.method === "POST") {
+          const message = (await request.clone().json()) as {
+            method?: string;
+            result?: { outcome?: { outcome?: string } };
+          };
+          sent.push(message.method ?? `answered ${message.result?.outcome?.outcome}`);
+        }
+        return deliver(request);
+      },
+      { preconnect: () => {} },
+    );
+    const events: ViewEvent[] = [];
+    const client = await connectSession({
+      url: URL,
+      fetch: recording,
+      onEvent: (event) => events.push(event),
+    });
+    const turn = client.prompt(fixtureNamed("permission-pending").scenario.prompt);
+    await until(() => events.some((e) => e.type === "permission_requested"), "the request");
+
+    await client.cancel();
+    await turn;
+
+    expect(events.filter((e) => e.type === "permission_answered")).toEqual([
+      { type: "permission_answered", requestId: "permission-1", outcome: { outcome: "cancelled" } },
+    ]);
+    const cancelled = sent.indexOf("session/cancel");
+    expect(cancelled).toBeGreaterThan(-1);
+    expect(sent.indexOf("answered cancelled")).toBeGreaterThan(cancelled);
+    await client.close();
+    expect(events.filter((e) => e.type === "permission_answered")).toHaveLength(1);
+  });
+
   test("closing the client answers what is still open as cancelled", async () => {
     const server = createFakeAcpServer();
     const { client, events } = await open(server, undefined);
