@@ -320,8 +320,9 @@ Elicitation lets the agent ask the user something through the client.
   - `accept` means the user agreed to open the link, not that the flow behind it finished.
   - The agent MAY report completion later with the notification `elicitation/complete` and the
     request's `elicitationId`.
-  - The client MUST ignore an unknown or already-completed id. It SHOULD offer to retry or cancel
-    by hand if completion never arrives.
+  - The client MUST ignore an unknown or already-completed id. ACP sets no rule for a completion
+    that never arrives. MCP's draft elicitation page, on which ACP's is based, says clients
+    SHOULD provide manual controls to retry or cancel.
 - **URL safety.** The client MUST show the full URL before the user agrees, MUST NOT prefetch it,
   and MUST open it where neither the client nor the model can inspect it.
 - **Secrets.** Form mode MUST NOT ask for secrets: passwords, API keys, tokens, payment
