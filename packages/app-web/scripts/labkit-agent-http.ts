@@ -91,6 +91,9 @@ console.error(
   }`,
 );
 console.error(
+  `  telemetry  ${env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "none: OTEL_EXPORTER_OTLP_ENDPOINT is not set"}`,
+);
+console.error(
   `  variables withheld from the agent  ${
     BRIDGE_VARIABLES.filter((name) => process.env[name] !== undefined).join(", ") || "none"
   }`,

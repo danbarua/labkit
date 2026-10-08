@@ -51,6 +51,18 @@ const env = {
   LABKIT_ACP_AGENT_URL: agentUrl,
   VITE_LABKIT_ACP_CWD: WORKSPACE_DIR.pathname,
 };
+
+// The agent sends its traces, log lines and metrics as OTLP while OTEL_EXPORTER_OTLP_ENDPOINT is
+// set (labkit-effect's docs/guide/logs-and-telemetry.md). The bridge passes its environment to the
+// agent, so the dev stack sets the variable there: to the local collector, unless the environment
+// already names one. A collector that does not answer loses the telemetry, so that is logged.
+const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318";
+const collector = await fetch(otlpEndpoint, { signal: AbortSignal.timeout(2000) }).then(
+  (response) => `a collector answered (HTTP ${response.status})`,
+  (err: unknown) =>
+    `WARN no collector answered (${err instanceof Error ? err.message : String(err)}); the agent's telemetry is lost until one runs: labkit-effect's scripts/observability/lgtm-stack.sh starts one`,
+);
+console.error(`labkit-web agent telemetry  ${otlpEndpoint}  ${collector}`);
 const acp = Bun.spawn(
   [
     "bun",
@@ -62,7 +74,7 @@ const acp = Bun.spawn(
     "--sessions-dir",
     SESSIONS_DIR.pathname,
   ],
-  { ...inherit, env },
+  { ...inherit, env: { ...env, OTEL_EXPORTER_OTLP_ENDPOINT: otlpEndpoint } },
 );
 
 // The bridge prints its address once it is listening. If it exits before that (a port already in
