@@ -15,6 +15,7 @@ import * as Client from "effective-acp/client";
 import * as Http from "effective-acp/http";
 import * as Protocol from "effective-acp/protocol";
 import * as V1 from "effective-acp/schema/v1";
+import { type PromptFile, promptBlocks } from "./prompt-blocks";
 
 export interface ConnectOptions {
   /** The agent's ACP endpoint. */
@@ -31,8 +32,13 @@ export interface ConnectOptions {
 
 export interface SessionClient {
   readonly sessionId: string;
-  /** Sends a prompt. Resolves when the turn has ended; what happened arrives through `onEvent`. */
-  prompt(text: string): Promise<void>;
+  /** What the agent takes in a prompt besides text, as its `initialize` answer advertises it. */
+  readonly promptCapabilities: acp.PromptCapabilities;
+  /**
+   * Sends a prompt: `text`, and `files` as `promptBlocks` turns them into blocks. Resolves when the
+   * turn has ended; what happened arrives through `onEvent`, as does a file the agent does not take.
+   */
+  prompt(text: string, files?: readonly PromptFile[]): Promise<void>;
   /** Asks the agent to stop the turn. The prompt then resolves as `cancelled`. */
   cancel(): Promise<void>;
   /** Answers a permission request the agent is waiting on. */
@@ -252,14 +258,27 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
   if (opened.configOptions) showConfigOptions(opened.configOptions);
 
   const id = sessionId;
+  const promptCapabilities = (connection.profile.agent.capabilities.promptCapabilities ??
+    {}) as acp.PromptCapabilities;
 
   return {
     sessionId: id,
-    async prompt(text) {
-      onEvent({ type: "prompt_started", content: [{ type: "text", text }] });
+    promptCapabilities,
+    async prompt(text, files = []) {
+      let content: acp.ContentBlock[];
+      try {
+        content = await promptBlocks(text, files, promptCapabilities);
+      } catch (err) {
+        onEvent({ type: "failed", message: describeError(err) });
+        return;
+      }
+      onEvent({ type: "prompt_started", content });
       try {
         const response = await runtime.runPromise(
-          connection.agent["session/prompt"]({ sessionId: id, prompt: [{ type: "text", text }] }),
+          connection.agent["session/prompt"]({
+            sessionId: id,
+            prompt: content as unknown as readonly V1.ContentBlock[],
+          }),
         );
         onEvent(promptEnded(response as unknown as acp.PromptResponse));
       } catch (err) {

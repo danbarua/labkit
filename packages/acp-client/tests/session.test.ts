@@ -222,6 +222,59 @@ describe("reopening a session", () => {
   });
 });
 
+describe("a prompt with files", () => {
+  test("is drawn with its files in the person's message, and reopening replays the same message", async () => {
+    const server = createFakeAcpServer();
+    const live = await open(server, undefined);
+    expect(live.client.promptCapabilities).toEqual({ image: true, embeddedContext: true });
+
+    const png = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "a.png", {
+      type: "image/png",
+    });
+    await live.client.prompt("/scenario plain-answer", [png, new File(["x,y\n"], "runs.csv")]);
+    const said = (events: readonly ViewEvent[]) => {
+      const first = replay(events).blocks[0];
+      return first?.kind === "user" ? first.content : undefined;
+    };
+    expect(said(live.events)?.map((c) => c.type)).toEqual(["text", "image", "resource"]);
+
+    const reopened = await open(server, undefined, live.client.sessionId);
+    expect(said(reopened.events)).toEqual(said(live.events));
+    await live.client.close();
+    await reopened.client.close();
+  });
+
+  test("a file the agent does not take fails the prompt, naming the file, and nothing is sent", async () => {
+    let prompted = false;
+    const server = new AcpServer({
+      createAgent: () =>
+        acp
+          .agent({ name: "text-only" })
+          .onRequest(acp.methods.agent.initialize, () => ({
+            protocolVersion: acp.PROTOCOL_VERSION,
+            agentCapabilities: {},
+          }))
+          .onRequest(acp.methods.agent.session.new, () => ({ sessionId: "text-only-1" }))
+          .onRequest(acp.methods.agent.session.prompt, () => {
+            prompted = true;
+            return { stopReason: "end_turn" as const };
+          }),
+    });
+    const live = await open(server, undefined);
+    expect(live.client.promptCapabilities).toEqual({});
+    await live.client.prompt("look", [
+      new File([new Uint8Array([1])], "a.png", { type: "image/png" }),
+    ]);
+    expect(live.events.filter((e) => e.type === "prompt_started")).toEqual([]);
+    expect(live.events).toContainEqual({
+      type: "failed",
+      message: expect.stringContaining("a.png (image/png) was not sent"),
+    });
+    expect(prompted).toBe(false);
+    await live.client.close();
+  });
+});
+
 describe("a session's history", () => {
   test("is what reopening it sends, complete, with the connection closed after", async () => {
     const fixture = fixtureNamed("tool-succeeds");

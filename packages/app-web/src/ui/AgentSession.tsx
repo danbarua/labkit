@@ -1,7 +1,11 @@
-import type { CreateElicitationResponse, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
+import type {
+  CreateElicitationResponse,
+  PromptCapabilities,
+  RequestPermissionOutcome,
+} from "@agentclientprotocol/sdk";
 import { connectSession, type SessionClient } from "@labkit/acp-client";
 import { SCENARIOS } from "@labkit/acp-scenarios";
-import { Conversation } from "@labkit/ui";
+import { type AttachLimits, Conversation } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import { initialState, reduce } from "@labkit/view-model";
@@ -14,6 +18,17 @@ import { useSavedTheme } from "./saved-theme";
 type Status = "connecting" | "ready" | "failed";
 
 type ViewAction = Parameters<typeof reduce>[1] | { type: "reset" };
+
+/**
+ * The files the composer takes, from what the agent advertises: any file when it takes embedded
+ * files, images when it takes only images, none otherwise. At most four files of 20 MiB each.
+ */
+function attachLimits(takes: PromptCapabilities | undefined): AttachLimits | undefined {
+  const most = { maxFiles: 4, maxBytes: 20 * 1024 * 1024 };
+  if (takes?.embeddedContext) return most;
+  if (takes?.image) return { ...most, accept: ["image/*"] };
+  return undefined;
+}
 
 /** The view of a session, emptied when another session is opened in its place. */
 const reduceView = (state: typeof initialState, action: ViewAction) =>
@@ -28,6 +43,7 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
   const [state, dispatch] = useReducer(reduceView, initialState);
   const [status, setStatus] = useState<Status>("connecting");
   const [started, setStarted] = useState<string>();
+  const [takes, setTakes] = useState<PromptCapabilities>();
   const client = useRef<SessionClient | null>(null);
   const reopen = sessionId === started ? undefined : sessionId;
 
@@ -35,6 +51,7 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
     let cancelled = false;
     let opened: SessionClient | undefined;
     setStatus("connecting");
+    setTakes(undefined);
     dispatch({ type: "reset" });
     // React's development-mode double-invoke runs this effect, its cleanup, then this effect
     // again, synchronously, with no gap for a second connect to see or reuse the first's. Deferring
@@ -59,6 +76,7 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
           opened = connected;
           client.current = connected;
           if (reopen === undefined) setStarted(connected.sessionId);
+          setTakes(connected.promptCapabilities);
           setStatus("ready");
         },
         (err: unknown) => {
@@ -76,7 +94,10 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
     };
   }, [url, cwd, reopen]);
 
-  const send = useCallback((text: string) => void client.current?.prompt(text), []);
+  const send = useCallback(
+    (text: string, files: readonly File[]) => void client.current?.prompt(text, files),
+    [],
+  );
   const cancel = useCallback(() => void client.current?.cancel(), []);
   const answer = useCallback(
     (requestId: string, outcome: RequestPermissionOutcome) =>
@@ -93,7 +114,8 @@ function useAgentSession(url: string, cwd: string | undefined, sessionId: string
       void client.current?.setConfigOption(configId, value),
     [],
   );
-  return { state, status, started, send, cancel, answer, answerQuestion, setConfig };
+  const attach = attachLimits(takes);
+  return { state, status, started, attach, send, cancel, answer, answerQuestion, setConfig };
 }
 
 /**
@@ -108,7 +130,7 @@ const HOST_COMMANDS = [{ name: "new", description: "Start a new session" }];
 
 export default function AgentSession({ sessionId }: { sessionId?: string }) {
   const real = AGENT_CWD !== undefined;
-  const { state, status, started, send, cancel, answer, answerQuestion, setConfig } =
+  const { state, status, started, attach, send, cancel, answer, answerQuestion, setConfig } =
     useAgentSession(AGENT_URL, AGENT_CWD, sessionId);
   const [theme, setTheme] = useSavedTheme();
   // A session started here takes its own address, so reloading the page reopens it.
@@ -141,7 +163,8 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
           theme={theme}
           onThemeChange={setTheme}
           hostCommands={HOST_COMMANDS}
-          onSend={(text) => {
+          {...(attach === undefined ? {} : { attach })}
+          onSend={(text, files) => {
             // A full page load: the page keeps the session it has open, and this starts one.
             if (text.trim() === "/new")
               void navigate({
@@ -150,7 +173,7 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
                 params: { sessionId: undefined },
                 reloadDocument: true,
               });
-            else send(text);
+            else send(text, files);
           }}
           onCancel={cancel}
           onAnswer={answer}

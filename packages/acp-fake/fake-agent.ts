@@ -82,7 +82,11 @@ export function createFakeAgent(world: FakeWorld = createFakeWorld()) {
       .agent({ name: "labkit-fake-agent" })
       .onRequest(acp.methods.agent.initialize, () => ({
         protocolVersion: acp.PROTOCOL_VERSION,
-        agentCapabilities: { loadSession: true, sessionCapabilities: { list: {} } },
+        agentCapabilities: {
+          loadSession: true,
+          sessionCapabilities: { list: {} },
+          promptCapabilities: { image: true, embeddedContext: true },
+        },
       }))
       .onRequest(acp.methods.agent.authenticate, () => ({}))
       .onRequest(acp.methods.agent.session.new, (ctx) => {
@@ -111,11 +115,12 @@ export function createFakeAgent(world: FakeWorld = createFakeWorld()) {
         const cancel = new AbortController();
         session.cancel = cancel;
 
-        // A real agent records what the person said, so a reopened session shows it.
-        session.history.push({
-          sessionId,
-          update: { sessionUpdate: "user_message_chunk", content: { type: "text", text } },
-        });
+        // A real agent records what the person said, files and all, so a reopened session shows it.
+        for (const content of prompt)
+          session.history.push({
+            sessionId,
+            update: { sessionUpdate: "user_message_chunk", content },
+          });
 
         const stopReason = await play(scenario, {
           update: async (update) => {

@@ -1,6 +1,7 @@
 export { Composer, type ComposerProps } from "./composer";
 export { Conversation, type ConversationProps } from "./conversation";
 export type { Activity } from "./activity";
+export type { AttachLimits } from "./attachments";
 export { useLingering, WorkingIndicator } from "./blocks";
 export { diffLines } from "./format";
 export type { ResolveLink } from "./links";
