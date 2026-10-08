@@ -215,8 +215,9 @@ The discriminator is `sessionUpdate`. The stable specification lists eleven kind
 
 - **`messageId`.** Chunks that carry the same optional `messageId` belong to one message, and a new
   `messageId` starts a new one. The id is opaque.
-- **`usage_update` needs a real size.** An agent that has no meaningful context size does not send
-  `usage_update` at all.
+- **`usage_update` needs a real size.** `used` and `size` are "required and non-null token
+  counts", so an agent that has no meaningful context size has no valid `usage_update` to send.
+  The update itself is optional: the agent "MAY" send it.
 - **Five more kinds are unstable.** SDK 1.5.0 also types `plan_update`, `plan_removed`, `notice`,
   `compaction_update` and `compaction_summary_chunk`. Each is unstable, and an agent MUST NOT send
   one unless the client advertised the matching capability.
