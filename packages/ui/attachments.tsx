@@ -1,6 +1,6 @@
 import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { FileIcon, XIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLink } from "./links";
 
 /** What a composer accepts as attachments. Without these a composer takes no files. */
@@ -76,12 +76,22 @@ export function useAttachments(limits: AttachLimits | undefined) {
   };
 }
 
+/**
+ * An image file's thumbnail, from an object URL the effect creates and its cleanup revokes. React's
+ * development mode runs an effect, its cleanup and the effect again, so a URL made outside the
+ * effect would be revoked while it is still shown.
+ */
 function Preview({ file }: { file: File }) {
-  const url = useMemo(
-    () => (file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined),
-    [file],
-  );
-  useEffect(() => () => (url ? URL.revokeObjectURL(url) : undefined), [url]);
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    if (!file.type.startsWith("image/")) return;
+    const created = URL.createObjectURL(file);
+    setUrl(created);
+    return () => {
+      URL.revokeObjectURL(created);
+      setUrl(undefined);
+    };
+  }, [file]);
   return url ? (
     <img className="lk-attachment-thumb" src={url} alt="" />
   ) : (
