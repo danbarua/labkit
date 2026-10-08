@@ -88,7 +88,9 @@ JSON-RPC id. Supporting it is optional on both sides.
 ## Capabilities
 
 - **Omitted means unsupported.** "Clients and Agents MUST treat all capabilities omitted in the
-  `initialize` request as UNSUPPORTED." Beyond the baseline, everything is gated by a capability.
+  `initialize` request as UNSUPPORTED." Beyond the baseline, the optional methods in the tables
+  above are gated by a capability, except `session/set_config_option` and `session/set_mode`,
+  which depend on what the session offered.
 - **Baseline.** Every agent MUST support `session/new`, `session/prompt`, `session/cancel` and
   `session/update`, and MUST accept `text` and `resource_link` blocks in a prompt.
 - **`null` and `{}`.** For an object-shaped capability, `null` is the same as omitted, and `{}`
