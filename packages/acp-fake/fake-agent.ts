@@ -135,9 +135,10 @@ export function createFakeAgent(world: FakeWorld = createFakeWorld()) {
             });
             const settled = await Promise.race([asked, whenAborted(cancel.signal)]);
             if (settled === "cancel") return "cancel";
-            // `cancelled` says that the client cancelled the turn (`session/cancel`); it is not an
-            // answer the person gives. Only `session/cancel` stops the turn, so this answer to a
-            // turn still running is refused, and the prompt fails with the reason.
+            // ACP defines the `cancelled` outcome as "The prompt turn was cancelled", and a client
+            // cancels a turn with `session/cancel`. ACP does not say what an agent does with a
+            // `cancelled` answer while its turn is still running. This fake treats one as a client
+            // defect: it refuses the answer, and the prompt fails with the reason.
             if (settled.outcome.outcome === "cancelled") {
               if (cancel.signal.aborted) return "cancel";
               throw acp.RequestError.invalidParams(
