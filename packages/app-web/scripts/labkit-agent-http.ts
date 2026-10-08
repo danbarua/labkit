@@ -11,7 +11,8 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { blobsFolderOf, brandFrom } from "labkit-effect/src/agent-host/brand.ts";
+import { brandFrom } from "labkit-effect/src/agent-host/brand.ts";
+import { brandFoldersOf } from "labkit-effect/src/agent-host/brand-folders.ts";
 import { blobPath, labkitBlobs } from "../src/infra/labkit-blobs";
 import { stdioAgentHttp } from "../src/infra/stdio-agent-http";
 
@@ -43,9 +44,10 @@ const env = Object.fromEntries(
 );
 
 const main = Bun.resolveSync("labkit-effect/src/agent-acp/main.ts", import.meta.dir);
-// Where the agent stores files: `~/.local/share/<brand>/blobs`, for the brand its environment names.
-// `--sessions-dir` does not change this folder.
-const blobsDir = blobsFolderOf(brandFrom(env));
+// Where the agent stores files: its data folder's `blobs/`, `~/.local/share/<brand>/blobs` for the
+// brand its environment names, since the agent is given no `--data-dir`. `--sessions-dir` does not
+// move it; a `LABKIT_ACP_DATA_DIR` in the environment moves the agent's but not this one.
+const blobsDir = brandFoldersOf(brandFrom(env)).blobs;
 await mkdir(cwd, { recursive: true });
 await mkdir(sessionsDir, { recursive: true });
 
