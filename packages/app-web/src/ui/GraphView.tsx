@@ -70,6 +70,11 @@ type Sim = {
 const KIND_COLOR: Record<string, string> = {};
 const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
+/**
+ * Slate-400: the light theme's faint text and the dark theme's dim text. It is light on a light
+ * background and stands out from a dark one, so near and far nodes differ only by the depth fade.
+ */
+const TEMPORAL_HISTORICAL = "#94a3b8";
 
 /**
  * The layout cools: the forces are scaled by the simulation's heat, which falls from 1 to HEAT_MIN
@@ -130,9 +135,7 @@ function colorForNode(sim: Sim, node: SimNode, palette: Palette): string {
         return TEMPORAL_TOUCHED;
       }
     }
-    // The page's dim text colour, which stands out from the background in either theme, so the
-    // depth fade shows on these nodes too.
-    return palette.dim;
+    return TEMPORAL_HISTORICAL;
   }
   return colorFor(node.type, palette);
 }
