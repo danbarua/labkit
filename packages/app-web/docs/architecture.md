@@ -67,7 +67,9 @@ recorded. Where it starts, and what each step opens, depend on what is open:
 | Any other resource | after the first act whose events name it | the next act's subject |
 
 Each step adds a history entry. A resource that fails to load shows its error, and playback goes
-on to the next act.
+on to the next act. While playback runs and the pointer is off the canvas, the card in the canvas's
+corner shows the current act's subject. With the pointer on the canvas, the card shows only the
+node under the pointer.
 
 Playback stops at the last act, on Pause, and when the reader opens anything else. The code is
 `src/ui/trace/playback.ts`.

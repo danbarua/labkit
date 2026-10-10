@@ -27,6 +27,11 @@ export interface GraphViewProps {
   active: boolean;
   /** What the popover shows for the node under the pointer. */
   summary: (id: string) => ReactNode;
+  /**
+   * The node whose card the popover shows while the pointer is off the canvas, or null for none.
+   * With the pointer on the canvas, the popover shows only the node under it.
+   */
+  pinnedId: string | null;
   onNavigate: (id: string) => void;
 }
 
@@ -600,6 +605,7 @@ export function GraphView({
   overlay,
   active,
   summary,
+  pinnedId,
   onNavigate,
 }: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -609,6 +615,9 @@ export function GraphView({
   const navigateRef = useRef(onNavigate);
   navigateRef.current = onNavigate;
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [pointerOn, setPointerOn] = useState(false);
+  const pinned = pinnedId !== null && nodes.some((n) => n.id === pinnedId) ? pinnedId : null;
+  const carded = pointerOn ? hoverId : pinned;
 
   const sim = simRef.current;
   sim.overlay = overlay;
@@ -655,6 +664,7 @@ export function GraphView({
       const hit = inside ? hitTest(s, mx, my) : null;
       s.hoverId = hit !== null && s.nodes.has(hit) ? hit : null;
       setHoverId(s.hoverId);
+      setPointerOn(inside);
     };
     const onPointerUp = () => {
       const s = simRef.current;
@@ -677,6 +687,7 @@ export function GraphView({
     const onLeave = () => {
       simRef.current.hoverId = null;
       setHoverId(null);
+      setPointerOn(false);
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -716,8 +727,8 @@ export function GraphView({
     <div id="stage-wrap">
       <canvas id="stage" ref={canvasRef} className="orbit" />
       <div className="hint">drag to orbit · scroll to zoom</div>
-      <div id="popover" className={hoverId === null ? "popover hidden" : "popover"}>
-        {hoverId === null ? null : summary(hoverId)}
+      <div id="popover" className={carded === null ? "popover hidden" : "popover"}>
+        {carded === null ? null : summary(carded)}
       </div>
     </div>
   );
