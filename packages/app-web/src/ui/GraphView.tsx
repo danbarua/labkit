@@ -315,6 +315,10 @@ function drawCompass(
   ctx.restore();
 }
 
+/**
+ * Eases the 2D zoom toward the one that fits every node in the canvas, out and back in, so a burst
+ * of nodes flung apart while they settle does not leave the graph zoomed out once they have.
+ */
 function autofit(sim: Sim, width: number, height: number): void {
   if (sim.view !== "2d" || sim.nodes.size === 0) return;
   const margin = 0.9;
@@ -325,7 +329,7 @@ function autofit(sim: Sim, width: number, height: number): void {
     if (halfW > 0) needed = Math.max(needed, Math.abs(n.x) / halfW);
     if (halfH > 0) needed = Math.max(needed, Math.abs(n.y) / halfH);
   }
-  if (needed > sim.zoom) sim.zoom += (needed - sim.zoom) * 0.08;
+  sim.zoom += (needed - sim.zoom) * 0.08;
 }
 
 function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, height: number): void {
