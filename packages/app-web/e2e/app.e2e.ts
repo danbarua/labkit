@@ -154,6 +154,16 @@ test.describe("an open resource", () => {
     await page.getByRole("button", { name: "Show or hide the response" }).click();
     await expect(page.locator("pre.jsonview")).toContainText("alpha question");
   });
+
+  test("reloading on the Debug tab fetches the events again and shows them", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=debug");
+    await expect(page.locator(".ev").first()).toBeVisible();
+    const refetched = page.waitForResponse((r) => r.url().includes("/workspace/alpha/Q_1/events"));
+    await page.getByRole("button", { name: "Reload from the API" }).click();
+    await refetched;
+    await expect(page.getByText("loading events…")).toHaveCount(0);
+    await expect(page.locator(".ev").first()).toBeVisible();
+  });
 });
 
 test.describe("a narrow window", () => {

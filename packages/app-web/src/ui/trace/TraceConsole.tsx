@@ -680,10 +680,9 @@ function Detail({
             className="tbtn"
             title="Reload from the API"
             aria-label="Reload from the API"
-            onClick={() => {
-              store.forget((p) => p.startsWith(`${path}/events`));
-              store.load(resourcePath(path), true);
-            }}
+            onClick={() =>
+              store.reload((p) => p === resourcePath(path) || p.startsWith(`${path}/events`))
+            }
           >
             ↻
           </button>
