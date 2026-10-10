@@ -320,6 +320,19 @@ function drawCompass(
   ctx.restore();
 }
 
+/** How much of its opacity the farthest node loses: depth is shown by fading, nearest to farthest. */
+const DEPTH_FADE = 0.7;
+
+/**
+ * The opacity for something `depth` from the camera, when the nearest node is `near` and the
+ * farthest `far`: 1 at the nearest, falling linearly to 1 - DEPTH_FADE at the farthest.
+ */
+export function depthOpacity(depth: number, near: number, far: number): number {
+  if (far <= near) return 1;
+  const t = Math.min(1, Math.max(0, (depth - near) / (far - near)));
+  return 1 - DEPTH_FADE * t;
+}
+
 function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, height: number): void {
   ctx.clearRect(0, 0, width, height);
   const palette = paletteOf(ctx.canvas);
@@ -329,13 +342,19 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   sim.screenPos = projected;
 
   const order = [...projected.entries()].sort((a, b) => b[1].depth - a[1].depth);
+  const visible = order.filter(([, p]) => p.scale > 0).map(([, p]) => p.depth);
+  const near = Math.min(...visible);
+  const far = Math.max(...visible);
+  const opacity = (depth: number) => depthOpacity(depth, near, far);
 
   ctx.lineWidth = 1;
-  const labels: { x: number; y: number; text: string; hot: boolean }[] = [];
+  const labels: { x: number; y: number; text: string; hot: boolean; opacity: number }[] = [];
   for (const edge of sim.edges) {
     const a = projected.get(edge.from);
     const b = projected.get(edge.to);
     if (!a || !b || a.scale === 0 || b.scale === 0) continue;
+    const edgeOpacity = opacity((a.depth + b.depth) / 2);
+    ctx.globalAlpha = edgeOpacity;
     ctx.strokeStyle = "rgba(128, 138, 156, 0.35)";
     ctx.beginPath();
     ctx.moveTo(a.sx, a.sy);
@@ -354,6 +373,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
         y: (a.sy + b.sy) / 2,
         text: edge.label,
         hot,
+        opacity: hot ? 1 : edgeOpacity,
       });
     }
   }
@@ -365,8 +385,9 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     const r = Math.max(2, 7 * p.scale);
     const isHover = id === sim.hoverId;
     const isSelected = id === sim.selectedId;
+    const alpha = node.alpha * (isHover || isSelected ? 1 : opacity(p.depth));
 
-    ctx.globalAlpha = node.alpha;
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = colorForNode(sim, node, palette);
     ctx.beginPath();
     ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
@@ -378,7 +399,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     }
 
     if (p.scale > 0.55) {
-      ctx.globalAlpha = node.alpha * 0.9;
+      ctx.globalAlpha = alpha * 0.9;
       ctx.fillStyle = palette.dim;
       ctx.font = "10px ui-monospace, monospace";
       ctx.fillText(node.label, p.sx + r + 3, p.sy + 3);
@@ -390,7 +411,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.textBaseline = "middle";
   ctx.font = "9px ui-monospace, monospace";
   for (const lab of labels) {
-    ctx.globalAlpha = lab.hot ? 0.95 : 0.75;
+    ctx.globalAlpha = (lab.hot ? 0.95 : 0.75) * lab.opacity;
     ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
     ctx.fillText(lab.text, lab.x, lab.y - 7);
   }
