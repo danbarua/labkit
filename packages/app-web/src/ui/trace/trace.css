@@ -380,6 +380,20 @@
   background: var(--accent-dim);
   border-color: var(--accent);
 }
+/* In the Collections pane the box marks the listed collection, as it marks the open row below. */
+.trace .type-list {
+  position: relative;
+}
+.trace .type-list .type-row {
+  position: relative;
+}
+.trace .type-list .type-row.active {
+  background: none;
+  border-color: transparent;
+}
+.trace .type-list .active-box.fill:not(.filled) ~ .type-row.active {
+  background: var(--panel-2);
+}
 .trace .type-swatch {
   width: 9px;
   height: 9px;

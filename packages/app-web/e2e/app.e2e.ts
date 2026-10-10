@@ -273,6 +273,22 @@ test.describe("the Items pane's open row", () => {
     await expect(fill(page)).toHaveClass(/filled/);
     await expect.poll(async () => (await top(box(page))) - (await top(item(page, "Q_2")))).toBe(0);
   });
+
+  test("in the Collections pane, a box marks the listed collection and slides to the next", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha/question")}`);
+    const outline = page.locator(".type-list .active-box.outline");
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    await expect(outline).toBeVisible();
+    expect(await top(outline)).toBe(await top(row(page, "Question")));
+    await row(page, "LineOfEnquiry").click();
+    await expect(page.locator(".type-list .active-box.fill")).toHaveClass(/filled/);
+    await expect
+      .poll(async () => (await top(outline)) - (await top(row(page, "LineOfEnquiry"))))
+      .toBe(0);
+  });
 });
 
 test.describe("the graph", () => {
