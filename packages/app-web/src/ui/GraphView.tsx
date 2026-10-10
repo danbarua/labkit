@@ -68,7 +68,6 @@ type Sim = {
 const KIND_COLOR: Record<string, string> = {};
 const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
-const TEMPORAL_HISTORICAL = "hsl(220deg 10% 34%)";
 
 const REPEL = 2600;
 const SPRING_LEN = 90;
@@ -121,7 +120,9 @@ function colorForNode(sim: Sim, node: SimNode, palette: Palette): string {
         return TEMPORAL_TOUCHED;
       }
     }
-    return TEMPORAL_HISTORICAL;
+    // The page's dim text colour, which stands out from the background in either theme, so the
+    // depth fade shows on these nodes too.
+    return palette.dim;
   }
   return colorFor(node.type, palette);
 }
