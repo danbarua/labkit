@@ -77,6 +77,12 @@ const DAMPING = 0.86;
 const CENTER_K = 0.002;
 const TOTAL_DEPTH = 46 * 14;
 const FOCAL = 640;
+/**
+ * Where the open resource's node is drawn, as fractions of the canvas's width and height from its
+ * top-left corner: in the lower-left quadrant, so the nodes seen later, which lie up and to the
+ * right along the time axis, have the rest of the canvas.
+ */
+const ANCHOR = { x: 0.25, y: 0.75 };
 
 /** The colours the canvas draws in, read from the page's stylesheet on each frame so a theme change shows. */
 type Palette = { css: CSSStyleDeclaration; text: string; dim: string; accent: string };
@@ -281,8 +287,8 @@ function project(sim: Sim, node: SimNode, width: number, height: number): Projec
   if (viewZ <= 1) return { sx: -9999, sy: -9999, scale: 0, depth: viewZ };
   const scale = FOCAL / viewZ;
   return {
-    sx: width / 2 + x1 * scale,
-    sy: height / 2 + y1 * scale,
+    sx: width * ANCHOR.x + x1 * scale,
+    sy: height * ANCHOR.y + y1 * scale,
     scale,
     depth: viewZ,
   };
