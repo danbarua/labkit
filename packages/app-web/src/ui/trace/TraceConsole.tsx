@@ -31,10 +31,12 @@ import {
   type HeldIndex,
   humanRel,
   itemView,
+  type ItemView,
   keyOf,
   labelFor,
   relGroups,
   shortId,
+  truncate,
   typeColour,
 } from "./hal";
 import {
@@ -539,12 +541,40 @@ function ResourceRow({
   const cls = ["res-item", unresolved ? "unresolved" : "", active ? "active" : ""].filter(Boolean);
   return (
     <button type="button" className={cls.join(" ")} title={title} onClick={() => onOpen(itemKey)}>
+      <RowBody view={view} />
+    </button>
+  );
+}
+
+function RowBody({
+  view,
+}: {
+  view: Omit<ItemView, "chipText"> & { chipText?: string | undefined };
+}) {
+  return (
+    <>
       <Badge type={view.chipType} text={view.chipText} />
       <span className="rtext">
         <span className="rid">{view.title}</span>
         <span className="rlabel">{view.sub}</span>
       </span>
-    </button>
+    </>
+  );
+}
+
+/** A held resource as a list row draws it: its type's chip, its handle, and its text. */
+function Summary({ itemKey, held }: { itemKey: string; held: HeldIndex }) {
+  const r = held.get(itemKey);
+  const resolved = r?.attrs !== undefined;
+  const view = {
+    chipType: r?.type ?? "?",
+    title: shortId(itemKey),
+    sub: resolved ? truncate(labelFor(r?.attrs) || (r?.type ?? ""), 160) : "not yet fetched",
+  };
+  return (
+    <div className={resolved ? "res-item summary" : "res-item summary unresolved"}>
+      <RowBody view={view} />
+    </div>
   );
 }
 
@@ -893,6 +923,7 @@ function GraphPanel({
           edges={edges}
           selectedId={path}
           overlay={overlay}
+          summary={(id) => <Summary itemKey={id} held={held} />}
           onNavigate={onOpen}
         />
       </div>

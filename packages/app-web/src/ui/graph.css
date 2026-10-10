@@ -38,12 +38,3 @@
 .popover.hidden {
   display: none;
 }
-
-.popover .kind {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.popover .handle {
-  color: var(--text-dim);
-}

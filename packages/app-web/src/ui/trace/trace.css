@@ -864,6 +864,11 @@
 .trace .graph-stage .popover {
   background: var(--panel);
   border-color: var(--line);
+  padding: 4px;
+  width: 300px;
+}
+.trace .graph-stage .popover .res-item {
+  border: none;
 }
 
 /* ---------- narrow windows: the side column becomes a drawer ---------- */
