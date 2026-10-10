@@ -456,10 +456,13 @@
 }
 
 /* ---------- main / detail ---------- */
+/* The scrollbar is always shown, so a short resource and a long one leave the same width for the
+   cards and their text, and stepping from one to the other does not reflow it. */
 .trace .main {
   display: block;
   flex: 1 1 auto;
-  overflow-y: auto;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
   min-width: 0;
 }
 .trace .detail {
