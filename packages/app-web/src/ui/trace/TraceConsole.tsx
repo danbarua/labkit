@@ -19,7 +19,7 @@ import {
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSavedTheme } from "../saved-theme";
 import {
   GraphView,
@@ -29,7 +29,6 @@ import {
   type ViewMode,
 } from "../GraphView";
 import {
-  type Collection,
   type CollectionItem,
   collectionOf,
   edgeLabelOf,
@@ -317,6 +316,18 @@ function proseFor(held: HeldIndex, path: string, onOpen: (key: string) => void):
 
 /* ---------------- left column ---------------- */
 
+/** The collection that the held document of collection `key` names as the one it is listed in. */
+function indexOfList(key: string): string | undefined {
+  const doc = docOf(store.entry(requestPath(key)));
+  return doc === undefined ? undefined : collectionOf(key, doc).index;
+}
+
+/** Collection `key` as a row of collection `upper`, when the document of `upper` is held. */
+function rowIn(upper: string, key: string): CollectionItem | undefined {
+  const doc = docOf(store.entry(requestPath(upper)));
+  return doc && collectionOf(upper, doc).items.find((item) => item.key === keyOf(key));
+}
+
 const readCollection =
   (key: string) =>
   (doc: HalDocument): { items: CollectionItem[]; next: string | undefined } => {
@@ -349,9 +360,19 @@ function Lists({
   onList: (key: string) => void;
 }) {
   const listEntry = useDocument(requestPath(listKey));
-  const listed: Collection | undefined =
-    listEntry?.status === "ready" ? collectionOf(listKey, listEntry.doc) : undefined;
-  const upperKey = root || listed?.index === undefined ? listKey : listed.index;
+  // Until the picked collection's first page arrives, the collection it was picked from stays the
+  // upper one, so the upper pane does not show the picked collection and then swap back.
+  const shown = useRef<string | undefined>(undefined);
+  const upperKey = root
+    ? listKey
+    : docOf(listEntry) !== undefined
+      ? (indexOfList(listKey) ?? listKey)
+      : shown.current !== undefined && rowIn(shown.current, listKey) !== undefined
+        ? shown.current
+        : listKey;
+  useEffect(() => {
+    shown.current = upperKey;
+  });
   const lowerKey = upperKey === listKey ? undefined : listKey;
   // The row for the lower collection, which `list` may name with a query (`?limit=`), is lit.
   const lowerRow = lowerKey === undefined ? undefined : keyOf(lowerKey);

@@ -80,6 +80,28 @@ test.describe("getting around", () => {
     await expect(page.getByText("Pick a type on the left")).toBeVisible();
   });
 
+  test("a collection picked from the upper pane loads below it, and the upper pane stays", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await expect(row(page, "Question")).toBeVisible();
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/workspace/alpha/question*", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await row(page, "Question").click();
+    await expect(page.locator(".sidebar .res-list .spinner")).toBeVisible();
+    await expect(row(page, "Question")).toHaveClass(/active/);
+    await expect(row(page, "LineOfEnquiry")).toBeVisible();
+    release();
+    await expect(item(page, "Q_1")).toBeVisible();
+    await expect(row(page, "LineOfEnquiry")).toBeVisible();
+  });
+
   test("a collection's next page is added on request", async ({ page }) => {
     await page.goto(`/app/?${list("/workspace/alpha/question?limit=1")}`);
     await expect(item(page, "Q_1")).toBeVisible();
