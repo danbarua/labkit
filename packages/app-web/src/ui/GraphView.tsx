@@ -288,6 +288,26 @@ function project(sim: Sim, node: SimNode, width: number, height: number): Projec
   };
 }
 
+/**
+ * The graph's three axes as the camera sees them: each unit axis's screen direction (`x1` right,
+ * `y1` down) and its depth away from the viewer (`z2`). The third is the time axis: a node seen
+ * later lies further along it.
+ */
+export function screenAxes(camera: Pick<Camera, "yaw" | "pitch">) {
+  const cosY = Math.cos(camera.yaw);
+  const sinY = Math.sin(camera.yaw);
+  const cosX = Math.cos(camera.pitch);
+  const sinX = Math.sin(camera.pitch);
+  return [
+    { x1: cosY, y1: -sinY * sinX, z2: sinY * cosX, color: "#e0687a", label: null as string | null },
+    { x1: 0, y1: cosX, z2: sinX, color: "#5ad1c9", label: null as string | null },
+    { x1: -sinY, y1: -cosY * sinX, z2: cosY * cosX, color: "#e0b25a", label: "time" },
+  ];
+}
+
+// Seen from here, the time axis points up, to the right and away from the viewer.
+export const INITIAL_CAMERA: Camera = { yaw: -0.5, pitch: 0.35, distance: 620 };
+
 function drawCompass(
   ctx: CanvasRenderingContext2D,
   sim: Sim,
@@ -298,17 +318,8 @@ function drawCompass(
   const cx = margin;
   const cy = height - margin;
   if (cy < margin) return;
-  const { yaw, pitch } = sim.camera;
-  const cosY = Math.cos(yaw);
-  const sinY = Math.sin(yaw);
-  const cosX = Math.cos(pitch);
-  const sinX = Math.sin(pitch);
   const len = 26;
-  const axes = [
-    { x1: cosY, y1: -sinY * sinX, z2: sinY * cosX, color: "#e0687a", label: null as string | null },
-    { x1: 0, y1: cosX, z2: sinX, color: "#5ad1c9", label: null as string | null },
-    { x1: -sinY, y1: -cosY * sinX, z2: cosY * cosX, color: "#e0b25a", label: "seen" },
-  ];
+  const axes = screenAxes(sim.camera);
   axes.sort((a, b) => a.z2 - b.z2);
   ctx.save();
   ctx.lineWidth = 2;
@@ -481,7 +492,7 @@ function createSim(): Sim {
     selectedId: null,
     hoverId: null,
     screenPos: new Map(),
-    camera: { yaw: 0.5, pitch: -0.35, distance: 620 },
+    camera: { ...INITIAL_CAMERA },
     pivot: null,
     drag: null,
     dragged: false,
