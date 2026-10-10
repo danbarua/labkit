@@ -199,6 +199,15 @@ test.describe("an open resource", () => {
     await expect(page.locator("pre.jsonview")).toContainText("alpha question");
   });
 
+  test("an unknown tab in the address opens the overview", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=nonsense");
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
   test("reloading on the Debug tab fetches the events again and shows them", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1?tab=debug");
     await expect(page.locator(".ev").first()).toBeVisible();

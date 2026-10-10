@@ -3,9 +3,9 @@ import { type Tab, TraceConsole } from "../ui/trace/TraceConsole";
 
 interface Search {
   /** The API path of the collection the left column lists. */
-  list?: string;
+  list?: string | undefined;
   /** The centre column's tab, when it is not the overview. */
-  tab?: Exclude<Tab, "overview">;
+  tab?: Exclude<Tab, "overview"> | undefined;
 }
 
 // Every path the other routes leave is an API path, opened in the Trace Console: `/app/workspace/w/Q_1`
@@ -16,9 +16,11 @@ export const Route = createFileRoute("/$")({
       console.warn("trace console: an unknown tab in the address shows the overview", {
         tab: search.tab,
       });
+    // The router lays this over the address's own query, so a value that is not valid is set to
+    // undefined here; leaving it out would let the address's value through.
     return {
-      ...(typeof search.list === "string" ? { list: search.list } : {}),
-      ...(search.tab === "graph" || search.tab === "debug" ? { tab: search.tab } : {}),
+      list: typeof search.list === "string" ? search.list : undefined,
+      tab: search.tab === "graph" || search.tab === "debug" ? search.tab : undefined,
     };
   },
   component: Page,
