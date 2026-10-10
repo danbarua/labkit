@@ -1,7 +1,7 @@
 /**
  * The Trace Console: the API's HAL documents, followed by link. The left column lists collections,
- * the centre shows the open resource, and the right lists what relates to it. The page's address
- * is the API path of what is open, so a reload or a pasted link opens it again.
+ * and the centre shows the open resource with the resources it relates to. The page's address is
+ * the API path of what is open, so a reload or a pasted link opens it again.
  */
 
 import { ICONS, ThemeToggle } from "@labkit/ui";
@@ -42,7 +42,6 @@ import {
   labelFor,
   relGroups,
   shortId,
-  truncate,
   typeColour,
 } from "./hal";
 import {
@@ -124,7 +123,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const router = useRouter();
   const [theme, setTheme] = useSavedTheme();
   const [term, setTerm] = useState("");
-  const [drawer, setDrawer] = useState<"items" | "relations" | undefined>();
+  const [drawer, setDrawer] = useState<"items" | undefined>();
   useStoreVersion();
   const held = store.index();
 
@@ -223,15 +222,6 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
             />
           </div>
           <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
-          <button
-            type="button"
-            className="hamburger"
-            id="hamburger-right"
-            aria-label="Toggle relations column"
-            onClick={() => setDrawer((d) => (d === "relations" ? undefined : "relations"))}
-          >
-            <SidebarSimpleIcon mirrored aria-hidden="true" />
-          </button>
         </header>
 
         <div className="body">
@@ -266,13 +256,6 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
               />
             </div>
           </main>
-          <Incoming
-            className={drawer === "relations" ? "relations-col open" : "relations-col"}
-            path={path}
-            held={held}
-            loading={openEntry?.status === "loading"}
-            onOpen={open}
-          />
         </div>
       </div>
     </IconContext.Provider>
@@ -673,17 +656,23 @@ function Detail({
             </div>
           </div>
           {loaded ? (
-            relGroups(res, "out").map((g) => (
-              <div key={g.rel}>
-                <div className="rel-heading">
-                  <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
-                  {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+            (["out", "in"] as const).flatMap((dir) =>
+              relGroups(res, dir).map((g) => (
+                <div key={`${dir} ${g.rel}`}>
+                  <div className="rel-heading">
+                    {dir === "out" ? (
+                      <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
+                    ) : (
+                      <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
+                    )}
+                    {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                  </div>
+                  {g.keys.map((key) => (
+                    <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
+                  ))}
                 </div>
-                {g.keys.map((key) => (
-                  <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
-                ))}
-              </div>
-            ))
+              )),
+            )
           ) : (
             <Spinner>fetching {shortId(path)}…</Spinner>
           )}
@@ -919,79 +908,4 @@ function graphOf(
     }
   }
   return { nodes: [...nodes.values()], edges };
-}
-
-/* ---------------- right column ---------------- */
-
-function Incoming({
-  className,
-  path,
-  held,
-  loading,
-  onOpen,
-}: {
-  className: string;
-  path: string;
-  held: HeldIndex;
-  loading: boolean;
-  onOpen: (key: string) => void;
-}) {
-  const res = path === "" ? undefined : held.get(path);
-  const groups = res?.own ? relGroups(res, "in") : [];
-  const count = groups.reduce((n, g) => n + g.keys.length, 0);
-  return (
-    <aside className={className}>
-      <div className="sidebar-section grow">
-        <div className="section-label">
-          Incoming relations<span className="count">{res?.own ? count : ""}</span>
-        </div>
-        <div className="panel-body">
-          {!res?.own ? (
-            <div className="empty-note">
-              {path === ""
-                ? "Nothing open yet."
-                : loading
-                  ? `Waiting on ${shortId(path)}…`
-                  : `${shortId(path)} hasn't loaded.`}
-            </div>
-          ) : groups.length === 0 ? (
-            <div className="empty-panel">None recorded.</div>
-          ) : (
-            groups.map((g) => (
-              <div key={g.rel} className="rel-group">
-                <div className="rel-key">
-                  <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
-                  {humanRel(g.rel)}
-                </div>
-                <div className="res-list">
-                  {g.keys.map((key) => {
-                    const r = held.get(key);
-                    const resolved = r?.attrs !== undefined;
-                    return (
-                      <ResourceRow
-                        key={key}
-                        itemKey={key}
-                        view={{
-                          chipType: r?.type ?? "?",
-                          chipText: undefined,
-                          title: shortId(key),
-                          sub: resolved
-                            ? truncate(labelFor(r?.attrs) || (r?.type ?? ""), 160)
-                            : "not yet fetched",
-                        }}
-                        unresolved={!resolved}
-                        active={key === path}
-                        title={resourcePath(key)}
-                        onOpen={onOpen}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </aside>
-  );
 }

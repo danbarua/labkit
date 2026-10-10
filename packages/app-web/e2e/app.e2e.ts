@@ -100,11 +100,14 @@ test.describe("an open resource", () => {
     await expect(page.locator(".card-head", { hasText: "LOE_1" })).toBeVisible();
   });
 
-  test("lists what relates to it on the right", async ({ page }) => {
+  test("shows the resources that relate to it as cards with their properties", async ({ page }) => {
     await page.goto("/app/workspace/alpha/LOE_1");
-    const incoming = page.locator(".relations-col");
-    await expect(incoming.locator(".rid", { hasText: /^Q_1$/ })).toBeVisible();
-    await expect(incoming.locator(".rid", { hasText: /^EU_1$/ })).toBeVisible();
+    await expect(page.locator(".rel-heading", { hasText: "question:motivates" })).toBeVisible();
+    const question = page.locator(".panel", {
+      has: page.locator(".card-head", { hasText: "Q_1" }),
+    });
+    await expect(question.getByText("alpha question")).toBeVisible();
+    await expect(page.locator(".card-head", { hasText: "EU_1" })).toBeVisible();
   });
 
   test("following a relation navigates in place, without reloading the page", async ({ page }) => {
@@ -164,21 +167,6 @@ test.describe("an open resource", () => {
   });
 });
 
-test.describe("a narrow window", () => {
-  test.use({ viewport: { width: 1000, height: 800 } });
-
-  test("the inbound relations are a drawer that closes when a row is opened", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/LOE_1");
-    const drawer = page.locator(".relations-col");
-    await expect(drawer).not.toHaveClass(/open/);
-    await page.getByRole("button", { name: "Toggle relations column" }).click();
-    await expect(drawer).toHaveClass(/open/);
-    await drawer.locator(".res-item", { hasText: "Q_1" }).click();
-    await expect(header(page)).toHaveText("Q_1");
-    await expect(drawer).not.toHaveClass(/open/);
-  });
-});
-
 test.describe("the graph tab", () => {
   test("draws the graph on the canvas", async ({ page }) => {
     await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
@@ -214,10 +202,10 @@ test.describe("the graph tab", () => {
   });
 
   test("the tab stays open as another resource is opened", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
-    await page.locator(".relations-col .res-item", { hasText: "Q_1" }).click();
+    await page.goto(`/app/workspace/alpha/LOE_1?tab=graph&${list("/workspace/alpha/question")}`);
+    await item(page, "Q_1").click();
     await expect(header(page)).toHaveText("Q_1");
-    await expect(page).toHaveURL(/\/Q_1\?tab=graph$/);
+    await expect(page).toHaveURL(/\/Q_1\?.*tab=graph/);
     await expect(page.locator("#stage")).toBeVisible();
   });
 });
