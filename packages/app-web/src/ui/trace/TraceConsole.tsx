@@ -1038,23 +1038,6 @@ function GraphCard({
               {label}
             </button>
           ))}
-          <span className="playback-status" aria-live="polite">
-            {status}
-          </span>
-          <button
-            type="button"
-            className={playing ? "tbtn on" : "tbtn"}
-            title={
-              playing
-                ? "Stop opening later acts' resources"
-                : "Open, one at a time, the resource each later act created"
-            }
-            disabled={!playing && !canPlay}
-            onClick={playing ? onPause : onPlay}
-          >
-            {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
-            {playing ? "Pause" : "Play"}
-          </button>
           <button
             type="button"
             className="tbtn"
@@ -1088,6 +1071,27 @@ function GraphCard({
           ))}
         </ul>
       ) : null}
+      {/* Playback's controls sit under the canvas, so the act's name, which changes length at every
+          step, never moves the header's controls. They stay while the card is folded. */}
+      <div className="graph-foot">
+        <button
+          type="button"
+          className={playing ? "tbtn on" : "tbtn"}
+          title={
+            playing
+              ? "Stop stepping through the acts"
+              : "Step through the later acts, one at a time"
+          }
+          disabled={!playing && !canPlay}
+          onClick={playing ? onPause : onPlay}
+        >
+          {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
+          {playing ? "Pause" : "Play"}
+        </button>
+        <span className="playback-status" aria-live="polite">
+          {status}
+        </span>
+      </div>
     </div>
   );
 }

@@ -425,6 +425,31 @@ test.describe("playback", () => {
     errors.length = 0;
   });
 
+  test("the act's name under the canvas does not move the header's controls", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/alpha/act");
+    // A web font arriving late changes the button's width by a fraction of a pixel.
+    await page.evaluate(() => document.fonts.ready);
+    const kind = page.locator('[data-overlay="structural"]');
+    const box = async () => {
+      const b = await kind.boundingBox();
+      return b && [b.x, b.y, b.width, b.height].map(Math.round);
+    };
+    const before = await box();
+    await expect(page.locator(".graph-foot").getByRole("button", { name: "Play" })).toBeVisible();
+    await play(page).click();
+    await expect(page.locator(".graph-foot .playback-status")).toHaveText("pose Q_1", {
+      timeout: 10_000,
+    });
+    expect(await box()).toEqual(before);
+    await pause(page).click();
+    // Act 2's subject, NOTE_1, may have been fetched: the browser reports its 404.
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+  });
+
   test("from an act, playback starts after that act", async ({ page, errors }) => {
     await page.goto("/app/workspace/alpha/act/2");
     await expect(header(page)).toHaveText("2");
