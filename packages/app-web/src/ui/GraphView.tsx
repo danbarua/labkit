@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import "./graph.css";
 
 /** What a node's colour shows: its record type, or how it stands to the selected node. */
@@ -493,19 +493,6 @@ function hitTest(sim: Sim, mx: number, my: number): string | null {
   return found;
 }
 
-/** Places the popover beside the pointer, inside the canvas. */
-function placePopover(
-  popover: HTMLDivElement,
-  clientX: number,
-  clientY: number,
-  rect: DOMRect,
-): void {
-  const left = Math.min(clientX - rect.left + 16, rect.width - popover.offsetWidth - 4);
-  const top = Math.min(clientY - rect.top + 16, rect.height - popover.offsetHeight - 4);
-  popover.style.left = `${Math.max(0, left)}px`;
-  popover.style.top = `${Math.max(0, top)}px`;
-}
-
 function createSim(): Sim {
   return {
     nodes: new Map(),
@@ -554,26 +541,12 @@ export function GraphView({
   onNavigate,
 }: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const simRef = useRef<Sim>(createSim());
   const sizeRef = useRef({ width: 0, height: 0 });
   const navigateRef = useRef(onNavigate);
   navigateRef.current = onNavigate;
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const pointerRef = useRef({ x: 0, y: 0 });
-  // The popover is measured once its content is drawn, so a new node's summary is placed by its own size.
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    const popover = popoverRef.current;
-    if (hoverId === null || !canvas || !popover) return;
-    placePopover(
-      popover,
-      pointerRef.current.x,
-      pointerRef.current.y,
-      canvas.getBoundingClientRect(),
-    );
-  }, [hoverId]);
 
   const sim = simRef.current;
   sim.overlay = overlay;
@@ -585,8 +558,7 @@ export function GraphView({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const popover = popoverRef.current;
-    if (!canvas || !popover) return;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctxRef.current = ctx;
@@ -620,9 +592,7 @@ export function GraphView({
       const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
       const hit = inside ? hitTest(s, mx, my) : null;
       s.hoverId = hit !== null && s.nodes.has(hit) ? hit : null;
-      pointerRef.current = { x: event.clientX, y: event.clientY };
       setHoverId(s.hoverId);
-      if (s.hoverId !== null) placePopover(popover, event.clientX, event.clientY, rect);
     };
     const onPointerUp = () => {
       const s = simRef.current;
@@ -684,11 +654,7 @@ export function GraphView({
     <div id="stage-wrap">
       <canvas id="stage" ref={canvasRef} className="orbit" />
       <div className="hint">drag to orbit · scroll to zoom</div>
-      <div
-        id="popover"
-        className={hoverId === null ? "popover hidden" : "popover"}
-        ref={popoverRef}
-      >
+      <div id="popover" className={hoverId === null ? "popover hidden" : "popover"}>
         {hoverId === null ? null : summary(hoverId)}
       </div>
     </div>
