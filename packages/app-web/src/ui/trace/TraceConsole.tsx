@@ -610,10 +610,13 @@ function ResourceRow({
   onOpen: (key: string) => void;
 }) {
   const cls = ["res-item", unresolved ? "unresolved" : "", active ? "active" : ""].filter(Boolean);
-  // The row for the open resource scrolls into its list's view, so the list shows where it is.
+  // The row for the open resource scrolls into its list's view, so the list shows where it is:
+  // smoothly, as playback steps down the list, unless the reader asks for reduced motion.
   const row = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (active) row.current?.scrollIntoView({ block: "nearest" });
+    if (!active) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    row.current?.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
   }, [active]);
   return (
     <button
