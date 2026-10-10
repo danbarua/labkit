@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { depthOpacity, INITIAL_CAMERA, screenAxes } from "../src/ui/GraphView";
+import {
+  createSim,
+  depthOpacity,
+  INITIAL_CAMERA,
+  mergeSeeds,
+  screenAxes,
+  tickPhysics,
+} from "../src/ui/GraphView";
 
 describe("the graph's depth fade", () => {
   test("the nearest node is opaque and the farthest keeps 30% of its opacity", () => {
@@ -21,5 +28,36 @@ describe("the graph's initial view", () => {
     expect(time?.x1).toBeGreaterThan(0);
     expect(time?.y1).toBeLessThan(0);
     expect(time?.z2).toBeGreaterThan(0);
+  });
+});
+
+describe("the graph's layout", () => {
+  const seed = (id: string) => ({ id, label: id, type: "Question" });
+  const positions = (sim: ReturnType<typeof createSim>) =>
+    [...sim.nodes.values()].map((n) => [n.x, n.y]);
+
+  test("cools, and once cold leaves every node where it is", () => {
+    const sim = createSim();
+    mergeSeeds(sim, [seed("a"), seed("b"), seed("c")], [{ from: "a", to: "b", label: "X" }], "a");
+    let ticks = 0;
+    while (tickPhysics(sim)) ticks++;
+    expect(ticks).toBeGreaterThan(250);
+    expect(ticks).toBeLessThan(350);
+    const still = positions(sim);
+    expect(tickPhysics(sim)).toBe(false);
+    expect(positions(sim)).toEqual(still);
+  });
+
+  test("heats again when a node or an edge is added, and not when nothing is", () => {
+    const sim = createSim();
+    mergeSeeds(sim, [seed("a"), seed("b")], [], "a");
+    while (tickPhysics(sim));
+    mergeSeeds(sim, [seed("a"), seed("b")], [], "a");
+    expect(tickPhysics(sim)).toBe(false);
+    mergeSeeds(sim, [seed("a"), seed("b")], [{ from: "a", to: "b", label: "X" }], "a");
+    expect(tickPhysics(sim)).toBe(true);
+    while (tickPhysics(sim));
+    mergeSeeds(sim, [seed("c")], [], "a");
+    expect(tickPhysics(sim)).toBe(true);
   });
 });

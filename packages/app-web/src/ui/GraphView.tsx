@@ -60,6 +60,8 @@ type Sim = {
   camera: Camera;
   /** The point the camera orbits and faces: it follows the open resource's node. */
   pivot: Point3 | null;
+  /** Scales every force, and falls each tick; below HEAT_MIN the layout is not computed. */
+  heat: number;
   drag: Drag | null;
   dragged: boolean;
 };
@@ -69,6 +71,14 @@ const KIND_COLOR: Record<string, string> = {};
 const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
 
+/**
+ * The layout cools: the forces are scaled by the simulation's heat, which falls from 1 to HEAT_MIN
+ * in 300 ticks, about 5s at 60 frames a second. Below HEAT_MIN the layout is not computed, since
+ * every tick costs a pass over every pair of nodes. New nodes or edges heat it to REHEAT.
+ */
+const HEAT_DECAY = 1 - 0.001 ** (1 / 300);
+const HEAT_MIN = 0.001;
+const REHEAT = 0.6;
 const REPEL = 2600;
 const SPRING_LEN = 90;
 const SPRING_K = 0.02;
@@ -142,12 +152,14 @@ function centroid(sim: Sim): [number, number] {
   return [sx / sim.nodes.size, sy / sim.nodes.size];
 }
 
-function mergeSeeds(
+/** Adds the nodes and edges the canvas does not have yet, and heats the layout when there are any. */
+export function mergeSeeds(
   sim: Sim,
   seeds: GraphNodeSeed[],
   edges: GraphEdgeSeed[],
   selectedId: string | null,
 ): void {
+  const before = sim.nodes.size + sim.edges.length;
   const ordered =
     selectedId === null
       ? seeds
@@ -185,12 +197,17 @@ function mergeSeeds(
     sim.edgeKeys.add(key);
     sim.edges.push(edge);
   }
+  if (sim.nodes.size + sim.edges.length > before) sim.heat = Math.max(sim.heat, REHEAT);
 }
 
-function tickPhysics(sim: Sim): void {
+/** Moves the nodes one step, unless the layout has cooled. Returns whether it moved them. */
+export function tickPhysics(sim: Sim): boolean {
   const nodes = [...sim.nodes.values()];
-  if (nodes.length === 0) return;
-  const repel = REPEL * springiness(nodes.length);
+  if (nodes.length === 0 || sim.heat < HEAT_MIN) return false;
+  const heat = sim.heat;
+  const repel = REPEL * springiness(nodes.length) * heat;
+  const centre = CENTER_K * heat;
+  const spring = SPRING_K * heat;
   for (let i = 0; i < nodes.length; i++) {
     const a = nodes[i];
     if (!a) continue;
@@ -210,8 +227,8 @@ function tickPhysics(sim: Sim): void {
       b.vx -= dx * f;
       b.vy -= dy * f;
     }
-    a.vx += -a.x * CENTER_K;
-    a.vy += -a.y * CENTER_K;
+    a.vx += -a.x * centre;
+    a.vy += -a.y * centre;
   }
   for (const edge of sim.edges) {
     const a = sim.nodes.get(edge.from);
@@ -220,7 +237,7 @@ function tickPhysics(sim: Sim): void {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-    const f = (d - SPRING_LEN) * SPRING_K;
+    const f = (d - SPRING_LEN) * spring;
     const ux = dx / d;
     const uy = dy / d;
     a.vx += ux * f;
@@ -234,6 +251,8 @@ function tickPhysics(sim: Sim): void {
     n.x += n.vx;
     n.y += n.vy;
   }
+  sim.heat -= sim.heat * HEAT_DECAY;
+  return true;
 }
 
 function zOf(sim: Sim, node: SimNode): number {
@@ -493,7 +512,7 @@ function hitTest(sim: Sim, mx: number, my: number): string | null {
   return found;
 }
 
-function createSim(): Sim {
+export function createSim(): Sim {
   return {
     nodes: new Map(),
     edges: [],
@@ -505,6 +524,7 @@ function createSim(): Sim {
     screenPos: new Map(),
     camera: { ...INITIAL_CAMERA },
     pivot: null,
+    heat: 1,
     drag: null,
     dragged: false,
   };
