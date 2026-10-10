@@ -13,12 +13,21 @@ import {
   ArrowRightIcon,
   BracketsCurlyIcon,
   CaretRightIcon,
+  ChartLineIcon,
+  ChatCircleTextIcon,
+  CheckCircleIcon,
+  CompassIcon,
+  EyeIcon,
+  FlagCheckeredIcon,
   HouseIcon,
+  type Icon,
   IconContext,
   MagnifyingGlassIcon,
   PauseIcon,
   PlayIcon,
+  SealCheckIcon,
   SidebarSimpleIcon,
+  XCircleIcon,
 } from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
@@ -664,6 +673,20 @@ function HoverCard({ itemKey, held }: { itemKey: string; held: HeldIndex }) {
 
 const PILL_KEYS = ["kind", "outcome", "resolution_kind", "status", "role"] as const;
 
+/** The icon a pill's value is drawn with, for the values the graph holds; any other has none. */
+const PILL_ICON: Record<string, Icon | undefined> = {
+  pass: CheckCircleIcon,
+  fail: XCircleIcon,
+  observation: EyeIcon,
+  observations: EyeIcon,
+  analysis: ChartLineIcon,
+  "analysis-output": ChartLineIcon,
+  exploratory: CompassIcon,
+  confirmatory: SealCheckIcon,
+  answered: ChatCircleTextIcon,
+  completed: FlagCheckeredIcon,
+};
+
 function Detail({
   path,
   entry,
@@ -743,20 +766,18 @@ function Detail({
           <Badge type={res.type} />
           <span className="header-id">{shortId(path)}</span>
           <span className="header-type">{res.type}</span>
+          {pills.map((k) => {
+            const v = String(a[k]);
+            const variant = k === "kind" || k === "outcome" ? ` ${k}-${v}` : "";
+            const Glyph = PILL_ICON[v];
+            return (
+              <span key={k} className={`pill${variant}`} title={k}>
+                {Glyph === undefined ? null : <Glyph aria-hidden="true" />}
+                {v}
+              </span>
+            );
+          })}
         </div>
-        {pills.length > 0 ? (
-          <div className="header-pills">
-            {pills.map((k) => {
-              const v = String(a[k]);
-              const variant = k === "kind" || k === "outcome" ? ` ${k}-${v}` : "";
-              return (
-                <span key={k} className={`pill${variant}`}>
-                  {v}
-                </span>
-              );
-            })}
-          </div>
-        ) : null}
         <div className="toolbar" role="tablist">
           {(["overview", "debug"] as const).map((t) => (
             <button
