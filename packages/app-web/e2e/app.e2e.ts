@@ -221,7 +221,9 @@ test.describe("the API keeps its own paths", () => {
   });
 
   test("even a client asking for HTML gets JSON from the API's paths", async ({ request }) => {
-    const response = await request.get("/graph/Q_1", { headers: { accept: "text/html" } });
+    const response = await request.get("/workspace/alpha/Q_1", {
+      headers: { accept: "text/html" },
+    });
     expect(response.headers()["content-type"]).toContain("application/hal+json");
   });
 
