@@ -449,6 +449,20 @@ function Lists({
     lowerKey === undefined ? undefined : requestPath(lowerKey),
     readCollection(listKey),
   );
+  // The Items pane follows the open resource: while it is of the type the pane lists and not among
+  // the rows loaded, the next page is loaded, as long as the last one names a next page.
+  const openType = held.get(openKey)?.type;
+  const behind =
+    lowerKey !== undefined &&
+    !lower.loading &&
+    lower.next !== undefined &&
+    openType !== undefined &&
+    lower.items[0]?.data.type === openType &&
+    !lower.items.some((item) => item.key === openKey);
+  const loadMore = lower.more;
+  useEffect(() => {
+    if (behind) loadMore();
+  }, [behind, loadMore]);
 
   return (
     <aside className={className}>
@@ -596,8 +610,19 @@ function ResourceRow({
   onOpen: (key: string) => void;
 }) {
   const cls = ["res-item", unresolved ? "unresolved" : "", active ? "active" : ""].filter(Boolean);
+  // The row for the open resource scrolls into its list's view, so the list shows where it is.
+  const row = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (active) row.current?.scrollIntoView({ block: "nearest" });
+  }, [active]);
   return (
-    <button type="button" className={cls.join(" ")} title={title} onClick={() => onOpen(itemKey)}>
+    <button
+      ref={row}
+      type="button"
+      className={cls.join(" ")}
+      title={title}
+      onClick={() => onOpen(itemKey)}
+    >
       <Badge type={view.chipType} text={view.chipText} />
       <span className="rtext">
         <span className="rid">{view.title}</span>

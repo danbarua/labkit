@@ -127,6 +127,16 @@ test.describe("getting around", () => {
     await expect(row(page, "Question")).toBeVisible();
   });
 
+  test("the Items pane loads pages until the open resource's row is there, and lights it", async ({
+    page,
+  }) => {
+    await page.goto(`/app/workspace/alpha/act/3?${list("/workspace/alpha/act?limit=1")}`);
+    await expect(header(page)).toHaveText("3");
+    await expect(page.locator(".sidebar .res-item")).toHaveCount(3);
+    await expect(page.locator(".sidebar .res-item.active")).toContainText("LOE_1");
+    await expect(page.locator(".sidebar .res-item.active")).toBeInViewport();
+  });
+
   test("a collection's next page is added on request", async ({ page }) => {
     await page.goto(`/app/?${list("/workspace/alpha/question?limit=1")}`);
     await expect(item(page, "Q_1")).toBeVisible();
@@ -396,6 +406,20 @@ test.describe("playback", () => {
     await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
     await expect(node(page, /\(Act\)$/)).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`${list("/workspace/alpha/act")}`));
+    // Act 2's subject, NOTE_1, is not in the graph: the browser reports its 404.
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+  });
+
+  test("the Acts list follows playback past the rows it has loaded", async ({ page, errors }) => {
+    await page.goto(`/app/workspace/alpha/act/1?${list("/workspace/alpha/act?limit=1")}`);
+    await expect(page.locator(".sidebar .res-item")).toHaveCount(1);
+    await play(page).click();
+    await expect(page.locator(".playback-status")).toHaveText("No later act.", {
+      timeout: 10_000,
+    });
+    await expect(page.locator(".sidebar .res-item")).toHaveCount(3);
+    await expect(page.locator(".sidebar .res-item.active")).toContainText("LOE_1");
     // Act 2's subject, NOTE_1, is not in the graph: the browser reports its 404.
     expect(errors.every((e) => e.includes("404"))).toBe(true);
     errors.length = 0;
