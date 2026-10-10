@@ -254,21 +254,40 @@ test.describe("an open resource", () => {
 });
 
 test.describe("the Items pane's open row", () => {
-  const box = (page: import("@playwright/test").Page) => page.locator(".res-list .active-box");
+  const box = (page: import("@playwright/test").Page) =>
+    page.locator(".res-list .active-box.outline");
+  const fill = (page: import("@playwright/test").Page) =>
+    page.locator(".res-list .active-box.fill");
 
   test("a box marks the open row, and slides to the next row opened, then fills", async ({
     page,
   }) => {
     await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
-    await expect(box(page)).toHaveClass(/filled/);
+    await expect(fill(page)).toHaveClass(/filled/);
     const top = async (locator: import("@playwright/test").Locator) =>
       Math.round((await locator.boundingBox())?.y ?? -1);
     expect(await top(box(page))).toBe(await top(item(page, "Q_1")));
 
     await item(page, "Q_2").click();
     await expect(header(page)).toHaveText("Q_2");
-    await expect(box(page)).toHaveClass(/filled/);
+    await expect(fill(page)).toHaveClass(/filled/);
     await expect.poll(async () => (await top(box(page))) - (await top(item(page, "Q_2")))).toBe(0);
+  });
+
+  test("in the Collections pane, a box marks the listed collection and slides to the next", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha/question")}`);
+    const outline = page.locator(".type-list .active-box.outline");
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    await expect(outline).toBeVisible();
+    expect(await top(outline)).toBe(await top(row(page, "Question")));
+    await row(page, "LineOfEnquiry").click();
+    await expect(page.locator(".type-list .active-box.fill")).toHaveClass(/filled/);
+    await expect
+      .poll(async () => (await top(outline)) - (await top(row(page, "LineOfEnquiry"))))
+      .toBe(0);
   });
 });
 

@@ -380,6 +380,20 @@
   background: var(--accent-dim);
   border-color: var(--accent);
 }
+/* In the Collections pane the box marks the listed collection, as it marks the open row below. */
+.trace .type-list {
+  position: relative;
+}
+.trace .type-list .type-row {
+  position: relative;
+}
+.trace .type-list .type-row.active {
+  background: none;
+  border-color: transparent;
+}
+.trace .type-list .active-box.fill:not(.filled) ~ .type-row.active {
+  background: var(--panel-2);
+}
 .trace .type-swatch {
   width: 9px;
   height: 9px;
@@ -404,7 +418,6 @@
   top: 0;
   left: 0;
   right: 0;
-  border: 1px solid var(--accent);
   border-radius: 6px;
   pointer-events: none;
   transition:
@@ -415,8 +428,12 @@
 .trace .active-box.placed {
   transition: background-color 150ms ease;
 }
-.trace .active-box.filled {
+.trace .active-box.fill.filled {
   background: var(--accent-dim);
+}
+.trace .active-box.outline {
+  z-index: 2;
+  border: 1px solid var(--accent);
 }
 .trace .res-item {
   display: flex;
@@ -445,7 +462,7 @@
   background: none;
   border-color: transparent;
 }
-.trace .res-list .active-box:not(.filled) ~ .res-item.active {
+.trace .res-list .active-box.fill:not(.filled) ~ .res-item.active {
   background: var(--panel-2);
 }
 .trace .res-item .badge {

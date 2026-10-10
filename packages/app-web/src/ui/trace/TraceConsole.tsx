@@ -472,6 +472,7 @@ function Lists({
     !lower.items.some((item) => item.key === openKey);
   const loadMore = lower.more;
   const lowerList = useRef<HTMLDivElement>(null);
+  const upperList = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (behind) loadMore();
   }, [behind, loadMore]);
@@ -484,7 +485,14 @@ function Lists({
           <span className="count">{upper.items.length > 0 ? upper.items.length : ""}</span>
         </div>
         <div className="faint mono pane-path">{upperKey}</div>
-        <div className="type-list">
+        <div className="type-list" ref={upperList}>
+          {lowerRow === undefined ? null : (
+            <ActiveBox
+              list={upperList}
+              activeKey={lowerRow}
+              rows={`${upper.items.length} ${term}`}
+            />
+          )}
           <Pane
             pages={upper}
             empty={`Loading ${ENTRY}…`}
@@ -574,6 +582,7 @@ function Pane({
           <button
             key={item.key}
             type="button"
+            data-key={item.key}
             className={item.key === lowerKey ? "type-row active" : "type-row"}
             title={item.key}
             onClick={() => onList(item.key)}
@@ -617,9 +626,10 @@ function Pane({
 const SLIDE_MS = 220;
 
 /**
- * The box around the open resource's row in the Items pane. When another row opens, the box loses
- * its fill, slides to that row, and fills again on arrival. When that row is out of the list's
- * view, the list scrolls to show it at the top, a page at a time rather than a row at a time.
+ * The box around a sidebar list's current row: the open resource in the Items pane, or the listed
+ * collection in the Collections pane. When the current row changes, the box loses its fill, slides
+ * to the new row, and fills again on arrival. When that row is out of the list's view, the list
+ * scrolls to show it at the top, a page at a time rather than a row at a time.
  */
 function ActiveBox({
   list,
@@ -673,12 +683,15 @@ function ActiveBox({
     return () => clearTimeout(timer);
   }, [filled]);
   if (box === undefined) return null;
+  // Two layers: the fill under the rows, so it does not tint their text, and the outline over
+  // them, so the hover background of the row it slides to does not hide it.
+  const style = { transform: `translateY(${box.top}px)`, height: box.height };
+  const state = [box.slide ? "" : "placed", filled ? "filled" : ""].join(" ");
   return (
-    <div
-      className={["active-box", box.slide ? "" : "placed", filled ? "filled" : ""].join(" ")}
-      style={{ transform: `translateY(${box.top}px)`, height: box.height }}
-      aria-hidden="true"
-    />
+    <>
+      <div className={`active-box fill ${state}`} style={style} aria-hidden="true" />
+      <div className={`active-box outline ${state}`} style={style} aria-hidden="true" />
+    </>
   );
 }
 
