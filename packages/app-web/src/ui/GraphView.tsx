@@ -412,7 +412,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   const opacity = (depth: number) => depthOpacity(depth, near, far);
 
   ctx.lineWidth = 1;
-  const labels: { x: number; y: number; text: string; hot: boolean; opacity: number }[] = [];
+  const labels: { a: Projected; b: Projected; text: string; hot: boolean; opacity: number }[] = [];
   // The edges of the open node and of the node under the pointer are drawn last, in the accent
   // colour and twice as wide, unfaded, so they stand out from the rest.
   const hotEdges: [Projected, Projected][] = [];
@@ -437,8 +437,8 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     const scale = Math.min(a.scale, b.scale);
     if (hot || scale > 0.55) {
       labels.push({
-        x: (a.sx + b.sx) / 2,
-        y: (a.sy + b.sy) / 2,
+        a,
+        b,
         text: edge.label,
         hot,
         opacity: hot ? 1 : edgeOpacity,
@@ -490,15 +490,54 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   // The hot edges' labels are drawn last, larger and bold, so no other label covers them.
   for (const lab of [...labels.filter((l) => !l.hot), ...labels.filter((l) => l.hot)]) {
     ctx.font = lab.hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
+    const width = ctx.measureText(lab.text).width + LABEL_MARKER;
+    const length = Math.hypot(lab.b.sx - lab.a.sx, lab.b.sy - lab.a.sy);
+    // A label longer than its edge on screen would run over the nodes, so only a hot one is drawn.
+    if (!lab.hot && width > length) continue;
+    const { angle, flipped } = labelAngle(lab.a.sx, lab.a.sy, lab.b.sx, lab.b.sy);
+    ctx.save();
+    ctx.translate((lab.a.sx + lab.b.sx) / 2, (lab.a.sy + lab.b.sy) / 2);
+    ctx.rotate(angle);
     ctx.globalAlpha = (lab.hot ? 0.95 : 0.75) * lab.opacity;
     ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
-    ctx.fillText(lab.text, lab.x, lab.y - 7);
+    const y = -6;
+    ctx.fillText(lab.text, flipped ? LABEL_MARKER / 2 : -LABEL_MARKER / 2, y);
+    // A triangle at the end the relation points to: after the text, or before it when flipped.
+    const tip = (flipped ? -1 : 1) * (width / 2);
+    const back = tip - (flipped ? -1 : 1) * 5;
+    ctx.beginPath();
+    ctx.moveTo(tip, y);
+    ctx.lineTo(back, y - 3);
+    ctx.lineTo(back, y + 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 
   drawCompass(ctx, sim, width, height);
+}
+
+/** The room an edge label leaves for its direction marker, in pixels. */
+const LABEL_MARKER = 9;
+
+/**
+ * The rotation for the label of an edge drawn from (ax, ay) to (bx, by): along the edge, turned at
+ * most a quarter circle either way so the text never reads upside down. `flipped` is set when the
+ * edge points leftward, so the label is turned half a circle from the edge's own direction.
+ */
+export function labelAngle(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): { angle: number; flipped: boolean } {
+  const along = Math.atan2(by - ay, bx - ax);
+  if (along > Math.PI / 2) return { angle: along - Math.PI, flipped: true };
+  if (along < -Math.PI / 2) return { angle: along + Math.PI, flipped: true };
+  return { angle: along, flipped: false };
 }
 
 function hitTest(sim: Sim, mx: number, my: number): string | null {

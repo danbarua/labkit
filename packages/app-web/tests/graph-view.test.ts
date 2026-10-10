@@ -3,6 +3,7 @@ import {
   createSim,
   depthOpacity,
   INITIAL_CAMERA,
+  labelAngle,
   mergeSeeds,
   screenAxes,
   tickPhysics,
@@ -59,5 +60,29 @@ describe("the graph's layout", () => {
     while (tickPhysics(sim));
     mergeSeeds(sim, [seed("c")], [], "a");
     expect(tickPhysics(sim)).toBe(true);
+  });
+});
+
+describe("an edge label's rotation", () => {
+  test("follows an edge that points rightward, unflipped", () => {
+    expect(labelAngle(0, 0, 10, 0)).toEqual({ angle: 0, flipped: false });
+    expect(labelAngle(0, 0, 10, 10).angle).toBeCloseTo(Math.PI / 4);
+    expect(labelAngle(0, 0, 0, 10)).toEqual({ angle: Math.PI / 2, flipped: false });
+  });
+
+  test("turns an edge that points leftward half a circle, so the text is upright", () => {
+    const left = labelAngle(10, 0, 0, 0);
+    expect(left.flipped).toBe(true);
+    expect(left.angle).toBeCloseTo(0);
+    const upLeft = labelAngle(10, 10, 0, 0);
+    expect(upLeft.flipped).toBe(true);
+    expect(upLeft.angle).toBeCloseTo(Math.PI / 4);
+    for (const [ax, ay, bx, by] of [
+      [0, 0, -3, 7],
+      [0, 0, -3, -7],
+      [0, 0, 5, -9],
+    ] as const) {
+      expect(Math.abs(labelAngle(ax, ay, bx, by).angle)).toBeLessThanOrEqual(Math.PI / 2);
+    }
   });
 });
