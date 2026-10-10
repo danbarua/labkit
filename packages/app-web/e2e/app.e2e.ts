@@ -233,11 +233,12 @@ test.describe("the graph tab", () => {
       .toBeGreaterThan(2);
   });
 
-  test("the view and colour toggles switch, and there is no standing overlay", async ({ page }) => {
+  test("the colour toggle switches, and there is no 2D view or standing overlay", async ({
+    page,
+  }) => {
     await page.goto("/app/workspace/alpha/Q_1?tab=graph");
-    const view3d = page.locator('[data-view="3d"]');
-    await view3d.click();
-    await expect(view3d).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#stage.orbit")).toBeVisible();
+    await expect(page.locator("[data-view]")).toHaveCount(0);
     const temporal = page.locator('[data-overlay="temporal"]');
     await temporal.click();
     await expect(temporal).toHaveAttribute("aria-pressed", "true");

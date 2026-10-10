@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import "./graph.css";
 
-export type ViewMode = "2d" | "3d";
 /** What a node's colour shows: its record type, or how it stands to the selected node. */
 export type Overlay = "structural" | "temporal";
 
@@ -22,7 +21,6 @@ export interface GraphViewProps {
   nodes: GraphNodeSeed[];
   edges: GraphEdgeSeed[];
   selectedId: string | null;
-  view: ViewMode;
   overlay: Overlay;
   onNavigate: (id: string) => void;
 }
@@ -47,7 +45,6 @@ type Sim = {
   edges: GraphEdgeSeed[];
   edgeKeys: Set<string>;
   nextStep: number;
-  view: ViewMode;
   overlay: Overlay;
   selectedId: string | null;
   hoverId: string | null;
@@ -55,7 +52,6 @@ type Sim = {
   camera: Camera;
   drag: Drag | null;
   dragged: boolean;
-  zoom: number;
 };
 
 /** Colours for record types the page's stylesheet gives none (`--c-<type>`), handed out as types appear. */
@@ -247,15 +243,6 @@ function maxCreatedZ(sim: Sim): number {
 }
 
 function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
-  if (sim.view === "2d") {
-    const z = 1 / sim.zoom;
-    return {
-      sx: width / 2 + node.x * z,
-      sy: height / 2 + node.y * z,
-      scale: z,
-      depth: 0,
-    };
-  }
   const { yaw, pitch, distance } = sim.camera;
   const zc = zOf(sim, node) - maxCreatedZ(sim) / 2;
   const cosY = Math.cos(yaw);
@@ -331,23 +318,6 @@ function drawCompass(
     }
   }
   ctx.restore();
-}
-
-/**
- * Eases the 2D zoom toward the one that fits every node in the canvas, out and back in, so a burst
- * of nodes flung apart while they settle does not leave the graph zoomed out once they have.
- */
-function autofit(sim: Sim, width: number, height: number): void {
-  if (sim.view !== "2d" || sim.nodes.size === 0) return;
-  const margin = 0.9;
-  const halfW = (width / 2) * margin;
-  const halfH = (height / 2) * margin;
-  let needed = 1;
-  for (const n of sim.nodes.values()) {
-    if (halfW > 0) needed = Math.max(needed, Math.abs(n.x) / halfW);
-    if (halfH > 0) needed = Math.max(needed, Math.abs(n.y) / halfH);
-  }
-  sim.zoom += (needed - sim.zoom) * 0.08;
 }
 
 function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, height: number): void {
@@ -428,7 +398,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 
-  if (sim.view === "3d") drawCompass(ctx, sim, width, height);
+  drawCompass(ctx, sim, width, height);
 }
 
 function hitTest(sim: Sim, mx: number, my: number): string | null {
@@ -476,7 +446,6 @@ function createSim(): Sim {
     edges: [],
     edgeKeys: new Set(),
     nextStep: 0,
-    view: "2d",
     overlay: "structural",
     selectedId: null,
     hoverId: null,
@@ -484,7 +453,6 @@ function createSim(): Sim {
     camera: { yaw: 0.5, pitch: -0.35, distance: 620 },
     drag: null,
     dragged: false,
-    zoom: 1,
   };
 }
 
@@ -504,7 +472,11 @@ function resizeCanvas(
   return { width: rect.width, height: rect.height };
 }
 
-export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate }: GraphViewProps) {
+/**
+ * The resources a reader has explored and their relations, laid out by a force simulation in the
+ * plane and by the order they were first seen in depth, and drawn in perspective.
+ */
+export function GraphView({ nodes, edges, selectedId, overlay, onNavigate }: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const simRef = useRef<Sim>(createSim());
@@ -513,7 +485,6 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
   navigateRef.current = onNavigate;
 
   const sim = simRef.current;
-  sim.view = view;
   sim.overlay = overlay;
   sim.selectedId = selectedId;
 
@@ -539,7 +510,6 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
     const loop = () => {
       const s = simRef.current;
       tickPhysics(s);
-      autofit(s, sizeRef.current.width, sizeRef.current.height);
       renderFrame(ctx, s, sizeRef.current.width, sizeRef.current.height);
       raf = requestAnimationFrame(loop);
     };
@@ -548,7 +518,6 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
     const onPointerDown = (event: PointerEvent) => {
       const s = simRef.current;
       s.dragged = false;
-      if (s.view !== "3d") return;
       s.drag = { x: event.clientX, y: event.clientY, yaw: s.camera.yaw, pitch: s.camera.pitch };
       canvas.classList.add("dragging");
     };
@@ -582,7 +551,6 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
       if (s.nodes.has(id)) navigateRef.current(id);
     };
     const onWheel = (event: WheelEvent) => {
-      if (simRef.current.view !== "3d") return;
       event.preventDefault();
       const cam = simRef.current.camera;
       cam.distance = Math.max(120, Math.min(2200, cam.distance + event.deltaY * 0.6));
@@ -613,8 +581,8 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
 
   return (
     <div id="stage-wrap">
-      <canvas id="stage" ref={canvasRef} className={view === "3d" ? "orbit" : undefined} />
-      <div className="hint">{view === "3d" ? "drag to orbit · scroll to zoom" : ""}</div>
+      <canvas id="stage" ref={canvasRef} className="orbit" />
+      <div className="hint">drag to orbit · scroll to zoom</div>
       <div id="popover" className="popover hidden" ref={popoverRef} />
     </div>
   );

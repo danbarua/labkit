@@ -47,7 +47,7 @@ according to what the API answers, never by the shape of the path. Its code is `
 | Column | Shows |
 |--------|-------|
 | Left | Two collections: the one picked (`?list=`) and the collection it is listed in. |
-| Centre | The open resource. Tabs: Overview (properties, then a card for each related resource, outbound then inbound), Graph (the 2D/3D canvas, `GraphView`), Debug (the response and the record's events). `?tab=` names the tab. |
+| Centre | The open resource. Tabs: Overview (properties, then a card for each related resource, outbound then inbound), Graph (the 3D canvas, `GraphView`), Debug (the response and the record's events). `?tab=` names the tab. |
 
 Every resource is requested at `depth=2`, so its neighbours arrive with their properties. The page
 keeps each response as it arrived and draws from them; a resource's own response is the only one

@@ -21,13 +21,7 @@ import "@labkit/design/tokens.css";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useSavedTheme } from "../saved-theme";
-import {
-  GraphView,
-  type GraphEdgeSeed,
-  type GraphNodeSeed,
-  type Overlay,
-  type ViewMode,
-} from "../GraphView";
+import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
   type CollectionItem,
   collectionOf,
@@ -866,27 +860,12 @@ function GraphPanel({
   held: HeldIndex;
   onOpen: (key: string) => void;
 }) {
-  const [view, setView] = useState<ViewMode>("2d");
   const [overlay, setOverlay] = useState<Overlay>("structural");
   const workspace = /^\/workspace\/[^/]+\//.exec(path)?.[0] ?? dirOf(path);
   const { nodes, edges } = useMemo(() => graphOf(held, workspace), [held, workspace]);
   return (
     <div className="panel graph-panel">
       <div className="panel-head">
-        <span className="graph-controls">
-          {(["2d", "3d"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              data-view={v}
-              aria-pressed={view === v}
-              className={view === v ? "tbtn on" : "tbtn"}
-              onClick={() => setView(v)}
-            >
-              {v.toUpperCase()}
-            </button>
-          ))}
-        </span>
         <span className="graph-controls">
           colour
           {(
@@ -913,7 +892,6 @@ function GraphPanel({
           nodes={nodes}
           edges={edges}
           selectedId={path}
-          view={view}
           overlay={overlay}
           onNavigate={onOpen}
         />
