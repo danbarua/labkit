@@ -222,7 +222,7 @@ test.describe("an open resource", () => {
 test.describe("the graph", () => {
   // The canvas's nodes are also a visually hidden list of buttons, for the keyboard, which is how
   // these tests pick a node: a canvas has no element to click.
-  const node = (page: import("@playwright/test").Page, name: string) =>
+  const node = (page: import("@playwright/test").Page, name: string | RegExp) =>
     page.getByRole("list", { name: "Nodes in the graph" }).getByRole("button", { name });
 
   test("draws the graph on the canvas", async ({ page }) => {
@@ -314,6 +314,14 @@ test.describe("the graph", () => {
     await expect(page).toHaveURL(/\/app\/workspace\/alpha\/LOE_1/);
     await expect(node(page, "EU_1 (EvidenceUnit)")).toBeVisible();
     await expect(node(page, "Q_1 (Question)")).toBeVisible();
+  });
+
+  test("an opened act is drawn as its subject, with no node for the act", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/act/1");
+    await expect(header(page)).toHaveText("1");
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+    await expect(node(page, /\(Act\)$/)).toHaveCount(0);
   });
 
   test("Reset forgets what was opened before the open resource", async ({ page }) => {

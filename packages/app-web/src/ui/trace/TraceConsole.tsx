@@ -37,6 +37,7 @@ import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from 
 import {
   type CollectionItem,
   collectionOf,
+  drawnAs,
   edgeLabelOf,
   type HalDocument,
   type Held,
@@ -960,9 +961,17 @@ function GraphCard({
   const playing = playback.state === "playing";
   const status = playing ? playback.act : playback.note;
   const [overlay, setOverlay] = useState<Overlay>("structural");
+  // An act is drawn as its subject, whose own response is fetched so its relations are drawn too.
+  const drawn = explored.flatMap((key) => drawnAs(held, key) ?? []);
+  const shown = drawnAs(held, selected) ?? selected;
+  const drawnJoined = drawn.join("\n");
+  useEffect(() => {
+    for (const key of drawnJoined.split("\n"))
+      if (key !== "" && store.entry(resourcePath(key)) === undefined) store.load(resourcePath(key));
+  }, [drawnJoined]);
   const { nodes, edges } = useMemo(
-    () => graphOf(held, explored, workspace),
-    [held, explored, workspace],
+    () => graphOf(held, drawnJoined.split("\n"), workspace),
+    [held, drawnJoined, workspace],
   );
   return (
     <div className="panel graph-card">
@@ -1030,7 +1039,7 @@ function GraphCard({
           key={`${workspace} ${generation}`}
           nodes={nodes}
           edges={edges}
-          selectedId={selected}
+          selectedId={shown}
           overlay={overlay}
           active={open}
           summary={(id) => <HoverCard itemKey={id} held={held} />}

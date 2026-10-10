@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   collectionOf,
+  drawnAs,
   edgeLabelOf,
   type HalDocument,
   indexOf,
@@ -408,5 +409,27 @@ describe("an answer to a request", () => {
     expect(answered).toBe(false);
     fail(new Error("HTTP 404 nothing here"));
     expect(await settled).toEqual({ status: "failed", error: "HTTP 404 nothing here" });
+  });
+});
+
+describe("what the graph draws for an opened resource", () => {
+  const act = node("/w/x/act/3", "Act", {
+    _links: {
+      self: { href: "http://h/w/x/act/3?depth=2" },
+      subject: { href: "http://h/w/x/NOTE_6?depth=2", dir: "out" },
+      touched: { href: "http://h/w/x/LOE_2?depth=2", dir: "out" },
+    },
+  });
+
+  test("an act is drawn as its subject, once the act's own response names it", () => {
+    expect(drawnAs(indexOf([{ key: "/w/x/act/3", doc: act }]), "/w/x/act/3")).toBe("/w/x/NOTE_6");
+    expect(drawnAs(indexOf([]), "/w/x/act/3")).toBe("/w/x/act/3");
+    const embeddedOnly = indexOf([{ key: "/w/x/act", doc: { _embedded: { act: [act] } } }]);
+    expect(drawnAs(embeddedOnly, "/w/x/act/3")).toBeUndefined();
+  });
+
+  test("any other resource is drawn as itself", () => {
+    const q = indexOf([{ key: "/w/x/Q_1", doc: node("/w/x/Q_1", "Question") }]);
+    expect(drawnAs(q, "/w/x/Q_1")).toBe("/w/x/Q_1");
   });
 });

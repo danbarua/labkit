@@ -53,7 +53,8 @@ Every resource is requested at `depth=2`, so its neighbours arrive with their pr
 keeps each response as it arrived and draws from them; a resource's own response is the only one
 that lists all of its relations. The palette comes from `@labkit/design`.
 
-The graph colours nodes by record type or by how they relate to the open resource (temporal).
+An act records a change to a resource rather than being one, so the graph draws an opened act as
+the act's subject and has no nodes for acts. The graph colours nodes by record type or by how they relate to the open resource (temporal).
 The API returns no standing for a resource, so there is no standing overlay.
 
 The graph card's Play button opens, one at a time, the subject of each later act, in the order the
