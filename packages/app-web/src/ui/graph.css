@@ -21,8 +21,12 @@
   pointer-events: none;
 }
 
+/* The popover stays in the canvas's bottom-right corner, so sweeping the pointer across the graph
+   does not move the text being read. */
 .popover {
   position: absolute;
+  right: 8px;
+  bottom: 8px;
   max-width: 320px;
   padding: 10px 12px;
   background: var(--panel);

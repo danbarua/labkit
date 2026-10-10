@@ -449,6 +449,20 @@ function Lists({
     lowerKey === undefined ? undefined : requestPath(lowerKey),
     readCollection(listKey),
   );
+  // The Items pane follows the open resource: while it is of the type the pane lists and not among
+  // the rows loaded, the next page is loaded, as long as the last one names a next page.
+  const openType = held.get(openKey)?.type;
+  const behind =
+    lowerKey !== undefined &&
+    !lower.loading &&
+    lower.next !== undefined &&
+    openType !== undefined &&
+    lower.items[0]?.data.type === openType &&
+    !lower.items.some((item) => item.key === openKey);
+  const loadMore = lower.more;
+  useEffect(() => {
+    if (behind) loadMore();
+  }, [behind, loadMore]);
 
   return (
     <aside className={className}>
@@ -596,8 +610,22 @@ function ResourceRow({
   onOpen: (key: string) => void;
 }) {
   const cls = ["res-item", unresolved ? "unresolved" : "", active ? "active" : ""].filter(Boolean);
+  // The row for the open resource scrolls into its list's view, so the list shows where it is:
+  // smoothly, as playback steps down the list, unless the reader asks for reduced motion.
+  const row = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!active) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    row.current?.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+  }, [active]);
   return (
-    <button type="button" className={cls.join(" ")} title={title} onClick={() => onOpen(itemKey)}>
+    <button
+      ref={row}
+      type="button"
+      className={cls.join(" ")}
+      title={title}
+      onClick={() => onOpen(itemKey)}
+    >
       <Badge type={view.chipType} text={view.chipText} />
       <span className="rtext">
         <span className="rid">{view.title}</span>
@@ -1013,23 +1041,6 @@ function GraphCard({
               {label}
             </button>
           ))}
-          <span className="playback-status" aria-live="polite">
-            {status}
-          </span>
-          <button
-            type="button"
-            className={playing ? "tbtn on" : "tbtn"}
-            title={
-              playing
-                ? "Stop opening later acts' resources"
-                : "Open, one at a time, the resource each later act created"
-            }
-            disabled={!playing && !canPlay}
-            onClick={playing ? onPause : onPlay}
-          >
-            {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
-            {playing ? "Pause" : "Play"}
-          </button>
           <button
             type="button"
             className="tbtn"
@@ -1063,6 +1074,27 @@ function GraphCard({
           ))}
         </ul>
       ) : null}
+      {/* Playback's controls sit under the canvas, so the act's name, which changes length at every
+          step, never moves the header's controls. They stay while the card is folded. */}
+      <div className="graph-foot">
+        <button
+          type="button"
+          className={playing ? "tbtn on" : "tbtn"}
+          title={
+            playing
+              ? "Stop stepping through the acts"
+              : "Step through the later acts, one at a time"
+          }
+          disabled={!playing && !canPlay}
+          onClick={playing ? onPause : onPlay}
+        >
+          {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
+          {playing ? "Pause" : "Play"}
+        </button>
+        <span className="playback-status" aria-live="polite">
+          {status}
+        </span>
+      </div>
     </div>
   );
 }

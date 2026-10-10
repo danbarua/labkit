@@ -858,11 +858,25 @@
 .trace .graph-card {
   margin-bottom: 22px;
 }
-/* The act's name gives way first when the header is narrow, so the buttons stay in the card. */
+.trace .graph-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+}
+.trace .graph-foot .tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+/* The act's name takes the rest of the bar and is cut with an ellipsis, so it never wraps. */
 .trace .playback-status {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

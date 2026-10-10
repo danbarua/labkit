@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import "./graph.css";
 
 /** What a node's colour shows: its record type, or how it stands to the selected node. */
@@ -60,6 +60,8 @@ type Sim = {
   camera: Camera;
   /** The point the camera orbits and faces: it follows the open resource's node. */
   pivot: Point3 | null;
+  /** Scales every force, and falls each tick; below HEAT_MIN the layout is not computed. */
+  heat: number;
   drag: Drag | null;
   dragged: boolean;
 };
@@ -68,7 +70,20 @@ type Sim = {
 const KIND_COLOR: Record<string, string> = {};
 const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
+/**
+ * Slate-400: the light theme's faint text and the dark theme's dim text. It is light on a light
+ * background and stands out from a dark one, so near and far nodes differ only by the depth fade.
+ */
+const TEMPORAL_HISTORICAL = "#94a3b8";
 
+/**
+ * The layout cools: the forces are scaled by the simulation's heat, which falls from 1 to HEAT_MIN
+ * in 300 ticks, about 5s at 60 frames a second. Below HEAT_MIN the layout is not computed, since
+ * every tick costs a pass over every pair of nodes. New nodes or edges heat it to REHEAT.
+ */
+const HEAT_DECAY = 1 - 0.001 ** (1 / 300);
+const HEAT_MIN = 0.001;
+const REHEAT = 0.6;
 const REPEL = 2600;
 const SPRING_LEN = 90;
 const SPRING_K = 0.02;
@@ -120,9 +135,7 @@ function colorForNode(sim: Sim, node: SimNode, palette: Palette): string {
         return TEMPORAL_TOUCHED;
       }
     }
-    // The page's dim text colour, which stands out from the background in either theme, so the
-    // depth fade shows on these nodes too.
-    return palette.dim;
+    return TEMPORAL_HISTORICAL;
   }
   return colorFor(node.type, palette);
 }
@@ -142,12 +155,14 @@ function centroid(sim: Sim): [number, number] {
   return [sx / sim.nodes.size, sy / sim.nodes.size];
 }
 
-function mergeSeeds(
+/** Adds the nodes and edges the canvas does not have yet, and heats the layout when there are any. */
+export function mergeSeeds(
   sim: Sim,
   seeds: GraphNodeSeed[],
   edges: GraphEdgeSeed[],
   selectedId: string | null,
 ): void {
+  const before = sim.nodes.size + sim.edges.length;
   const ordered =
     selectedId === null
       ? seeds
@@ -185,12 +200,17 @@ function mergeSeeds(
     sim.edgeKeys.add(key);
     sim.edges.push(edge);
   }
+  if (sim.nodes.size + sim.edges.length > before) sim.heat = Math.max(sim.heat, REHEAT);
 }
 
-function tickPhysics(sim: Sim): void {
+/** Moves the nodes one step, unless the layout has cooled. Returns whether it moved them. */
+export function tickPhysics(sim: Sim): boolean {
   const nodes = [...sim.nodes.values()];
-  if (nodes.length === 0) return;
-  const repel = REPEL * springiness(nodes.length);
+  if (nodes.length === 0 || sim.heat < HEAT_MIN) return false;
+  const heat = sim.heat;
+  const repel = REPEL * springiness(nodes.length) * heat;
+  const centre = CENTER_K * heat;
+  const spring = SPRING_K * heat;
   for (let i = 0; i < nodes.length; i++) {
     const a = nodes[i];
     if (!a) continue;
@@ -210,8 +230,8 @@ function tickPhysics(sim: Sim): void {
       b.vx -= dx * f;
       b.vy -= dy * f;
     }
-    a.vx += -a.x * CENTER_K;
-    a.vy += -a.y * CENTER_K;
+    a.vx += -a.x * centre;
+    a.vy += -a.y * centre;
   }
   for (const edge of sim.edges) {
     const a = sim.nodes.get(edge.from);
@@ -220,7 +240,7 @@ function tickPhysics(sim: Sim): void {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-    const f = (d - SPRING_LEN) * SPRING_K;
+    const f = (d - SPRING_LEN) * spring;
     const ux = dx / d;
     const uy = dy / d;
     a.vx += ux * f;
@@ -234,6 +254,8 @@ function tickPhysics(sim: Sim): void {
     n.x += n.vx;
     n.y += n.vy;
   }
+  sim.heat -= sim.heat * HEAT_DECAY;
+  return true;
 }
 
 function zOf(sim: Sim, node: SimNode): number {
@@ -390,7 +412,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   const opacity = (depth: number) => depthOpacity(depth, near, far);
 
   ctx.lineWidth = 1;
-  const labels: { x: number; y: number; text: string; hot: boolean; opacity: number }[] = [];
+  const labels: { a: Projected; b: Projected; text: string; hot: boolean; opacity: number }[] = [];
   // The edges of the open node and of the node under the pointer are drawn last, in the accent
   // colour and twice as wide, unfaded, so they stand out from the rest.
   const hotEdges: [Projected, Projected][] = [];
@@ -415,8 +437,8 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     const scale = Math.min(a.scale, b.scale);
     if (hot || scale > 0.55) {
       labels.push({
-        x: (a.sx + b.sx) / 2,
-        y: (a.sy + b.sy) / 2,
+        a,
+        b,
         text: edge.label,
         hot,
         opacity: hot ? 1 : edgeOpacity,
@@ -468,15 +490,54 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   // The hot edges' labels are drawn last, larger and bold, so no other label covers them.
   for (const lab of [...labels.filter((l) => !l.hot), ...labels.filter((l) => l.hot)]) {
     ctx.font = lab.hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
+    const width = ctx.measureText(lab.text).width + LABEL_MARKER;
+    const length = Math.hypot(lab.b.sx - lab.a.sx, lab.b.sy - lab.a.sy);
+    // A label longer than its edge on screen would run over the nodes, so only a hot one is drawn.
+    if (!lab.hot && width > length) continue;
+    const { angle, flipped } = labelAngle(lab.a.sx, lab.a.sy, lab.b.sx, lab.b.sy);
+    ctx.save();
+    ctx.translate((lab.a.sx + lab.b.sx) / 2, (lab.a.sy + lab.b.sy) / 2);
+    ctx.rotate(angle);
     ctx.globalAlpha = (lab.hot ? 0.95 : 0.75) * lab.opacity;
     ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
-    ctx.fillText(lab.text, lab.x, lab.y - 7);
+    const y = -6;
+    ctx.fillText(lab.text, flipped ? LABEL_MARKER / 2 : -LABEL_MARKER / 2, y);
+    // A triangle at the end the relation points to: after the text, or before it when flipped.
+    const tip = (flipped ? -1 : 1) * (width / 2);
+    const back = tip - (flipped ? -1 : 1) * 5;
+    ctx.beginPath();
+    ctx.moveTo(tip, y);
+    ctx.lineTo(back, y - 3);
+    ctx.lineTo(back, y + 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 
   drawCompass(ctx, sim, width, height);
+}
+
+/** The room an edge label leaves for its direction marker, in pixels. */
+const LABEL_MARKER = 9;
+
+/**
+ * The rotation for the label of an edge drawn from (ax, ay) to (bx, by): along the edge, turned at
+ * most a quarter circle either way so the text never reads upside down. `flipped` is set when the
+ * edge points leftward, so the label is turned half a circle from the edge's own direction.
+ */
+export function labelAngle(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): { angle: number; flipped: boolean } {
+  const along = Math.atan2(by - ay, bx - ax);
+  if (along > Math.PI / 2) return { angle: along - Math.PI, flipped: true };
+  if (along < -Math.PI / 2) return { angle: along + Math.PI, flipped: true };
+  return { angle: along, flipped: false };
 }
 
 function hitTest(sim: Sim, mx: number, my: number): string | null {
@@ -493,20 +554,7 @@ function hitTest(sim: Sim, mx: number, my: number): string | null {
   return found;
 }
 
-/** Places the popover beside the pointer, inside the canvas. */
-function placePopover(
-  popover: HTMLDivElement,
-  clientX: number,
-  clientY: number,
-  rect: DOMRect,
-): void {
-  const left = Math.min(clientX - rect.left + 16, rect.width - popover.offsetWidth - 4);
-  const top = Math.min(clientY - rect.top + 16, rect.height - popover.offsetHeight - 4);
-  popover.style.left = `${Math.max(0, left)}px`;
-  popover.style.top = `${Math.max(0, top)}px`;
-}
-
-function createSim(): Sim {
+export function createSim(): Sim {
   return {
     nodes: new Map(),
     edges: [],
@@ -518,6 +566,7 @@ function createSim(): Sim {
     screenPos: new Map(),
     camera: { ...INITIAL_CAMERA },
     pivot: null,
+    heat: 1,
     drag: null,
     dragged: false,
   };
@@ -554,26 +603,12 @@ export function GraphView({
   onNavigate,
 }: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const simRef = useRef<Sim>(createSim());
   const sizeRef = useRef({ width: 0, height: 0 });
   const navigateRef = useRef(onNavigate);
   navigateRef.current = onNavigate;
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const pointerRef = useRef({ x: 0, y: 0 });
-  // The popover is measured once its content is drawn, so a new node's summary is placed by its own size.
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    const popover = popoverRef.current;
-    if (hoverId === null || !canvas || !popover) return;
-    placePopover(
-      popover,
-      pointerRef.current.x,
-      pointerRef.current.y,
-      canvas.getBoundingClientRect(),
-    );
-  }, [hoverId]);
 
   const sim = simRef.current;
   sim.overlay = overlay;
@@ -585,8 +620,7 @@ export function GraphView({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const popover = popoverRef.current;
-    if (!canvas || !popover) return;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctxRef.current = ctx;
@@ -620,9 +654,7 @@ export function GraphView({
       const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
       const hit = inside ? hitTest(s, mx, my) : null;
       s.hoverId = hit !== null && s.nodes.has(hit) ? hit : null;
-      pointerRef.current = { x: event.clientX, y: event.clientY };
       setHoverId(s.hoverId);
-      if (s.hoverId !== null) placePopover(popover, event.clientX, event.clientY, rect);
     };
     const onPointerUp = () => {
       const s = simRef.current;
@@ -684,11 +716,7 @@ export function GraphView({
     <div id="stage-wrap">
       <canvas id="stage" ref={canvasRef} className="orbit" />
       <div className="hint">drag to orbit · scroll to zoom</div>
-      <div
-        id="popover"
-        className={hoverId === null ? "popover hidden" : "popover"}
-        ref={popoverRef}
-      >
+      <div id="popover" className={hoverId === null ? "popover hidden" : "popover"}>
         {hoverId === null ? null : summary(hoverId)}
       </div>
     </div>
