@@ -875,11 +875,31 @@
 .trace .graph-stage .popover {
   background: var(--panel);
   border-color: var(--line);
-  padding: 4px;
-  width: 300px;
+  padding: 0;
+  width: 340px;
+  max-width: calc(100% - 8px);
+  max-height: 320px;
+  overflow: hidden;
 }
-.trace .graph-stage .popover .res-item {
-  border: none;
+/* The card is cut off at the popover's height and fades out there; the open resource has the rest. */
+.trace .graph-stage .popover .panel-body {
+  padding: 0 12px 8px;
+  mask-image: linear-gradient(to bottom, black 85%, transparent);
+}
+.trace .graph-stage .popover .kv {
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+.trace .graph-stage .popover .kv .k {
+  flex: none;
+}
+.trace .graph-stage .popover .kv .v {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
 }
 .trace .sr-only {
   position: absolute;
