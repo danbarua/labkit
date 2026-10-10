@@ -1,24 +1,38 @@
 /**
- * The Trace Console: the API's HAL documents, followed by link. The left column lists collections,
- * the centre shows the open resource, and the right lists what relates to it. The page's address
- * is the API path of what is open, so a reload or a pasted link opens it again.
+ * The Trace Console: the API's HAL documents, followed by link. The left column lists collections.
+ * The centre shows the graph of what the reader has opened, then the open resource with the
+ * resources it relates to. The page's address is the API path of what is open, so a reload or a
+ * pasted link opens it again.
  */
 
-import { ThemeToggle } from "@labkit/ui";
+import { ICONS, ThemeToggle } from "@labkit/ui";
+import {
+  ArrowClockwiseIcon,
+  ArrowCounterClockwiseIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  BracketsCurlyIcon,
+  CaretRightIcon,
+  HouseIcon,
+  IconContext,
+  MagnifyingGlassIcon,
+  SidebarSimpleIcon,
+} from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSavedTheme } from "../saved-theme";
+import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
-  GraphView,
-  type GraphEdgeSeed,
-  type GraphNodeSeed,
-  type Overlay,
-  type ViewMode,
-} from "../GraphView";
-import {
-  type Collection,
   type CollectionItem,
   collectionOf,
   edgeLabelOf,
@@ -31,7 +45,6 @@ import {
   labelFor,
   relGroups,
   shortId,
-  truncate,
   typeColour,
 } from "./hal";
 import {
@@ -56,7 +69,7 @@ const ENTRY = "/collections/workspace";
  */
 const DEPTH = 2;
 
-export type Tab = "overview" | "graph" | "debug";
+export type Tab = "overview" | "debug";
 
 const resourcePath = (key: string) => `${key}?depth=${DEPTH}`;
 
@@ -73,11 +86,12 @@ function Spinner({ children }: { children: ReactNode }) {
 }
 
 /**
- * The history entries this page has seen, by their position in the browser's history. The browser
- * does not let a page read its history, so the page keeps the path it showed at each position: an
- * entry is replaced when the page arrives at its position again by a new navigation, and the
- * entries after it are dropped, as the browser drops them. The position and the path are read from
- * one location, so a render between two navigations never pairs one's position with the other's path.
+ * The history entries this page has seen, by their position in the browser's history, which enable
+ * or disable the Back and Forward buttons. The browser does not let a page read its history, so
+ * the page keeps the path it showed at each position: an entry is replaced when the page arrives at
+ * its position again by a new navigation, and the entries after it are dropped, as the browser
+ * drops them. The position and the path are read from one location, so a render between two
+ * navigations never pairs one's position with the other's path.
  */
 function useTrail(): { trail: string[]; at: number } {
   const here = useRouterState({
@@ -99,9 +113,30 @@ function useTrail(): { trail: string[]; at: number } {
   return { trail, at };
 }
 
-/** A trail entry that opened something: any path but the console's root. */
-const opened = (entry: string | undefined): entry is string =>
-  entry !== undefined && shortId(entry) !== "";
+/**
+ * The resources the reader has opened since the graph was last reset, in the order they were first
+ * opened. The graph draws these and what they relate to. `generation` counts the resets, so the
+ * canvas can start a new layout on each one.
+ */
+function useExplored(path: string) {
+  const [state, setState] = useState<{ keys: string[]; generation: number }>({
+    keys: [],
+    generation: 0,
+  });
+  const add = useCallback(
+    (key: string) => setState((s) => (s.keys.includes(key) ? s : { ...s, keys: [...s.keys, key] })),
+    [],
+  );
+  useEffect(() => {
+    if (path !== "") add(path);
+  }, [path, add]);
+  const reset = () =>
+    setState((s) => ({ keys: path === "" ? [] : [path], generation: s.generation + 1 }));
+  return { ...state, reset };
+}
+
+/** The workspace directory a key sits in, `/workspace/<slug>/`, or undefined outside one. */
+const workspaceOf = (key: string) => /^\/workspace\/[^/]+\//.exec(key)?.[0];
 
 export interface TraceConsoleProps {
   /** The API path of what is open, or "" when nothing is. */
@@ -116,7 +151,10 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const router = useRouter();
   const [theme, setTheme] = useSavedTheme();
   const [term, setTerm] = useState("");
-  const [drawer, setDrawer] = useState<"items" | "relations" | undefined>();
+  const [drawer, setDrawer] = useState<"items" | undefined>();
+  const [graphOpen, setGraphOpen] = useState(true);
+  const explored = useExplored(path);
+  const workspace = workspaceOf(path);
   useStoreVersion();
   const held = store.index();
 
@@ -124,11 +162,26 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const openDoc = docOf(openEntry);
   const openIsCollection = openDoc !== undefined && typeof openDoc.type !== "string";
 
-  // Opening what is already open adds no history entry.
+  // Opening what is already open adds no history entry. Opening a resource of another type than
+  // the listed collection's lists the collection that one is listed in instead, which closes the
+  // Items pane: the reader is following relations, not reading down the list.
+  const shownList = openIsCollection ? path : list;
   const open = (key: string) => {
     setDrawer(undefined);
     if (key === path) return;
-    void navigate({ to: "/$", params: { _splat: key.replace(/^\//, "") }, search: (s) => s });
+    const upper = shownList === undefined ? undefined : indexOfList(shownList);
+    const listedType =
+      upper === undefined || shownList === undefined
+        ? undefined
+        : rowIn(upper, shownList)?.data.type;
+    const type = held.get(key)?.type;
+    const nextList =
+      listedType !== undefined && type !== undefined && type !== listedType ? upper : shownList;
+    void navigate({
+      to: "/$",
+      params: { _splat: key.replace(/^\//, "") },
+      search: (s) => ({ ...s, list: nextList }),
+    });
   };
   // A collection picked, or the workspaces on going home, is fetched again: what it lists changes
   // as records are written, and its rows stay on screen until the new page arrives.
@@ -156,116 +209,115 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const prose = proseFor(held, path, open);
 
   return (
-    <div className="lk-root trace" data-theme={theme === "system" ? undefined : theme}>
-      <header className="topbar">
-        <button
-          type="button"
-          className="hamburger"
-          aria-label="Toggle collections column"
-          onClick={() => setDrawer((d) => (d === "items" ? undefined : "items"))}
-        >
-          ☰
-        </button>
-        <div className="brand">
-          <img className="brand-mark" src={markUrl} alt="" />
-          <span className="brand-name">Trace Console</span>
-          <span className="brand-sub">live · {window.location.host}</span>
-        </div>
-        <div className="nav-controls">
+    <IconContext.Provider value={ICONS}>
+      <div className="lk-root trace" data-theme={theme === "system" ? undefined : theme}>
+        <header className="topbar">
           <button
             type="button"
-            className="nav-btn"
-            aria-label="Entry point"
-            title="Back to the workspaces"
-            onClick={home}
+            className="hamburger"
+            aria-label="Toggle collections column"
+            onClick={() => setDrawer((d) => (d === "items" ? undefined : "items"))}
           >
-            ⌂
+            <SidebarSimpleIcon aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            className="nav-btn"
-            aria-label="Back"
-            disabled={!canBack}
-            onClick={() => router.history.back()}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="nav-btn"
-            aria-label="Forward"
-            disabled={!canForward}
-            onClick={() => router.history.forward()}
-          >
-            ›
-          </button>
-        </div>
-        <Breadcrumb trail={trail} at={at} go={(delta) => router.history.go(delta)} />
-        {import.meta.env.DEV ? <DevLinks /> : null}
-        <div className="search-wrap">
-          <span className="icon">⌕</span>
-          <input
-            type="text"
-            placeholder="Filter…"
-            autoComplete="off"
-            aria-label="Filter the lists"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-          />
-        </div>
-        <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
-        <button
-          type="button"
-          className="hamburger"
-          id="hamburger-right"
-          aria-label="Toggle relations column"
-          onClick={() => setDrawer((d) => (d === "relations" ? undefined : "relations"))}
-        >
-          ⇆
-        </button>
-      </header>
-
-      <div className="body">
-        <button
-          type="button"
-          className={drawer === undefined ? "scrim" : "scrim open"}
-          aria-label="Close the column"
-          tabIndex={-1}
-          onClick={() => setDrawer(undefined)}
-        />
-        <Lists
-          className={drawer === "items" ? "sidebar open" : "sidebar"}
-          listKey={listKey}
-          root={listKey === ENTRY}
-          openKey={path}
-          held={held}
-          term={term}
-          onOpen={open}
-          onList={pickList}
-        />
-        <main className="main">
-          <div className="detail">
-            <Detail
-              path={path}
-              entry={openEntry}
-              isCollection={openIsCollection}
-              held={held}
-              tab={tab}
-              prose={prose}
-              onTab={pickTab}
-              onOpen={open}
+          <div className="brand">
+            <img className="brand-mark" src={markUrl} alt="" />
+            <span className="brand-name">Trace Console</span>
+            <span className="brand-sub">live · {window.location.host}</span>
+          </div>
+          <div className="nav-controls">
+            <button
+              type="button"
+              className="nav-btn"
+              aria-label="Entry point"
+              title="Back to the workspaces"
+              onClick={home}
+            >
+              <HouseIcon aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="nav-btn"
+              aria-label="Back"
+              disabled={!canBack}
+              onClick={() => router.history.back()}
+            >
+              <ArrowLeftIcon aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="nav-btn"
+              aria-label="Forward"
+              disabled={!canForward}
+              onClick={() => router.history.forward()}
+            >
+              <ArrowRightIcon aria-hidden="true" />
+            </button>
+          </div>
+          <span className="topbar-gap" />
+          {import.meta.env.DEV ? <DevLinks /> : null}
+          <div className="search-wrap">
+            <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+            <input
+              type="text"
+              placeholder="Filter…"
+              autoComplete="off"
+              aria-label="Filter the lists"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
             />
           </div>
-        </main>
-        <Incoming
-          className={drawer === "relations" ? "relations-col open" : "relations-col"}
-          path={path}
-          held={held}
-          loading={openEntry?.status === "loading"}
-          onOpen={open}
-        />
+          <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
+        </header>
+
+        <div className="body">
+          <button
+            type="button"
+            className={drawer === undefined ? "scrim" : "scrim open"}
+            aria-label="Close the column"
+            tabIndex={-1}
+            onClick={() => setDrawer(undefined)}
+          />
+          <Lists
+            className={drawer === "items" ? "sidebar open" : "sidebar"}
+            listKey={listKey}
+            root={listKey === ENTRY}
+            openKey={path}
+            held={held}
+            term={term}
+            onOpen={open}
+            onList={pickList}
+          />
+          <main className="main">
+            <div className="detail">
+              {workspace === undefined ? null : (
+                <GraphCard
+                  open={graphOpen}
+                  workspace={workspace}
+                  explored={explored.keys}
+                  generation={explored.generation}
+                  held={held}
+                  selected={path}
+                  onToggle={() => setGraphOpen((o) => !o)}
+                  onOpen={open}
+                  onReset={explored.reset}
+                />
+              )}
+              <Detail
+                path={path}
+                entry={openEntry}
+                isCollection={openIsCollection}
+                held={held}
+                tab={tab}
+                prose={prose}
+                onTab={pickTab}
+                onOpen={open}
+              />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </IconContext.Provider>
   );
 }
 
@@ -279,46 +331,6 @@ function DevLinks() {
       <Link to="/agent/{-$sessionId}" params={{ sessionId: undefined }} reloadDocument>
         agent
       </Link>
-    </nav>
-  );
-}
-
-/** The run of resources opened one after another that the current one is part of. */
-function Breadcrumb({
-  trail,
-  at,
-  go,
-}: {
-  trail: string[];
-  at: number;
-  go: (delta: number) => void;
-}) {
-  const crumbs: number[] = [];
-  if (opened(trail[at])) {
-    let start = at;
-    while (start > 0 && opened(trail[start - 1])) start--;
-    for (let i = start; i < trail.length && opened(trail[i]); i++) crumbs.push(i);
-  }
-  // The newest crumb stays in view when the trail is wider than the bar.
-  const nav = useRef<HTMLElement>(null);
-  const last = crumbs.at(-1);
-  useEffect(() => {
-    if (last !== undefined && nav.current) nav.current.scrollLeft = nav.current.scrollWidth;
-  }, [last]);
-  return (
-    <nav ref={nav} className="breadcrumb" aria-label="Navigation history">
-      {crumbs.map((i, n) => (
-        <span key={i} className="crumb-step">
-          {n > 0 ? <span className="crumb-sep">›</span> : null}
-          <button
-            type="button"
-            className={i === at ? "crumb current" : "crumb"}
-            onClick={() => go(i - at)}
-          >
-            {shortId(trail[i] ?? "")}
-          </button>
-        </span>
-      ))}
     </nav>
   );
 }
@@ -364,6 +376,18 @@ function proseFor(held: HeldIndex, path: string, onOpen: (key: string) => void):
 
 /* ---------------- left column ---------------- */
 
+/** The collection that the held document of collection `key` names as the one it is listed in. */
+function indexOfList(key: string): string | undefined {
+  const doc = docOf(store.entry(requestPath(key)));
+  return doc === undefined ? undefined : collectionOf(key, doc).index;
+}
+
+/** Collection `key` as a row of collection `upper`, when the document of `upper` is held. */
+function rowIn(upper: string, key: string): CollectionItem | undefined {
+  const doc = docOf(store.entry(requestPath(upper)));
+  return doc && collectionOf(upper, doc).items.find((item) => item.key === keyOf(key));
+}
+
 const readCollection =
   (key: string) =>
   (doc: HalDocument): { items: CollectionItem[]; next: string | undefined } => {
@@ -396,9 +420,19 @@ function Lists({
   onList: (key: string) => void;
 }) {
   const listEntry = useDocument(requestPath(listKey));
-  const listed: Collection | undefined =
-    listEntry?.status === "ready" ? collectionOf(listKey, listEntry.doc) : undefined;
-  const upperKey = root || listed?.index === undefined ? listKey : listed.index;
+  // Until the picked collection's first page arrives, the collection it was picked from stays the
+  // upper one, so the upper pane does not show the picked collection and then swap back.
+  const shown = useRef<string | undefined>(undefined);
+  const upperKey = root
+    ? listKey
+    : docOf(listEntry) !== undefined
+      ? (indexOfList(listKey) ?? listKey)
+      : shown.current !== undefined && rowIn(shown.current, listKey) !== undefined
+        ? shown.current
+        : listKey;
+  useEffect(() => {
+    shown.current = upperKey;
+  });
   const lowerKey = upperKey === listKey ? undefined : listKey;
   // The row for the lower collection, which `list` may name with a query (`?limit=`), is lit.
   const lowerRow = lowerKey === undefined ? undefined : keyOf(lowerKey);
@@ -565,7 +599,32 @@ function ResourceRow({
   );
 }
 
-/* ---------------- centre column ---------------- */
+/**
+ * A resource as the graph's popover draws it: its type's chip, handle and type, then its
+ * properties. A resource known only by a link to it is fetched when it is first hovered.
+ */
+function HoverCard({ itemKey, held }: { itemKey: string; held: HeldIndex }) {
+  const r = held.get(itemKey);
+  const entry = useDocument(r?.attrs === undefined ? resourcePath(itemKey) : undefined);
+  return (
+    <div className="hover-card">
+      <div className="card-head">
+        <Badge type={r?.type} />
+        <span className="cid mono">{shortId(itemKey)}</span>
+        <span className="clabel">{r?.type}</span>
+      </div>
+      <div className="panel-body">
+        {entry?.status === "failed" ? (
+          <div className="empty-panel">Fetch failed: {entry.error}</div>
+        ) : r?.attrs === undefined ? (
+          <Spinner>fetching {shortId(itemKey)}…</Spinner>
+        ) : (
+          <PropRows attrs={r.attrs} prose={proseFor(held, itemKey, () => {})} />
+        )}
+      </div>
+    </div>
+  );
+}
 
 const PILL_KEYS = ["kind", "outcome", "resolution_kind", "status", "role"] as const;
 
@@ -663,7 +722,7 @@ function Detail({
           </div>
         ) : null}
         <div className="toolbar" role="tablist">
-          {(["overview", "graph", "debug"] as const).map((t) => (
+          {(["overview", "debug"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -672,7 +731,7 @@ function Detail({
               className={tab === t ? "tbtn on" : "tbtn"}
               onClick={() => onTab(t)}
             >
-              {t === "overview" ? "Overview" : t === "graph" ? "Graph" : "Debug"}
+              {t === "overview" ? "Overview" : "Debug"}
             </button>
           ))}
           <button
@@ -680,19 +739,16 @@ function Detail({
             className="tbtn"
             title="Reload from the API"
             aria-label="Reload from the API"
-            onClick={() => {
-              store.forget((p) => p.startsWith(`${path}/events`));
-              store.load(resourcePath(path), true);
-            }}
+            onClick={() =>
+              store.reload((p) => p === resourcePath(path) || p.startsWith(`${path}/events`))
+            }
           >
-            ↻
+            <ArrowClockwiseIcon aria-hidden="true" />
           </button>
         </div>
       </div>
       {tab === "debug" ? (
         <Debug res={res} entry={entry} onOpen={onOpen} />
-      ) : tab === "graph" ? (
-        <GraphPanel path={path} held={held} onOpen={onOpen} />
       ) : (
         <>
           <div className="panel">
@@ -704,16 +760,23 @@ function Detail({
             </div>
           </div>
           {loaded ? (
-            relGroups(res, "out").map((g) => (
-              <div key={g.rel}>
-                <div className="rel-heading">
-                  → {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+            (["out", "in"] as const).flatMap((dir) =>
+              relGroups(res, dir).map((g) => (
+                <div key={`${dir} ${g.rel}`}>
+                  <div className="rel-heading">
+                    {dir === "out" ? (
+                      <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
+                    ) : (
+                      <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
+                    )}
+                    {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                  </div>
+                  {g.keys.map((key) => (
+                    <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
+                  ))}
                 </div>
-                {g.keys.map((key) => (
-                  <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
-                ))}
-              </div>
-            ))
+              )),
+            )
           ) : (
             <Spinner>fetching {shortId(path)}…</Spinner>
           )}
@@ -775,22 +838,31 @@ function Debug({
     <>
       <div className="panel">
         <div className="panel-head">
-          <span>
+          <span className="response-head">
             <button
               type="button"
-              className="toggle-btn caret"
+              className="toggle-btn"
               title="Show or hide the response"
               aria-label="Show or hide the response"
               aria-expanded={responseOpen}
               onClick={() => setResponseOpen((o) => !o)}
             >
-              {responseOpen ? "▾" : "▸"}
-            </button>{" "}
+              <CaretRightIcon
+                className={responseOpen ? "caret open" : "caret"}
+                aria-hidden="true"
+              />
+            </button>
             <a href={self} target="_blank" rel="noopener" title="Open in a new tab">
               {self}
             </a>
           </span>
-          <button type="button" className="toggle-btn" onClick={() => setResponseOpen((o) => !o)}>
+          <button
+            type="button"
+            className="toggle-btn response-chip"
+            aria-expanded={responseOpen}
+            onClick={() => setResponseOpen((o) => !o)}
+          >
+            <BracketsCurlyIcon aria-hidden="true" />
             response
           </button>
         </div>
@@ -850,38 +922,50 @@ function Events({ href, onOpen }: { href: string; onOpen: (key: string) => void 
 }
 
 /**
- * Every resource opened in this workspace, with what each relates to, drawn on a canvas. The
- * canvas keeps what it has been shown as the reader moves from one resource to the next.
+ * The resources explored in this workspace, with what each relates to, drawn on a canvas. The
+ * canvas keeps its layout as the reader moves from one resource to the next, and while the card is
+ * folded, until Reset starts it again from the open resource.
  */
-function GraphPanel({
-  path,
+function GraphCard({
+  open,
+  workspace,
+  explored,
+  generation,
   held,
+  selected,
+  onToggle,
   onOpen,
+  onReset,
 }: {
-  path: string;
+  open: boolean;
+  workspace: string;
+  explored: string[];
+  generation: number;
   held: HeldIndex;
+  selected: string;
+  onToggle: () => void;
   onOpen: (key: string) => void;
+  onReset: () => void;
 }) {
-  const [view, setView] = useState<ViewMode>("2d");
   const [overlay, setOverlay] = useState<Overlay>("structural");
-  const workspace = /^\/workspace\/[^/]+\//.exec(path)?.[0] ?? dirOf(path);
-  const { nodes, edges } = useMemo(() => graphOf(held, workspace), [held, workspace]);
+  const { nodes, edges } = useMemo(
+    () => graphOf(held, explored, workspace),
+    [held, explored, workspace],
+  );
   return (
-    <div className="panel graph-panel">
+    <div className="panel graph-card">
       <div className="panel-head">
-        <span className="graph-controls">
-          {(["2d", "3d"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              data-view={v}
-              aria-pressed={view === v}
-              className={view === v ? "tbtn on" : "tbtn"}
-              onClick={() => setView(v)}
-            >
-              {v.toUpperCase()}
-            </button>
-          ))}
+        <span className="graph-title">
+          <button
+            type="button"
+            className="toggle-btn"
+            aria-label="Show or hide the graph"
+            aria-expanded={open}
+            onClick={onToggle}
+          >
+            <CaretRightIcon className={open ? "caret open" : "caret"} aria-hidden="true" />
+          </button>
+          Graph<span className="faint">{nodes.length}</span>
         </span>
         <span className="graph-controls">
           colour
@@ -902,25 +986,50 @@ function GraphPanel({
               {label}
             </button>
           ))}
+          <button
+            type="button"
+            className="tbtn"
+            title="Draw the open resource alone, and forget what else was explored"
+            onClick={onReset}
+          >
+            <ArrowCounterClockwiseIcon aria-hidden="true" /> Reset
+          </button>
         </span>
       </div>
-      <div className="graph-stage">
+      <div className="graph-stage" hidden={!open}>
         <GraphView
+          key={`${workspace} ${generation}`}
           nodes={nodes}
           edges={edges}
-          selectedId={path}
-          view={view}
+          selectedId={selected}
           overlay={overlay}
+          active={open}
+          summary={(id) => <HoverCard itemKey={id} held={held} />}
           onNavigate={onOpen}
         />
       </div>
+      {open ? (
+        <ul className="sr-only" aria-label="Nodes in the graph">
+          {nodes.map((n) => (
+            <li key={n.id}>
+              <button type="button" onClick={() => onOpen(n.id)}>
+                {`${n.label} (${n.type})`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
 
-/** The resources fetched in a workspace and their relations, as the canvas's nodes and edges. */
+/**
+ * The explored resources in a workspace and their relations, as the canvas's nodes and edges. A
+ * resource adds its relations once its own response has arrived.
+ */
 function graphOf(
   held: HeldIndex,
+  explored: string[],
   workspace: string,
 ): { nodes: GraphNodeSeed[]; edges: GraphEdgeSeed[] } {
   const nodes = new Map<string, GraphNodeSeed>();
@@ -930,8 +1039,9 @@ function graphOf(
       nodes.set(key, { id: key, label: shortId(key), type: held.get(key)?.type ?? "?" });
     }
   };
-  for (const r of held.values()) {
-    if (!r.own || !r.key.startsWith(workspace)) continue;
+  for (const key of explored) {
+    const r = held.get(key);
+    if (r?.own !== true || !key.startsWith(workspace)) continue;
     node(r.key);
     for (const rel of r.rels) {
       node(rel.key);
@@ -940,79 +1050,4 @@ function graphOf(
     }
   }
   return { nodes: [...nodes.values()], edges };
-}
-
-/* ---------------- right column ---------------- */
-
-function Incoming({
-  className,
-  path,
-  held,
-  loading,
-  onOpen,
-}: {
-  className: string;
-  path: string;
-  held: HeldIndex;
-  loading: boolean;
-  onOpen: (key: string) => void;
-}) {
-  const res = path === "" ? undefined : held.get(path);
-  const groups = res?.own ? relGroups(res, "in") : [];
-  const count = groups.reduce((n, g) => n + g.keys.length, 0);
-  return (
-    <aside className={className}>
-      <div className="sidebar-section grow">
-        <div className="section-label">
-          Incoming relations<span className="count">{res?.own ? count : ""}</span>
-        </div>
-        <div className="panel-body">
-          {!res?.own ? (
-            <div className="empty-note">
-              {path === ""
-                ? "Nothing open yet."
-                : loading
-                  ? `Waiting on ${shortId(path)}…`
-                  : `${shortId(path)} hasn't loaded.`}
-            </div>
-          ) : groups.length === 0 ? (
-            <div className="empty-panel">None recorded.</div>
-          ) : (
-            groups.map((g) => (
-              <div key={g.rel} className="rel-group">
-                <div className="rel-key">
-                  <span className="rel-arrow">←</span>
-                  {humanRel(g.rel)}
-                </div>
-                <div className="res-list">
-                  {g.keys.map((key) => {
-                    const r = held.get(key);
-                    const resolved = r?.attrs !== undefined;
-                    return (
-                      <ResourceRow
-                        key={key}
-                        itemKey={key}
-                        view={{
-                          chipType: r?.type ?? "?",
-                          chipText: undefined,
-                          title: shortId(key),
-                          sub: resolved
-                            ? truncate(labelFor(r?.attrs) || (r?.type ?? ""), 160)
-                            : "not yet fetched",
-                        }}
-                        unresolved={!resolved}
-                        active={key === path}
-                        title={resourcePath(key)}
-                        onOpen={onOpen}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </aside>
-  );
 }

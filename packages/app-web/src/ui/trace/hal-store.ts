@@ -87,14 +87,12 @@ export class HalStore {
     );
   }
 
-  /** Drops every held document whose path `match` accepts, so the next `load` fetches it. */
-  forget(match: (path: string) => boolean): void {
-    for (const path of [...this.entries.keys()]) {
-      if (!match(path)) continue;
-      this.entries.delete(path);
-      this.requests.delete(path);
-    }
-    this.changed();
+  /**
+   * Fetches again every requested path that `match` accepts. Each document stays readable until its
+   * new one arrives, so a reader on screen keeps its rows and sees the request as loading.
+   */
+  reload(match: (path: string) => boolean): void {
+    for (const path of [...this.entries.keys()]) if (match(path)) this.load(path, true);
   }
 
   /** Every resource the held documents name, in the order the documents arrived. */
@@ -126,7 +124,7 @@ export class HalStore {
 /** The page's documents, for as long as the page is open. */
 export const store = new HalStore();
 
-/** Re-renders the caller whenever a document arrives, fails or is dropped. */
+/** Re-renders the caller whenever a request starts, a document arrives or a request fails. */
 export function useStoreVersion(): number {
   return useSyncExternalStore(store.subscribe, store.getVersion);
 }

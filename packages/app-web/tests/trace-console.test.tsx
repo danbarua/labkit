@@ -333,18 +333,23 @@ describe("the documents fetched", () => {
     expect(store.index().get("/w/x/Q_1")?.attrs).toEqual({ name: "second" });
   });
 
-  test("a held document is not fetched again until it is forgotten", async () => {
+  test("a held document is fetched again only when reloaded, and stays readable meanwhile", async () => {
     let fetched = 0;
     const store = new HalStore(async () => {
       fetched++;
-      return node("/w/x/Q_1", "Question");
+      return node("/w/x/Q_1", "Question", { name: `fetch ${fetched}` });
     });
     store.load("/w/x/Q_1");
     store.load("/w/x/Q_1");
+    await Bun.sleep(0);
     expect(fetched).toBe(1);
-    store.forget((p) => p === "/w/x/Q_1");
-    store.load("/w/x/Q_1");
+    store.reload((p) => p === "/w/x/Q_1" || p === "/w/x/never-requested");
+    expect(store.entry("/w/x/Q_1")?.status).toBe("loading");
+    expect(docOf(store.entry("/w/x/Q_1"))?.name).toBe("fetch 1");
+    expect(store.entry("/w/x/never-requested")).toBeUndefined();
+    await Bun.sleep(0);
     expect(fetched).toBe(2);
+    expect(docOf(store.entry("/w/x/Q_1"))?.name).toBe("fetch 2");
   });
 
   test("a failed request is held as its error, and fetched again when next asked for", async () => {

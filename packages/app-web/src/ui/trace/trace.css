@@ -72,8 +72,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .trace .spinner,
-  .trace .sidebar,
-  .trace .relations-col {
+  .trace .sidebar {
     animation: none;
     transition: none;
   }
@@ -253,40 +252,8 @@
   color: var(--accent);
 }
 
-.trace .breadcrumb {
+.trace .topbar-gap {
   flex: 1 1 auto;
-  min-width: 0;
-  overflow-x: auto;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  padding: 4px 0;
-}
-.trace .crumb-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.trace .crumb {
-  font-size: inherit;
-  color: var(--text-dim);
-  background: none;
-  border: none;
-  padding: 3px 6px;
-  border-radius: 5px;
-}
-.trace .crumb:hover {
-  color: var(--text);
-  background: var(--panel-2);
-}
-.trace .crumb.current {
-  color: var(--accent);
-}
-.trace .crumb-sep {
-  color: var(--text-faint);
 }
 
 .trace .dev-links {
@@ -324,7 +291,6 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-faint);
-  font-size: 12px;
 }
 
 .trace .theme-btn {
@@ -582,6 +548,8 @@
   padding: 4px 14px;
 }
 .trace .toggle-btn {
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: none;
   padding: 0;
@@ -591,9 +559,20 @@
   color: var(--text);
 }
 .trace .caret {
-  display: inline-block;
-  width: 1em;
   color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.trace .caret.open {
+  transform: rotate(90deg);
+}
+.trace .response-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.trace .response-chip {
+  gap: 4px;
 }
 
 .trace .kv {
@@ -674,22 +653,6 @@
   margin-top: 4px;
 }
 
-.trace .rel-group {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-}
-.trace .rel-group:last-child {
-  border-bottom: none;
-}
-.trace .rel-key {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text-dim);
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 .trace .rel-arrow {
   color: var(--text-faint);
 }
@@ -800,20 +763,6 @@
   margin-top: 8px;
 }
 
-.trace .relations-col {
-  flex: 0 0 300px;
-  width: 300px;
-  min-width: 300px;
-  overflow-x: hidden;
-  border-left: 1px solid var(--line);
-  background: var(--panel);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.trace .relations-col .panel-body {
-  padding: 4px 0;
-}
 .trace .scrim {
   display: none;
   position: fixed;
@@ -823,14 +772,14 @@
   padding: 0;
   z-index: 19;
 }
-.trace .scrim.open {
-  display: block;
-}
 .trace .rel-heading {
   font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--text-dim);
   margin: 22px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .trace .ev {
   display: flex;
@@ -899,12 +848,26 @@
   gap: 6px;
 }
 .trace .graph-controls .tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 9px;
   font-size: 12px;
 }
+.trace .graph-card {
+  margin-bottom: 22px;
+}
+.trace .graph-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .trace .graph-stage {
   display: flex;
-  height: min(64vh, 620px);
+  height: min(48vh, 460px);
+}
+.trace .graph-stage[hidden] {
+  display: none;
 }
 .trace .graph-stage .hint {
   color: var(--text-dim);
@@ -912,28 +875,45 @@
 .trace .graph-stage .popover {
   background: var(--panel);
   border-color: var(--line);
+  padding: 0;
+  width: 340px;
+  max-width: calc(100% - 8px);
+  max-height: 320px;
+  overflow: hidden;
+}
+/* The card is cut off at the popover's height and fades out there; the open resource has the rest. */
+.trace .graph-stage .popover .panel-body {
+  padding: 0 12px 8px;
+  mask-image: linear-gradient(to bottom, black 85%, transparent);
+}
+.trace .graph-stage .popover .kv {
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+.trace .graph-stage .popover .kv .k {
+  flex: none;
+}
+.trace .graph-stage .popover .kv .v {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+}
+.trace .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* ---------- narrow windows: the side columns become drawers ---------- */
-@media (max-width: 1180px) {
-  .trace #hamburger-right {
-    display: flex;
-  }
-  .trace .relations-col {
-    position: fixed;
-    z-index: 20;
-    top: 52px;
-    right: 0;
-    bottom: 0;
-    width: 300px;
-    transform: translateX(100%);
-    transition: transform 0.18s ease;
-    box-shadow: -2px 0 16px rgba(0, 0, 0, 0.35);
-  }
-  .trace .relations-col.open {
-    transform: translateX(0);
-  }
-}
+/* ---------- narrow windows: the side column becomes a drawer ---------- */
 @media (max-width: 860px) {
   .trace .search-wrap,
   .trace .dev-links {
@@ -941,6 +921,9 @@
   }
   .trace .hamburger {
     display: flex;
+  }
+  .trace .scrim.open {
+    display: block;
   }
   .trace .sidebar {
     position: fixed;

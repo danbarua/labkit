@@ -74,10 +74,53 @@ test.describe("getting around", () => {
     await expect(header(page)).toHaveText("LOE_1");
   });
 
-  test("a path that names a collection lists it", async ({ page }) => {
+  test("a path that names a collection lists it, and keeps it listed when an item opens", async ({
+    page,
+  }) => {
     await page.goto("/app/workspace/alpha/question");
     await expect(item(page, "Q_1")).toBeVisible();
     await expect(page.getByText("Pick a type on the left")).toBeVisible();
+    await item(page, "Q_1").click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(page).toHaveURL(new RegExp(`/Q_1\\?${list("/workspace/alpha/question")}$`));
+    await expect(item(page, "Q_1")).toHaveClass(/active/);
+  });
+
+  test("a collection picked from the upper pane loads below it, and the upper pane stays", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await expect(row(page, "Question")).toBeVisible();
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/workspace/alpha/question*", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await row(page, "Question").click();
+    await expect(page.locator(".sidebar .res-list .spinner")).toBeVisible();
+    await expect(row(page, "Question")).toHaveClass(/active/);
+    await expect(row(page, "LineOfEnquiry")).toBeVisible();
+    release();
+    await expect(item(page, "Q_1")).toBeVisible();
+    await expect(row(page, "LineOfEnquiry")).toBeVisible();
+  });
+
+  test("opening a resource of another type than the listed one closes the Items pane", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha/question")}`);
+    await item(page, "Q_1").click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(item(page, "Q_2")).toBeVisible();
+
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(page).toHaveURL(new RegExp(`${list("/workspace/alpha")}$`));
+    await expect(page.getByText("Pick a collection above to list its items.")).toBeVisible();
+    await expect(row(page, "Question")).toBeVisible();
   });
 
   test("a collection's next page is added on request", async ({ page }) => {
@@ -100,11 +143,14 @@ test.describe("an open resource", () => {
     await expect(page.locator(".card-head", { hasText: "LOE_1" })).toBeVisible();
   });
 
-  test("lists what relates to it on the right", async ({ page }) => {
+  test("shows the resources that relate to it as cards with their properties", async ({ page }) => {
     await page.goto("/app/workspace/alpha/LOE_1");
-    const incoming = page.locator(".relations-col");
-    await expect(incoming.locator(".rid", { hasText: /^Q_1$/ })).toBeVisible();
-    await expect(incoming.locator(".rid", { hasText: /^EU_1$/ })).toBeVisible();
+    await expect(page.locator(".rel-heading", { hasText: "question:motivates" })).toBeVisible();
+    const question = page.locator(".panel", {
+      has: page.locator(".card-head", { hasText: "Q_1" }),
+    });
+    await expect(question.getByText("alpha question")).toBeVisible();
+    await expect(page.locator(".card-head", { hasText: "EU_1" })).toBeVisible();
   });
 
   test("following a relation navigates in place, without reloading the page", async ({ page }) => {
@@ -126,23 +172,21 @@ test.describe("an open resource", () => {
     await page.goto("/app/workspace/alpha/Q_1");
     await page.locator(".card-head", { hasText: "LOE_1" }).click();
     await expect(header(page)).toHaveText("LOE_1");
-    await expect(page.locator(".breadcrumb .crumb")).toHaveText(["Q_1", "LOE_1"]);
 
     await page.goBack();
     await expect(header(page)).toHaveText("Q_1");
     await page.getByRole("button", { name: "Forward" }).click();
     await expect(header(page)).toHaveText("LOE_1");
+    await expect(page.getByRole("button", { name: "Forward" })).toBeDisabled();
     await page.getByRole("button", { name: "Back" }).click();
     await expect(header(page)).toHaveText("Q_1");
-    await page.locator(".breadcrumb .crumb", { hasText: "LOE_1" }).click();
-    await expect(header(page)).toHaveText("LOE_1");
   });
 
   test("opening the resource that is open adds no history entry", async ({ page }) => {
     await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
     await expect(header(page)).toHaveText("Q_1");
     await item(page, "Q_1").click();
-    await expect(page.locator(".breadcrumb .crumb")).toHaveText(["Q_1"]);
+    await expect(header(page)).toHaveText("Q_1");
     await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
   });
 
@@ -154,26 +198,35 @@ test.describe("an open resource", () => {
     await page.getByRole("button", { name: "Show or hide the response" }).click();
     await expect(page.locator("pre.jsonview")).toContainText("alpha question");
   });
-});
 
-test.describe("a narrow window", () => {
-  test.use({ viewport: { width: 1000, height: 800 } });
-
-  test("the inbound relations are a drawer that closes when a row is opened", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/LOE_1");
-    const drawer = page.locator(".relations-col");
-    await expect(drawer).not.toHaveClass(/open/);
-    await page.getByRole("button", { name: "Toggle relations column" }).click();
-    await expect(drawer).toHaveClass(/open/);
-    await drawer.locator(".res-item", { hasText: "Q_1" }).click();
+  test("an unknown tab in the address opens the overview", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=nonsense");
     await expect(header(page)).toHaveText("Q_1");
-    await expect(drawer).not.toHaveClass(/open/);
+    await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  test("reloading on the Debug tab fetches the events again and shows them", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=debug");
+    await expect(page.locator(".ev").first()).toBeVisible();
+    const refetched = page.waitForResponse((r) => r.url().includes("/workspace/alpha/Q_1/events"));
+    await page.getByRole("button", { name: "Reload from the API" }).click();
+    await refetched;
+    await expect(page.getByText("loading events…")).toHaveCount(0);
+    await expect(page.locator(".ev").first()).toBeVisible();
   });
 });
 
-test.describe("the graph tab", () => {
+test.describe("the graph", () => {
+  // The canvas's nodes are also a visually hidden list of buttons, for the keyboard, which is how
+  // these tests pick a node: a canvas has no element to click.
+  const node = (page: import("@playwright/test").Page, name: string) =>
+    page.getByRole("list", { name: "Nodes in the graph" }).getByRole("button", { name });
+
   test("draws the graph on the canvas", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
+    await page.goto("/app/workspace/alpha/LOE_1");
     const canvas = page.locator("#stage");
     await expect(canvas).toBeVisible();
     // A canvas that was sized but never drawn on has one colour in it.
@@ -194,22 +247,90 @@ test.describe("the graph tab", () => {
       .toBeGreaterThan(2);
   });
 
-  test("the view and colour toggles switch, and there is no standing overlay", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/Q_1?tab=graph");
-    const view3d = page.locator('[data-view="3d"]');
-    await view3d.click();
-    await expect(view3d).toHaveAttribute("aria-pressed", "true");
+  test("the camera faces the open resource: its node is drawn at the canvas's centre", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/LOE_1");
+    await expect(header(page)).toHaveText("LOE_1");
+    // A node is a filled disc several pixels across; an edge or a label cannot fill a 5×5 block.
+    const centreFilled = () =>
+      page.locator("#stage").evaluate((el) => {
+        const c = el as HTMLCanvasElement;
+        const data = c
+          .getContext("2d")
+          ?.getImageData(Math.floor(c.width / 2) - 2, Math.floor(c.height / 2) - 2, 5, 5).data;
+        if (!data) return false;
+        for (let i = 3; i < data.length; i += 4) if ((data[i] ?? 0) < 250) return false;
+        return true;
+      });
+    await expect.poll(centreFilled).toBe(true);
+    await page.locator(".card-head", { hasText: "EU_1" }).click();
+    await expect(header(page)).toHaveText("EU_1");
+    await expect.poll(centreFilled).toBe(true);
+  });
+
+  test("the colour toggle switches, and there is no 2D view or standing overlay", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(page.locator("#stage.orbit")).toBeVisible();
+    await expect(page.locator("[data-view]")).toHaveCount(0);
     const temporal = page.locator('[data-overlay="temporal"]');
     await temporal.click();
     await expect(temporal).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator('[data-overlay="standing"]')).toHaveCount(0);
   });
 
-  test("the tab stays open as another resource is opened", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
-    await page.locator(".relations-col .res-item", { hasText: "Q_1" }).click();
+  test("sits above the open resource, and stays folded as another resource opens", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/LOE_1");
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(page.locator("#stage")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Graph" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Show or hide the graph" }).click();
+    await expect(page.locator("#stage")).toBeHidden();
+    await page.locator(".card-head", { hasText: "Q_1" }).click();
     await expect(header(page)).toHaveText("Q_1");
-    await expect(page).toHaveURL(/\/Q_1\?tab=graph$/);
+    await expect(page.locator("#stage")).toBeHidden();
+    await page.getByRole("button", { name: "Show or hide the graph" }).click();
+    await expect(page.locator("#stage")).toBeVisible();
+  });
+
+  test("a node opens its resource, and that resource's relations join the graph", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+    await expect(node(page, "EU_1 (EvidenceUnit)")).toHaveCount(0);
+    await node(page, "LOE_1 (LineOfEnquiry)").press("Enter");
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/LOE_1/);
+    await expect(node(page, "EU_1 (EvidenceUnit)")).toBeVisible();
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+  });
+
+  test("Reset forgets what was opened before the open resource", async ({ page }) => {
+    await page.goto(`/app/workspace/alpha/Q_2?${list("/workspace/alpha/question")}`);
+    await expect(header(page)).toHaveText("Q_2");
+    await item(page, "Q_1").click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(node(page, "Q_2 (Question)")).toBeVisible();
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(node(page, "Q_2 (Question)")).toHaveCount(0);
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+  });
+
+  test("an address with the old graph tab opens the overview", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=graph");
+    await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     await expect(page.locator("#stage")).toBeVisible();
   });
 });

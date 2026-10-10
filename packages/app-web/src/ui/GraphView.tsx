@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import "./graph.css";
 
-export type ViewMode = "2d" | "3d";
 /** What a node's colour shows: its record type, or how it stands to the selected node. */
 export type Overlay = "structural" | "temporal";
 
@@ -21,9 +20,13 @@ export interface GraphEdgeSeed {
 export interface GraphViewProps {
   nodes: GraphNodeSeed[];
   edges: GraphEdgeSeed[];
+  /** The open resource, drawn with a ring. New nodes are placed beside it. */
   selectedId: string | null;
-  view: ViewMode;
   overlay: Overlay;
+  /** False while the canvas is hidden: the simulation and the drawing stop until it is shown. */
+  active: boolean;
+  /** What the popover shows for the node under the pointer. */
+  summary: (id: string) => ReactNode;
   onNavigate: (id: string) => void;
 }
 
@@ -40,6 +43,9 @@ type Projected = { sx: number; sy: number; scale: number; depth: number };
 
 type Camera = { yaw: number; pitch: number; distance: number };
 
+/** A point in the graph's space: the plane of the force layout, and depth by order first seen. */
+type Point3 = { x: number; y: number; z: number };
+
 type Drag = { x: number; y: number; yaw: number; pitch: number };
 
 type Sim = {
@@ -47,15 +53,15 @@ type Sim = {
   edges: GraphEdgeSeed[];
   edgeKeys: Set<string>;
   nextStep: number;
-  view: ViewMode;
   overlay: Overlay;
   selectedId: string | null;
   hoverId: string | null;
   screenPos: Map<string, Projected>;
   camera: Camera;
+  /** The point the camera orbits and faces: it follows the open resource's node. */
+  pivot: Point3 | null;
   drag: Drag | null;
   dragged: boolean;
-  zoom: number;
 };
 
 /** Colours for record types the page's stylesheet gives none (`--c-<type>`), handed out as types appear. */
@@ -71,18 +77,6 @@ const DAMPING = 0.86;
 const CENTER_K = 0.002;
 const TOTAL_DEPTH = 46 * 14;
 const FOCAL = 640;
-
-const ESC: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function esc(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ESC[c] ?? c);
-}
 
 /** The colours the canvas draws in, read from the page's stylesheet on each frame so a theme change shows. */
 type Palette = { css: CSSStyleDeclaration; text: string; dim: string; accent: string };
@@ -246,26 +240,43 @@ function maxCreatedZ(sim: Sim): number {
   return max;
 }
 
-function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
-  if (sim.view === "2d") {
-    const z = 1 / sim.zoom;
-    return {
-      sx: width / 2 + node.x * z,
-      sy: height / 2 + node.y * z,
-      scale: z,
-      depth: 0,
-    };
+/**
+ * Where the camera should face: the open resource's node, or, while the canvas has no node for it,
+ * the middle of the graph's depth at the plane's origin, which the layout is pulled towards.
+ */
+function pivotTarget(sim: Sim): Point3 {
+  const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
+  if (open) return { x: open.x, y: open.y, z: zOf(sim, open) };
+  return { x: 0, y: 0, z: maxCreatedZ(sim) / 2 };
+}
+
+/** Eases the pivot toward its target, so opening another resource turns the view rather than jumping it. */
+function followPivot(sim: Sim): void {
+  const target = pivotTarget(sim);
+  if (sim.pivot === null) {
+    sim.pivot = target;
+    return;
   }
+  const k = 0.12;
+  sim.pivot.x += (target.x - sim.pivot.x) * k;
+  sim.pivot.y += (target.y - sim.pivot.y) * k;
+  sim.pivot.z += (target.z - sim.pivot.z) * k;
+}
+
+function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
   const { yaw, pitch, distance } = sim.camera;
-  const zc = zOf(sim, node) - maxCreatedZ(sim) / 2;
+  const pivot = sim.pivot ?? pivotTarget(sim);
+  const x0 = node.x - pivot.x;
+  const y0 = node.y - pivot.y;
+  const zc = zOf(sim, node) - pivot.z;
   const cosY = Math.cos(yaw);
   const sinY = Math.sin(yaw);
-  const x1 = node.x * cosY - zc * sinY;
-  const z1 = node.x * sinY + zc * cosY;
+  const x1 = x0 * cosY - zc * sinY;
+  const z1 = x0 * sinY + zc * cosY;
   const cosX = Math.cos(pitch);
   const sinX = Math.sin(pitch);
-  const y1 = node.y * cosX - z1 * sinX;
-  const z2 = node.y * sinX + z1 * cosX;
+  const y1 = y0 * cosX - z1 * sinX;
+  const z2 = y0 * sinX + z1 * cosX;
   const viewZ = z2 + distance;
   if (viewZ <= 1) return { sx: -9999, sy: -9999, scale: 0, depth: viewZ };
   const scale = FOCAL / viewZ;
@@ -333,21 +344,17 @@ function drawCompass(
   ctx.restore();
 }
 
+/** How much of its opacity the farthest node loses: depth is shown by fading, nearest to farthest. */
+const DEPTH_FADE = 0.7;
+
 /**
- * Eases the 2D zoom toward the one that fits every node in the canvas, out and back in, so a burst
- * of nodes flung apart while they settle does not leave the graph zoomed out once they have.
+ * The opacity for something `depth` from the camera, when the nearest node is `near` and the
+ * farthest `far`: 1 at the nearest, falling linearly to 1 - DEPTH_FADE at the farthest.
  */
-function autofit(sim: Sim, width: number, height: number): void {
-  if (sim.view !== "2d" || sim.nodes.size === 0) return;
-  const margin = 0.9;
-  const halfW = (width / 2) * margin;
-  const halfH = (height / 2) * margin;
-  let needed = 1;
-  for (const n of sim.nodes.values()) {
-    if (halfW > 0) needed = Math.max(needed, Math.abs(n.x) / halfW);
-    if (halfH > 0) needed = Math.max(needed, Math.abs(n.y) / halfH);
-  }
-  sim.zoom += (needed - sim.zoom) * 0.08;
+export function depthOpacity(depth: number, near: number, far: number): number {
+  if (far <= near) return 1;
+  const t = Math.min(1, Math.max(0, (depth - near) / (far - near)));
+  return 1 - DEPTH_FADE * t;
 }
 
 function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, height: number): void {
@@ -359,24 +366,28 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   sim.screenPos = projected;
 
   const order = [...projected.entries()].sort((a, b) => b[1].depth - a[1].depth);
+  const visible = order.filter(([, p]) => p.scale > 0).map(([, p]) => p.depth);
+  const near = Math.min(...visible);
+  const far = Math.max(...visible);
+  const opacity = (depth: number) => depthOpacity(depth, near, far);
 
   ctx.lineWidth = 1;
-  const labels: { x: number; y: number; text: string; hot: boolean }[] = [];
+  const labels: { x: number; y: number; text: string; hot: boolean; opacity: number }[] = [];
   for (const edge of sim.edges) {
     const a = projected.get(edge.from);
     const b = projected.get(edge.to);
     if (!a || !b || a.scale === 0 || b.scale === 0) continue;
+    const edgeOpacity = opacity((a.depth + b.depth) / 2);
+    ctx.globalAlpha = edgeOpacity;
     ctx.strokeStyle = "rgba(128, 138, 156, 0.35)";
     ctx.beginPath();
     ctx.moveTo(a.sx, a.sy);
     ctx.lineTo(b.sx, b.sy);
     ctx.stroke();
 
-    const hot =
-      edge.from === sim.selectedId ||
-      edge.to === sim.selectedId ||
-      edge.from === sim.hoverId ||
-      edge.to === sim.hoverId;
+    const hot = [sim.selectedId, sim.hoverId].some(
+      (id) => id !== null && (edge.from === id || edge.to === id),
+    );
     const scale = Math.min(a.scale, b.scale);
     if (hot || scale > 0.55) {
       labels.push({
@@ -384,6 +395,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
         y: (a.sy + b.sy) / 2,
         text: edge.label,
         hot,
+        opacity: hot ? 1 : edgeOpacity,
       });
     }
   }
@@ -395,8 +407,9 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     const r = Math.max(2, 7 * p.scale);
     const isHover = id === sim.hoverId;
     const isSelected = id === sim.selectedId;
+    const alpha = node.alpha * (isHover || isSelected ? 1 : opacity(p.depth));
 
-    ctx.globalAlpha = node.alpha;
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = colorForNode(sim, node, palette);
     ctx.beginPath();
     ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
@@ -408,7 +421,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     }
 
     if (p.scale > 0.55) {
-      ctx.globalAlpha = node.alpha * 0.9;
+      ctx.globalAlpha = alpha * 0.9;
       ctx.fillStyle = palette.dim;
       ctx.font = "10px ui-monospace, monospace";
       ctx.fillText(node.label, p.sx + r + 3, p.sy + 3);
@@ -420,7 +433,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.textBaseline = "middle";
   ctx.font = "9px ui-monospace, monospace";
   for (const lab of labels) {
-    ctx.globalAlpha = lab.hot ? 0.95 : 0.75;
+    ctx.globalAlpha = (lab.hot ? 0.95 : 0.75) * lab.opacity;
     ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
     ctx.fillText(lab.text, lab.x, lab.y - 7);
   }
@@ -428,7 +441,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 
-  if (sim.view === "3d") drawCompass(ctx, sim, width, height);
+  drawCompass(ctx, sim, width, height);
 }
 
 function hitTest(sim: Sim, mx: number, my: number): string | null {
@@ -445,29 +458,17 @@ function hitTest(sim: Sim, mx: number, my: number): string | null {
   return found;
 }
 
+/** Places the popover beside the pointer, inside the canvas. */
 function placePopover(
   popover: HTMLDivElement,
-  sim: Sim,
-  id: string | null,
   clientX: number,
   clientY: number,
   rect: DOMRect,
 ): void {
-  if (!id) {
-    popover.classList.add("hidden");
-    return;
-  }
-  const node = sim.nodes.get(id);
-  if (!node) {
-    popover.classList.add("hidden");
-    return;
-  }
-  popover.innerHTML = `<div><span class="kind">${esc(node.type)}</span> <span class="handle">${esc(node.label)}</span></div>`;
-  const left = Math.min(clientX - rect.left + 16, rect.width - 220);
-  const top = Math.min(clientY - rect.top + 16, rect.height - 60);
+  const left = Math.min(clientX - rect.left + 16, rect.width - popover.offsetWidth - 4);
+  const top = Math.min(clientY - rect.top + 16, rect.height - popover.offsetHeight - 4);
   popover.style.left = `${Math.max(0, left)}px`;
   popover.style.top = `${Math.max(0, top)}px`;
-  popover.classList.remove("hidden");
 }
 
 function createSim(): Sim {
@@ -476,15 +477,14 @@ function createSim(): Sim {
     edges: [],
     edgeKeys: new Set(),
     nextStep: 0,
-    view: "2d",
     overlay: "structural",
     selectedId: null,
     hoverId: null,
     screenPos: new Map(),
     camera: { yaw: 0.5, pitch: -0.35, distance: 620 },
+    pivot: null,
     drag: null,
     dragged: false,
-    zoom: 1,
   };
 }
 
@@ -504,16 +504,43 @@ function resizeCanvas(
   return { width: rect.width, height: rect.height };
 }
 
-export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate }: GraphViewProps) {
+/**
+ * The resources a reader has explored and their relations, laid out by a force simulation in the
+ * plane and by the order they were first seen in depth, and drawn in perspective. The camera
+ * orbits and faces the open resource's node.
+ */
+export function GraphView({
+  nodes,
+  edges,
+  selectedId,
+  overlay,
+  active,
+  summary,
+  onNavigate,
+}: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const simRef = useRef<Sim>(createSim());
   const sizeRef = useRef({ width: 0, height: 0 });
   const navigateRef = useRef(onNavigate);
   navigateRef.current = onNavigate;
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const pointerRef = useRef({ x: 0, y: 0 });
+  // The popover is measured once its content is drawn, so a new node's summary is placed by its own size.
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    const popover = popoverRef.current;
+    if (hoverId === null || !canvas || !popover) return;
+    placePopover(
+      popover,
+      pointerRef.current.x,
+      pointerRef.current.y,
+      canvas.getBoundingClientRect(),
+    );
+  }, [hoverId]);
 
   const sim = simRef.current;
-  sim.view = view;
   sim.overlay = overlay;
   sim.selectedId = selectedId;
 
@@ -527,6 +554,7 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
     if (!canvas || !popover) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctxRef.current = ctx;
 
     sizeRef.current = resizeCanvas(canvas, ctx);
     const ro = new ResizeObserver(() => {
@@ -535,20 +563,9 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
     const wrap = canvas.parentElement;
     if (wrap) ro.observe(wrap);
 
-    let raf = 0;
-    const loop = () => {
-      const s = simRef.current;
-      tickPhysics(s);
-      autofit(s, sizeRef.current.width, sizeRef.current.height);
-      renderFrame(ctx, s, sizeRef.current.width, sizeRef.current.height);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-
     const onPointerDown = (event: PointerEvent) => {
       const s = simRef.current;
       s.dragged = false;
-      if (s.view !== "3d") return;
       s.drag = { x: event.clientX, y: event.clientY, yaw: s.camera.yaw, pitch: s.camera.pitch };
       canvas.classList.add("dragging");
     };
@@ -565,8 +582,12 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
       }
       const mx = event.clientX - rect.left;
       const my = event.clientY - rect.top;
-      s.hoverId = hitTest(s, mx, my);
-      placePopover(popover, s, s.hoverId, event.clientX, event.clientY, rect);
+      const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
+      const hit = inside ? hitTest(s, mx, my) : null;
+      s.hoverId = hit !== null && s.nodes.has(hit) ? hit : null;
+      pointerRef.current = { x: event.clientX, y: event.clientY };
+      setHoverId(s.hoverId);
+      if (s.hoverId !== null) placePopover(popover, event.clientX, event.clientY, rect);
     };
     const onPointerUp = () => {
       const s = simRef.current;
@@ -582,14 +603,13 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
       if (s.nodes.has(id)) navigateRef.current(id);
     };
     const onWheel = (event: WheelEvent) => {
-      if (simRef.current.view !== "3d") return;
       event.preventDefault();
       const cam = simRef.current.camera;
       cam.distance = Math.max(120, Math.min(2200, cam.distance + event.deltaY * 0.6));
     };
     const onLeave = () => {
       simRef.current.hoverId = null;
-      popover.classList.add("hidden");
+      setHoverId(null);
     };
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -600,7 +620,6 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
     canvas.addEventListener("pointerleave", onLeave);
 
     return () => {
-      cancelAnimationFrame(raf);
       ro.disconnect();
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
@@ -611,11 +630,32 @@ export function GraphView({ nodes, edges, selectedId, view, overlay, onNavigate 
     };
   }, []);
 
+  useEffect(() => {
+    const ctx = ctxRef.current;
+    if (!active || !ctx) return;
+    let raf = 0;
+    const loop = () => {
+      const s = simRef.current;
+      tickPhysics(s);
+      followPivot(s);
+      renderFrame(ctx, s, sizeRef.current.width, sizeRef.current.height);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
+
   return (
     <div id="stage-wrap">
-      <canvas id="stage" ref={canvasRef} className={view === "3d" ? "orbit" : undefined} />
-      <div className="hint">{view === "3d" ? "drag to orbit · scroll to zoom" : ""}</div>
-      <div id="popover" className="popover hidden" ref={popoverRef} />
+      <canvas id="stage" ref={canvasRef} className="orbit" />
+      <div className="hint">drag to orbit · scroll to zoom</div>
+      <div
+        id="popover"
+        className={hoverId === null ? "popover hidden" : "popover"}
+        ref={popoverRef}
+      >
+        {hoverId === null ? null : summary(hoverId)}
+      </div>
     </div>
   );
 }

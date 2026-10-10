@@ -47,14 +47,13 @@ according to what the API answers, never by the shape of the path. Its code is `
 | Column | Shows |
 |--------|-------|
 | Left | Two collections: the one picked (`?list=`) and the collection it is listed in. |
-| Centre | The open resource. Tabs: Overview (properties, outbound relations), Graph (the 2D/3D canvas, `GraphView`), Debug (the response and the record's events). `?tab=` names the tab. |
-| Right | Inbound relations. |
+| Centre | The graph, a card that folds: the resources opened in the workspace since its last reset and what they relate to, on a 3D canvas (`GraphView`). Clicking a node opens its resource. Below it, the open resource. Tabs: Overview (properties, then a card for each related resource, outbound then inbound), Debug (the response and the record's events). `?tab=` names the tab. |
 
 Every resource is requested at `depth=2`, so its neighbours arrive with their properties. The page
 keeps each response as it arrived and draws from them; a resource's own response is the only one
 that lists all of its relations. The palette comes from `@labkit/design`.
 
-The Graph tab colours nodes by record type or by how they relate to the open resource (temporal).
+The graph colours nodes by record type or by how they relate to the open resource (temporal).
 The API returns no standing for a resource, so there is no standing overlay.
 
 ## Parent project
