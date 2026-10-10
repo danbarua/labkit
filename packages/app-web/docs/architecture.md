@@ -36,23 +36,26 @@ HAL root (`Accept: application/hal+json` on `/`, or `/api` through Vite):
 { id: "labkit", _links: { self: { href: "/" }, start: { href: "/questions/1", name: "Q_1" }, questions: { href: "/questions" }, ... } }
 ```
 
-The explorer loads `/api`, then `_links.start`.
+The Trace Console starts at `/collections/workspace`.
 
-## Explorer
+## Trace Console
 
-Colour and chrome come from the deleted `explorer/` tree (removed in `207a96e2`, 2026-09-08). Tokens in `src/styles.css` match that file:
+The browser app's page for the graph, at `/app/<API path>`: `/app/workspace/overlap_bench/Q_1` opens
+`/workspace/overlap_bench/Q_1`. The page fetches that path and shows a resource or a collection
+according to what the API answers, never by the shape of the path. Its code is `src/ui/trace/`.
 
-`--bg #0b0e14`, `--panel #12151d`, `--panel-border #232838`, `--text #d7dce4`, `--text-dim #808a9c`, `--accent #5ad1c9`, `--amber #e0b25a`, `--danger #e0687a`.
+| Column | Shows |
+|--------|-------|
+| Left | Two collections: the one picked (`?list=`) and the collection it is listed in. |
+| Centre | The open resource. Tabs: Overview (properties, outbound relations), Graph (the 2D/3D canvas, `GraphView`), Debug (the response and the record's events). `?tab=` names the tab. |
+| Right | Inbound relations. |
 
-Keep `#bar` (title, 2D/3D, colour overlay kind/standing/temporal, current handle) and the resource pane. GraphView is the 2D/3D canvas. Do not replace this with a generic admin theme.
+Every resource is requested at `depth=2`, so its neighbours arrive with their properties. The page
+keeps each response as it arrived and draws from them; a resource's own response is the only one
+that lists all of its relations. The palette comes from `@labkit/design`.
 
-## Walk
-
-Playwright (`tests/walk.spec.ts`) boots the UI and clicks:
-
-`Q_1` → `LOE_7` → `NOTE_68`
-
-That is the first `labkit pose` question on overlap_bench, then the enquiry it motivates, then the last minted note (event 215, `NOTE_68 -[:CONCERNS]-> LOE_7`).
+The Graph tab colours nodes by record type or by how they relate to the open resource (temporal).
+The API returns no standing for a resource, so there is no standing overlay.
 
 ## Parent project
 

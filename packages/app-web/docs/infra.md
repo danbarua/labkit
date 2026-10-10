@@ -44,7 +44,7 @@ Deleted on purpose: `explorer/` (static 2D/3D), `docker/webapp`, compose `spike`
 
 Kept as facts, not restored as code:
 
-- Explorer colour tokens and `#bar` layout (now `web/src/styles.css`).
+- `#bar` layout (now `src/styles.css`). The Trace Console takes its palette from `@labkit/design`.
 - Compose `db` service and `LABKIT_PORT_DB`.
 - Worktree port hash (the 2026-08-28 failure: one worktree's `/healthz` looked like yours).
 

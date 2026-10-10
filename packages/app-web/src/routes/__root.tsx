@@ -9,7 +9,9 @@ export const Route = createRootRoute({
       <div className="page">
         <h2>Not found</h2>
         <p>
-          <Link to="/">Back to the workspaces</Link>
+          <Link to="/$" params={{ _splat: "" }}>
+            Back to the workspaces
+          </Link>
         </p>
       </div>
     </>

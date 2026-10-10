@@ -27,6 +27,7 @@
     "@labkit/acp-transcripts": "workspace:*",
     "@labkit/core-db": "workspace:*",
     "@labkit/core-domain": "workspace:*",
+    "@labkit/design": "workspace:*",
     "@labkit/ui": "workspace:*",
     "@labkit/view-model": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",

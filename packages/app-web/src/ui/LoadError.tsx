@@ -16,7 +16,9 @@ export function LoadError({ error }: { error: unknown }) {
           <button type="button" onClick={() => void router.invalidate()}>
             Try again
           </button>{" "}
-          <Link to="/">Back to the workspaces</Link>
+          <Link to="/$" params={{ _splat: "" }}>
+            Back to the workspaces
+          </Link>
         </p>
       </div>
     </>

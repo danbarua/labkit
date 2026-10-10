@@ -1,18 +1,21 @@
 import { useEffect, useRef } from "react";
-import type { EdgeLabel } from "@labkit/core-db/domain";
+import "./graph.css";
 
 export type ViewMode = "2d" | "3d";
-export type Overlay = "structural" | "standing" | "temporal";
+/** What a node's colour shows: its record type, or how it stands to the selected node. */
+export type Overlay = "structural" | "temporal";
 
 export interface GraphNodeSeed {
   id: string;
+  /** The text drawn beside the node. */
+  label: string;
   type: string;
 }
 
 export interface GraphEdgeSeed {
   from: string;
   to: string;
-  label: EdgeLabel;
+  label: string;
 }
 
 export interface GraphViewProps {
@@ -55,6 +58,7 @@ type Sim = {
   zoom: number;
 };
 
+/** Colours for record types the page's stylesheet gives none (`--c-<type>`), handed out as types appear. */
 const KIND_COLOR: Record<string, string> = {};
 const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
@@ -80,7 +84,23 @@ function esc(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ESC[c] ?? c);
 }
 
-function colorFor(kind: string): string {
+/** The colours the canvas draws in, read from the page's stylesheet on each frame so a theme change shows. */
+type Palette = { css: CSSStyleDeclaration; text: string; dim: string; accent: string };
+
+function paletteOf(canvas: HTMLCanvasElement): Palette {
+  const css = getComputedStyle(canvas);
+  const read = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+  return {
+    css,
+    text: read("--text", "#ffffff"),
+    dim: read("--text-dim", "#c8cedb"),
+    accent: read("--accent", "#5ad1c9"),
+  };
+}
+
+function colorFor(kind: string, palette: Palette): string {
+  const styled = palette.css.getPropertyValue(`--c-${kind.toLowerCase()}`).trim();
+  if (styled) return styled;
   const existing = KIND_COLOR[kind];
   if (existing) return existing;
   const n = Object.keys(KIND_COLOR).length;
@@ -90,9 +110,7 @@ function colorFor(kind: string): string {
   return color;
 }
 
-function colorForNode(sim: Sim, node: SimNode): string {
-  // Standing is derived server-side in the old explorer; ResourceDocument
-  // does not carry it, so the overlay falls back to kind.
+function colorForNode(sim: Sim, node: SimNode, palette: Palette): string {
   if (sim.overlay === "temporal") {
     if (node.id === sim.selectedId) return TEMPORAL_CREATED;
     for (const edge of sim.edges) {
@@ -105,7 +123,7 @@ function colorForNode(sim: Sim, node: SimNode): string {
     }
     return TEMPORAL_HISTORICAL;
   }
-  return colorFor(node.type);
+  return colorFor(node.type, palette);
 }
 
 function springiness(n: number): number {
@@ -334,6 +352,7 @@ function autofit(sim: Sim, width: number, height: number): void {
 
 function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, height: number): void {
   ctx.clearRect(0, 0, width, height);
+  const palette = paletteOf(ctx.canvas);
   const nodes = [...sim.nodes.values()];
   const projected = new Map<string, Projected>();
   for (const n of nodes) projected.set(n.id, project(sim, n, width, height));
@@ -342,7 +361,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   const order = [...projected.entries()].sort((a, b) => b[1].depth - a[1].depth);
 
   ctx.lineWidth = 1;
-  const labels: { x: number; y: number; text: EdgeLabel; hot: boolean }[] = [];
+  const labels: { x: number; y: number; text: string; hot: boolean }[] = [];
   for (const edge of sim.edges) {
     const a = projected.get(edge.from);
     const b = projected.get(edge.to);
@@ -378,21 +397,21 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     const isSelected = id === sim.selectedId;
 
     ctx.globalAlpha = node.alpha;
-    ctx.fillStyle = colorForNode(sim, node);
+    ctx.fillStyle = colorForNode(sim, node, palette);
     ctx.beginPath();
     ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
     ctx.fill();
     if (isHover || isSelected) {
-      ctx.strokeStyle = isSelected ? "#fff" : "#c8cedb";
+      ctx.strokeStyle = isSelected ? palette.text : palette.dim;
       ctx.lineWidth = isSelected ? 1.5 : 1;
       ctx.stroke();
     }
 
     if (p.scale > 0.55) {
       ctx.globalAlpha = node.alpha * 0.9;
-      ctx.fillStyle = "#c8cedb";
+      ctx.fillStyle = palette.dim;
       ctx.font = "10px ui-monospace, monospace";
-      ctx.fillText(node.id, p.sx + r + 3, p.sy + 3);
+      ctx.fillText(node.label, p.sx + r + 3, p.sy + 3);
     }
     ctx.globalAlpha = 1;
   }
@@ -402,7 +421,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.font = "9px ui-monospace, monospace";
   for (const lab of labels) {
     ctx.globalAlpha = lab.hot ? 0.95 : 0.75;
-    ctx.fillStyle = lab.hot ? "#5ad1c9" : "#c8cedb";
+    ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
     ctx.fillText(lab.text, lab.x, lab.y - 7);
   }
   ctx.globalAlpha = 1;
@@ -443,7 +462,7 @@ function placePopover(
     popover.classList.add("hidden");
     return;
   }
-  popover.innerHTML = `<div><span class="kind">${esc(node.type)}</span> <span class="handle">${esc(node.id)}</span></div>`;
+  popover.innerHTML = `<div><span class="kind">${esc(node.type)}</span> <span class="handle">${esc(node.label)}</span></div>`;
   const left = Math.min(clientX - rect.left + 16, rect.width - 220);
   const top = Math.min(clientY - rect.top + 16, rect.height - 60);
   popover.style.left = `${Math.max(0, left)}px`;

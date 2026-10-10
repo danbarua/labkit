@@ -27,74 +27,138 @@ const test = base.extend<{ errors: string[] }>({
   ],
 });
 
-const handle = (page: import("@playwright/test").Page) => page.locator(".current-handle");
+const header = (page: import("@playwright/test").Page) => page.locator(".header-id");
+const row = (page: import("@playwright/test").Page, name: string) =>
+  page.getByRole("button", { name, exact: true });
+const item = (page: import("@playwright/test").Page, handle: string) =>
+  page.locator(".sidebar .res-item", {
+    has: page.locator(".rid", { hasText: new RegExp(`^${handle}$`) }),
+  });
+const list = (path: string) => `list=${encodeURIComponent(path)}`;
 
 test.describe("getting around", () => {
   test("a browser at the root lands on the app, with the workspaces", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/app\/$/);
-    await expect(page.getByRole("heading", { name: "Workspaces" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "alpha", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "beta", exact: true })).toBeVisible();
+    await expect(row(page, "alpha")).toBeVisible();
+    await expect(row(page, "beta")).toBeVisible();
   });
 
-  test("workspace, then collection, then graph, by clicking", async ({ page }) => {
+  test("workspace, then collection, then resource, by clicking", async ({ page }) => {
     await page.goto("/app/");
-    await page.getByRole("link", { name: "alpha", exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/workspace\/alpha$/);
+    await row(page, "alpha").click();
+    await expect(page).toHaveURL(new RegExp(list("/workspace/alpha")));
 
-    await page.getByRole("link", { name: "question", exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/question$/);
-    await expect(page.getByRole("link", { name: "Q_1", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Q_2", exact: true })).toBeVisible();
+    await row(page, "Question").click();
+    await expect(page).toHaveURL(new RegExp(list("/workspace/alpha/question")));
+    await expect(item(page, "Q_1")).toBeVisible();
+    await expect(item(page, "Q_2")).toBeVisible();
 
-    await page.getByRole("link", { name: "Q_1", exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/graph\/Q_1$/);
-    await expect(handle(page)).toHaveText("Q_1");
+    await item(page, "Q_1").click();
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/Q_1\?/);
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(item(page, "Q_1")).toHaveClass(/active/);
   });
 
-  test("the header leads back up", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1");
-    await page.getByRole("link", { name: "alpha", exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/workspace\/alpha$/);
-    await page.getByRole("link", { name: /LabKit/ }).click();
+  test("the home button leads back to the workspaces", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await page.getByRole("button", { name: "Entry point" }).click();
     await expect(page).toHaveURL(/\/app\/$/);
+    await expect(page.getByText("Pick a type on the left")).toBeVisible();
   });
 
   test("a deep link renders directly, and survives a reload", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/LOE_1");
-    await expect(handle(page)).toHaveText("LOE_1");
+    await page.goto("/app/workspace/alpha/LOE_1");
+    await expect(header(page)).toHaveText("LOE_1");
     await page.reload();
-    await expect(handle(page)).toHaveText("LOE_1");
+    await expect(header(page)).toHaveText("LOE_1");
   });
 
-  test("a collection pages forward and back", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/question?limit=1");
-    await expect(page.getByRole("link", { name: "Q_1", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: /previous/ })).toHaveCount(0);
+  test("a path that names a collection lists it", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/question");
+    await expect(item(page, "Q_1")).toBeVisible();
+    await expect(page.getByText("Pick a type on the left")).toBeVisible();
+  });
 
-    await page.getByRole("link", { name: /next/ }).click();
-    await expect(page).toHaveURL(/limit=1&offset=1|offset=1&limit=1/);
-    await expect(page.getByRole("link", { name: "Q_2", exact: true })).toBeVisible();
-
-    await page.getByRole("link", { name: /previous/ }).click();
-    await expect(page.getByRole("link", { name: "Q_1", exact: true })).toBeVisible();
+  test("a collection's next page is added on request", async ({ page }) => {
+    await page.goto(`/app/?${list("/workspace/alpha/question?limit=1")}`);
+    await expect(item(page, "Q_1")).toBeVisible();
+    await expect(item(page, "Q_2")).toHaveCount(0);
+    await page.getByRole("button", { name: "Load more" }).click();
+    await expect(item(page, "Q_2")).toBeVisible();
+    await expect(item(page, "Q_1")).toBeVisible();
   });
 });
 
-test.describe("the graph page", () => {
-  test("shows the resource, its properties and its links", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1");
-    const panel = page.locator("#resource");
-    await expect(panel.locator(".handle")).toHaveText("Q_1");
-    await expect(panel.locator(".kind")).toHaveText("Question");
-    await expect(panel.locator("dt", { hasText: "name" })).toBeVisible();
-    await expect(panel.getByText("alpha question")).toBeVisible();
-    await expect(panel.locator('a[data-id="LOE_1"]')).toBeVisible();
+test.describe("an open resource", () => {
+  test("shows its properties and the resources it relates to", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(page.locator(".header-type")).toHaveText("Question");
+    await expect(page.locator(".detail .kv .k", { hasText: "name" }).first()).toBeVisible();
+    await expect(page.locator(".detail").getByText("alpha question")).toBeVisible();
+    await expect(page.locator(".card-head", { hasText: "LOE_1" })).toBeVisible();
   });
 
+  test("lists what relates to it on the right", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/LOE_1");
+    const incoming = page.locator(".relations-col");
+    await expect(incoming.locator(".rid", { hasText: /^Q_1$/ })).toBeVisible();
+    await expect(incoming.locator(".rid", { hasText: /^EU_1$/ })).toBeVisible();
+  });
+
+  test("following a relation navigates in place, without reloading the page", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    await page.evaluate(() => {
+      (window as unknown as { kept: boolean }).kept = true;
+    });
+
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/LOE_1$/);
+    await expect(header(page)).toHaveText("LOE_1");
+    expect(await page.evaluate(() => (window as unknown as { kept?: boolean }).kept)).toBe(true);
+  });
+
+  test("back and forward, the browser's or the page's, step through what was opened", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(page.locator(".breadcrumb .crumb")).toHaveText(["Q_1", "LOE_1"]);
+
+    await page.goBack();
+    await expect(header(page)).toHaveText("Q_1");
+    await page.getByRole("button", { name: "Forward" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(header(page)).toHaveText("Q_1");
+    await page.locator(".breadcrumb .crumb", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+  });
+
+  test("opening the resource that is open adds no history entry", async ({ page }) => {
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    await expect(header(page)).toHaveText("Q_1");
+    await item(page, "Q_1").click();
+    await expect(page.locator(".breadcrumb .crumb")).toHaveText(["Q_1"]);
+    await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
+  });
+
+  test("the Debug tab shows the response and the record's events", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await page.getByRole("tab", { name: "Debug" }).click();
+    await expect(page).toHaveURL(/tab=debug/);
+    await expect(page.locator(".ev").first()).toBeVisible();
+    await page.getByRole("button", { name: "Show or hide the response" }).click();
+    await expect(page.locator("pre.jsonview")).toContainText("alpha question");
+  });
+});
+
+test.describe("the graph tab", () => {
   test("draws the graph on the canvas", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/LOE_1");
+    await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
     const canvas = page.locator("#stage");
     await expect(canvas).toBeVisible();
     // A canvas that was sized but never drawn on has one colour in it.
@@ -115,101 +179,63 @@ test.describe("the graph page", () => {
       .toBeGreaterThan(2);
   });
 
-  test("following a link navigates in place, without reloading the page", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1");
-    await expect(handle(page)).toHaveText("Q_1");
-    await page.evaluate(() => {
-      (window as unknown as { kept: boolean }).kept = true;
-    });
-
-    await page.locator('#resource a[data-id="LOE_1"]').click();
-    await expect(page).toHaveURL(/\/graph\/LOE_1/);
-    await expect(handle(page)).toHaveText("LOE_1");
-    expect(await page.evaluate(() => (window as unknown as { kept?: boolean }).kept)).toBe(true);
-  });
-
-  test("the back button returns to the previous resource", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1");
-    await page.locator('#resource a[data-id="LOE_1"]').click();
-    await expect(handle(page)).toHaveText("LOE_1");
-    await page.goBack();
-    await expect(handle(page)).toHaveText("Q_1");
-  });
-
-  test("a chosen depth stays in the URL as you follow links", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1?depth=2");
-    await page.locator('#resource a[data-id="LOE_1"]').click();
-    await expect(page).toHaveURL(/\/graph\/LOE_1\?depth=2$/);
-  });
-
-  test("the view and colour toggles switch", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1");
+  test("the view and colour toggles switch, and there is no standing overlay", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=graph");
     const view3d = page.locator('[data-view="3d"]');
     await view3d.click();
-    await expect(view3d).toHaveClass(/active/);
-    const standing = page.locator('[data-overlay="standing"]');
-    await standing.click();
-    await expect(standing).toHaveClass(/active/);
+    await expect(view3d).toHaveAttribute("aria-pressed", "true");
+    const temporal = page.locator('[data-overlay="temporal"]');
+    await temporal.click();
+    await expect(temporal).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-overlay="standing"]')).toHaveCount(0);
+  });
+
+  test("the tab stays open as another resource is opened", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
+    await page.locator(".relations-col .res-item", { hasText: "Q_1" }).click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(page).toHaveURL(/\/Q_1\?tab=graph$/);
+    await expect(page.locator("#stage")).toBeVisible();
   });
 });
 
 test.describe("workspaces are separate", () => {
   test("the same handle is a different resource in each", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1");
-    await expect(page.locator("#resource").getByText("alpha question")).toBeVisible();
-    await page.goto("/app/workspace/beta/graph/Q_1");
-    await expect(page.locator("#resource").getByText("beta question")).toBeVisible();
-    await expect(page.locator("#resource").getByText("alpha question")).toHaveCount(0);
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(page.locator(".detail").getByText("alpha question")).toBeVisible();
+    await page.goto("/app/workspace/beta/Q_1");
+    await expect(page.locator(".detail").getByText("beta question")).toBeVisible();
+    await expect(page.locator(".detail").getByText("alpha question")).toHaveCount(0);
   });
 
   test("a handle that lives in another workspace is an error, not a fallback", async ({
     page,
     errors,
   }) => {
-    await page.goto("/app/workspace/beta/graph/LOE_1");
-    await expect(page.locator(".load-error")).toContainText("404");
+    await page.goto("/app/workspace/beta/LOE_1");
+    await expect(page.locator(".fetch-error")).toContainText("404");
     errors.length = 0;
   });
 
   test("links inside a workspace stay inside it", async ({ page }) => {
-    await page.goto("/app/workspace/beta");
-    await page.getByRole("link", { name: "question", exact: true }).click();
-    await page.getByRole("link", { name: "Q_1", exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/workspace\/beta\/graph\/Q_1$/);
-    await expect(page.locator("#resource").getByText("beta question")).toBeVisible();
+    await page.goto(`/app/?${list("/workspace/beta/question")}`);
+    await item(page, "Q_1").click();
+    await expect(page).toHaveURL(/\/app\/workspace\/beta\/Q_1\?/);
+    await expect(page.locator(".detail").getByText("beta question")).toBeVisible();
   });
 });
 
 test.describe("when something is not there", () => {
   test("an unknown workspace says so", async ({ page, errors }) => {
     await page.goto("/app/workspace/nowhere");
-    await expect(page.locator(".load-error")).toContainText("404");
+    await expect(page.locator(".fetch-error")).toContainText("404");
     errors.length = 0;
   });
 
   test("an unknown handle says so", async ({ page, errors }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_999");
-    await expect(page.locator(".load-error")).toContainText("404");
+    await page.goto("/app/workspace/alpha/Q_999");
+    await expect(page.locator(".fetch-error")).toContainText("404");
     errors.length = 0;
-  });
-
-  test("a depth the API refuses is shown as the API's answer", async ({ page, errors }) => {
-    await page.goto("/app/workspace/alpha/graph/Q_1?depth=9");
-    await expect(page.locator(".load-error")).toContainText("400");
-    errors.length = 0;
-  });
-
-  test("an unknown collection says so", async ({ page, errors }) => {
-    await page.goto("/app/workspace/alpha/nope");
-    await expect(page.locator(".load-error")).toContainText("404");
-    errors.length = 0;
-  });
-
-  test("an unknown page in the app is not found, with a way home", async ({ page }) => {
-    await page.goto("/app/nothing/here");
-    await expect(page.getByRole("heading", { name: "Not found" })).toBeVisible();
-    await page.getByRole("link", { name: /Back to the workspaces/ }).click();
-    await expect(page).toHaveURL(/\/app\/$/);
   });
 });
 
