@@ -35,6 +35,7 @@ import {
   typeColour,
 } from "./hal";
 import {
+  docOf,
   type Pages,
   requestPath,
   store,
@@ -120,7 +121,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const held = store.index();
 
   const openEntry = useDocument(path === "" ? undefined : resourcePath(path));
-  const openDoc = openEntry?.status === "ready" ? openEntry.doc : undefined;
+  const openDoc = docOf(openEntry);
   const openIsCollection = openDoc !== undefined && typeof openDoc.type !== "string";
 
   // Opening what is already open adds no history entry.
@@ -129,8 +130,12 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
     if (key === path) return;
     void navigate({ to: "/$", params: { _splat: key.replace(/^\//, "") }, search: (s) => s });
   };
-  const pickList = (key: string) =>
+  // A collection picked, or the workspaces on going home, is fetched again: what it lists changes
+  // as records are written, and its rows stay on screen until the new page arrives.
+  const pickList = (key: string) => {
+    store.load(requestPath(key), true);
     void navigate({ to: ".", search: (s) => ({ ...s, list: key }), replace: true });
+  };
   const pickTab = (next: Tab) =>
     void navigate({
       to: ".",
@@ -139,6 +144,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
     });
   const home = () => {
     setDrawer(undefined);
+    store.load(requestPath(ENTRY), true);
     void navigate({ to: "/$", params: { _splat: "" }, search: {} });
   };
 
@@ -600,7 +606,21 @@ function Detail({
     );
 
   const res = held.get(path);
-  const loaded = entry?.status === "ready" && res?.own === true;
+  const loaded = res?.own === true;
+  if (entry?.status === "ready" && !loaded)
+    return (
+      <div className="fetch-error">
+        <div className="title">Not a resource</div>
+        <div>
+          The response has a type but names no resource at <span className="mono">{path}</span>: it
+          has no <span className="mono">id</span>, or its <span className="mono">self</span> link is
+          another address.
+        </div>
+        <div className="requested">
+          Requested <span className="mono">{resourcePath(path)}</span>.
+        </div>
+      </div>
+    );
   if (res?.attrs === undefined)
     return (
       <>

@@ -6,10 +6,17 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { type HalDocument, type HeldIndex, indexOf, keyOf } from "./hal";
 
+/** A request's state. A document fetched again stays readable, as `previous`, until the new one arrives. */
 export type Entry =
-  | { status: "loading" }
+  | { status: "loading"; previous?: HalDocument }
   | { status: "ready"; doc: HalDocument }
   | { status: "failed"; error: string };
+
+/** The document an entry holds: the one that arrived, or while it is fetched again, the one before. */
+export function docOf(entry: Entry | undefined): HalDocument | undefined {
+  if (entry?.status === "ready") return entry.doc;
+  return entry?.status === "loading" ? entry.previous : undefined;
+}
 
 const ACCEPT = "application/hal+json, application/json";
 
@@ -56,12 +63,17 @@ export class HalStore {
     return this.entries.get(path);
   }
 
-  /** Fetches `path` unless it is held or on its way. `force` fetches it again. */
+  /** Fetches `path` unless it is held or on its way. A failed one is fetched again; `force` fetches any. */
   load(path: string, force = false): void {
-    if (!force && this.entries.has(path)) return;
+    const before = this.entries.get(path);
+    if (!force && before !== undefined && before.status !== "failed") return;
     const id = ++this.requested;
     this.requests.set(path, id);
-    this.set(path, { status: "loading" });
+    const previous = docOf(before);
+    this.set(
+      path,
+      previous === undefined ? { status: "loading" } : { status: "loading", previous },
+    );
     this.fetchDoc(path).then(
       (doc) => {
         if (this.requests.get(path) === id) this.set(path, { status: "ready", doc });
@@ -90,7 +102,8 @@ export class HalStore {
     if (this.held?.version !== this.version) {
       const documents: { key: string; doc: HalDocument }[] = [];
       for (const [path, entry] of this.entries) {
-        if (entry.status === "ready") documents.push({ key: keyOf(path), doc: entry.doc });
+        const doc = docOf(entry);
+        if (doc !== undefined) documents.push({ key: keyOf(path), doc });
       }
       this.held = { version: this.version, index: indexOf(documents) };
     }
@@ -163,6 +176,7 @@ export function usePages<T>(
   for (const path of paths) {
     const entry = store.entry(path) ?? { status: "loading" };
     if (entry.status === "loading") {
+      if (entry.previous !== undefined) items.push(...read(entry.previous).items);
       loading = true;
       next = undefined;
       break;

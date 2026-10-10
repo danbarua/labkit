@@ -14,7 +14,7 @@ import {
   labelFor,
   relGroups,
 } from "../src/ui/trace/hal";
-import { HalStore } from "../src/ui/trace/hal-store";
+import { docOf, HalStore } from "../src/ui/trace/hal-store";
 import { findMathSpans, proseSegments } from "../src/ui/trace/prose";
 import { EventRow, JsonView, PropRows, Value } from "../src/ui/trace/values";
 
@@ -347,12 +347,32 @@ describe("the documents fetched", () => {
     expect(fetched).toBe(2);
   });
 
-  test("a failed request is held as its error", async () => {
+  test("a failed request is held as its error, and fetched again when next asked for", async () => {
+    let calls = 0;
     const store = new HalStore(async () => {
-      throw new Error("HTTP 404 nothing here");
+      calls++;
+      if (calls === 1) throw new Error("HTTP 404 nothing here");
+      return node("/w/x/Q_9", "Question");
     });
     store.load("/w/x/Q_9");
     await Bun.sleep(0);
     expect(store.entry("/w/x/Q_9")).toEqual({ status: "failed", error: "HTTP 404 nothing here" });
+    store.load("/w/x/Q_9");
+    await Bun.sleep(0);
+    expect(store.entry("/w/x/Q_9")?.status).toBe("ready");
+  });
+
+  test("a document fetched again stays readable until the new one arrives", async () => {
+    const later = deferred();
+    const answers = [Promise.resolve(node("/w/x/Q_1", "Question", { name: "old" })), later.promise];
+    const store = new HalStore(() => answers.shift()!);
+    store.load("/w/x/Q_1");
+    await Bun.sleep(0);
+    store.load("/w/x/Q_1", true);
+    expect(docOf(store.entry("/w/x/Q_1"))?.name).toBe("old");
+    expect(store.index().get("/w/x/Q_1")?.attrs).toEqual({ name: "old" });
+    later.resolve(node("/w/x/Q_1", "Question", { name: "new" }));
+    await later.promise;
+    expect(store.index().get("/w/x/Q_1")?.attrs).toEqual({ name: "new" });
   });
 });
