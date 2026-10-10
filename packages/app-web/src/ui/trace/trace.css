@@ -292,7 +292,6 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-faint);
-  font-size: 12px;
 }
 
 .trace .theme-btn {
@@ -550,6 +549,8 @@
   padding: 4px 14px;
 }
 .trace .toggle-btn {
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: none;
   padding: 0;
@@ -559,9 +560,20 @@
   color: var(--text);
 }
 .trace .caret {
-  display: inline-block;
-  width: 1em;
   color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.trace .caret.open {
+  transform: rotate(90deg);
+}
+.trace .response-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.trace .response-chip {
+  gap: 4px;
 }
 
 .trace .kv {
@@ -799,6 +811,9 @@
   font-size: 11.5px;
   color: var(--text-dim);
   margin: 22px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .trace .ev {
   display: flex;

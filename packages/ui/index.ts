@@ -21,5 +21,5 @@ export {
   useToasts,
 } from "./overlay/toast";
 export type { RecordsConfig } from "./records-context";
-export { Surface } from "./surface";
+export { ICONS, Surface } from "./surface";
 export { type Theme, ThemeToggle } from "./theme";

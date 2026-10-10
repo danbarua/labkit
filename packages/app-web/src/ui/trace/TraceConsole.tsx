@@ -4,7 +4,18 @@
  * is the API path of what is open, so a reload or a pasted link opens it again.
  */
 
-import { ThemeToggle } from "@labkit/ui";
+import { ICONS, ThemeToggle } from "@labkit/ui";
+import {
+  ArrowClockwiseIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  BracketsCurlyIcon,
+  CaretRightIcon,
+  HouseIcon,
+  IconContext,
+  MagnifyingGlassIcon,
+  SidebarSimpleIcon,
+} from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
@@ -153,116 +164,118 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const prose = proseFor(held, path, open);
 
   return (
-    <div className="lk-root trace" data-theme={theme === "system" ? undefined : theme}>
-      <header className="topbar">
-        <button
-          type="button"
-          className="hamburger"
-          aria-label="Toggle collections column"
-          onClick={() => setDrawer((d) => (d === "items" ? undefined : "items"))}
-        >
-          ☰
-        </button>
-        <div className="brand">
-          <img className="brand-mark" src={markUrl} alt="" />
-          <span className="brand-name">Trace Console</span>
-          <span className="brand-sub">live · {window.location.host}</span>
-        </div>
-        <div className="nav-controls">
+    <IconContext.Provider value={ICONS}>
+      <div className="lk-root trace" data-theme={theme === "system" ? undefined : theme}>
+        <header className="topbar">
           <button
             type="button"
-            className="nav-btn"
-            aria-label="Entry point"
-            title="Back to the workspaces"
-            onClick={home}
+            className="hamburger"
+            aria-label="Toggle collections column"
+            onClick={() => setDrawer((d) => (d === "items" ? undefined : "items"))}
           >
-            ⌂
+            <SidebarSimpleIcon aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            className="nav-btn"
-            aria-label="Back"
-            disabled={!canBack}
-            onClick={() => router.history.back()}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="nav-btn"
-            aria-label="Forward"
-            disabled={!canForward}
-            onClick={() => router.history.forward()}
-          >
-            ›
-          </button>
-        </div>
-        <span className="topbar-gap" />
-        {import.meta.env.DEV ? <DevLinks /> : null}
-        <div className="search-wrap">
-          <span className="icon">⌕</span>
-          <input
-            type="text"
-            placeholder="Filter…"
-            autoComplete="off"
-            aria-label="Filter the lists"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-          />
-        </div>
-        <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
-        <button
-          type="button"
-          className="hamburger"
-          id="hamburger-right"
-          aria-label="Toggle relations column"
-          onClick={() => setDrawer((d) => (d === "relations" ? undefined : "relations"))}
-        >
-          ⇆
-        </button>
-      </header>
-
-      <div className="body">
-        <button
-          type="button"
-          className={drawer === undefined ? "scrim" : "scrim open"}
-          aria-label="Close the column"
-          tabIndex={-1}
-          onClick={() => setDrawer(undefined)}
-        />
-        <Lists
-          className={drawer === "items" ? "sidebar open" : "sidebar"}
-          listKey={listKey}
-          root={listKey === ENTRY}
-          openKey={path}
-          held={held}
-          term={term}
-          onOpen={open}
-          onList={pickList}
-        />
-        <main className="main">
-          <div className="detail">
-            <Detail
-              path={path}
-              entry={openEntry}
-              isCollection={openIsCollection}
-              held={held}
-              tab={tab}
-              prose={prose}
-              onTab={pickTab}
-              onOpen={open}
+          <div className="brand">
+            <img className="brand-mark" src={markUrl} alt="" />
+            <span className="brand-name">Trace Console</span>
+            <span className="brand-sub">live · {window.location.host}</span>
+          </div>
+          <div className="nav-controls">
+            <button
+              type="button"
+              className="nav-btn"
+              aria-label="Entry point"
+              title="Back to the workspaces"
+              onClick={home}
+            >
+              <HouseIcon aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="nav-btn"
+              aria-label="Back"
+              disabled={!canBack}
+              onClick={() => router.history.back()}
+            >
+              <ArrowLeftIcon aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="nav-btn"
+              aria-label="Forward"
+              disabled={!canForward}
+              onClick={() => router.history.forward()}
+            >
+              <ArrowRightIcon aria-hidden="true" />
+            </button>
+          </div>
+          <span className="topbar-gap" />
+          {import.meta.env.DEV ? <DevLinks /> : null}
+          <div className="search-wrap">
+            <MagnifyingGlassIcon className="icon" aria-hidden="true" />
+            <input
+              type="text"
+              placeholder="Filter…"
+              autoComplete="off"
+              aria-label="Filter the lists"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
             />
           </div>
-        </main>
-        <Incoming
-          className={drawer === "relations" ? "relations-col open" : "relations-col"}
-          path={path}
-          held={held}
-          loading={openEntry?.status === "loading"}
-          onOpen={open}
-        />
+          <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
+          <button
+            type="button"
+            className="hamburger"
+            id="hamburger-right"
+            aria-label="Toggle relations column"
+            onClick={() => setDrawer((d) => (d === "relations" ? undefined : "relations"))}
+          >
+            <SidebarSimpleIcon mirrored aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className="body">
+          <button
+            type="button"
+            className={drawer === undefined ? "scrim" : "scrim open"}
+            aria-label="Close the column"
+            tabIndex={-1}
+            onClick={() => setDrawer(undefined)}
+          />
+          <Lists
+            className={drawer === "items" ? "sidebar open" : "sidebar"}
+            listKey={listKey}
+            root={listKey === ENTRY}
+            openKey={path}
+            held={held}
+            term={term}
+            onOpen={open}
+            onList={pickList}
+          />
+          <main className="main">
+            <div className="detail">
+              <Detail
+                path={path}
+                entry={openEntry}
+                isCollection={openIsCollection}
+                held={held}
+                tab={tab}
+                prose={prose}
+                onTab={pickTab}
+                onOpen={open}
+              />
+            </div>
+          </main>
+          <Incoming
+            className={drawer === "relations" ? "relations-col open" : "relations-col"}
+            path={path}
+            held={held}
+            loading={openEntry?.status === "loading"}
+            onOpen={open}
+          />
+        </div>
       </div>
-    </div>
+    </IconContext.Provider>
   );
 }
 
@@ -641,7 +654,7 @@ function Detail({
               store.reload((p) => p === resourcePath(path) || p.startsWith(`${path}/events`))
             }
           >
-            ↻
+            <ArrowClockwiseIcon aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -663,7 +676,8 @@ function Detail({
             relGroups(res, "out").map((g) => (
               <div key={g.rel}>
                 <div className="rel-heading">
-                  → {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                  <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
+                  {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
                 </div>
                 {g.keys.map((key) => (
                   <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
@@ -731,22 +745,31 @@ function Debug({
     <>
       <div className="panel">
         <div className="panel-head">
-          <span>
+          <span className="response-head">
             <button
               type="button"
-              className="toggle-btn caret"
+              className="toggle-btn"
               title="Show or hide the response"
               aria-label="Show or hide the response"
               aria-expanded={responseOpen}
               onClick={() => setResponseOpen((o) => !o)}
             >
-              {responseOpen ? "▾" : "▸"}
-            </button>{" "}
+              <CaretRightIcon
+                className={responseOpen ? "caret open" : "caret"}
+                aria-hidden="true"
+              />
+            </button>
             <a href={self} target="_blank" rel="noopener" title="Open in a new tab">
               {self}
             </a>
           </span>
-          <button type="button" className="toggle-btn" onClick={() => setResponseOpen((o) => !o)}>
+          <button
+            type="button"
+            className="toggle-btn response-chip"
+            aria-expanded={responseOpen}
+            onClick={() => setResponseOpen((o) => !o)}
+          >
+            <BracketsCurlyIcon aria-hidden="true" />
             response
           </button>
         </div>
@@ -937,7 +960,7 @@ function Incoming({
             groups.map((g) => (
               <div key={g.rel} className="rel-group">
                 <div className="rel-key">
-                  <span className="rel-arrow">←</span>
+                  <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
                   {humanRel(g.rel)}
                 </div>
                 <div className="res-list">
