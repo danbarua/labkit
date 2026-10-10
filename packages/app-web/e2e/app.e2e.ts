@@ -204,6 +204,26 @@ test.describe("an open resource", () => {
     await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
   });
 
+  test("while its response is on its way, the page keeps its layout with placeholder rows", async ({
+    page,
+  }) => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/workspace/alpha/EU_1?depth=2", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/app/workspace/alpha/EU_1");
+    await expect(header(page)).toHaveText("EU_1");
+    await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "Loading the properties" })).toBeVisible();
+    release();
+    await expect(page.locator(".detail .kv .k", { hasText: "role" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "Loading the properties" })).toHaveCount(0);
+  });
+
   test("the Debug tab shows the response and the record's events", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1");
     await page.getByRole("tab", { name: "Debug" }).click();

@@ -739,35 +739,19 @@ function Detail({
         </div>
       </div>
     );
-  if (res?.attrs === undefined)
-    return (
-      <>
-        <div className="detail-header">
-          <div className="header-top">
-            <Badge type={res?.type} />
-            <span className="header-id">{shortId(path)}</span>
-          </div>
-        </div>
-        <div className="panel">
-          <div className="panel-head">GET {resourcePath(path)}</div>
-          <div className="panel-body">
-            <Spinner>fetching {shortId(path)}…</Spinner>
-          </div>
-        </div>
-      </>
-    );
-
-  const a = res.attrs;
-  const pills = PILL_KEYS.filter((k) => typeof a[k] === "string" && a[k]);
+  // Until the resource's own response arrives, the page keeps the layout it will have: the header,
+  // the tabs, and Properties with placeholder rows when no properties are held yet.
+  const a = res?.attrs;
+  const pills = PILL_KEYS.filter((k) => typeof a?.[k] === "string" && a[k]);
   return (
     <>
       <div className="detail-header">
         <div className="header-top">
-          <Badge type={res.type} />
+          <Badge type={res?.type} />
           <span className="header-id">{shortId(path)}</span>
-          <span className="header-type">{res.type}</span>
+          <span className="header-type">{res?.type}</span>
           {pills.map((k) => {
-            const v = String(a[k]);
+            const v = String(a?.[k]);
             const variant = k === "kind" || k === "outcome" ? ` ${k}-${v}` : "";
             const Glyph = PILL_ICON[v];
             return (
@@ -804,42 +788,72 @@ function Detail({
           </button>
         </div>
       </div>
-      {tab === "debug" ? (
+      {tab === "debug" && res !== undefined ? (
         <Debug res={res} entry={entry} onOpen={onOpen} />
       ) : (
         <>
           <div className="panel">
             <div className="panel-head">
-              Properties<span>{Object.keys(a).length}</span>
+              Properties<span>{a === undefined ? "" : Object.keys(a).length}</span>
             </div>
             <div className="panel-body">
-              <PropRows attrs={a} prose={prose} />
+              {a === undefined ? (
+                <SkeletonRows count={propertyCountOf(held, res?.type)} />
+              ) : (
+                <PropRows attrs={a} prose={prose} />
+              )}
             </div>
           </div>
-          {loaded ? (
-            (["out", "in"] as const).flatMap((dir) =>
-              relGroups(res, dir).map((g) => (
-                <div key={`${dir} ${g.rel}`}>
-                  <div className="rel-heading">
-                    {dir === "out" ? (
-                      <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
-                    ) : (
-                      <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
-                    )}
-                    {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+          {loaded
+            ? (["out", "in"] as const).flatMap((dir) =>
+                relGroups(res, dir).map((g) => (
+                  <div key={`${dir} ${g.rel}`}>
+                    <div className="rel-heading">
+                      {dir === "out" ? (
+                        <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
+                      ) : (
+                        <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
+                      )}
+                      {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                    </div>
+                    {g.keys.map((key) => (
+                      <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
+                    ))}
                   </div>
-                  {g.keys.map((key) => (
-                    <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
-                  ))}
-                </div>
-              )),
-            )
-          ) : (
-            <Spinner>fetching {shortId(path)}…</Spinner>
-          )}
+                )),
+              )
+            : null}
         </>
       )}
     </>
+  );
+}
+
+/**
+ * How many properties a resource of `type` has, from a held resource of that type whose own
+ * response has arrived, so the placeholder is about as tall as what replaces it. Four otherwise.
+ */
+function propertyCountOf(held: HeldIndex, type: string | undefined): number {
+  for (const r of held.values())
+    if (r.own && r.type === type && r.attrs !== undefined) return Object.keys(r.attrs).length;
+  return 4;
+}
+
+/** Property rows drawn as grey bars, standing in while the properties are fetched. */
+function SkeletonRows({ count }: { count: number }) {
+  return (
+    <div className="skeleton" role="status" aria-busy="true" aria-label="Loading the properties">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="kv">
+          <div className="k">
+            <span className="bar" style={{ width: `${50 + ((i * 37) % 40)}%` }} />
+          </div>
+          <div className="v">
+            <span className="bar" style={{ width: `${45 + ((i * 53) % 50)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
