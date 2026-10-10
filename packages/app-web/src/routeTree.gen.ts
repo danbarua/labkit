@@ -9,20 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as SplatRouteImport } from './routes/$'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as AgentChar123SessionIdChar125RouteImport } from './routes/agent.{-$sessionId}'
 import { Route as GallerySlugRouteImport } from './routes/gallery_.$slug'
 import { Route as GallerySessionsRouteImport } from './routes/gallery_.sessions'
-import { Route as WorkspaceSlugRouteRouteImport } from './routes/workspace.$slug.route'
 import { Route as GallerySessionsSessionIdRouteImport } from './routes/gallery_.sessions_.$sessionId'
-import { Route as WorkspaceSlugIndexRouteImport } from './routes/workspace.$slug.index'
-import { Route as WorkspaceSlugTypeRouteImport } from './routes/workspace.$slug.$type'
-import { Route as WorkspaceSlugGraphIdRouteImport } from './routes/workspace.$slug.graph.$id'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SplatRoute = SplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GalleryRoute = GalleryRouteImport.update({
@@ -46,111 +42,68 @@ const GallerySessionsRoute = GallerySessionsRouteImport.update({
   path: '/gallery/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkspaceSlugRouteRoute = WorkspaceSlugRouteRouteImport.update({
-  id: '/workspace/$slug',
-  path: '/workspace/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const GallerySessionsSessionIdRoute =
   GallerySessionsSessionIdRouteImport.update({
     id: '/gallery_/sessions_/$sessionId',
     path: '/gallery/sessions/$sessionId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const WorkspaceSlugIndexRoute = WorkspaceSlugIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => WorkspaceSlugRouteRoute,
-} as any)
-const WorkspaceSlugTypeRoute = WorkspaceSlugTypeRouteImport.update({
-  id: '/$type',
-  path: '/$type',
-  getParentRoute: () => WorkspaceSlugRouteRoute,
-} as any)
-const WorkspaceSlugGraphIdRoute = WorkspaceSlugGraphIdRouteImport.update({
-  id: '/graph/$id',
-  path: '/graph/$id',
-  getParentRoute: () => WorkspaceSlugRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/gallery': typeof GalleryRoute
-  '/workspace/$slug': typeof WorkspaceSlugRouteRouteWithChildren
   '/agent/{-$sessionId}': typeof AgentChar123SessionIdChar125Route
   '/gallery/$slug': typeof GallerySlugRoute
   '/gallery/sessions': typeof GallerySessionsRoute
   '/gallery/sessions/$sessionId': typeof GallerySessionsSessionIdRoute
-  '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
-  '/workspace/$slug/': typeof WorkspaceSlugIndexRoute
-  '/workspace/$slug/graph/$id': typeof WorkspaceSlugGraphIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/gallery': typeof GalleryRoute
   '/agent/{-$sessionId}': typeof AgentChar123SessionIdChar125Route
   '/gallery/$slug': typeof GallerySlugRoute
   '/gallery/sessions': typeof GallerySessionsRoute
   '/gallery/sessions/$sessionId': typeof GallerySessionsSessionIdRoute
-  '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
-  '/workspace/$slug': typeof WorkspaceSlugIndexRoute
-  '/workspace/$slug/graph/$id': typeof WorkspaceSlugGraphIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/$': typeof SplatRoute
   '/gallery': typeof GalleryRoute
-  '/workspace/$slug': typeof WorkspaceSlugRouteRouteWithChildren
   '/agent/{-$sessionId}': typeof AgentChar123SessionIdChar125Route
   '/gallery_/$slug': typeof GallerySlugRoute
   '/gallery_/sessions': typeof GallerySessionsRoute
   '/gallery_/sessions_/$sessionId': typeof GallerySessionsSessionIdRoute
-  '/workspace/$slug/$type': typeof WorkspaceSlugTypeRoute
-  '/workspace/$slug/': typeof WorkspaceSlugIndexRoute
-  '/workspace/$slug/graph/$id': typeof WorkspaceSlugGraphIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
+    | '/$'
     | '/gallery'
-    | '/workspace/$slug'
     | '/agent/{-$sessionId}'
     | '/gallery/$slug'
     | '/gallery/sessions'
     | '/gallery/sessions/$sessionId'
-    | '/workspace/$slug/$type'
-    | '/workspace/$slug/'
-    | '/workspace/$slug/graph/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
+    | '/$'
     | '/gallery'
     | '/agent/{-$sessionId}'
     | '/gallery/$slug'
     | '/gallery/sessions'
     | '/gallery/sessions/$sessionId'
-    | '/workspace/$slug/$type'
-    | '/workspace/$slug'
-    | '/workspace/$slug/graph/$id'
   id:
     | '__root__'
-    | '/'
+    | '/$'
     | '/gallery'
-    | '/workspace/$slug'
     | '/agent/{-$sessionId}'
     | '/gallery_/$slug'
     | '/gallery_/sessions'
     | '/gallery_/sessions_/$sessionId'
-    | '/workspace/$slug/$type'
-    | '/workspace/$slug/'
-    | '/workspace/$slug/graph/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  SplatRoute: typeof SplatRoute
   GalleryRoute: typeof GalleryRoute
-  WorkspaceSlugRouteRoute: typeof WorkspaceSlugRouteRouteWithChildren
   AgentChar123SessionIdChar125Route: typeof AgentChar123SessionIdChar125Route
   GallerySlugRoute: typeof GallerySlugRoute
   GallerySessionsRoute: typeof GallerySessionsRoute
@@ -159,11 +112,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/$': {
+      id: '/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gallery': {
@@ -194,13 +147,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GallerySessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/workspace/$slug': {
-      id: '/workspace/$slug'
-      path: '/workspace/$slug'
-      fullPath: '/workspace/$slug'
-      preLoaderRoute: typeof WorkspaceSlugRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/gallery_/sessions_/$sessionId': {
       id: '/gallery_/sessions_/$sessionId'
       path: '/gallery/sessions/$sessionId'
@@ -208,49 +154,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GallerySessionsSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/workspace/$slug/': {
-      id: '/workspace/$slug/'
-      path: '/'
-      fullPath: '/workspace/$slug/'
-      preLoaderRoute: typeof WorkspaceSlugIndexRouteImport
-      parentRoute: typeof WorkspaceSlugRouteRoute
-    }
-    '/workspace/$slug/$type': {
-      id: '/workspace/$slug/$type'
-      path: '/$type'
-      fullPath: '/workspace/$slug/$type'
-      preLoaderRoute: typeof WorkspaceSlugTypeRouteImport
-      parentRoute: typeof WorkspaceSlugRouteRoute
-    }
-    '/workspace/$slug/graph/$id': {
-      id: '/workspace/$slug/graph/$id'
-      path: '/graph/$id'
-      fullPath: '/workspace/$slug/graph/$id'
-      preLoaderRoute: typeof WorkspaceSlugGraphIdRouteImport
-      parentRoute: typeof WorkspaceSlugRouteRoute
-    }
   }
 }
 
-interface WorkspaceSlugRouteRouteChildren {
-  WorkspaceSlugTypeRoute: typeof WorkspaceSlugTypeRoute
-  WorkspaceSlugIndexRoute: typeof WorkspaceSlugIndexRoute
-  WorkspaceSlugGraphIdRoute: typeof WorkspaceSlugGraphIdRoute
-}
-
-const WorkspaceSlugRouteRouteChildren: WorkspaceSlugRouteRouteChildren = {
-  WorkspaceSlugTypeRoute: WorkspaceSlugTypeRoute,
-  WorkspaceSlugIndexRoute: WorkspaceSlugIndexRoute,
-  WorkspaceSlugGraphIdRoute: WorkspaceSlugGraphIdRoute,
-}
-
-const WorkspaceSlugRouteRouteWithChildren =
-  WorkspaceSlugRouteRoute._addFileChildren(WorkspaceSlugRouteRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  SplatRoute: SplatRoute,
   GalleryRoute: GalleryRoute,
-  WorkspaceSlugRouteRoute: WorkspaceSlugRouteRouteWithChildren,
   AgentChar123SessionIdChar125Route: AgentChar123SessionIdChar125Route,
   GallerySlugRoute: GallerySlugRoute,
   GallerySessionsRoute: GallerySessionsRoute,

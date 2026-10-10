@@ -75,9 +75,10 @@ body,
   letter-spacing: 0.05em;
 }
 
-select,
-button,
-input[type="range"] {
+/* The Trace Console (`.trace`) styles its own controls. */
+select:where(:not(.trace *)),
+button:where(:not(.trace *)),
+input[type="range"]:where(:not(.trace *)) {
   font-family: inherit;
   font-size: 12px;
   color: var(--text);
@@ -91,15 +92,15 @@ select {
   min-width: 220px;
 }
 
-button {
+button:where(:not(.trace *)) {
   padding: 5px 10px;
   cursor: pointer;
 }
-button:hover {
+button:where(:not(.trace *)):hover {
   border-color: var(--accent);
   color: var(--accent);
 }
-button:active {
+button:where(:not(.trace *)):active {
   transform: translateY(1px);
 }
 /* The theme button: an icon alone, as tall as the text buttons beside it. */
@@ -210,4 +211,20 @@ main {
 #bar h1 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* A page that failed to load: the error the API or the router gave. */
+.load-error {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 3px;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 42ch;
 }
