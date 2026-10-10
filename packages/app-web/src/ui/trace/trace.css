@@ -253,40 +253,8 @@
   color: var(--accent);
 }
 
-.trace .breadcrumb {
+.trace .topbar-gap {
   flex: 1 1 auto;
-  min-width: 0;
-  overflow-x: auto;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  padding: 4px 0;
-}
-.trace .crumb-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.trace .crumb {
-  font-size: inherit;
-  color: var(--text-dim);
-  background: none;
-  border: none;
-  padding: 3px 6px;
-  border-radius: 5px;
-}
-.trace .crumb:hover {
-  color: var(--text);
-  background: var(--panel-2);
-}
-.trace .crumb.current {
-  color: var(--accent);
-}
-.trace .crumb-sep {
-  color: var(--text-faint);
 }
 
 .trace .dev-links {

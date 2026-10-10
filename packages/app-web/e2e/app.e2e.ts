@@ -126,23 +126,21 @@ test.describe("an open resource", () => {
     await page.goto("/app/workspace/alpha/Q_1");
     await page.locator(".card-head", { hasText: "LOE_1" }).click();
     await expect(header(page)).toHaveText("LOE_1");
-    await expect(page.locator(".breadcrumb .crumb")).toHaveText(["Q_1", "LOE_1"]);
 
     await page.goBack();
     await expect(header(page)).toHaveText("Q_1");
     await page.getByRole("button", { name: "Forward" }).click();
     await expect(header(page)).toHaveText("LOE_1");
+    await expect(page.getByRole("button", { name: "Forward" })).toBeDisabled();
     await page.getByRole("button", { name: "Back" }).click();
     await expect(header(page)).toHaveText("Q_1");
-    await page.locator(".breadcrumb .crumb", { hasText: "LOE_1" }).click();
-    await expect(header(page)).toHaveText("LOE_1");
   });
 
   test("opening the resource that is open adds no history entry", async ({ page }) => {
     await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
     await expect(header(page)).toHaveText("Q_1");
     await item(page, "Q_1").click();
-    await expect(page.locator(".breadcrumb .crumb")).toHaveText(["Q_1"]);
+    await expect(header(page)).toHaveText("Q_1");
     await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
   });
 

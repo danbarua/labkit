@@ -8,7 +8,7 @@ import { ThemeToggle } from "@labkit/ui";
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSavedTheme } from "../saved-theme";
 import {
   GraphView,
@@ -73,11 +73,12 @@ function Spinner({ children }: { children: ReactNode }) {
 }
 
 /**
- * The history entries this page has seen, by their position in the browser's history. The browser
- * does not let a page read its history, so the page keeps the path it showed at each position: an
- * entry is replaced when the page arrives at its position again by a new navigation, and the
- * entries after it are dropped, as the browser drops them. The position and the path are read from
- * one location, so a render between two navigations never pairs one's position with the other's path.
+ * The history entries this page has seen, by their position in the browser's history, which enable
+ * or disable the Back and Forward buttons. The browser does not let a page read its history, so
+ * the page keeps the path it showed at each position: an entry is replaced when the page arrives at
+ * its position again by a new navigation, and the entries after it are dropped, as the browser
+ * drops them. The position and the path are read from one location, so a render between two
+ * navigations never pairs one's position with the other's path.
  */
 function useTrail(): { trail: string[]; at: number } {
   const here = useRouterState({
@@ -98,10 +99,6 @@ function useTrail(): { trail: string[]; at: number } {
   }, [at, path]);
   return { trail, at };
 }
-
-/** A trail entry that opened something: any path but the console's root. */
-const opened = (entry: string | undefined): entry is string =>
-  entry !== undefined && shortId(entry) !== "";
 
 export interface TraceConsoleProps {
   /** The API path of what is open, or "" when nothing is. */
@@ -200,7 +197,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
             ›
           </button>
         </div>
-        <Breadcrumb trail={trail} at={at} go={(delta) => router.history.go(delta)} />
+        <span className="topbar-gap" />
         {import.meta.env.DEV ? <DevLinks /> : null}
         <div className="search-wrap">
           <span className="icon">⌕</span>
@@ -279,46 +276,6 @@ function DevLinks() {
       <Link to="/agent/{-$sessionId}" params={{ sessionId: undefined }} reloadDocument>
         agent
       </Link>
-    </nav>
-  );
-}
-
-/** The run of resources opened one after another that the current one is part of. */
-function Breadcrumb({
-  trail,
-  at,
-  go,
-}: {
-  trail: string[];
-  at: number;
-  go: (delta: number) => void;
-}) {
-  const crumbs: number[] = [];
-  if (opened(trail[at])) {
-    let start = at;
-    while (start > 0 && opened(trail[start - 1])) start--;
-    for (let i = start; i < trail.length && opened(trail[i]); i++) crumbs.push(i);
-  }
-  // The newest crumb stays in view when the trail is wider than the bar.
-  const nav = useRef<HTMLElement>(null);
-  const last = crumbs.at(-1);
-  useEffect(() => {
-    if (last !== undefined && nav.current) nav.current.scrollLeft = nav.current.scrollWidth;
-  }, [last]);
-  return (
-    <nav ref={nav} className="breadcrumb" aria-label="Navigation history">
-      {crumbs.map((i, n) => (
-        <span key={i} className="crumb-step">
-          {n > 0 ? <span className="crumb-sep">›</span> : null}
-          <button
-            type="button"
-            className={i === at ? "crumb current" : "crumb"}
-            onClick={() => go(i - at)}
-          >
-            {shortId(trail[i] ?? "")}
-          </button>
-        </span>
-      ))}
     </nav>
   );
 }
