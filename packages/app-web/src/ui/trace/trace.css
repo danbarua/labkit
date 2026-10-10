@@ -404,7 +404,6 @@
   top: 0;
   left: 0;
   right: 0;
-  border: 1px solid var(--accent);
   border-radius: 6px;
   pointer-events: none;
   transition:
@@ -415,8 +414,12 @@
 .trace .active-box.placed {
   transition: background-color 150ms ease;
 }
-.trace .active-box.filled {
+.trace .active-box.fill.filled {
   background: var(--accent-dim);
+}
+.trace .active-box.outline {
+  z-index: 2;
+  border: 1px solid var(--accent);
 }
 .trace .res-item {
   display: flex;
@@ -445,7 +448,7 @@
   background: none;
   border-color: transparent;
 }
-.trace .res-list .active-box:not(.filled) ~ .res-item.active {
+.trace .res-list .active-box.fill:not(.filled) ~ .res-item.active {
   background: var(--panel-2);
 }
 .trace .res-item .badge {

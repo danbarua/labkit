@@ -673,12 +673,15 @@ function ActiveBox({
     return () => clearTimeout(timer);
   }, [filled]);
   if (box === undefined) return null;
+  // Two layers: the fill under the rows, so it does not tint their text, and the outline over
+  // them, so the hover background of the row it slides to does not hide it.
+  const style = { transform: `translateY(${box.top}px)`, height: box.height };
+  const state = [box.slide ? "" : "placed", filled ? "filled" : ""].join(" ");
   return (
-    <div
-      className={["active-box", box.slide ? "" : "placed", filled ? "filled" : ""].join(" ")}
-      style={{ transform: `translateY(${box.top}px)`, height: box.height }}
-      aria-hidden="true"
-    />
+    <>
+      <div className={`active-box fill ${state}`} style={style} aria-hidden="true" />
+      <div className={`active-box outline ${state}`} style={style} aria-hidden="true" />
+    </>
   );
 }
 
