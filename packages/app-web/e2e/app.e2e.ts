@@ -463,6 +463,40 @@ test.describe("playback", () => {
     errors.length = 0;
   });
 
+  test("while playing, the corner card shows what playback opened, until the pointer is on the canvas", async ({
+    page,
+  }) => {
+    // Playback stays on act 1 while the page after it is held.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(
+      (url) =>
+        url.pathname.endsWith("/workspace/alpha/act") && url.searchParams.get("since") === "1",
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+    await page.goto("/app/workspace/alpha/act");
+    await play(page).click();
+    await expect(header(page)).toHaveText("1", { timeout: 10_000 });
+    const card = page.locator("#popover");
+    await expect(card.locator(".cid")).toHaveText("Q_1");
+
+    const stage = await page.locator("#stage").boundingBox();
+    if (stage === null) throw new Error("the canvas has no box");
+    await page.mouse.move(stage.x + stage.width - 10, stage.y + 10);
+    await expect(card).toBeHidden();
+    await page.mouse.move(stage.x + stage.width / 2, stage.y - 20);
+    await expect(card.locator(".cid")).toHaveText("Q_1");
+
+    await pause(page).click();
+    await expect(card).toBeHidden();
+    release();
+  });
+
   test("stops when the reader opens something else", async ({ page }) => {
     let release: () => void = () => {};
     const held = new Promise<void>((resolve) => {

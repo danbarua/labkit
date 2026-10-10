@@ -1060,6 +1060,9 @@ function GraphCard({
           overlay={overlay}
           active={open}
           summary={(id) => <HoverCard itemKey={id} held={held} />}
+          // While playback runs, the card of what it opened stands in for the open resource's
+          // page below the graph, until the pointer comes onto the canvas.
+          pinnedId={playing ? shown : null}
           onNavigate={onOpen}
         />
       </div>
