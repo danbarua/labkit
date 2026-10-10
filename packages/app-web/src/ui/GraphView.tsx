@@ -98,10 +98,9 @@ const TOTAL_DEPTH = 46 * 14;
 const FOCAL = 640;
 /**
  * Where the open resource's node is drawn, as fractions of the canvas's width and height from its
- * top-left corner: in the lower-left quadrant, so the nodes seen later, which lie up and to the
- * right along the time axis, have the rest of the canvas.
+ * top-left corner: up and left of centre, in the middle of the area the corner card leaves clear.
  */
-const ANCHOR = { x: 0.25, y: 0.75 };
+const ANCHOR = { x: 0.35, y: 0.45 };
 
 /** The colours the canvas draws in, read from the page's stylesheet on each frame so a theme change shows. */
 type Palette = { css: CSSStyleDeclaration; text: string; dim: string; accent: string };

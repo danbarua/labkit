@@ -314,7 +314,7 @@ test.describe("the graph", () => {
       .toBeGreaterThan(2);
   });
 
-  test("the camera faces the open resource: its node is drawn in the lower-left quadrant", async ({
+  test("the camera faces the open resource: its node is drawn left of centre, clear of the card", async ({
     page,
   }) => {
     await page.goto("/app/workspace/alpha/LOE_1");
@@ -326,8 +326,8 @@ test.describe("the graph", () => {
         const data = c
           .getContext("2d")
           ?.getImageData(
-            Math.floor(c.width * 0.25) - 2,
-            Math.floor(c.height * 0.75) - 2,
+            Math.floor(c.width * 0.35) - 2,
+            Math.floor(c.height * 0.45) - 2,
             5,
             5,
           ).data;
