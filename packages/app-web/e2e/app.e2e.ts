@@ -35,6 +35,10 @@ const item = (page: import("@playwright/test").Page, handle: string) =>
     has: page.locator(".rid", { hasText: new RegExp(`^${handle}$`) }),
   });
 const list = (path: string) => `list=${encodeURIComponent(path)}`;
+// The canvas's nodes are also a visually hidden list of buttons, for the keyboard, which is how
+// these tests pick a node: a canvas has no element to click.
+const node = (page: import("@playwright/test").Page, name: string | RegExp) =>
+  page.getByRole("list", { name: "Nodes in the graph" }).getByRole("button", { name });
 
 test.describe("getting around", () => {
   test("a browser at the root lands on the app, with the workspaces", async ({ page }) => {
@@ -220,11 +224,6 @@ test.describe("an open resource", () => {
 });
 
 test.describe("the graph", () => {
-  // The canvas's nodes are also a visually hidden list of buttons, for the keyboard, which is how
-  // these tests pick a node: a canvas has no element to click.
-  const node = (page: import("@playwright/test").Page, name: string) =>
-    page.getByRole("list", { name: "Nodes in the graph" }).getByRole("button", { name });
-
   test("draws the graph on the canvas", async ({ page }) => {
     await page.goto("/app/workspace/alpha/LOE_1");
     const canvas = page.locator("#stage");
@@ -316,6 +315,14 @@ test.describe("the graph", () => {
     await expect(node(page, "Q_1 (Question)")).toBeVisible();
   });
 
+  test("an opened act is drawn as its subject, with no node for the act", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/act/1");
+    await expect(header(page)).toHaveText("1");
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+    await expect(node(page, /\(Act\)$/)).toHaveCount(0);
+  });
+
   test("Reset forgets what was opened before the open resource", async ({ page }) => {
     await page.goto(`/app/workspace/alpha/Q_2?${list("/workspace/alpha/question")}`);
     await expect(header(page)).toHaveText("Q_2");
@@ -337,6 +344,102 @@ test.describe("the graph", () => {
       "true",
     );
     await expect(page.locator("#stage")).toBeVisible();
+  });
+});
+
+test.describe("playback", () => {
+  const play = (page: import("@playwright/test").Page) =>
+    page.locator(".graph-card").getByRole("button", { name: "Play", exact: true });
+  const pause = (page: import("@playwright/test").Page) =>
+    page.locator(".graph-card").getByRole("button", { name: "Pause", exact: true });
+
+  test("opens, one act at a time, each later act's subject, then stops", async ({
+    page,
+    errors,
+  }) => {
+    // Q_1 was posed by act 1. Act 2's subject is NOTE_1, which the graph does not hold, and
+    // act 3's subject is LOE_1.
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    await play(page).click();
+    await expect(pause(page)).toBeVisible();
+    await expect(page).toHaveURL(/\/NOTE_1/, { timeout: 10_000 });
+    await expect(page.locator(".fetch-error")).toContainText("404");
+    await expect(header(page)).toHaveText("LOE_1", { timeout: 10_000 });
+    await expect(page.locator(".playback-status")).toHaveText("No later act.", {
+      timeout: 10_000,
+    });
+    await expect(play(page)).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/NOTE_1/);
+    // The browser reports the 404 for NOTE_1 as a console error.
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+  });
+
+  test("from the acts collection, each step opens the next act, and the graph draws its subject", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/alpha/act");
+    await expect(page.locator(".sidebar .res-item")).toHaveCount(3);
+    await play(page).click();
+    await expect(header(page)).toHaveText("1", { timeout: 10_000 });
+    await expect(page.locator(".sidebar .res-item.active")).toContainText("pose Q_1");
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+    await expect(header(page)).toHaveText("2", { timeout: 10_000 });
+    await expect(header(page)).toHaveText("3", { timeout: 10_000 });
+    await expect(page.locator(".sidebar .res-item.active")).toContainText("LOE_1");
+    await expect(page.locator(".playback-status")).toHaveText("No later act.", {
+      timeout: 10_000,
+    });
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+    await expect(node(page, /\(Act\)$/)).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`${list("/workspace/alpha/act")}`));
+    // Act 2's subject, NOTE_1, is not in the graph: the browser reports its 404.
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+  });
+
+  test("from an act, playback starts after that act", async ({ page, errors }) => {
+    await page.goto("/app/workspace/alpha/act/2");
+    await expect(header(page)).toHaveText("2");
+    await play(page).click();
+    await expect(header(page)).toHaveText("3", { timeout: 10_000 });
+    await expect(page.locator(".playback-status")).toHaveText("No later act.", {
+      timeout: 10_000,
+    });
+    // Act 2's subject, NOTE_1, is not in the graph: the browser reports its 404.
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+  });
+
+  test("stops when the reader opens something else", async ({ page }) => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/workspace/alpha/act?*", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto("/app/workspace/alpha/Q_1");
+    await play(page).click();
+    await expect(pause(page)).toBeVisible();
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(play(page)).toBeVisible();
+    release();
+    await page.waitForTimeout(2_000);
+    await expect(header(page)).toHaveText("LOE_1");
+  });
+
+  test("from a resource no act records, says so", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/EU_1");
+    await expect(header(page)).toHaveText("EU_1");
+    await play(page).click();
+    await expect(page.locator(".playback-status")).toHaveText("No act records EU_1.");
+    await expect(play(page)).toBeVisible();
   });
 });
 

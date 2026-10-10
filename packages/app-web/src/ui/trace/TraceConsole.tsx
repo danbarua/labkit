@@ -16,6 +16,8 @@ import {
   HouseIcon,
   IconContext,
   MagnifyingGlassIcon,
+  PauseIcon,
+  PlayIcon,
   SidebarSimpleIcon,
 } from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
@@ -35,6 +37,7 @@ import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from 
 import {
   type CollectionItem,
   collectionOf,
+  drawnAs,
   edgeLabelOf,
   type HalDocument,
   type Held,
@@ -51,11 +54,13 @@ import {
   docOf,
   type Pages,
   requestPath,
+  resourcePath,
   store,
   useDocument,
   usePages,
   useStoreVersion,
 } from "./hal-store";
+import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
 import { Badge, EventRow, JsonView, PropRows, type Prose } from "./values";
 import "./trace.css";
@@ -63,15 +68,7 @@ import "./trace.css";
 /** Where the left column starts: the list of workspaces. */
 const ENTRY = "/collections/workspace";
 
-/**
- * The depth every resource is requested at. At depth 1 a resource's neighbours are links alone;
- * at 2 they arrive with their properties, which the centre column's cards show.
- */
-const DEPTH = 2;
-
 export type Tab = "overview" | "debug";
-
-const resourcePath = (key: string) => `${key}?depth=${DEPTH}`;
 
 /** The directory a key sits in, with its trailing slash. */
 const dirOf = (key: string) => key.slice(0, key.lastIndexOf("/") + 1);
@@ -183,6 +180,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
       search: (s) => ({ ...s, list: nextList }),
     });
   };
+  const playback = usePlayback(path, workspace, open);
   // A collection picked, or the workspaces on going home, is fetched again: what it lists changes
   // as records are written, and its rows stay on screen until the new page arrives.
   const pickList = (key: string) => {
@@ -298,9 +296,13 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
                   generation={explored.generation}
                   held={held}
                   selected={path}
+                  playback={playback.playback}
+                  canPlay={held.get(path)?.own === true || (openIsCollection && listsActs(path))}
                   onToggle={() => setGraphOpen((o) => !o)}
                   onOpen={open}
                   onReset={explored.reset}
+                  onPlay={playback.play}
+                  onPause={playback.pause}
                 />
               )}
               <Detail
@@ -380,6 +382,12 @@ function proseFor(held: HeldIndex, path: string, onOpen: (key: string) => void):
 function indexOfList(key: string): string | undefined {
   const doc = docOf(store.entry(requestPath(key)));
   return doc === undefined ? undefined : collectionOf(key, doc).index;
+}
+
+/** Whether collection `key` is the acts collection: the type its own index lists it under is Act. */
+function listsActs(key: string): boolean {
+  const upper = indexOfList(key);
+  return upper !== undefined && rowIn(upper, key)?.data.type === "Act";
 }
 
 /** Collection `key` as a row of collection `upper`, when the document of `upper` is held. */
@@ -933,9 +941,13 @@ function GraphCard({
   generation,
   held,
   selected,
+  playback,
+  canPlay,
   onToggle,
   onOpen,
   onReset,
+  onPlay,
+  onPause,
 }: {
   open: boolean;
   workspace: string;
@@ -943,14 +955,29 @@ function GraphCard({
   generation: number;
   held: HeldIndex;
   selected: string;
+  playback: Playback;
+  /** True when a resource or the acts collection is open: playback starts from either. */
+  canPlay: boolean;
   onToggle: () => void;
   onOpen: (key: string) => void;
   onReset: () => void;
+  onPlay: () => void;
+  onPause: () => void;
 }) {
+  const playing = playback.state === "playing";
+  const status = playing ? playback.act : playback.note;
   const [overlay, setOverlay] = useState<Overlay>("structural");
+  // An act is drawn as its subject, whose own response is fetched so its relations are drawn too.
+  const drawn = explored.flatMap((key) => drawnAs(held, key) ?? []);
+  const shown = drawnAs(held, selected) ?? selected;
+  const drawnJoined = drawn.join("\n");
+  useEffect(() => {
+    for (const key of drawnJoined.split("\n"))
+      if (key !== "" && store.entry(resourcePath(key)) === undefined) store.load(resourcePath(key));
+  }, [drawnJoined]);
   const { nodes, edges } = useMemo(
-    () => graphOf(held, explored, workspace),
-    [held, explored, workspace],
+    () => graphOf(held, drawnJoined.split("\n"), workspace),
+    [held, drawnJoined, workspace],
   );
   return (
     <div className="panel graph-card">
@@ -986,6 +1013,23 @@ function GraphCard({
               {label}
             </button>
           ))}
+          <span className="playback-status" aria-live="polite">
+            {status}
+          </span>
+          <button
+            type="button"
+            className={playing ? "tbtn on" : "tbtn"}
+            title={
+              playing
+                ? "Stop opening later acts' resources"
+                : "Open, one at a time, the resource each later act created"
+            }
+            disabled={!playing && !canPlay}
+            onClick={playing ? onPause : onPlay}
+          >
+            {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
+            {playing ? "Pause" : "Play"}
+          </button>
           <button
             type="button"
             className="tbtn"
@@ -1001,7 +1045,7 @@ function GraphCard({
           key={`${workspace} ${generation}`}
           nodes={nodes}
           edges={edges}
-          selectedId={selected}
+          selectedId={shown}
           overlay={overlay}
           active={open}
           summary={(id) => <HoverCard itemKey={id} held={held} />}

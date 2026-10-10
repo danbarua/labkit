@@ -68,7 +68,6 @@ type Sim = {
 const KIND_COLOR: Record<string, string> = {};
 const TEMPORAL_CREATED = "hsl(178deg 60% 62%)";
 const TEMPORAL_TOUCHED = "hsl(38deg 65% 62%)";
-const TEMPORAL_HISTORICAL = "hsl(220deg 10% 34%)";
 
 const REPEL = 2600;
 const SPRING_LEN = 90;
@@ -121,7 +120,9 @@ function colorForNode(sim: Sim, node: SimNode, palette: Palette): string {
         return TEMPORAL_TOUCHED;
       }
     }
-    return TEMPORAL_HISTORICAL;
+    // The page's dim text colour, which stands out from the background in either theme, so the
+    // depth fade shows on these nodes too.
+    return palette.dim;
   }
   return colorFor(node.type, palette);
 }
@@ -390,21 +391,27 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
 
   ctx.lineWidth = 1;
   const labels: { x: number; y: number; text: string; hot: boolean; opacity: number }[] = [];
+  // The edges of the open node and of the node under the pointer are drawn last, in the accent
+  // colour and twice as wide, unfaded, so they stand out from the rest.
+  const hotEdges: [Projected, Projected][] = [];
   for (const edge of sim.edges) {
     const a = projected.get(edge.from);
     const b = projected.get(edge.to);
     if (!a || !b || a.scale === 0 || b.scale === 0) continue;
     const edgeOpacity = opacity((a.depth + b.depth) / 2);
-    ctx.globalAlpha = edgeOpacity;
-    ctx.strokeStyle = "rgba(128, 138, 156, 0.35)";
-    ctx.beginPath();
-    ctx.moveTo(a.sx, a.sy);
-    ctx.lineTo(b.sx, b.sy);
-    ctx.stroke();
-
     const hot = [sim.selectedId, sim.hoverId].some(
       (id) => id !== null && (edge.from === id || edge.to === id),
     );
+    if (hot) hotEdges.push([a, b]);
+    else {
+      ctx.globalAlpha = edgeOpacity;
+      ctx.strokeStyle = "rgba(128, 138, 156, 0.35)";
+      ctx.beginPath();
+      ctx.moveTo(a.sx, a.sy);
+      ctx.lineTo(b.sx, b.sy);
+      ctx.stroke();
+    }
+
     const scale = Math.min(a.scale, b.scale);
     if (hot || scale > 0.55) {
       labels.push({
@@ -416,6 +423,16 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
       });
     }
   }
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = palette.accent;
+  ctx.lineWidth = 2;
+  for (const [a, b] of hotEdges) {
+    ctx.beginPath();
+    ctx.moveTo(a.sx, a.sy);
+    ctx.lineTo(b.sx, b.sy);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 1;
 
   for (const [id] of order) {
     const node = sim.nodes.get(id);
@@ -448,8 +465,9 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "9px ui-monospace, monospace";
-  for (const lab of labels) {
+  // The hot edges' labels are drawn last, larger and bold, so no other label covers them.
+  for (const lab of [...labels.filter((l) => !l.hot), ...labels.filter((l) => l.hot)]) {
+    ctx.font = lab.hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
     ctx.globalAlpha = (lab.hot ? 0.95 : 0.75) * lab.opacity;
     ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
     ctx.fillText(lab.text, lab.x, lab.y - 7);

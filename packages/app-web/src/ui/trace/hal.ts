@@ -304,6 +304,22 @@ export function itemView(item: CollectionItem, held: Held | undefined): ItemView
   };
 }
 
+/**
+ * The resource the graph draws for `key`: an act's subject, since an act records a change to a
+ * resource rather than being one, and any other key itself. Undefined for an act whose own
+ * response, which names its subject, has not arrived.
+ */
+export function drawnAs(held: HeldIndex, key: string): string | undefined {
+  const r = held.get(key);
+  if (r?.type !== "Act") return key;
+  return r.rels.find((rel) => rel.rel === "subject")?.key;
+}
+
+/** The address of a document's first link under `rel`, or undefined when it has none. */
+export function hrefOf(node: HalDocument, rel: string): string | undefined {
+  return linksOf(node, rel)[0]?.href;
+}
+
 /** The relations of `held` in one direction, grouped by rel name, in rel-name order. */
 export function relGroups(held: Held, dir: "in" | "out"): { rel: string; keys: string[] }[] {
   const byRel = new Map<string, string[]>();
