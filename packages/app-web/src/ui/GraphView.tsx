@@ -43,6 +43,9 @@ type Projected = { sx: number; sy: number; scale: number; depth: number };
 
 type Camera = { yaw: number; pitch: number; distance: number };
 
+/** A point in the graph's space: the plane of the force layout, and depth by order first seen. */
+type Point3 = { x: number; y: number; z: number };
+
 type Drag = { x: number; y: number; yaw: number; pitch: number };
 
 type Sim = {
@@ -55,6 +58,8 @@ type Sim = {
   hoverId: string | null;
   screenPos: Map<string, Projected>;
   camera: Camera;
+  /** The point the camera orbits and faces: it follows the open resource's node. */
+  pivot: Point3 | null;
   drag: Drag | null;
   dragged: boolean;
 };
@@ -235,17 +240,43 @@ function maxCreatedZ(sim: Sim): number {
   return max;
 }
 
+/**
+ * Where the camera should face: the open resource's node, or, while the canvas has no node for it,
+ * the middle of the graph's depth at the plane's origin, which the layout is pulled towards.
+ */
+function pivotTarget(sim: Sim): Point3 {
+  const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
+  if (open) return { x: open.x, y: open.y, z: zOf(sim, open) };
+  return { x: 0, y: 0, z: maxCreatedZ(sim) / 2 };
+}
+
+/** Eases the pivot toward its target, so opening another resource turns the view rather than jumping it. */
+function followPivot(sim: Sim): void {
+  const target = pivotTarget(sim);
+  if (sim.pivot === null) {
+    sim.pivot = target;
+    return;
+  }
+  const k = 0.12;
+  sim.pivot.x += (target.x - sim.pivot.x) * k;
+  sim.pivot.y += (target.y - sim.pivot.y) * k;
+  sim.pivot.z += (target.z - sim.pivot.z) * k;
+}
+
 function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
   const { yaw, pitch, distance } = sim.camera;
-  const zc = zOf(sim, node) - maxCreatedZ(sim) / 2;
+  const pivot = sim.pivot ?? pivotTarget(sim);
+  const x0 = node.x - pivot.x;
+  const y0 = node.y - pivot.y;
+  const zc = zOf(sim, node) - pivot.z;
   const cosY = Math.cos(yaw);
   const sinY = Math.sin(yaw);
-  const x1 = node.x * cosY - zc * sinY;
-  const z1 = node.x * sinY + zc * cosY;
+  const x1 = x0 * cosY - zc * sinY;
+  const z1 = x0 * sinY + zc * cosY;
   const cosX = Math.cos(pitch);
   const sinX = Math.sin(pitch);
-  const y1 = node.y * cosX - z1 * sinX;
-  const z2 = node.y * sinX + z1 * cosX;
+  const y1 = y0 * cosX - z1 * sinX;
+  const z2 = y0 * sinX + z1 * cosX;
   const viewZ = z2 + distance;
   if (viewZ <= 1) return { sx: -9999, sy: -9999, scale: 0, depth: viewZ };
   const scale = FOCAL / viewZ;
@@ -451,6 +482,7 @@ function createSim(): Sim {
     hoverId: null,
     screenPos: new Map(),
     camera: { yaw: 0.5, pitch: -0.35, distance: 620 },
+    pivot: null,
     drag: null,
     dragged: false,
   };
@@ -474,7 +506,8 @@ function resizeCanvas(
 
 /**
  * The resources a reader has explored and their relations, laid out by a force simulation in the
- * plane and by the order they were first seen in depth, and drawn in perspective.
+ * plane and by the order they were first seen in depth, and drawn in perspective. The camera
+ * orbits and faces the open resource's node.
  */
 export function GraphView({
   nodes,
@@ -604,6 +637,7 @@ export function GraphView({
     const loop = () => {
       const s = simRef.current;
       tickPhysics(s);
+      followPivot(s);
       renderFrame(ctx, s, sizeRef.current.width, sizeRef.current.height);
       raf = requestAnimationFrame(loop);
     };

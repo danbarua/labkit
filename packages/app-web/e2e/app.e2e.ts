@@ -247,6 +247,28 @@ test.describe("the graph", () => {
       .toBeGreaterThan(2);
   });
 
+  test("the camera faces the open resource: its node is drawn at the canvas's centre", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/LOE_1");
+    await expect(header(page)).toHaveText("LOE_1");
+    // A node is a filled disc several pixels across; an edge or a label cannot fill a 5×5 block.
+    const centreFilled = () =>
+      page.locator("#stage").evaluate((el) => {
+        const c = el as HTMLCanvasElement;
+        const data = c
+          .getContext("2d")
+          ?.getImageData(Math.floor(c.width / 2) - 2, Math.floor(c.height / 2) - 2, 5, 5).data;
+        if (!data) return false;
+        for (let i = 3; i < data.length; i += 4) if ((data[i] ?? 0) < 250) return false;
+        return true;
+      });
+    await expect.poll(centreFilled).toBe(true);
+    await page.locator(".card-head", { hasText: "EU_1" }).click();
+    await expect(header(page)).toHaveText("EU_1");
+    await expect.poll(centreFilled).toBe(true);
+  });
+
   test("the colour toggle switches, and there is no 2D view or standing overlay", async ({
     page,
   }) => {
