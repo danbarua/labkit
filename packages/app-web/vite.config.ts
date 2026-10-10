@@ -2,7 +2,6 @@ import path from "node:path";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { designAssets } from "./src/infra/design-assets";
 import { labkitDev } from "./src/infra/dev-plugin";
 import { agentBackend } from "./src/infra/agent-backend";
 import { transcripts } from "./src/infra/transcripts-plugin";
@@ -25,7 +24,6 @@ export default defineConfig(({ command, isPreview }) => ({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
-    designAssets(),
     labkitDev(),
     transcripts(),
     ...agent.plugins,

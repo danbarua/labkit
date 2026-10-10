@@ -26,7 +26,6 @@
       "scripts/**",
       "tests/**",
       "e2e/**",
-      "public/explorer*.js",
       "*.ts",
       "*.json",
       "!src/routeTree.gen.ts"
