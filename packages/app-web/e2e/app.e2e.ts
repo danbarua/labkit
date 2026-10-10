@@ -74,10 +74,16 @@ test.describe("getting around", () => {
     await expect(header(page)).toHaveText("LOE_1");
   });
 
-  test("a path that names a collection lists it", async ({ page }) => {
+  test("a path that names a collection lists it, and keeps it listed when an item opens", async ({
+    page,
+  }) => {
     await page.goto("/app/workspace/alpha/question");
     await expect(item(page, "Q_1")).toBeVisible();
     await expect(page.getByText("Pick a type on the left")).toBeVisible();
+    await item(page, "Q_1").click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(page).toHaveURL(new RegExp(`/Q_1\\?${list("/workspace/alpha/question")}$`));
+    await expect(item(page, "Q_1")).toHaveClass(/active/);
   });
 
   test("a collection picked from the upper pane loads below it, and the upper pane stays", async ({
@@ -100,6 +106,21 @@ test.describe("getting around", () => {
     release();
     await expect(item(page, "Q_1")).toBeVisible();
     await expect(row(page, "LineOfEnquiry")).toBeVisible();
+  });
+
+  test("opening a resource of another type than the listed one closes the Items pane", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha/question")}`);
+    await item(page, "Q_1").click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(item(page, "Q_2")).toBeVisible();
+
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(page).toHaveURL(new RegExp(`${list("/workspace/alpha")}$`));
+    await expect(page.getByText("Pick a collection above to list its items.")).toBeVisible();
+    await expect(row(page, "Question")).toBeVisible();
   });
 
   test("a collection's next page is added on request", async ({ page }) => {

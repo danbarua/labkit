@@ -130,11 +130,26 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const openDoc = docOf(openEntry);
   const openIsCollection = openDoc !== undefined && typeof openDoc.type !== "string";
 
-  // Opening what is already open adds no history entry.
+  // Opening what is already open adds no history entry. Opening a resource of another type than
+  // the listed collection's lists the collection that one is listed in instead, which closes the
+  // Items pane: the reader is following relations, not reading down the list.
+  const shownList = openIsCollection ? path : list;
   const open = (key: string) => {
     setDrawer(undefined);
     if (key === path) return;
-    void navigate({ to: "/$", params: { _splat: key.replace(/^\//, "") }, search: (s) => s });
+    const upper = shownList === undefined ? undefined : indexOfList(shownList);
+    const listedType =
+      upper === undefined || shownList === undefined
+        ? undefined
+        : rowIn(upper, shownList)?.data.type;
+    const type = held.get(key)?.type;
+    const nextList =
+      listedType !== undefined && type !== undefined && type !== listedType ? upper : shownList;
+    void navigate({
+      to: "/$",
+      params: { _splat: key.replace(/^\//, "") },
+      search: (s) => ({ ...s, list: nextList }),
+    });
   };
   // A collection picked, or the workspaces on going home, is fetched again: what it lists changes
   // as records are written, and its rows stay on screen until the new page arrives.
