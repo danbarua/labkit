@@ -1,12 +1,14 @@
 /**
- * The Trace Console: the API's HAL documents, followed by link. The left column lists collections,
- * and the centre shows the open resource with the resources it relates to. The page's address is
- * the API path of what is open, so a reload or a pasted link opens it again.
+ * The Trace Console: the API's HAL documents, followed by link. The left column lists collections.
+ * The centre shows the graph of what the reader has opened, then the open resource with the
+ * resources it relates to. The page's address is the API path of what is open, so a reload or a
+ * pasted link opens it again.
  */
 
 import { ICONS, ThemeToggle } from "@labkit/ui";
 import {
   ArrowClockwiseIcon,
+  ArrowCounterClockwiseIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
   BracketsCurlyIcon,
@@ -19,7 +21,15 @@ import {
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
 import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSavedTheme } from "../saved-theme";
 import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
@@ -61,7 +71,7 @@ const ENTRY = "/collections/workspace";
  */
 const DEPTH = 2;
 
-export type Tab = "overview" | "graph" | "debug";
+export type Tab = "overview" | "debug";
 
 const resourcePath = (key: string) => `${key}?depth=${DEPTH}`;
 
@@ -105,6 +115,31 @@ function useTrail(): { trail: string[]; at: number } {
   return { trail, at };
 }
 
+/**
+ * The resources the reader has opened since the graph was last reset, in the order they were first
+ * opened. The graph draws these and what they relate to. `generation` counts the resets, so the
+ * canvas can start a new layout on each one.
+ */
+function useExplored(path: string) {
+  const [state, setState] = useState<{ keys: string[]; generation: number }>({
+    keys: [],
+    generation: 0,
+  });
+  const add = useCallback(
+    (key: string) => setState((s) => (s.keys.includes(key) ? s : { ...s, keys: [...s.keys, key] })),
+    [],
+  );
+  useEffect(() => {
+    if (path !== "") add(path);
+  }, [path, add]);
+  const reset = () =>
+    setState((s) => ({ keys: path === "" ? [] : [path], generation: s.generation + 1 }));
+  return { ...state, reset };
+}
+
+/** The workspace directory a key sits in, `/workspace/<slug>/`, or undefined outside one. */
+const workspaceOf = (key: string) => /^\/workspace\/[^/]+\//.exec(key)?.[0];
+
 export interface TraceConsoleProps {
   /** The API path of what is open, or "" when nothing is. */
   path: string;
@@ -119,6 +154,9 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const [theme, setTheme] = useSavedTheme();
   const [term, setTerm] = useState("");
   const [drawer, setDrawer] = useState<"items" | undefined>();
+  const [graphOpen, setGraphOpen] = useState(true);
+  const explored = useExplored(path);
+  const workspace = workspaceOf(path);
   useStoreVersion();
   const held = store.index();
 
@@ -254,6 +292,19 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
           />
           <main className="main">
             <div className="detail">
+              {workspace === undefined ? null : (
+                <GraphCard
+                  open={graphOpen}
+                  workspace={workspace}
+                  explored={explored.keys}
+                  generation={explored.generation}
+                  held={held}
+                  selected={path}
+                  onToggle={() => setGraphOpen((o) => !o)}
+                  onOpen={open}
+                  onReset={explored.reset}
+                />
+              )}
               <Detail
                 path={path}
                 entry={openEntry}
@@ -676,7 +727,7 @@ function Detail({
           </div>
         ) : null}
         <div className="toolbar" role="tablist">
-          {(["overview", "graph", "debug"] as const).map((t) => (
+          {(["overview", "debug"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -685,7 +736,7 @@ function Detail({
               className={tab === t ? "tbtn on" : "tbtn"}
               onClick={() => onTab(t)}
             >
-              {t === "overview" ? "Overview" : t === "graph" ? "Graph" : "Debug"}
+              {t === "overview" ? "Overview" : "Debug"}
             </button>
           ))}
           <button
@@ -703,8 +754,6 @@ function Detail({
       </div>
       {tab === "debug" ? (
         <Debug res={res} entry={entry} onOpen={onOpen} />
-      ) : tab === "graph" ? (
-        <GraphPanel path={path} held={held} onOpen={onOpen} />
       ) : (
         <>
           <div className="panel">
@@ -878,24 +927,51 @@ function Events({ href, onOpen }: { href: string; onOpen: (key: string) => void 
 }
 
 /**
- * Every resource opened in this workspace, with what each relates to, drawn on a canvas. The
- * canvas keeps what it has been shown as the reader moves from one resource to the next.
+ * The resources explored in this workspace, with what each relates to, drawn on a canvas. The
+ * canvas keeps its layout as the reader moves from one resource to the next, and while the card is
+ * folded, until Reset starts it again from the open resource.
  */
-function GraphPanel({
-  path,
+function GraphCard({
+  open,
+  workspace,
+  explored,
+  generation,
   held,
+  selected,
+  onToggle,
   onOpen,
+  onReset,
 }: {
-  path: string;
+  open: boolean;
+  workspace: string;
+  explored: string[];
+  generation: number;
   held: HeldIndex;
+  selected: string;
+  onToggle: () => void;
   onOpen: (key: string) => void;
+  onReset: () => void;
 }) {
   const [overlay, setOverlay] = useState<Overlay>("structural");
-  const workspace = /^\/workspace\/[^/]+\//.exec(path)?.[0] ?? dirOf(path);
-  const { nodes, edges } = useMemo(() => graphOf(held, workspace), [held, workspace]);
+  const { nodes, edges } = useMemo(
+    () => graphOf(held, explored, workspace),
+    [held, explored, workspace],
+  );
   return (
-    <div className="panel graph-panel">
+    <div className="panel graph-card">
       <div className="panel-head">
+        <span className="graph-title">
+          <button
+            type="button"
+            className="toggle-btn"
+            aria-label="Show or hide the graph"
+            aria-expanded={open}
+            onClick={onToggle}
+          >
+            <CaretRightIcon className={open ? "caret open" : "caret"} aria-hidden="true" />
+          </button>
+          Graph<span className="faint">{nodes.length}</span>
+        </span>
         <span className="graph-controls">
           colour
           {(
@@ -915,25 +991,50 @@ function GraphPanel({
               {label}
             </button>
           ))}
+          <button
+            type="button"
+            className="tbtn"
+            title="Draw the open resource alone, and forget what else was explored"
+            onClick={onReset}
+          >
+            <ArrowCounterClockwiseIcon aria-hidden="true" /> Reset
+          </button>
         </span>
       </div>
-      <div className="graph-stage">
+      <div className="graph-stage" hidden={!open}>
         <GraphView
+          key={`${workspace} ${generation}`}
           nodes={nodes}
           edges={edges}
-          selectedId={path}
+          selectedId={selected}
           overlay={overlay}
+          active={open}
           summary={(id) => <Summary itemKey={id} held={held} />}
           onNavigate={onOpen}
         />
       </div>
+      {open ? (
+        <ul className="sr-only" aria-label="Nodes in the graph">
+          {nodes.map((n) => (
+            <li key={n.id}>
+              <button type="button" onClick={() => onOpen(n.id)}>
+                {`${n.label} (${n.type})`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
 
-/** The resources fetched in a workspace and their relations, as the canvas's nodes and edges. */
+/**
+ * The explored resources in a workspace and their relations, as the canvas's nodes and edges. A
+ * resource adds its relations once its own response has arrived.
+ */
 function graphOf(
   held: HeldIndex,
+  explored: string[],
   workspace: string,
 ): { nodes: GraphNodeSeed[]; edges: GraphEdgeSeed[] } {
   const nodes = new Map<string, GraphNodeSeed>();
@@ -943,8 +1044,9 @@ function graphOf(
       nodes.set(key, { id: key, label: shortId(key), type: held.get(key)?.type ?? "?" });
     }
   };
-  for (const r of held.values()) {
-    if (!r.own || !r.key.startsWith(workspace)) continue;
+  for (const key of explored) {
+    const r = held.get(key);
+    if (r?.own !== true || !key.startsWith(workspace)) continue;
     node(r.key);
     for (const rel of r.rels) {
       node(rel.key);

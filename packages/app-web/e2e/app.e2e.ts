@@ -219,9 +219,14 @@ test.describe("an open resource", () => {
   });
 });
 
-test.describe("the graph tab", () => {
+test.describe("the graph", () => {
+  // The canvas's nodes are also a visually hidden list of buttons, for the keyboard, which is how
+  // these tests pick a node: a canvas has no element to click.
+  const node = (page: import("@playwright/test").Page, name: string) =>
+    page.getByRole("list", { name: "Nodes in the graph" }).getByRole("button", { name });
+
   test("draws the graph on the canvas", async ({ page }) => {
-    await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
+    await page.goto("/app/workspace/alpha/LOE_1");
     const canvas = page.locator("#stage");
     await expect(canvas).toBeVisible();
     // A canvas that was sized but never drawn on has one colour in it.
@@ -245,7 +250,7 @@ test.describe("the graph tab", () => {
   test("the colour toggle switches, and there is no 2D view or standing overlay", async ({
     page,
   }) => {
-    await page.goto("/app/workspace/alpha/Q_1?tab=graph");
+    await page.goto("/app/workspace/alpha/Q_1");
     await expect(page.locator("#stage.orbit")).toBeVisible();
     await expect(page.locator("[data-view]")).toHaveCount(0);
     const temporal = page.locator('[data-overlay="temporal"]');
@@ -254,11 +259,56 @@ test.describe("the graph tab", () => {
     await expect(page.locator('[data-overlay="standing"]')).toHaveCount(0);
   });
 
-  test("the tab stays open as another resource is opened", async ({ page }) => {
-    await page.goto(`/app/workspace/alpha/LOE_1?tab=graph&${list("/workspace/alpha/question")}`);
+  test("sits above the open resource, and stays folded as another resource opens", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/LOE_1");
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(page.locator("#stage")).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Graph" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Show or hide the graph" }).click();
+    await expect(page.locator("#stage")).toBeHidden();
+    await page.locator(".card-head", { hasText: "Q_1" }).click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(page.locator("#stage")).toBeHidden();
+    await page.getByRole("button", { name: "Show or hide the graph" }).click();
+    await expect(page.locator("#stage")).toBeVisible();
+  });
+
+  test("a node opens its resource, and that resource's relations join the graph", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+    await expect(node(page, "EU_1 (EvidenceUnit)")).toHaveCount(0);
+    await node(page, "LOE_1 (LineOfEnquiry)").press("Enter");
+    await expect(header(page)).toHaveText("LOE_1");
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/LOE_1/);
+    await expect(node(page, "EU_1 (EvidenceUnit)")).toBeVisible();
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+  });
+
+  test("Reset forgets what was opened before the open resource", async ({ page }) => {
+    await page.goto(`/app/workspace/alpha/Q_2?${list("/workspace/alpha/question")}`);
+    await expect(header(page)).toHaveText("Q_2");
     await item(page, "Q_1").click();
     await expect(header(page)).toHaveText("Q_1");
-    await expect(page).toHaveURL(/\/Q_1\?.*tab=graph/);
+    await expect(node(page, "Q_2 (Question)")).toBeVisible();
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(node(page, "Q_2 (Question)")).toHaveCount(0);
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+    await expect(node(page, "LOE_1 (LineOfEnquiry)")).toBeVisible();
+  });
+
+  test("an address with the old graph tab opens the overview", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=graph");
+    await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     await expect(page.locator("#stage")).toBeVisible();
   });
 });

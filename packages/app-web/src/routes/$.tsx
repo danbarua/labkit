@@ -12,7 +12,7 @@ interface Search {
 // opens `/workspace/w/Q_1`. What it is, a resource or a collection, is what the API answers.
 export const Route = createFileRoute("/$")({
   validateSearch: (search: Record<string, unknown>): Search => {
-    if (search.tab !== undefined && search.tab !== "graph" && search.tab !== "debug")
+    if (search.tab !== undefined && search.tab !== "debug")
       console.warn("trace console: an unknown tab in the address shows the overview", {
         tab: search.tab,
       });
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/$")({
     // undefined here; leaving it out would let the address's value through.
     return {
       list: typeof search.list === "string" ? search.list : undefined,
-      tab: search.tab === "graph" || search.tab === "debug" ? search.tab : undefined,
+      tab: search.tab === "debug" ? search.tab : undefined,
     };
   },
   component: Page,

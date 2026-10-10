@@ -772,9 +772,6 @@
   padding: 0;
   z-index: 19;
 }
-.trace .scrim.open {
-  display: block;
-}
 .trace .rel-heading {
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -851,12 +848,26 @@
   gap: 6px;
 }
 .trace .graph-controls .tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 9px;
   font-size: 12px;
 }
+.trace .graph-card {
+  margin-bottom: 22px;
+}
+.trace .graph-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .trace .graph-stage {
   display: flex;
-  height: min(64vh, 620px);
+  height: min(48vh, 460px);
+}
+.trace .graph-stage[hidden] {
+  display: none;
 }
 .trace .graph-stage .hint {
   color: var(--text-dim);
@@ -870,6 +881,17 @@
 .trace .graph-stage .popover .res-item {
   border: none;
 }
+.trace .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ---------- narrow windows: the side column becomes a drawer ---------- */
 @media (max-width: 860px) {
@@ -879,6 +901,9 @@
   }
   .trace .hamburger {
     display: flex;
+  }
+  .trace .scrim.open {
+    display: block;
   }
   .trace .sidebar {
     position: fixed;

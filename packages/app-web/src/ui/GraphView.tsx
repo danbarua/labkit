@@ -20,8 +20,11 @@ export interface GraphEdgeSeed {
 export interface GraphViewProps {
   nodes: GraphNodeSeed[];
   edges: GraphEdgeSeed[];
+  /** The open resource, drawn with a ring. New nodes are placed beside it. */
   selectedId: string | null;
   overlay: Overlay;
+  /** False while the canvas is hidden: the simulation and the drawing stop until it is shown. */
+  active: boolean;
   /** What the popover shows for the node under the pointer. */
   summary: (id: string) => ReactNode;
   onNavigate: (id: string) => void;
@@ -351,11 +354,9 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     ctx.lineTo(b.sx, b.sy);
     ctx.stroke();
 
-    const hot =
-      edge.from === sim.selectedId ||
-      edge.to === sim.selectedId ||
-      edge.from === sim.hoverId ||
-      edge.to === sim.hoverId;
+    const hot = [sim.selectedId, sim.hoverId].some(
+      (id) => id !== null && (edge.from === id || edge.to === id),
+    );
     const scale = Math.min(a.scale, b.scale);
     if (hot || scale > 0.55) {
       labels.push({
@@ -480,11 +481,13 @@ export function GraphView({
   edges,
   selectedId,
   overlay,
+  active,
   summary,
   onNavigate,
 }: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const simRef = useRef<Sim>(createSim());
   const sizeRef = useRef({ width: 0, height: 0 });
   const navigateRef = useRef(onNavigate);
@@ -518,6 +521,7 @@ export function GraphView({
     if (!canvas || !popover) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctxRef.current = ctx;
 
     sizeRef.current = resizeCanvas(canvas, ctx);
     const ro = new ResizeObserver(() => {
@@ -525,15 +529,6 @@ export function GraphView({
     });
     const wrap = canvas.parentElement;
     if (wrap) ro.observe(wrap);
-
-    let raf = 0;
-    const loop = () => {
-      const s = simRef.current;
-      tickPhysics(s);
-      renderFrame(ctx, s, sizeRef.current.width, sizeRef.current.height);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
 
     const onPointerDown = (event: PointerEvent) => {
       const s = simRef.current;
@@ -554,7 +549,8 @@ export function GraphView({
       }
       const mx = event.clientX - rect.left;
       const my = event.clientY - rect.top;
-      const hit = hitTest(s, mx, my);
+      const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
+      const hit = inside ? hitTest(s, mx, my) : null;
       s.hoverId = hit !== null && s.nodes.has(hit) ? hit : null;
       pointerRef.current = { x: event.clientX, y: event.clientY };
       setHoverId(s.hoverId);
@@ -591,7 +587,6 @@ export function GraphView({
     canvas.addEventListener("pointerleave", onLeave);
 
     return () => {
-      cancelAnimationFrame(raf);
       ro.disconnect();
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
@@ -601,6 +596,20 @@ export function GraphView({
       canvas.removeEventListener("pointerleave", onLeave);
     };
   }, []);
+
+  useEffect(() => {
+    const ctx = ctxRef.current;
+    if (!active || !ctx) return;
+    let raf = 0;
+    const loop = () => {
+      const s = simRef.current;
+      tickPhysics(s);
+      renderFrame(ctx, s, sizeRef.current.width, sizeRef.current.height);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
 
   return (
     <div id="stage-wrap">
