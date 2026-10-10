@@ -20,6 +20,15 @@ export function docOf(entry: Entry | undefined): HalDocument | undefined {
 
 const ACCEPT = "application/hal+json, application/json";
 
+/**
+ * The depth every resource is requested at. At depth 1 a resource's neighbours are links alone;
+ * at 2 they arrive with their properties, which the centre column's cards show.
+ */
+const DEPTH = 2;
+
+/** The request for a resource's own document. */
+export const resourcePath = (key: string) => `${key}?depth=${DEPTH}`;
+
 /** An API address as the path and query the page requests, so it goes to the page's own origin. */
 export function requestPath(href: string): string {
   const url = new URL(href, "http://labkit.invalid");
@@ -61,6 +70,25 @@ export class HalStore {
 
   entry(path: string): Entry | undefined {
     return this.entries.get(path);
+  }
+
+  /**
+   * Resolves with the entry for `path` once its request has an answer, ready or failed: at once
+   * when it already has one. It waits for a request that has not started yet, so the caller loads
+   * the path first.
+   */
+  settled(path: string): Promise<Entry> {
+    return new Promise((resolve) => {
+      let unsubscribe = () => {};
+      const check = () => {
+        const entry = this.entries.get(path);
+        if (entry === undefined || entry.status === "loading") return false;
+        unsubscribe();
+        resolve(entry);
+        return true;
+      };
+      if (!check()) unsubscribe = this.subscribe(check);
+    });
   }
 
   /** Fetches `path` unless it is held or on its way. A failed one is fetched again; `force` fetches any. */

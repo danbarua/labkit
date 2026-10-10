@@ -16,6 +16,8 @@ import {
   HouseIcon,
   IconContext,
   MagnifyingGlassIcon,
+  PauseIcon,
+  PlayIcon,
   SidebarSimpleIcon,
 } from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
@@ -51,11 +53,13 @@ import {
   docOf,
   type Pages,
   requestPath,
+  resourcePath,
   store,
   useDocument,
   usePages,
   useStoreVersion,
 } from "./hal-store";
+import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
 import { Badge, EventRow, JsonView, PropRows, type Prose } from "./values";
 import "./trace.css";
@@ -63,15 +67,7 @@ import "./trace.css";
 /** Where the left column starts: the list of workspaces. */
 const ENTRY = "/collections/workspace";
 
-/**
- * The depth every resource is requested at. At depth 1 a resource's neighbours are links alone;
- * at 2 they arrive with their properties, which the centre column's cards show.
- */
-const DEPTH = 2;
-
 export type Tab = "overview" | "debug";
-
-const resourcePath = (key: string) => `${key}?depth=${DEPTH}`;
 
 /** The directory a key sits in, with its trailing slash. */
 const dirOf = (key: string) => key.slice(0, key.lastIndexOf("/") + 1);
@@ -183,6 +179,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
       search: (s) => ({ ...s, list: nextList }),
     });
   };
+  const playback = usePlayback(path, workspace, open);
   // A collection picked, or the workspaces on going home, is fetched again: what it lists changes
   // as records are written, and its rows stay on screen until the new page arrives.
   const pickList = (key: string) => {
@@ -298,9 +295,13 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
                   generation={explored.generation}
                   held={held}
                   selected={path}
+                  playback={playback.playback}
+                  canPlay={held.get(path)?.own === true}
                   onToggle={() => setGraphOpen((o) => !o)}
                   onOpen={open}
                   onReset={explored.reset}
+                  onPlay={playback.play}
+                  onPause={playback.pause}
                 />
               )}
               <Detail
@@ -933,9 +934,13 @@ function GraphCard({
   generation,
   held,
   selected,
+  playback,
+  canPlay,
   onToggle,
   onOpen,
   onReset,
+  onPlay,
+  onPause,
 }: {
   open: boolean;
   workspace: string;
@@ -943,10 +948,17 @@ function GraphCard({
   generation: number;
   held: HeldIndex;
   selected: string;
+  playback: Playback;
+  /** False unless a resource is open: playback starts after the first act that names it. */
+  canPlay: boolean;
   onToggle: () => void;
   onOpen: (key: string) => void;
   onReset: () => void;
+  onPlay: () => void;
+  onPause: () => void;
 }) {
+  const playing = playback.state === "playing";
+  const status = playing ? playback.act : playback.note;
   const [overlay, setOverlay] = useState<Overlay>("structural");
   const { nodes, edges } = useMemo(
     () => graphOf(held, explored, workspace),
@@ -986,6 +998,23 @@ function GraphCard({
               {label}
             </button>
           ))}
+          <span className="playback-status" aria-live="polite">
+            {status}
+          </span>
+          <button
+            type="button"
+            className={playing ? "tbtn on" : "tbtn"}
+            title={
+              playing
+                ? "Stop opening later acts' resources"
+                : "Open, one at a time, the resource each later act created"
+            }
+            disabled={!playing && !canPlay}
+            onClick={playing ? onPause : onPlay}
+          >
+            {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
+            {playing ? "Pause" : "Play"}
+          </button>
           <button
             type="button"
             className="tbtn"

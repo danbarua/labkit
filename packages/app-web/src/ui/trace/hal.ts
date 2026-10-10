@@ -304,6 +304,37 @@ export function itemView(item: CollectionItem, held: Held | undefined): ItemView
   };
 }
 
+/** What an act created that playback can open. */
+export type Created =
+  | { kind: "open"; key: string }
+  /** The act created no resource. */
+  | { kind: "none" }
+  /** The act created resources, and none of them is named by its `subject` or `touched` links. */
+  | { kind: "unlinked"; handles: string[] };
+
+/**
+ * The resource an act created, from its own document: its subject when the act created the
+ * subject, otherwise the first resource it created. A `NodeCreated` change names a handle; the
+ * resource's address is the act's `subject` or `touched` link whose last segment is that handle.
+ */
+export function createdBy(act: Held): Created {
+  const changes = act.attrs?.changes;
+  const handles = (Array.isArray(changes) ? changes : []).flatMap((c: unknown) => {
+    const change = c as { change?: unknown; id?: unknown } | null;
+    return change?.change === "NodeCreated" && typeof change.id === "string" ? [change.id] : [];
+  });
+  if (handles.length === 0) return { kind: "none" };
+  const named = act.rels.filter((r) => r.rel === "subject" || r.rel === "touched");
+  const subject = named.find((r) => r.rel === "subject");
+  if (subject !== undefined && handles.includes(shortId(subject.key)))
+    return { kind: "open", key: subject.key };
+  for (const handle of handles) {
+    const rel = named.find((r) => shortId(r.key) === handle);
+    if (rel !== undefined) return { kind: "open", key: rel.key };
+  }
+  return { kind: "unlinked", handles };
+}
+
 /** The relations of `held` in one direction, grouped by rel name, in rel-name order. */
 export function relGroups(held: Held, dir: "in" | "out"): { rel: string; keys: string[] }[] {
   const byRel = new Map<string, string[]>();

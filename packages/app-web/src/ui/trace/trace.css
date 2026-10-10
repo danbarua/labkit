@@ -846,6 +846,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 .trace .graph-controls .tbtn {
   display: inline-flex;
@@ -856,6 +857,18 @@
 }
 .trace .graph-card {
   margin-bottom: 22px;
+}
+/* The act's name gives way first when the header is narrow, so the buttons stay in the card. */
+.trace .playback-status {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
 }
 .trace .graph-title {
   display: inline-flex;
