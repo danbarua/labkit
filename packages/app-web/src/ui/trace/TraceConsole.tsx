@@ -13,12 +13,21 @@ import {
   ArrowRightIcon,
   BracketsCurlyIcon,
   CaretRightIcon,
+  ChartLineIcon,
+  ChatCircleTextIcon,
+  CheckCircleIcon,
+  CompassIcon,
+  EyeIcon,
+  FlagCheckeredIcon,
   HouseIcon,
+  type Icon,
   IconContext,
   MagnifyingGlassIcon,
   PauseIcon,
   PlayIcon,
+  SealCheckIcon,
   SidebarSimpleIcon,
+  XCircleIcon,
 } from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
@@ -26,8 +35,10 @@ import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-ro
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -460,6 +471,7 @@ function Lists({
     lower.items[0]?.data.type === openType &&
     !lower.items.some((item) => item.key === openKey);
   const loadMore = lower.more;
+  const lowerList = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (behind) loadMore();
   }, [behind, loadMore]);
@@ -490,17 +502,24 @@ function Lists({
           </span>
         </div>
         <div className="faint mono pane-path">{lowerKey ?? ""}</div>
-        <div className="res-list">
+        <div className="res-list" ref={lowerList}>
           {lowerKey === undefined ? (
             <div className="empty-note">Pick a collection above to list its items.</div>
           ) : (
-            <Pane
-              pages={lower}
-              empty=""
-              {...{ held, term, openKey, onOpen, onList }}
-              lowerKey={lowerRow}
-              pageable
-            />
+            <>
+              <ActiveBox
+                list={lowerList}
+                activeKey={openKey}
+                rows={`${lower.items.length} ${term}`}
+              />
+              <Pane
+                pages={lower}
+                empty=""
+                {...{ held, term, openKey, onOpen, onList }}
+                lowerKey={lowerRow}
+                pageable
+              />
+            </>
           )}
         </div>
       </div>
@@ -594,6 +613,75 @@ function Pane({
   );
 }
 
+/** How long the open row's box takes to slide from one row to another, in milliseconds. */
+const SLIDE_MS = 220;
+
+/**
+ * The box around the open resource's row in the Items pane. When another row opens, the box loses
+ * its fill, slides to that row, and fills again on arrival. When that row is out of the list's
+ * view, the list scrolls to show it at the top, a page at a time rather than a row at a time.
+ */
+function ActiveBox({
+  list,
+  activeKey,
+  rows,
+}: {
+  list: RefObject<HTMLDivElement | null>;
+  activeKey: string;
+  /** Changes whenever the rows drawn change, so the box is measured again. */
+  rows: string;
+}) {
+  const [box, setBox] = useState<{ top: number; height: number; slide: boolean }>();
+  const [filled, setFilled] = useState(true);
+  const lastTop = useRef<number | undefined>(undefined);
+  // The row the list has yet to scroll to: set when another row opens, cleared once it is shown,
+  // so rows added below by Load more do not pull the list back to the open row.
+  const scrollTo = useRef<string | undefined>(activeKey);
+  const shownKey = useRef<string | undefined>(undefined);
+  if (shownKey.current !== activeKey) {
+    shownKey.current = activeKey;
+    scrollTo.current = activeKey;
+  }
+  useLayoutEffect(() => {
+    const row = list.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(activeKey)}"]`);
+    if (!row) {
+      lastTop.current = undefined;
+      setBox(undefined);
+      return;
+    }
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const top = row.offsetTop;
+    const slide = lastTop.current !== undefined && lastTop.current !== top && !reduced;
+    lastTop.current = top;
+    setBox({ top, height: row.offsetHeight, slide });
+    if (slide) setFilled(false);
+    if (scrollTo.current !== activeKey) return;
+    scrollTo.current = undefined;
+    const scroller = row.closest<HTMLElement>(".sidebar-section");
+    if (!scroller) return;
+    const view = scroller.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    if (at.top >= view.top && at.bottom <= view.bottom) return;
+    scroller.scrollTo({
+      top: scroller.scrollTop + (at.top - view.top) - 4,
+      behavior: reduced ? "auto" : "smooth",
+    });
+  }, [list, activeKey, rows]);
+  useEffect(() => {
+    if (filled) return;
+    const timer = setTimeout(() => setFilled(true), SLIDE_MS);
+    return () => clearTimeout(timer);
+  }, [filled]);
+  if (box === undefined) return null;
+  return (
+    <div
+      className={["active-box", box.slide ? "" : "placed", filled ? "filled" : ""].join(" ")}
+      style={{ transform: `translateY(${box.top}px)`, height: box.height }}
+      aria-hidden="true"
+    />
+  );
+}
+
 function ResourceRow({
   itemKey,
   view,
@@ -610,17 +698,9 @@ function ResourceRow({
   onOpen: (key: string) => void;
 }) {
   const cls = ["res-item", unresolved ? "unresolved" : "", active ? "active" : ""].filter(Boolean);
-  // The row for the open resource scrolls into its list's view, so the list shows where it is:
-  // smoothly, as playback steps down the list, unless the reader asks for reduced motion.
-  const row = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!active) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    row.current?.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
-  }, [active]);
   return (
     <button
-      ref={row}
+      data-key={itemKey}
       type="button"
       className={cls.join(" ")}
       title={title}
@@ -663,6 +743,20 @@ function HoverCard({ itemKey, held }: { itemKey: string; held: HeldIndex }) {
 }
 
 const PILL_KEYS = ["kind", "outcome", "resolution_kind", "status", "role"] as const;
+
+/** The icon a pill's value is drawn with, for the values the graph holds; any other has none. */
+const PILL_ICON: Record<string, Icon | undefined> = {
+  pass: CheckCircleIcon,
+  fail: XCircleIcon,
+  observation: EyeIcon,
+  observations: EyeIcon,
+  analysis: ChartLineIcon,
+  "analysis-output": ChartLineIcon,
+  exploratory: CompassIcon,
+  confirmatory: SealCheckIcon,
+  answered: ChatCircleTextIcon,
+  completed: FlagCheckeredIcon,
+};
 
 function Detail({
   path,
@@ -716,47 +810,29 @@ function Detail({
         </div>
       </div>
     );
-  if (res?.attrs === undefined)
-    return (
-      <>
-        <div className="detail-header">
-          <div className="header-top">
-            <Badge type={res?.type} />
-            <span className="header-id">{shortId(path)}</span>
-          </div>
-        </div>
-        <div className="panel">
-          <div className="panel-head">GET {resourcePath(path)}</div>
-          <div className="panel-body">
-            <Spinner>fetching {shortId(path)}…</Spinner>
-          </div>
-        </div>
-      </>
-    );
-
-  const a = res.attrs;
-  const pills = PILL_KEYS.filter((k) => typeof a[k] === "string" && a[k]);
+  // Until the resource's own response arrives, the page keeps the layout it will have: the header,
+  // the tabs, and Properties with placeholder rows when no properties are held yet.
+  const a = res?.attrs;
+  const pills = PILL_KEYS.filter((k) => typeof a?.[k] === "string" && a[k]);
   return (
     <>
       <div className="detail-header">
         <div className="header-top">
-          <Badge type={res.type} />
+          <Badge type={res?.type} />
           <span className="header-id">{shortId(path)}</span>
-          <span className="header-type">{res.type}</span>
+          <span className="header-type">{res?.type}</span>
+          {pills.map((k) => {
+            const v = String(a?.[k]);
+            const variant = k === "kind" || k === "outcome" ? ` ${k}-${v}` : "";
+            const Glyph = PILL_ICON[v];
+            return (
+              <span key={k} className={`pill${variant}`} title={k}>
+                {Glyph === undefined ? null : <Glyph aria-hidden="true" />}
+                {v}
+              </span>
+            );
+          })}
         </div>
-        {pills.length > 0 ? (
-          <div className="header-pills">
-            {pills.map((k) => {
-              const v = String(a[k]);
-              const variant = k === "kind" || k === "outcome" ? ` ${k}-${v}` : "";
-              return (
-                <span key={k} className={`pill${variant}`}>
-                  {v}
-                </span>
-              );
-            })}
-          </div>
-        ) : null}
         <div className="toolbar" role="tablist">
           {(["overview", "debug"] as const).map((t) => (
             <button
@@ -783,42 +859,72 @@ function Detail({
           </button>
         </div>
       </div>
-      {tab === "debug" ? (
+      {tab === "debug" && res !== undefined ? (
         <Debug res={res} entry={entry} onOpen={onOpen} />
       ) : (
         <>
           <div className="panel">
             <div className="panel-head">
-              Properties<span>{Object.keys(a).length}</span>
+              Properties<span>{a === undefined ? "" : Object.keys(a).length}</span>
             </div>
             <div className="panel-body">
-              <PropRows attrs={a} prose={prose} />
+              {a === undefined ? (
+                <SkeletonRows count={propertyCountOf(held, res?.type)} />
+              ) : (
+                <PropRows attrs={a} prose={prose} />
+              )}
             </div>
           </div>
-          {loaded ? (
-            (["out", "in"] as const).flatMap((dir) =>
-              relGroups(res, dir).map((g) => (
-                <div key={`${dir} ${g.rel}`}>
-                  <div className="rel-heading">
-                    {dir === "out" ? (
-                      <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
-                    ) : (
-                      <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
-                    )}
-                    {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+          {loaded
+            ? (["out", "in"] as const).flatMap((dir) =>
+                relGroups(res, dir).map((g) => (
+                  <div key={`${dir} ${g.rel}`}>
+                    <div className="rel-heading">
+                      {dir === "out" ? (
+                        <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
+                      ) : (
+                        <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
+                      )}
+                      {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                    </div>
+                    {g.keys.map((key) => (
+                      <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
+                    ))}
                   </div>
-                  {g.keys.map((key) => (
-                    <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
-                  ))}
-                </div>
-              )),
-            )
-          ) : (
-            <Spinner>fetching {shortId(path)}…</Spinner>
-          )}
+                )),
+              )
+            : null}
         </>
       )}
     </>
+  );
+}
+
+/**
+ * How many properties a resource of `type` has, from a held resource of that type whose own
+ * response has arrived, so the placeholder is about as tall as what replaces it. Four otherwise.
+ */
+function propertyCountOf(held: HeldIndex, type: string | undefined): number {
+  for (const r of held.values())
+    if (r.own && r.type === type && r.attrs !== undefined) return Object.keys(r.attrs).length;
+  return 4;
+}
+
+/** Property rows drawn as grey bars, standing in while the properties are fetched. */
+function SkeletonRows({ count }: { count: number }) {
+  return (
+    <div className="skeleton" role="status" aria-busy="true" aria-label="Loading the properties">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="kv">
+          <div className="k">
+            <span className="bar" style={{ width: `${50 + ((i * 37) % 40)}%` }} />
+          </div>
+          <div className="v">
+            <span className="bar" style={{ width: `${45 + ((i * 53) % 50)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -72,6 +72,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .trace .spinner,
+  .trace .skeleton .bar,
+  .trace .active-box,
   .trace .sidebar {
     animation: none;
     transition: none;
@@ -391,8 +393,30 @@
 }
 
 .trace .res-list {
+  position: relative;
   display: flex;
   flex-direction: column;
+}
+/* The open row's box: it slides between rows unfilled, and fills when it arrives. The rows are
+   drawn over it, so the row under the pointer still shows its own background. */
+.trace .active-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  pointer-events: none;
+  transition:
+    transform 220ms ease,
+    height 220ms ease,
+    background-color 150ms ease;
+}
+.trace .active-box.placed {
+  transition: background-color 150ms ease;
+}
+.trace .active-box.filled {
+  background: var(--accent-dim);
 }
 .trace .res-item {
   display: flex;
@@ -408,9 +432,21 @@
 .trace .res-item:hover {
   background: var(--panel-2);
 }
+/* The box marks the open row in the Items pane; until the box arrives, the row shows the hover
+   background. Elsewhere, the open row is marked by its own fill and border. */
 .trace .res-item.active {
   background: var(--accent-dim);
   border-color: var(--accent);
+}
+.trace .res-list .res-item {
+  position: relative;
+}
+.trace .res-list .res-item.active {
+  background: none;
+  border-color: transparent;
+}
+.trace .res-list .active-box:not(.filled) ~ .res-item.active {
+  background: var(--panel-2);
 }
 .trace .res-item .badge {
   margin-top: 1px;
@@ -456,10 +492,13 @@
 }
 
 /* ---------- main / detail ---------- */
+/* The scrollbar is always shown, so a short resource and a long one leave the same width for the
+   cards and their text, and stepping from one to the other does not reflow it. */
 .trace .main {
   display: block;
   flex: 1 1 auto;
-  overflow-y: auto;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
   min-width: 0;
 }
 .trace .detail {
@@ -471,9 +510,10 @@
 .trace .detail-header {
   margin-bottom: 22px;
 }
+/* The chip, handle, type and pills share one line, on the handle's baseline. */
 .trace .header-top {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 10px;
@@ -487,10 +527,22 @@
   font-size: 12.5px;
   color: var(--text-dim);
 }
-.trace .header-pills {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.trace .header-top .pill {
+  align-self: center;
+}
+
+.trace .skeleton .bar {
+  display: block;
+  height: 10px;
+  margin: 3px 0;
+  border-radius: 4px;
+  background: var(--panel-2);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .trace .toolbar {
