@@ -253,6 +253,25 @@ test.describe("an open resource", () => {
   });
 });
 
+test.describe("the Items pane's open row", () => {
+  const box = (page: import("@playwright/test").Page) => page.locator(".res-list .active-box");
+
+  test("a box marks the open row, and slides to the next row opened, then fills", async ({
+    page,
+  }) => {
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    await expect(box(page)).toHaveClass(/filled/);
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    expect(await top(box(page))).toBe(await top(item(page, "Q_1")));
+
+    await item(page, "Q_2").click();
+    await expect(header(page)).toHaveText("Q_2");
+    await expect(box(page)).toHaveClass(/filled/);
+    await expect.poll(async () => (await top(box(page))) - (await top(item(page, "Q_2")))).toBe(0);
+  });
+});
+
 test.describe("the graph", () => {
   test("draws the graph on the canvas", async ({ page }) => {
     await page.goto("/app/workspace/alpha/LOE_1");

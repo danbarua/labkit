@@ -35,8 +35,10 @@ import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-ro
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -469,6 +471,7 @@ function Lists({
     lower.items[0]?.data.type === openType &&
     !lower.items.some((item) => item.key === openKey);
   const loadMore = lower.more;
+  const lowerList = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (behind) loadMore();
   }, [behind, loadMore]);
@@ -499,17 +502,24 @@ function Lists({
           </span>
         </div>
         <div className="faint mono pane-path">{lowerKey ?? ""}</div>
-        <div className="res-list">
+        <div className="res-list" ref={lowerList}>
           {lowerKey === undefined ? (
             <div className="empty-note">Pick a collection above to list its items.</div>
           ) : (
-            <Pane
-              pages={lower}
-              empty=""
-              {...{ held, term, openKey, onOpen, onList }}
-              lowerKey={lowerRow}
-              pageable
-            />
+            <>
+              <ActiveBox
+                list={lowerList}
+                activeKey={openKey}
+                rows={`${lower.items.length} ${term}`}
+              />
+              <Pane
+                pages={lower}
+                empty=""
+                {...{ held, term, openKey, onOpen, onList }}
+                lowerKey={lowerRow}
+                pageable
+              />
+            </>
           )}
         </div>
       </div>
@@ -603,6 +613,75 @@ function Pane({
   );
 }
 
+/** How long the open row's box takes to slide from one row to another, in milliseconds. */
+const SLIDE_MS = 220;
+
+/**
+ * The box around the open resource's row in the Items pane. When another row opens, the box loses
+ * its fill, slides to that row, and fills again on arrival. When that row is out of the list's
+ * view, the list scrolls to show it at the top, a page at a time rather than a row at a time.
+ */
+function ActiveBox({
+  list,
+  activeKey,
+  rows,
+}: {
+  list: RefObject<HTMLDivElement | null>;
+  activeKey: string;
+  /** Changes whenever the rows drawn change, so the box is measured again. */
+  rows: string;
+}) {
+  const [box, setBox] = useState<{ top: number; height: number; slide: boolean }>();
+  const [filled, setFilled] = useState(true);
+  const lastTop = useRef<number | undefined>(undefined);
+  // The row the list has yet to scroll to: set when another row opens, cleared once it is shown,
+  // so rows added below by Load more do not pull the list back to the open row.
+  const scrollTo = useRef<string | undefined>(activeKey);
+  const shownKey = useRef<string | undefined>(undefined);
+  if (shownKey.current !== activeKey) {
+    shownKey.current = activeKey;
+    scrollTo.current = activeKey;
+  }
+  useLayoutEffect(() => {
+    const row = list.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(activeKey)}"]`);
+    if (!row) {
+      lastTop.current = undefined;
+      setBox(undefined);
+      return;
+    }
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const top = row.offsetTop;
+    const slide = lastTop.current !== undefined && lastTop.current !== top && !reduced;
+    lastTop.current = top;
+    setBox({ top, height: row.offsetHeight, slide });
+    if (slide) setFilled(false);
+    if (scrollTo.current !== activeKey) return;
+    scrollTo.current = undefined;
+    const scroller = row.closest<HTMLElement>(".sidebar-section");
+    if (!scroller) return;
+    const view = scroller.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    if (at.top >= view.top && at.bottom <= view.bottom) return;
+    scroller.scrollTo({
+      top: scroller.scrollTop + (at.top - view.top) - 4,
+      behavior: reduced ? "auto" : "smooth",
+    });
+  }, [list, activeKey, rows]);
+  useEffect(() => {
+    if (filled) return;
+    const timer = setTimeout(() => setFilled(true), SLIDE_MS);
+    return () => clearTimeout(timer);
+  }, [filled]);
+  if (box === undefined) return null;
+  return (
+    <div
+      className={["active-box", box.slide ? "" : "placed", filled ? "filled" : ""].join(" ")}
+      style={{ transform: `translateY(${box.top}px)`, height: box.height }}
+      aria-hidden="true"
+    />
+  );
+}
+
 function ResourceRow({
   itemKey,
   view,
@@ -619,17 +698,9 @@ function ResourceRow({
   onOpen: (key: string) => void;
 }) {
   const cls = ["res-item", unresolved ? "unresolved" : "", active ? "active" : ""].filter(Boolean);
-  // The row for the open resource scrolls into its list's view, so the list shows where it is:
-  // smoothly, as playback steps down the list, unless the reader asks for reduced motion.
-  const row = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!active) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    row.current?.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
-  }, [active]);
   return (
     <button
-      ref={row}
+      data-key={itemKey}
       type="button"
       className={cls.join(" ")}
       title={title}
