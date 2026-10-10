@@ -7,7 +7,6 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   collectionOf,
-  createdBy,
   edgeLabelOf,
   type HalDocument,
   indexOf,
@@ -409,57 +408,5 @@ describe("an answer to a request", () => {
     expect(answered).toBe(false);
     fail(new Error("HTTP 404 nothing here"));
     expect(await settled).toEqual({ status: "failed", error: "HTTP 404 nothing here" });
-  });
-});
-
-describe("what an act created", () => {
-  const act = (changes: unknown[], links: Record<string, string | string[]>) =>
-    indexOf([
-      {
-        key: "/w/x/act/3",
-        doc: node("/w/x/act/3", "Act", {
-          changes,
-          _links: {
-            self: { href: "http://h/w/x/act/3?depth=2" },
-            ...Object.fromEntries(
-              Object.entries(links).map(([rel, keys]) => [
-                rel,
-                [keys].flat().map((k) => ({ href: `http://h${k}?depth=2`, dir: "out" })),
-              ]),
-            ),
-          },
-        }),
-      },
-    ]).get("/w/x/act/3")!;
-
-  test("is its subject when the act created the subject", () => {
-    const created = act(
-      [
-        { change: "NodeCreated", id: "NOTE_6" },
-        { change: "EdgeCreated", from: "NOTE_6", to: "LOE_2" },
-      ],
-      { subject: "/w/x/NOTE_6", touched: "/w/x/LOE_2" },
-    );
-    expect(createdBy(created)).toEqual({ kind: "open", key: "/w/x/NOTE_6" });
-  });
-
-  test("is the first resource it created when that is not its subject", () => {
-    const created = act([{ change: "NodeCreated", id: "Q_2" }], {
-      subject: "/w/x/LOE_1",
-      touched: ["/w/x/Q_1", "/w/x/Q_2"],
-    });
-    expect(createdBy(created)).toEqual({ kind: "open", key: "/w/x/Q_2" });
-  });
-
-  test("is nothing when the act only changed resources", () => {
-    const created = act([{ change: "NodePropertiesSet", id: "CLM_1" }], {
-      subject: "/w/x/CLM_1",
-    });
-    expect(createdBy(created)).toEqual({ kind: "none" });
-  });
-
-  test("names the handles it created when no link names them", () => {
-    const created = act([{ change: "NodeCreated", id: "Q_7" }], { subject: "/w/x/LOE_1" });
-    expect(createdBy(created)).toEqual({ kind: "unlinked", handles: ["Q_7"] });
   });
 });

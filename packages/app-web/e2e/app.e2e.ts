@@ -346,19 +346,19 @@ test.describe("playback", () => {
   const pause = (page: import("@playwright/test").Page) =>
     page.locator(".graph-card").getByRole("button", { name: "Pause", exact: true });
 
-  test("opens, one act at a time, what each later act created, then stops", async ({
+  test("opens, one act at a time, each later act's subject, then stops", async ({
     page,
     errors,
   }) => {
-    // Q_1 was posed by act 1. Act 2 created NOTE_1, which the graph does not hold, and act 3,
-    // about LOE_1, created Q_2.
+    // Q_1 was posed by act 1. Act 2's subject is NOTE_1, which the graph does not hold, and
+    // act 3's subject is LOE_1.
     await page.goto("/app/workspace/alpha/Q_1");
     await expect(header(page)).toHaveText("Q_1");
     await play(page).click();
     await expect(pause(page)).toBeVisible();
     await expect(page).toHaveURL(/\/NOTE_1/, { timeout: 10_000 });
     await expect(page.locator(".fetch-error")).toContainText("404");
-    await expect(header(page)).toHaveText("Q_2", { timeout: 10_000 });
+    await expect(header(page)).toHaveText("LOE_1", { timeout: 10_000 });
     await expect(page.locator(".playback-status")).toHaveText("No later act.", {
       timeout: 10_000,
     });

@@ -56,15 +56,11 @@ that lists all of its relations. The palette comes from `@labkit/design`.
 The graph colours nodes by record type or by how they relate to the open resource (temporal).
 The API returns no standing for a resource, so there is no standing overlay.
 
-The graph card's Play button opens, one at a time, a resource created by each later act, in the order
-the acts were recorded. It starts after the first act whose events name the open resource, which
-for most resources is the act that created it. For an open act, it starts after that act. Each step
-adds a history entry. The rules for each act are:
-
-- The step opens the act's subject when the act created the subject. Otherwise it opens the first
-  resource the act created.
-- An act that created nothing is skipped.
-- A resource that fails to load shows its error, and playback goes on to the next act.
+The graph card's Play button opens, one at a time, the subject of each later act, in the order the
+acts were recorded. It starts after the first act whose events name the open resource, which for
+most resources is the act that created it. For an open act, it starts after that act. Each step
+adds a history entry. A subject that fails to load shows its error, and playback goes on to the
+next act.
 
 Playback stops at the last act, on Pause, and when the reader opens anything else. The code is
 `src/ui/trace/playback.ts`.

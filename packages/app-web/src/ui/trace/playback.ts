@@ -1,11 +1,11 @@
 /**
  * Playback: the acts recorded after the open resource, one at a time, in the order they were
- * recorded. Each step opens the resource the act created, which adds it to the graph, and waits for
- * it to arrive before the next step.
+ * recorded. Each step opens the act's subject, which adds it to the graph, and waits for it to
+ * arrive before the next step.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { collectionOf, createdBy, type HalDocument, keyOf, shortId } from "./hal";
+import { collectionOf, type HalDocument, hrefOf, keyOf, shortId } from "./hal";
 import { requestPath, resourcePath, store } from "./hal-store";
 
 /** How long each opened resource stays open before the next act's resource is opened. */
@@ -88,30 +88,26 @@ export function usePlayback(
         // Acts are only ever added, so a page that was empty before may not be now.
         const doc = await fetched(page, true);
         if (!live()) return;
-        const item = collectionOf(keyOf(page), doc).items[0];
-        if (item === undefined) return pause("No later act.");
-        await fetched(resourcePath(item.key));
-        if (!live()) return;
-        const act = store.index().get(item.key);
-        const created = act === undefined ? ({ kind: "none" } as const) : createdBy(act);
-        if (created.kind === "unlinked")
-          console.warn("trace console: an act's created resources have no link; it is skipped", {
-            act: item.key,
-            handles: created.handles,
+        const [act] = Object.values(doc._embedded ?? {}).flat() as HalDocument[];
+        if (act === undefined) return pause("No later act.");
+        const subject = hrefOf(act, "subject");
+        if (subject === undefined)
+          console.warn("trace console: an act names no subject; playback skips it", {
+            act: hrefOf(act, "self"),
           });
-        if (created.kind === "open") {
-          setPlayback({ state: "playing", act: String(item.data.name ?? item.key) });
-          opened.current = created.key;
-          openRef.current(created.key);
+        else {
+          const key = keyOf(subject);
+          setPlayback({ state: "playing", act: String(act.name ?? act.id) });
+          opened.current = key;
+          openRef.current(key);
           // A resource that fails to load shows its error, and playback goes on to the next act.
-          store.load(resourcePath(created.key));
-          await store.settled(resourcePath(created.key));
+          store.load(resourcePath(key));
+          await store.settled(resourcePath(key));
           if (!live()) return;
           await sleep(STEP_MS);
           if (!live()) return;
         }
-        const since = doc._links?.since;
-        const next = Array.isArray(since) ? since[0]?.href : since?.href;
+        const next = hrefOf(doc, "since");
         if (next === undefined) return pause("The acts page names no page after it.");
         page = requestPath(next);
       }
