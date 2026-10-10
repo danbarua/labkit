@@ -156,6 +156,21 @@ test.describe("an open resource", () => {
   });
 });
 
+test.describe("a narrow window", () => {
+  test.use({ viewport: { width: 1000, height: 800 } });
+
+  test("the inbound relations are a drawer that closes when a row is opened", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/LOE_1");
+    const drawer = page.locator(".relations-col");
+    await expect(drawer).not.toHaveClass(/open/);
+    await page.getByRole("button", { name: "Toggle relations column" }).click();
+    await expect(drawer).toHaveClass(/open/);
+    await drawer.locator(".res-item", { hasText: "Q_1" }).click();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(drawer).not.toHaveClass(/open/);
+  });
+});
+
 test.describe("the graph tab", () => {
   test("draws the graph on the canvas", async ({ page }) => {
     await page.goto("/app/workspace/alpha/LOE_1?tab=graph");
