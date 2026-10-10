@@ -297,7 +297,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
                   held={held}
                   selected={path}
                   playback={playback.playback}
-                  canPlay={held.get(path)?.own === true}
+                  canPlay={held.get(path)?.own === true || (openIsCollection && listsActs(path))}
                   onToggle={() => setGraphOpen((o) => !o)}
                   onOpen={open}
                   onReset={explored.reset}
@@ -382,6 +382,12 @@ function proseFor(held: HeldIndex, path: string, onOpen: (key: string) => void):
 function indexOfList(key: string): string | undefined {
   const doc = docOf(store.entry(requestPath(key)));
   return doc === undefined ? undefined : collectionOf(key, doc).index;
+}
+
+/** Whether collection `key` is the acts collection: the type its own index lists it under is Act. */
+function listsActs(key: string): boolean {
+  const upper = indexOfList(key);
+  return upper !== undefined && rowIn(upper, key)?.data.type === "Act";
 }
 
 /** Collection `key` as a row of collection `upper`, when the document of `upper` is held. */
@@ -950,7 +956,7 @@ function GraphCard({
   held: HeldIndex;
   selected: string;
   playback: Playback;
-  /** False unless a resource is open: playback starts after the first act that names it. */
+  /** True when a resource or the acts collection is open: playback starts from either. */
   canPlay: boolean;
   onToggle: () => void;
   onOpen: (key: string) => void;

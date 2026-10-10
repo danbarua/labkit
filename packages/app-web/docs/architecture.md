@@ -57,11 +57,17 @@ An act records a change to a resource rather than being one, so the graph draws 
 the act's subject and has no nodes for acts. The graph colours nodes by record type or by how they relate to the open resource (temporal).
 The API returns no standing for a resource, so there is no standing overlay.
 
-The graph card's Play button opens, one at a time, the subject of each later act, in the order the
-acts were recorded. It starts after the first act whose events name the open resource, which for
-most resources is the act that created it. For an open act, it starts after that act. Each step
-adds a history entry. A subject that fails to load shows its error, and playback goes on to the
-next act.
+The graph card's Play button steps through later acts, one at a time, in the order the acts were
+recorded. Where it starts, and what each step opens, depend on what is open:
+
+| Open | Starts | Each step opens |
+|------|--------|-----------------|
+| The acts collection | before the first act | the next act; the graph draws its subject |
+| An act | after that act | the next act; the graph draws its subject |
+| Any other resource | after the first act whose events name it | the next act's subject |
+
+Each step adds a history entry. A resource that fails to load shows its error, and playback goes
+on to the next act.
 
 Playback stops at the last act, on Pause, and when the reader opens anything else. The code is
 `src/ui/trace/playback.ts`.

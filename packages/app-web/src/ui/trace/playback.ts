@@ -1,7 +1,8 @@
 /**
  * Playback: the acts recorded after the open resource, one at a time, in the order they were
- * recorded. Each step opens the act's subject, which adds it to the graph, and waits for it to
- * arrive before the next step.
+ * recorded. From a research record, each step opens the act's subject. From the acts collection
+ * or an act, the acts are the frames: each step opens the act, and the graph draws its subject.
+ * A step waits for what it opened to arrive before the next one.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -36,18 +37,30 @@ async function actsOf(workspace: string): Promise<string> {
 }
 
 /**
- * The act position playback starts after, from `key`: an act's own position, or the position of
- * the first act whose events name `key`.
+ * Where playback starts from `key`, and whether the acts are its frames:
+ *
+ * - the acts collection: before the first act, opening each act;
+ * - an act: after it, opening each act;
+ * - any other resource: after the first act whose events name it, opening each act's subject.
  */
-async function startOf(key: string): Promise<number> {
+async function startOf(key: string, acts: string): Promise<{ since: number; frames: boolean }> {
+  if (key === acts) return { since: 0, frames: true };
   await fetched(resourcePath(key));
   const held = store.index().get(key);
-  if (held?.type === "Act") return Number(shortId(key));
+  if (held?.type === "Act") return { since: Number(shortId(key)), frames: true };
   if (held?.eventsHref === undefined) throw new Stop(`No act records ${shortId(key)}.`);
   const events = (await fetched(requestPath(held.eventsHref)))._embedded?.events;
   const first = Array.isArray(events) ? (events[0] as { seq?: unknown } | undefined) : undefined;
   if (typeof first?.seq !== "number") throw new Stop(`No act records ${shortId(key)}.`);
-  return first.seq;
+  return { since: first.seq, frames: false };
+}
+
+/** Opens `key` and resolves once its response, and that of each of `alsoLoad`, has an answer. */
+async function openAndWait(open: (key: string) => void, key: string, alsoLoad: string[]) {
+  open(key);
+  const paths = [key, ...alsoLoad].map(resourcePath);
+  for (const path of paths) store.load(path);
+  await Promise.all(paths.map((path) => store.settled(path)));
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,26 +96,26 @@ export function usePlayback(
     opened.current = start;
     setPlayback({ state: "playing" });
     try {
-      let page = `${await actsOf(workspace)}?limit=1&since=${await startOf(start)}`;
+      const acts = await actsOf(workspace);
+      const { since, frames } = await startOf(start, acts);
+      let page = `${acts}?limit=1&since=${since}`;
       for (;;) {
         // Acts are only ever added, so a page that was empty before may not be now.
         const doc = await fetched(page, true);
         if (!live()) return;
         const [act] = Object.values(doc._embedded ?? {}).flat() as HalDocument[];
         if (act === undefined) return pause("No later act.");
+        const self = hrefOf(act, "self");
         const subject = hrefOf(act, "subject");
-        if (subject === undefined)
-          console.warn("trace console: an act names no subject; playback skips it", {
-            act: hrefOf(act, "self"),
-          });
+        const key = frames ? self : subject;
+        if (key === undefined)
+          console.warn("trace console: an act names no subject; playback skips it", { act: self });
         else {
-          const key = keyOf(subject);
           setPlayback({ state: "playing", act: String(act.name ?? act.id) });
-          opened.current = key;
-          openRef.current(key);
+          opened.current = keyOf(key);
           // A resource that fails to load shows its error, and playback goes on to the next act.
-          store.load(resourcePath(key));
-          await store.settled(resourcePath(key));
+          const subjectToo = frames && subject !== undefined ? [keyOf(subject)] : [];
+          await openAndWait(openRef.current, keyOf(key), subjectToo);
           if (!live()) return;
           await sleep(STEP_MS);
           if (!live()) return;
