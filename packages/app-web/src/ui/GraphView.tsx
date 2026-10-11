@@ -67,6 +67,8 @@ type Sim = {
   pivot: Point3 | null;
   /** Scales every force, and falls each tick; below HEAT_MIN the layout is not computed. */
   heat: number;
+  /** Whether the camera frames the open node by itself: set when a node opens, cleared by a drag or a scroll. */
+  follow: boolean;
   drag: Drag | null;
   dragged: boolean;
 };
@@ -294,6 +296,114 @@ function followPivot(sim: Sim): void {
   sim.pivot.x += (target.x - sim.pivot.x) * k;
   sim.pivot.y += (target.y - sim.pivot.y) * k;
   sim.pivot.z += (target.z - sim.pivot.z) * k;
+}
+
+/** How much of the canvas's shorter side the open node's neighbourhood is zoomed to fill. */
+const FIT = 0.3;
+/** How far the camera moves toward its framing on each frame. */
+const FRAME_EASE = 0.05;
+/**
+ * The nearest and farthest the camera frames from. A small graph spaces its few nodes far apart
+ * along the time axis, and fitting them all would draw every node a pixel or two across.
+ */
+const FRAME_DISTANCE = { min: 300, max: 900 };
+
+/** Where `v`, a point relative to the pivot, is drawn relative to the pivot, ignoring perspective. */
+function onScreen(v: Point3, camera: Pick<Camera, "yaw" | "pitch">) {
+  const x1 = v.x * Math.cos(camera.yaw) - v.z * Math.sin(camera.yaw);
+  const z1 = v.x * Math.sin(camera.yaw) + v.z * Math.cos(camera.yaw);
+  const y1 = v.y * Math.cos(camera.pitch) - z1 * Math.sin(camera.pitch);
+  const z2 = v.y * Math.sin(camera.pitch) + z1 * Math.cos(camera.pitch);
+  return { x1, y1, z2 };
+}
+
+/** How far toward the canvas's bottom-right corner `v` is drawn, at the given yaw. */
+function towardCorner(v: Point3, yaw: number, pitch: number): number {
+  const { x1, y1 } = onScreen(v, { yaw, pitch });
+  return (x1 + y1) / Math.SQRT2;
+}
+
+/**
+ * The yaw, among 72 evenly spaced, that draws `v` furthest toward the canvas's bottom-right
+ * corner, where the card is. It keeps `yaw` unless another draws `v` at least a tenth of its
+ * length further, so a graph spread evenly around the pivot does not swing from side to side.
+ */
+export function yawToward(v: Point3, pitch: number, yaw: number): number {
+  let best = yaw;
+  let bestScore = towardCorner(v, yaw, pitch);
+  const keep = bestScore;
+  for (let i = 0; i < 72; i++) {
+    const candidate = -Math.PI + (i * Math.PI) / 36;
+    const score = towardCorner(v, candidate, pitch);
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return bestScore - keep < 0.1 * Math.hypot(v.x, v.y, v.z) ? yaw : best;
+}
+
+/**
+ * The camera distance at which the farthest of `points`, relative to the pivot, is drawn `radius`
+ * pixels from the pivot. Undefined when there are no points away from the pivot.
+ */
+export function distanceToFit(
+  points: Point3[],
+  camera: Pick<Camera, "yaw" | "pitch">,
+  radius: number,
+): number | undefined {
+  let distance: number | undefined;
+  for (const point of points) {
+    const { x1, y1, z2 } = onScreen(point, camera);
+    const offset = Math.hypot(x1, y1);
+    if (offset === 0) continue;
+    const needed = (offset * FOCAL) / radius - z2;
+    distance = distance === undefined ? needed : Math.max(distance, needed);
+  }
+  return distance;
+}
+
+/**
+ * While the camera follows, eases it toward framing the open node: turned so the rest of the
+ * graph lies toward the bottom-right corner, behind the card, and zoomed so the open node's
+ * neighbours fill FIT of the canvas's shorter side.
+ */
+function frameCamera(sim: Sim, width: number, height: number): void {
+  const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
+  if (!sim.follow || !open || width === 0 || height === 0) return;
+  const at = zOf(sim, open);
+  const rel = (n: SimNode): Point3 => ({ x: n.x - open.x, y: n.y - open.y, z: zOf(sim, n) - at });
+  const near = new Set<string>();
+  for (const edge of sim.edges) {
+    if (edge.from === open.id) near.add(edge.to);
+    else if (edge.to === open.id) near.add(edge.from);
+  }
+  const rest = { x: 0, y: 0, z: 0 };
+  let count = 0;
+  for (const n of sim.nodes.values()) {
+    if (n.id === open.id || near.has(n.id)) continue;
+    const r = rel(n);
+    rest.x += r.x;
+    rest.y += r.y;
+    rest.z += r.z;
+    count++;
+  }
+  const camera = sim.camera;
+  if (count > 0) {
+    const centroid = { x: rest.x / count, y: rest.y / count, z: rest.z / count };
+    const target = yawToward(centroid, camera.pitch, camera.yaw);
+    const turn = Math.atan2(Math.sin(target - camera.yaw), Math.cos(target - camera.yaw));
+    camera.yaw += turn * FRAME_EASE;
+  }
+  const points = [...near].flatMap((id) => {
+    const n = sim.nodes.get(id);
+    return n === undefined ? [] : [rel(n)];
+  });
+  const fit = distanceToFit(points, camera, FIT * Math.min(width, height));
+  if (fit !== undefined) {
+    const target = Math.min(FRAME_DISTANCE.max, Math.max(FRAME_DISTANCE.min, fit));
+    camera.distance += (target - camera.distance) * FRAME_EASE;
+  }
 }
 
 function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
@@ -571,6 +681,7 @@ export function createSim(): Sim {
     camera: { ...INITIAL_CAMERA },
     pivot: null,
     heat: 1,
+    follow: true,
     drag: null,
     dragged: false,
   };
@@ -620,6 +731,8 @@ export function GraphView({
 
   const sim = simRef.current;
   sim.overlay = overlay;
+  // Opening a node hands the camera back to the framing, after a drag or a scroll took it.
+  if (sim.selectedId !== selectedId) sim.follow = true;
   sim.selectedId = selectedId;
 
   useEffect(() => {
@@ -652,7 +765,10 @@ export function GraphView({
       if (s.drag) {
         const dx = event.clientX - s.drag.x;
         const dy = event.clientY - s.drag.y;
-        if (Math.hypot(dx, dy) > 4) s.dragged = true;
+        if (Math.hypot(dx, dy) > 4) {
+          s.dragged = true;
+          s.follow = false;
+        }
         s.camera.yaw = s.drag.yaw + dx * 0.006;
         s.camera.pitch = s.drag.pitch - dy * 0.006;
         return;
@@ -680,6 +796,7 @@ export function GraphView({
     };
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
+      simRef.current.follow = false;
       const cam = simRef.current.camera;
       cam.distance = Math.max(120, Math.min(2200, cam.distance + event.deltaY * 0.6));
     };
@@ -715,6 +832,7 @@ export function GraphView({
       const s = simRef.current;
       tickPhysics(s);
       followPivot(s);
+      frameCamera(s, sizeRef.current.width, sizeRef.current.height);
       renderFrame(ctx, s, sizeRef.current.width, sizeRef.current.height);
       raf = requestAnimationFrame(loop);
     };
