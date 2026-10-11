@@ -403,7 +403,7 @@ test.describe("the sidebar", () => {
       .toBeLessThanOrEqual(2);
   });
 
-  test("a double-click or Home on a border returns the two sections it divides to their initial proportion, and no other border moves", async ({
+  test("a double-click on a border returns the two sections it divides to their initial proportion, and no other border moves", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -443,11 +443,41 @@ test.describe("the sidebar", () => {
     ).toBeLessThanOrEqual(2);
     expect(reset.records).toBe(dragged.records);
 
-    await lower.focus();
+    await lower.dblclick();
+    const both = await heights();
+    expect(Math.abs(both.records - 2 * both.history)).toBeLessThanOrEqual(3);
+    expect(both.files).toBe(reset.files);
+  });
+
+  test("Home on a focused border moves it up until the section above is 72 px high, and End moves it down until the section below is", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    await explorer(page, "Source Explorer").click();
+    const section = (name: string) => sidebar(page).getByRole("region", { name });
+    const height = async (name: string) =>
+      Math.round((await section(name).boundingBox())?.height ?? -1);
+    const heights = async () => ({
+      files: await height("File Explorer"),
+      history: await height("Source Explorer"),
+      records: await height("Record Explorer"),
+    });
+    const before = await heights();
+    await page.getByRole("separator", { name: "Resize File Explorer and Source Explorer" }).focus();
     await page.keyboard.press("Home");
     const home = await heights();
-    expect(Math.abs(home.records - 2 * home.history)).toBeLessThanOrEqual(3);
-    expect(home.files).toBe(reset.files);
+    expect(Math.abs(home.files - 72)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(home.files + home.history - (before.files + before.history)),
+    ).toBeLessThanOrEqual(2);
+    expect(home.records).toBe(before.records);
+
+    await page.keyboard.press("End");
+    const end = await heights();
+    expect(Math.abs(end.history - 72)).toBeLessThanOrEqual(1);
+    expect(end.records).toBe(before.records);
   });
 
   test("Source Explorer draws the branches' lanes and opens on HEAD's branch; picking another outlines its tip", async ({

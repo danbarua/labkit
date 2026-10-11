@@ -786,11 +786,11 @@ const MIN_SECTION = 72;
 const SPLITTER_STEP = 16;
 
 /**
- * The border between two open sidebar sections, which a drag or the Up and Down keys move. The two
- * sections divide their height in the new proportion, and keep it on the next visit; each keeps at
- * least MIN_SECTION pixels. A folded section between them moves with the border. A double-click or
- * the Home key returns the two sections to their initial proportion of the height they share, so
- * no other border moves.
+ * The border between two open sidebar sections, which a drag or the window splitter pattern's keys
+ * move: Up and Down by SPLITTER_STEP, Home and End as far up or down as it goes. The two sections
+ * divide their height in the new proportion, and keep it on the next visit; each keeps at least
+ * MIN_SECTION pixels. A folded section between them moves with the border. A double-click returns
+ * the two sections to their initial proportion of the height they share, so no other border moves.
  */
 function Splitter({ above, below }: { above: Share; below: Share }) {
   const drag = useRef<{ y: number; a: number; b: number } | undefined>(undefined);
@@ -843,14 +843,20 @@ function Splitter({ above, below }: { above: Share; below: Share }) {
       onPointerCancel={stop}
       onDoubleClick={reset}
       onKeyDown={(e) => {
-        if (e.key === "Home") {
-          e.preventDefault();
-          reset();
-          return;
-        }
-        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        const from = sizes();
+        const delta =
+          e.key === "ArrowUp"
+            ? -SPLITTER_STEP
+            : e.key === "ArrowDown"
+              ? SPLITTER_STEP
+              : e.key === "Home"
+                ? MIN_SECTION - from.a
+                : e.key === "End"
+                  ? from.b - MIN_SECTION
+                  : undefined;
+        if (delta === undefined) return;
         e.preventDefault();
-        move(sizes(), e.key === "ArrowUp" ? -SPLITTER_STEP : SPLITTER_STEP);
+        move(from, delta);
       }}
     />
   );
