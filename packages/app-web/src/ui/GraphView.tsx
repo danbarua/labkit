@@ -304,10 +304,16 @@ export function followPivot(sim: Sim): void {
 /** How much of the canvas's shorter side the open node's neighbourhood is zoomed to fill. */
 const FIT = 0.3;
 /**
- * How far the camera moves toward its framing on each frame: its pan, turn and zoom. At 60 frames
- * a second it covers 98% of the way in 1.2s, one playback step.
+ * How far the camera moves toward its framing on each frame: its pan, turn, tilt and zoom. At 60
+ * frames a second it covers 98% of the way in 1.2s, one playback step.
  */
 const FRAME_EASE = 0.05;
+/**
+ * The least spread, as a share of the best turn's, at which a turn draws the open node's
+ * neighbours. The neighbours that arrive with a resource's response lie close together on the
+ * time axis, a flat cluster; for one, this admits turns up to about 45° from facing it.
+ */
+const SPREAD_KEEP = 0.87;
 /**
  * The nearest and farthest the camera frames from. A small graph spaces its few nodes far apart
  * along the time axis, and fitting them all would draw every node a pixel or two across.
@@ -329,24 +335,56 @@ function towardCorner(v: Point3, yaw: number, pitch: number): number {
   return (x1 + y1) / Math.SQRT2;
 }
 
+/** The signed turn, between -π and π, from angle `from` to angle `to`. */
+function turnBetween(from: number, to: number): number {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+
 /**
- * The yaw, among 72 evenly spaced, that draws `v` furthest toward the canvas's bottom-right
- * corner, where the card is. It keeps `yaw` unless another draws `v` at least a tenth of its
- * length further, so a graph spread evenly around the pivot does not swing from side to side.
+ * How far from the pivot the camera draws `points`, relative to the pivot, as the mean over the
+ * points of each one's drawn distance divided by its distance in the graph's space. 1 when every
+ * point is drawn at its full distance; lower when the camera looks along their directions.
  */
-export function yawToward(v: Point3, pitch: number, yaw: number): number {
-  let best = yaw;
-  let bestScore = towardCorner(v, yaw, pitch);
-  const keep = bestScore;
-  for (let i = 0; i < 72; i++) {
-    const candidate = -Math.PI + (i * Math.PI) / 36;
-    const score = towardCorner(v, candidate, pitch);
-    if (score > bestScore) {
-      best = candidate;
-      bestScore = score;
-    }
+function spreadOf(points: Point3[], camera: Pick<Camera, "yaw" | "pitch">): number {
+  let sum = 0;
+  let count = 0;
+  for (const v of points) {
+    const length = Math.hypot(v.x, v.y, v.z);
+    if (length === 0) continue;
+    const { x1, y1 } = onScreen(v, camera);
+    sum += Math.hypot(x1, y1) / length;
+    count++;
   }
-  return bestScore - keep < 0.1 * Math.hypot(v.x, v.y, v.z) ? yaw : best;
+  return count === 0 ? 1 : sum / count;
+}
+
+/**
+ * The yaw, among `yaw` and 72 evenly spaced, that draws `rest`, the centroid of the nodes that are
+ * not the open node or its neighbours, furthest toward the canvas's bottom-right corner, among the
+ * yaws that draw `near`, the neighbours, at SPREAD_KEEP of the best spread and `rest` at or behind
+ * the pivot's depth. When no such yaw puts `rest` behind, the depth condition is dropped. It keeps
+ * `yaw` unless another draws `rest` a tenth of its length further, so a graph spread evenly around
+ * the pivot does not swing from side to side. Points are relative to the pivot.
+ */
+export function yawToward(view: { rest: Point3; near: Point3[]; pitch: number; yaw: number }) {
+  const { rest, near, pitch, yaw } = view;
+  const candidates = [yaw, ...Array.from({ length: 72 }, (_, i) => -Math.PI + (i * Math.PI) / 36)];
+  const spread = candidates.map((c) => spreadOf(near, { yaw: c, pitch }));
+  const best = Math.max(...spread);
+  const shows = candidates.filter((_, i) => (spread[i] ?? 0) >= SPREAD_KEEP * best);
+  const behind = shows.filter((c) => onScreen(rest, { yaw: c, pitch }).z2 >= 0);
+  // `shows` always holds the yaw with the best spread, so the pool is never empty.
+  const pool = behind.length > 0 ? behind : shows;
+  const score = (c: number) => towardCorner(rest, c, pitch);
+  // Between yaws that score the same, the smaller turn from `yaw` wins.
+  const chosen = pool.reduce((a, c) => {
+    const gain = score(c) - score(a);
+    const shorter = Math.abs(turnBetween(yaw, c)) < Math.abs(turnBetween(yaw, a));
+    return gain > 1e-9 || (gain > -1e-9 && shorter) ? c : a;
+  });
+  const keep =
+    pool.includes(yaw) && score(chosen) - score(yaw) < 0.1 * Math.hypot(rest.x, rest.y, rest.z);
+  return keep ? yaw : chosen;
 }
 
 /**
@@ -370,13 +408,17 @@ export function distanceToFit(
 }
 
 /**
- * While the camera follows, eases it toward framing the open node: turned so the rest of the
- * graph lies toward the bottom-right corner, behind the card, and zoomed so the open node's
+ * While the camera follows, eases it toward framing the open node: tilted to the initial camera's
+ * pitch, turned as `yawToward` chooses, so the open node's neighbours are seen spread out and the
+ * rest of the graph lies behind them toward the bottom-right corner, and zoomed so the
  * neighbours fill FIT of the canvas's shorter side.
  */
-function frameCamera(sim: Sim, width: number, height: number): void {
+export function frameCamera(sim: Sim, width: number, height: number): void {
   const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
   if (!sim.follow || !open || width === 0 || height === 0) return;
+  const camera = sim.camera;
+  const pitch = INITIAL_CAMERA.pitch;
+  camera.pitch += turnBetween(camera.pitch, pitch) * FRAME_EASE;
   const at = zOf(sim, open);
   const rel = (n: SimNode): Point3 => ({ x: n.x - open.x, y: n.y - open.y, z: zOf(sim, n) - at });
   const near = new Set<string>();
@@ -394,17 +436,14 @@ function frameCamera(sim: Sim, width: number, height: number): void {
     rest.z += r.z;
     count++;
   }
-  const camera = sim.camera;
-  if (count > 0) {
-    const centroid = { x: rest.x / count, y: rest.y / count, z: rest.z / count };
-    const target = yawToward(centroid, camera.pitch, camera.yaw);
-    const turn = Math.atan2(Math.sin(target - camera.yaw), Math.cos(target - camera.yaw));
-    camera.yaw += turn * FRAME_EASE;
-  }
   const points = [...near].flatMap((id) => {
     const n = sim.nodes.get(id);
     return n === undefined ? [] : [rel(n)];
   });
+  const centroid =
+    count > 0 ? { x: rest.x / count, y: rest.y / count, z: rest.z / count } : { x: 0, y: 0, z: 0 };
+  const target = yawToward({ rest: centroid, near: points, pitch, yaw: camera.yaw });
+  camera.yaw += turnBetween(camera.yaw, target) * FRAME_EASE;
   const fit = distanceToFit(points, camera, FIT * Math.min(width, height));
   if (fit !== undefined) {
     const target = Math.min(FRAME_DISTANCE.max, Math.max(FRAME_DISTANCE.min, fit));

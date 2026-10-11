@@ -4,6 +4,7 @@ import {
   depthOpacity,
   distanceToFit,
   followPivot,
+  frameCamera,
   INITIAL_CAMERA,
   labelAngle,
   mergeSeeds,
@@ -91,29 +92,73 @@ describe("an edge label's rotation", () => {
 });
 
 describe("the camera's framing", () => {
-  // Where a point relative to the pivot is drawn, ignoring perspective, as the canvas does.
-  const drawn = (v: { x: number; y: number; z: number }, yaw: number, pitch: number) => {
+  const seed = (id: string) => ({ id, label: id, type: "Question" });
+  type Point = { x: number; y: number; z: number };
+  // Where a point relative to the pivot is drawn, ignoring perspective, as the canvas does, and
+  // its depth: positive is further from the viewer than the pivot.
+  const drawn = (v: Point, yaw: number, pitch: number) => {
     const x1 = v.x * Math.cos(yaw) - v.z * Math.sin(yaw);
     const z1 = v.x * Math.sin(yaw) + v.z * Math.cos(yaw);
-    return { x: x1, y: v.y * Math.cos(pitch) - z1 * Math.sin(pitch) };
+    return {
+      x: x1,
+      y: v.y * Math.cos(pitch) - z1 * Math.sin(pitch),
+      depth: v.y * Math.sin(pitch) + z1 * Math.cos(pitch),
+    };
   };
+  // The mean share of each point's distance from the pivot that the camera draws.
+  const spread = (points: Point[], yaw: number, pitch: number) =>
+    points.reduce((sum, v) => {
+      const at = drawn(v, yaw, pitch);
+      return sum + Math.hypot(at.x, at.y) / Math.hypot(v.x, v.y, v.z);
+    }, 0) / points.length;
 
   test("turns the rest of the graph toward the bottom-right corner", () => {
-    for (const v of [
+    for (const rest of [
       { x: 0, y: 0, z: 100 },
       { x: -80, y: -40, z: 20 },
       { x: 30, y: 10, z: -90 },
     ]) {
-      const yaw = yawToward(v, 0.35, 0);
-      const at = drawn(v, yaw, 0.35);
+      const yaw = yawToward({ rest, near: [], pitch: 0.35, yaw: 0 });
+      const at = drawn(rest, yaw, 0.35);
       expect(at.x).toBeGreaterThan(0);
       expect(at.x + at.y).toBeGreaterThan(0);
     }
   });
 
   test("keeps its yaw when no other turns the graph a tenth of its length further", () => {
-    const v = { x: 100, y: 100, z: 0 };
-    expect(yawToward(v, 0, 0)).toBe(0);
+    const rest = { x: 100, y: 100, z: 0 };
+    expect(yawToward({ rest, near: [], pitch: 0, yaw: 0 })).toBe(0);
+  });
+
+  test("sees a cluster that shares the open node's time spread out, not edge-on, with the earlier graph behind it", () => {
+    // Eight neighbours that arrived with the open node's response: around it in the layout's
+    // plane, a few units later on the time axis. The rest of the graph is earlier.
+    const near = Array.from({ length: 8 }, (_, i) => ({
+      x: 90 * Math.cos((i * Math.PI) / 4),
+      y: 90 * Math.sin((i * Math.PI) / 4),
+      z: 2 * (i + 1),
+    }));
+    const rest = { x: 40, y: -30, z: -320 };
+    const edgeOn = Math.PI / 2;
+    expect(spread(near, edgeOn, 0.35)).toBeLessThan(0.7);
+    const yaw = yawToward({ rest, near, pitch: 0.35, yaw: edgeOn });
+    expect(spread(near, yaw, 0.35)).toBeGreaterThan(0.8);
+    const at = drawn(rest, yaw, 0.35);
+    expect(at.x).toBeGreaterThan(0);
+    expect(at.depth).toBeGreaterThanOrEqual(0);
+  });
+
+  test("while it follows, tilts back to the initial camera's pitch; after a drag it does not", () => {
+    const sim = createSim();
+    mergeSeeds(sim, [seed("a"), seed("b")], [{ from: "a", to: "b", label: "R" }], "a");
+    sim.selectedId = "a";
+    sim.camera.pitch = Math.PI / 2;
+    sim.follow = false;
+    frameCamera(sim, 800, 400);
+    expect(sim.camera.pitch).toBe(Math.PI / 2);
+    sim.follow = true;
+    for (let i = 0; i < 300; i++) frameCamera(sim, 800, 400);
+    expect(sim.camera.pitch).toBeCloseTo(INITIAL_CAMERA.pitch, 3);
   });
 
   test("zooms so the farthest neighbour is drawn at the given radius", () => {
