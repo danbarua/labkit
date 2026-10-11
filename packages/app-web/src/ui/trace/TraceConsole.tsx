@@ -59,6 +59,7 @@ import {
   drawnAs,
   edgeLabelOf,
   FILE_TYPE,
+  commitsRanAgainst,
   type HalDocument,
   type Held,
   type HeldIndex,
@@ -1278,7 +1279,10 @@ const readEvents = (doc: HalDocument) => {
   };
 };
 
-/** A record's events, from its `events` link: one row per change, oldest first, a page at a time. */
+/**
+ * A record's or a commit's events, from its `events` link: one row per change, oldest first, a page
+ * of acts at a time. Under them, the commits the acts ran against, each with its acts.
+ */
 function Events({
   href,
   current,
@@ -1291,37 +1295,75 @@ function Events({
 }) {
   const path = requestPath(href);
   const events = usePages(path, readEvents);
+  const commits = commitsRanAgainst(events.items, current);
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <a href={path} target="_blank" rel="noopener" title="Open in a new tab">
-          {path}
-        </a>
-        <span>events{events.items.length > 0 ? ` · ${events.items.length}` : ""}</span>
+    <>
+      <div className="panel">
+        <div className="panel-head">
+          <a href={path} target="_blank" rel="noopener" title="Open in a new tab">
+            {path}
+          </a>
+          <span>events{events.items.length > 0 ? ` · ${events.items.length}` : ""}</span>
+        </div>
+        <div className="panel-body">
+          {events.items.map((e) => (
+            <EventRow
+              key={`${String(e.seq)}.${String(e.index)}`}
+              event={e}
+              current={current}
+              onOpen={onOpen}
+            />
+          ))}
+          {events.error !== undefined ? (
+            <div className="empty-panel">Fetch failed: {events.error}</div>
+          ) : events.loading ? (
+            <Spinner>loading events…</Spinner>
+          ) : events.items.length === 0 ? (
+            <div className="empty-panel">No event names this record.</div>
+          ) : null}
+          {!events.loading && events.next !== undefined ? (
+            <button type="button" className="tbtn primary events-more" onClick={events.more}>
+              Load more acts
+            </button>
+          ) : null}
+        </div>
       </div>
-      <div className="panel-body">
-        {events.items.map((e) => (
-          <EventRow
-            key={`${String(e.seq)}.${String(e.index)}`}
-            event={e}
-            current={current}
-            onOpen={onOpen}
-          />
-        ))}
-        {events.error !== undefined ? (
-          <div className="empty-panel">Fetch failed: {events.error}</div>
-        ) : events.loading ? (
-          <Spinner>loading events…</Spinner>
-        ) : events.items.length === 0 ? (
-          <div className="empty-panel">No event names this record.</div>
-        ) : null}
-        {!events.loading && events.next !== undefined ? (
-          <button type="button" className="tbtn primary events-more" onClick={events.more}>
-            Load more acts
-          </button>
-        ) : null}
-      </div>
-    </div>
+      {commits.length === 0 ? null : (
+        <div className="panel">
+          <div className="panel-head">
+            Commits the acts ran against<span>{commits.length}</span>
+          </div>
+          <div className="panel-body">
+            {commits.map(({ commit, acts }) => (
+              <div key={commit} className="ev ran-against">
+                <button
+                  type="button"
+                  className="mention"
+                  style={{ "--mention": typeColour(COMMIT_TYPE) } as CSSProperties}
+                  title={COMMIT_TYPE}
+                  onClick={() => onOpen(commit)}
+                >
+                  {nameOf(commit, COMMIT_TYPE)}
+                </button>
+                <span>
+                  {acts.map((act) => (
+                    <button
+                      key={act.key}
+                      type="button"
+                      className="ref mono"
+                      title="Open the act"
+                      onClick={() => onOpen(act.key)}
+                    >
+                      #{act.seq}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

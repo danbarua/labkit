@@ -636,6 +636,20 @@ test.describe("an open resource", () => {
     errors.length = 0;
   });
 
+  test("under a record's events, the commits their acts ran against, each opening its commit", async ({
+    page,
+  }) => {
+    // Act 1, which posed Q_1, ran against the repository's first commit.
+    await page.goto("/app/workspace/alpha/Q_1?tab=debug");
+    const commits = page.locator(".panel", { hasText: "Commits the acts ran against" });
+    const row = commits.locator(".ev.ran-against");
+    await expect(row).toHaveCount(1);
+    await expect(row.getByRole("button", { name: "#1" })).toBeVisible();
+    await row.locator(".mention").click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
+  });
+
   test("an unknown tab in the address opens the overview", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1?tab=nonsense");
     await expect(header(page)).toHaveText("Q_1");

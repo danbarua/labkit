@@ -1281,6 +1281,10 @@
 .trace .mention.current {
   background: color-mix(in srgb, var(--mention) 22%, transparent);
 }
+/* A commit the acts ran against: its chip, then its acts. */
+.trace .ev.ran-against {
+  align-items: center;
+}
 .trace .events-more {
   margin: 8px 0;
 }
