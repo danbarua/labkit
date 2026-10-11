@@ -147,6 +147,44 @@ test.describe("getting around", () => {
   });
 });
 
+test.describe("the sidebar", () => {
+  const sidebar = (page: import("@playwright/test").Page) => page.locator("aside.sidebar");
+  const toggle = (page: import("@playwright/test").Page) =>
+    page.getByRole("button", { name: "Show or hide the sidebar" });
+
+  test("at full width, the toggle hides and shows the sidebar, and a reload keeps it hidden", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(sidebar(page)).toBeVisible();
+    await expect(toggle(page)).toHaveAttribute("aria-expanded", "true");
+    await toggle(page).click();
+    await expect(sidebar(page)).toBeHidden();
+    await expect(toggle(page)).toHaveAttribute("aria-expanded", "false");
+    await page.reload();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(sidebar(page)).toBeHidden();
+    await toggle(page).click();
+    await expect(sidebar(page)).toBeVisible();
+  });
+
+  test("in a narrow window, the toggle opens the sidebar over the page, and opening a resource closes it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 600, height: 800 });
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(sidebar(page)).not.toBeInViewport();
+    await expect(toggle(page)).toHaveAttribute("aria-expanded", "false");
+    await toggle(page).click();
+    await expect(sidebar(page)).toBeInViewport();
+    await expect(toggle(page)).toHaveAttribute("aria-expanded", "true");
+    await item(page, "Q_2").click();
+    await expect(header(page)).toHaveText("Q_2");
+    await expect(sidebar(page)).not.toBeInViewport();
+  });
+});
+
 test.describe("an open resource", () => {
   test("shows its properties and the resources it relates to", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1");

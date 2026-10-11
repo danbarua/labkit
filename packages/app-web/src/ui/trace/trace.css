@@ -215,7 +215,7 @@
 }
 
 .trace .hamburger {
-  display: none;
+  display: flex;
   background: none;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -1011,14 +1011,18 @@
   border: 0;
 }
 
+/* ---------- full width: the sidebar is shown or hidden ---------- */
+@media (min-width: 861px) {
+  .trace .sidebar.collapsed {
+    display: none;
+  }
+}
+
 /* ---------- narrow windows: the side column becomes a drawer ---------- */
 @media (max-width: 860px) {
   .trace .search-wrap,
   .trace .dev-links {
     display: none;
-  }
-  .trace .hamburger {
-    display: flex;
   }
   .trace .scrim.open {
     display: block;

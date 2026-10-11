@@ -42,7 +42,9 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
+import { useSavedFlag } from "../saved-flag";
 import { useSavedTheme } from "../saved-theme";
 import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
@@ -146,6 +148,22 @@ function useExplored(path: string) {
 /** The workspace directory a key sits in, `/workspace/<slug>/`, or undefined outside one. */
 const workspaceOf = (key: string) => /^\/workspace\/[^/]+\//.exec(key)?.[0];
 
+/** The windows in which the sidebar is a drawer over the page: trace.css's narrow-window rules. */
+export const NARROW = "(max-width: 860px)";
+
+/** Whether the window matches the media query `query`, kept current as the window changes. */
+function useMediaQuery(query: string): boolean {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const media = window.matchMedia(query);
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    [query],
+  );
+  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches);
+}
+
 export interface TraceConsoleProps {
   /** The API path of what is open, or "" when nothing is. */
   path: string;
@@ -160,6 +178,10 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const [theme, setTheme] = useSavedTheme();
   const [term, setTerm] = useState("");
   const [drawer, setDrawer] = useState<"items" | undefined>();
+  // At full width the sidebar is shown or hidden, as this browser last left it; in a narrow
+  // window it is a drawer over the page, closed until opened.
+  const [sidebarShown, setSidebarShown] = useSavedFlag("labkit.trace.sidebar", true);
+  const narrow = useMediaQuery(NARROW);
   const [graphOpen, setGraphOpen] = useState(true);
   const explored = useExplored(path);
   const workspace = workspaceOf(path);
@@ -224,8 +246,13 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
           <button
             type="button"
             className="hamburger"
-            aria-label="Toggle collections column"
-            onClick={() => setDrawer((d) => (d === "items" ? undefined : "items"))}
+            aria-label="Show or hide the sidebar"
+            aria-expanded={narrow ? drawer === "items" : sidebarShown}
+            onClick={() =>
+              narrow
+                ? setDrawer((d) => (d === "items" ? undefined : "items"))
+                : setSidebarShown(!sidebarShown)
+            }
           >
             <SidebarSimpleIcon aria-hidden="true" />
           </button>
@@ -288,7 +315,11 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
             onClick={() => setDrawer(undefined)}
           />
           <Lists
-            className={drawer === "items" ? "sidebar open" : "sidebar"}
+            className={[
+              "sidebar",
+              drawer === "items" ? "open" : "",
+              sidebarShown ? "" : "collapsed",
+            ].join(" ")}
             listKey={listKey}
             root={listKey === ENTRY}
             openKey={path}
