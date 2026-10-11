@@ -46,6 +46,9 @@ type SimNode = GraphNodeSeed & {
 
 type Projected = { sx: number; sy: number; scale: number; depth: number };
 
+/** An edge on the canvas. `born` is the label frame in which it was added. */
+type SimEdge = GraphEdgeSeed & { born: number };
+
 type Camera = { yaw: number; pitch: number; distance: number };
 
 /** A point in the graph's space: the plane of the force layout, and depth by order first seen. */
@@ -55,7 +58,7 @@ type Drag = { x: number; y: number; yaw: number; pitch: number };
 
 type Sim = {
   nodes: Map<string, SimNode>;
-  edges: GraphEdgeSeed[];
+  edges: SimEdge[];
   edgeKeys: Set<string>;
   nextStep: number;
   overlay: Overlay;
@@ -213,7 +216,7 @@ export function mergeSeeds(
     const key = `${edge.from}\0${edge.label}\0${edge.to}`;
     if (sim.edgeKeys.has(key)) continue;
     sim.edgeKeys.add(key);
-    sim.edges.push(edge);
+    sim.edges.push({ ...edge, born: sim.labels.frame });
   }
   if (sim.nodes.size + sim.edges.length > before) sim.heat = Math.max(sim.heat, REHEAT);
 }
@@ -604,6 +607,11 @@ const LABEL_HOLD = 30;
  * fade out once not. A label fading out takes no room, so another may fade in where it was.
  */
 const LABEL_FADE = 10;
+/**
+ * How many frames, 0.5s at 60 frames a second, a new edge is drawn before its label may be: the
+ * relation appears first, then what it means.
+ */
+const EDGE_LABEL_DELAY = 30;
 
 /** What label placement keeps from one frame to the next. */
 export type LabelMemory = {
@@ -717,7 +725,8 @@ type EdgeLabel = {
 
 /**
  * The labels the canvas may draw in this frame, before overlaps are resolved, and their boxes.
- * `measure` returns a text's width in pixels in a font. Ranks: the open and hovered nodes' labels
+ * `measure` returns a text's width in pixels in a font. An edge's label is not a candidate until
+ * EDGE_LABEL_DELAY frames after the edge was added. Ranks: the open and hovered nodes' labels
  * and their edges' labels 0, the open node's neighbours' 1, other nodes' 2, other edges' 3.
  */
 export function labelCandidates(
@@ -759,6 +768,7 @@ export function labelCandidates(
       (id) => id !== null && (edge.from === id || edge.to === id),
     );
     const key = `e\0${edge.from}\0${edge.label}\0${edge.to}`;
+    if (sim.labels.frame - edge.born < EDGE_LABEL_DELAY) continue;
     if (!hot && !big(Math.min(a.scale, b.scale), key)) continue;
     const font = hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
     const width = measure(edge.label, font) + LABEL_MARKER;

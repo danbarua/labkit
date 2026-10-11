@@ -97,6 +97,9 @@ frame is favoured over one that was not:
 A label fades in over 10 frames, about 0.17 s, once placed, and fades out over the same time once
 not. A label fading out takes no room, so another may fade in where it was. A label whose node
 becomes too small, or whose edge becomes too short, is not faded out.
+
+A new edge is drawn for 0.5 s before its label may be placed, so the relation appears first and
+what it means fades in after it. This holds for the open node's own edges too.
 The API returns no standing for a resource, so there is no standing overlay.
 
 The graph card's Play button steps through later acts, one at a time, in the order the acts were

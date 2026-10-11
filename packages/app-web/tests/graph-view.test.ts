@@ -380,6 +380,21 @@ describe("label placement", () => {
         .boxes.map((b) => b.key.replace(/\0/g, " "))
         .sort();
 
+    test("an edge's label becomes a candidate 30 frames after the edge was added", () => {
+      const sim = createSim();
+      sim.labels.frame = 50;
+      const edges = [{ from: "a", to: "b", label: "R" }];
+      mergeSeeds(sim, [seed("a"), seed("b")], edges, "a");
+      const projected = new Map([
+        ["a", at(100, 0.8)],
+        ["b", at(200, 0.8)],
+      ]);
+      sim.labels.frame = 79;
+      expect(keys(sim, projected)).toEqual(["n a", "n b"]);
+      sim.labels.frame = 80;
+      expect(keys(sim, projected)).toEqual(["e a R b", "n a", "n b"]);
+    });
+
     test("a node's label drawn in the last frame stays a candidate down to scale 0.5; a new one needs 0.55", () => {
       const sim = createSim();
       mergeSeeds(sim, [seed("a")], [], null);
@@ -393,6 +408,7 @@ describe("label placement", () => {
       const sim = createSim();
       const edges = [{ from: "a", to: "b", label: "R" }];
       mergeSeeds(sim, [seed("a"), seed("b")], edges, null);
+      sim.labels.frame = 30;
       // The label is 6 pixels wide and its direction marker 9; the edge is 14 pixels long.
       const projected = new Map([
         ["a", at(100, 0.8)],
