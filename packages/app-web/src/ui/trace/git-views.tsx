@@ -3,14 +3,14 @@
  * its own under the resource's properties, drawn with the content views the chat uses.
  */
 
-import { CodeView, ContentCard, DiffView, filesOfPatch, rowsOfPatch } from "@labkit/ui";
+import { CodeView, ContentCard, DiffView, rowsOfPatch } from "@labkit/ui";
 import { collectionOf, type HalDocument, keyOf } from "./hal";
 import { requestPath, usePages } from "./hal-store";
 
 /** The properties a file or a commit shows in its own card rather than as a property row. */
 export const SHOWN_APART: Readonly<Record<string, readonly string[]>> = {
   File: ["content"],
-  Commit: ["message", "diff"],
+  Commit: ["message"],
 };
 
 /**
@@ -119,8 +119,7 @@ export function CommitView({
   const body = message.split("\n").slice(1).join("\n").trim();
   const parents = hrefsOf(doc, "parent:commit");
   const changes = hrefsOf(doc, "changes")[0];
-  const diff = typeof attrs.diff === "string" ? attrs.diff : "";
-  const files = filesOfPatch(diff);
+  const diff = hrefsOf(doc, "diff")[0];
   return (
     <>
       {body === "" ? null : (
@@ -148,30 +147,56 @@ export function CommitView({
         </div>
         {changes === undefined ? null : <ChangedFiles href={changes} onOpen={onOpen} />}
       </ContentCard>
-      {attrs.diff_truncated === true ? (
-        <div className="card-note">
-          The diff is cut at {diff.length.toLocaleString("en")} characters; the files after the cut
-          are not shown.
-        </div>
-      ) : null}
-      {files.map((file) => {
-        const { added, removed } = countsOf(file.patch);
+      {diff === undefined ? null : <Diffs href={diff} />}
+    </>
+  );
+}
+
+/**
+ * A commit's diff, one card per changed file, from its `diff` collection: the first page of files,
+ * then each next page asked for. Only this page asks for a commit's diff.
+ */
+function Diffs({ href }: { href: string }) {
+  const key = keyOf(href);
+  const pages = usePages(requestPath(href), (doc) => {
+    const c = collectionOf(key, doc);
+    return { items: c.items, next: c.next };
+  });
+  return (
+    <>
+      {pages.items.map((item) => {
+        const path = String(item.data.path ?? item.id ?? "");
+        const patch = typeof item.data.patch === "string" ? item.data.patch : "";
+        const { added, removed } = countsOf(patch);
         return (
           <ContentCard
-            key={file.path}
+            key={item.key}
             className="diff-card"
-            title={<span className="mono">{file.path}</span>}
+            title={<span className="mono">{path}</span>}
             meta={`+${added} −${removed}`}
           >
+            {item.data.patch_truncated === true ? (
+              <div className="card-note">
+                The first {patch.length.toLocaleString("en")} characters of this file's diff.
+              </div>
+            ) : null}
             <DiffView
-              path={file.path}
-              rows={rowsOfPatch(file.patch)}
+              path={path}
+              rows={rowsOfPatch(patch)}
               caption={false}
               preview={FILE_PREVIEW}
             />
           </ContentCard>
         );
       })}
+      {pages.error !== undefined ? (
+        <div className="card-note">Fetch failed: {pages.error}</div>
+      ) : null}
+      {pages.next !== undefined && !pages.loading ? (
+        <button type="button" className="tbtn primary load-more" onClick={pages.more}>
+          Load more files
+        </button>
+      ) : null}
     </>
   );
 }

@@ -11,6 +11,7 @@ import {
 import {
   COMMIT_SLUG,
   COMMIT_TYPE,
+  DIFF_TYPE,
   DIRECTORY_TYPE,
   FILE_SLUG,
   FILE_TYPE,
@@ -18,12 +19,13 @@ import {
 } from "./collection-paths";
 import { DEFAULT_LIMIT, halJson, MAX_LIMIT, pageParam, pagingLinks } from "./collections-handler";
 import { problem, publicOrigin } from "./graph-handler";
+import { summaryOf } from "./commit-summary";
 import { actItem, actsRanAgainst, RAN_AGAINST } from "./events-handler";
 import { isNotFound } from "./repositories";
 import type { TenantScope } from "./runtime";
 
-/** The longest diff a commit is served with, in characters. A longer one is cut and flagged. */
-export const DIFF_LIMIT = 100_000;
+/** The longest diff of one file a commit is served with, in characters. A longer one is cut and flagged. */
+export const PATCH_LIMIT = 20_000;
 /** The most line edits a file's diff is computed with. A file needing more is served without its lines. */
 const EDIT_LIMIT = 20_000;
 /** The longest text a file is served with, in characters. A longer one is cut and flagged. */
@@ -35,6 +37,10 @@ const ONE_COMMIT = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})$/;
 // `/commit/{id}/acts`.
 const CHANGES = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/changes\/?$/;
 const ACTS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/acts\/?$/;
+// A commit's diff, one resource per changed file: `/commit/{id}/diff` lists them, and
+// `/commit/{id}/diff/{path}` is one.
+const DIFFS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/diff\/?$/;
+const ONE_DIFF = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/diff\/(.+)$/;
 // The commits that changed a file, from HEAD, `/history/{path}`, or from a commit,
 // `/commit/{id}/history/{path}`.
 const HISTORY = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/history\/(.+)$/;
@@ -49,13 +55,12 @@ export function isGitPath(rest: string): boolean {
 /**
  * The relations a commit and a file have, named as the graph's are: `<edge>:<type>` out, and
  * `<type>:<edge>` in. Each lists at most DEFAULT_LIMIT resources, the page size of every
- * collection; a collection link (`changes`, `acts`, `history`) has the rest.
+ * collection; a collection link (`changes`, `acts`, `diff`, `history`) has the rest.
  */
 export const REL = {
   parent: "parent:commit",
   changes: "changes:file",
   changedBy: "commit:changes",
-  directory: "contained_in:directory",
 } as const;
 
 /** `path` decoded from its URL form, each segment, with empty segments dropped. */
@@ -153,18 +158,6 @@ function patchOf(repo: Repository, delta: DiffDelta): string {
   return head + patch.replace(/^=+\n/, "");
 }
 
-/** A commit as an item of the history: its id, first line, author and time. */
-function summaryOf(base: string, commit: Commit) {
-  return {
-    id: commit.id(),
-    type: COMMIT_TYPE,
-    name: commit.summary() ?? "",
-    author: commit.author().name,
-    committed_at: commit.time().toISOString(),
-    _links: { self: { href: `${base}/${COMMIT_SLUG}/${commit.id()}`, type: COMMIT_TYPE } },
-  };
-}
-
 /** The ids of commit `id`'s parents, first parent first; none for a root commit. */
 function parentsOf(repo: Repository, id: string): string[] {
   const parents: string[] = [];
@@ -248,13 +241,6 @@ async function oneCommit(
     };
   });
   const stats = diff.stats();
-  // Files are diffed in order until the limit is passed; the rest are not read.
-  let patch = "";
-  for (const delta of deltas) {
-    if (patch.length > DIFF_LIMIT) break;
-    patch += patchOf(repo, delta);
-  }
-  const truncated = patch.length > DIFF_LIMIT;
   const summary = summaryOf(base, commit);
   const files = changedFiles(base, id, first, changes);
   const shown = files.slice(0, DEFAULT_LIMIT);
@@ -267,14 +253,13 @@ async function oneCommit(
     files_changed: Number(stats.filesChanged),
     insertions: Number(stats.insertions),
     deletions: Number(stats.deletions),
-    diff: truncated ? patch.slice(0, DIFF_LIMIT) : patch,
-    diff_truncated: truncated,
     _links: {
       ...summary._links,
       index: { href: `${base}/${COMMIT_SLUG}` },
       tree: { href: `${base}/${COMMIT_SLUG}/${id}/${FILE_SLUG}` },
       changes: { href: `${base}/${COMMIT_SLUG}/${id}/changes` },
       acts: { href: `${base}/${COMMIT_SLUG}/${id}/acts` },
+      diff: { href: `${base}/${COMMIT_SLUG}/${id}/diff` },
       [REL.parent]: parents.map((p) => ({
         href: `${base}/${COMMIT_SLUG}/${p}`,
         type: COMMIT_TYPE,
@@ -343,6 +328,94 @@ function commitChanges(req: Request, repo: Repository, base: string, id: string,
     page: files.slice(offset, offset + limit),
     more: files.length > offset + limit,
   }));
+}
+
+/**
+ * Commit `id`'s parents' first, and the changes from it: each delta of the diff from the first
+ * parent's tree, or from nothing for a root commit. Undefined when the repository holds no
+ * commit `id`.
+ */
+function deltasOf(
+  repo: Repository,
+  id: string,
+): { first?: string; deltas: DiffDelta[] } | undefined {
+  let commit: Commit;
+  try {
+    commit = repo.getCommit(id);
+  } catch (err) {
+    if (isNotFound(err)) return undefined;
+    throw err;
+  }
+  const first = parentsOf(repo, id)[0];
+  const diff = repo.diffTreeToTree(
+    first === undefined ? undefined : repo.getCommit(first).tree(),
+    commit.tree(),
+  );
+  return { ...(first === undefined ? {} : { first }), deltas: [...diff.deltas()] };
+}
+
+/**
+ * One changed file's diff in commit `id`, as a resource: the file's path and status, and its
+ * unified diff, cut at PATCH_LIMIT characters and flagged when it is.
+ */
+function diffOf(
+  repo: Repository,
+  base: string,
+  id: string,
+  first: string | undefined,
+  delta: DiffDelta,
+) {
+  const path = delta.newFile().path() ?? delta.oldFile().path() ?? "";
+  const status = delta.status();
+  const patch = patchOf(repo, delta);
+  const truncated = patch.length > PATCH_LIMIT;
+  const at = `${base}/${COMMIT_SLUG}/${status === "Deleted" ? (first ?? id) : id}`;
+  return {
+    id: path,
+    type: DIFF_TYPE,
+    name: path.split("/").pop() ?? path,
+    path,
+    status,
+    patch: truncated ? patch.slice(0, PATCH_LIMIT) : patch,
+    patch_truncated: truncated,
+    _links: {
+      self: { href: `${base}/${COMMIT_SLUG}/${id}/diff/${pathHref(path)}`, type: DIFF_TYPE },
+      index: { href: `${base}/${COMMIT_SLUG}/${id}/diff` },
+      file: { href: `${at}/${FILE_SLUG}/${pathHref(path)}`, type: FILE_TYPE },
+    },
+  };
+}
+
+/** `/commit/{id}/diff`: commit `id`'s diff, one resource per changed file, by `limit` and `offset`. */
+function commitDiffs(req: Request, repo: Repository, base: string, id: string, slug: string) {
+  const of = deltasOf(repo, id);
+  if (of === undefined) return problem(404, "Not Found", `${id} is not a commit in ${slug}`);
+  const self = `${base}/${COMMIT_SLUG}/${id}/diff`;
+  // Only the page's files are diffed.
+  return collectionPage(req, `${base}/${COMMIT_SLUG}/${id}`, self, "diff", (offset, limit) => ({
+    page: of.deltas
+      .slice(offset, offset + limit)
+      .map((delta) => diffOf(repo, base, id, of.first, delta)),
+    more: of.deltas.length > offset + limit,
+  }));
+}
+
+/** `/commit/{id}/diff/{path}`: the diff of the one file `path` that commit `id` changed. */
+function oneDiff(
+  req: Request,
+  repo: Repository,
+  base: string,
+  id: string,
+  encoded: string,
+  slug: string,
+) {
+  const of = deltasOf(repo, id);
+  if (of === undefined) return problem(404, "Not Found", `${id} is not a commit in ${slug}`);
+  const path = decodedPath(encoded);
+  const delta = of.deltas.find((d) => (d.newFile().path() ?? d.oldFile().path()) === path);
+  if (delta === undefined)
+    return problem(404, "Not Found", `${id} does not change ${path} in ${slug}`);
+  return halJson(req, diffOf(repo, base, id, of.first, delta));
 }
 
 /** `/commit/{id}/acts`: the acts that ran against commit `id`, oldest first, by `limit` and `offset`. */
@@ -490,7 +563,6 @@ function file(
     index: { href: parent },
     commit: { href: `${base}/${COMMIT_SLUG}/${commit}`, type: COMMIT_TYPE },
     history: { href: history },
-    [REL.directory]: { href: parent, type: DIRECTORY_TYPE, dir: "out" },
     [REL.changedBy]: changedBy.map((c) => ({ ...c._links.self, dir: "in" })),
   };
   const embedded = { [REL.changedBy]: changedBy };
@@ -592,6 +664,11 @@ export async function gitHandler(
   if (changed !== undefined) return commitChanges(req, repo, base, changed, scope.slug);
   const actsOf = ACTS.exec(rest)?.[1];
   if (actsOf !== undefined) return commitActs(req, scope, base, actsOf);
+  const diffs = DIFFS.exec(rest)?.[1];
+  if (diffs !== undefined) return commitDiffs(req, repo, base, diffs, scope.slug);
+  const diff = ONE_DIFF.exec(rest);
+  if (diff !== null && diff[1] !== undefined)
+    return oneDiff(req, repo, base, diff[1], diff[2] ?? "", scope.slug);
   const fileHistoryOf = HISTORY.exec(rest);
   if (fileHistoryOf !== null)
     return fileHistory(req, repo, base, scope.slug, fileHistoryOf[1], fileHistoryOf[2] ?? "");

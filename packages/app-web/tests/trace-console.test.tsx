@@ -450,10 +450,11 @@ describe("the file and history types", () => {
   test("the page names them as the server serves them", async () => {
     const page = await import("../src/ui/trace/hal");
     const server = await import("../src/server/collection-paths");
-    expect([page.FILE_TYPE, page.DIRECTORY_TYPE, page.COMMIT_TYPE]).toEqual([
+    expect([page.FILE_TYPE, page.DIRECTORY_TYPE, page.COMMIT_TYPE, page.DIFF_TYPE]).toEqual([
       server.FILE_TYPE,
       server.DIRECTORY_TYPE,
       server.COMMIT_TYPE,
+      server.DIFF_TYPE,
     ]);
   });
 });

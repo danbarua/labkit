@@ -48,7 +48,9 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 | Path | Serves |
 | --- | --- |
 | `/workspace/{slug}/commit` | The commits from HEAD, newest first, paged by `limit` and `offset`. |
-| `/workspace/{slug}/commit/{id}` | One commit: message, author, time, parents, changed files, and its diff from its first parent, cut at 100,000 characters (`diff_truncated`). |
+| `/workspace/{slug}/commit/{id}` | One commit: message, author, time, line counts, and its relations; not its diff. |
+| `/workspace/{slug}/commit/{id}/diff` | The commit's diff from its first parent, one `Diff` resource per changed file, paged. |
+| `/workspace/{slug}/commit/{id}/diff/{path}` | One changed file's diff: its status and unified diff, cut at 20,000 characters (`patch_truncated`). |
 | `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). |
 | `/workspace/{slug}/commit/{id}/file/{path}` | The same, at that commit. |
 | `/workspace/{slug}/commit/{id}/changes` | The files the commit changed, with their status, paged. |
@@ -68,7 +70,6 @@ link beside it has the rest:
 | A commit | `parent:commit` | its parents | — |
 | A commit | `changes:file`, with each file's status in the link's `props` | the files it changed | `changes` |
 | A commit | `act:ran_against` | the acts whose `git_hash` is the commit | `acts` |
-| A file | `contained_in:directory` | the directory it is in, a collection | — |
 | A file | `commit:changes` | the commits that changed it | `history` |
 | An act | `ran_against:commit` | its `git_hash`, when the workspace's repository holds it | — |
 
@@ -125,10 +126,10 @@ the act's subject and has no nodes for acts. A relation to an act ends at the ac
 a commit's acts are drawn as edges from the records they changed to the commit. Until an act's
 own response arrives, its subject is the one the document that embeds it names.
 
-Files, directories and commits are drawn with their relations, as records are: a commit with its
-parents and changed files, a file with its directory and the commits that changed it. A directory
-is a collection, not a resource, so opening its node lists its entries in Record Explorer's Items
-pane rather than drawing them. When a node opens, the camera eases toward framing it:
+Files and commits are drawn with their relations, as records are: a commit with its parents and
+changed files, a file with the commits that changed it. A file's directory is not drawn: its path
+names it. A commit's diff is fetched only by the commit's own page. When a node opens, the camera
+eases toward framing it:
 
 - The camera draws the node up and left of centre.
 - The camera tilts to 20° above the plane of the force layout.

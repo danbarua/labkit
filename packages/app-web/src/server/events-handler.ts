@@ -13,6 +13,7 @@ import {
   withExtras,
 } from "./collections-handler";
 import { nodePath, problem, publicOrigin } from "./graph-handler";
+import { summaryOf } from "./commit-summary";
 import { holdsCommit } from "./repositories";
 import type { TenantScope } from "./runtime";
 
@@ -252,6 +253,14 @@ async function act(
     command: event.command,
     changes: event.changes,
     _links: extras.length === 0 ? links : withExtras(links, extras),
+    // The commit's summary, so a page shows it without asking for the commit and its relations.
+    ...(ranAgainst && repo !== undefined
+      ? {
+          _embedded: {
+            [RAN_AGAINST.out]: { ...summaryOf(root, repo.getCommit(hash)), dir: "out" },
+          },
+        }
+      : {}),
   });
 }
 

@@ -40,3 +40,6 @@ export const FILE_TYPE = "File";
 export const DIRECTORY_TYPE = "Directory";
 // A tree entry that is another repository's commit: it has no content here.
 export const SUBMODULE_TYPE = "Submodule";
+// One changed file's diff in a commit, `/commit/{id}/diff/{path}`: a child of the commit, fetched
+// only where the diff is shown.
+export const DIFF_TYPE = "Diff";

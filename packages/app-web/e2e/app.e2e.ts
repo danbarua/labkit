@@ -309,7 +309,7 @@ test.describe("the sidebar", () => {
     await expect(node(page, /\(Act\)$/)).toHaveCount(0);
   });
 
-  test("a file's directory and the commits that changed it join the graph, and the directory lists its files", async ({
+  test("the commits that changed a file join the graph, and its directory does not", async ({
     page,
   }) => {
     await page.goto("/app/workspace/alpha/Q_1");
@@ -318,10 +318,8 @@ test.describe("the sidebar", () => {
     await tree.getByRole("button", { name: "src" }).click();
     await tree.getByRole("button", { name: "a.ts" }).click();
     await expect(header(page)).toHaveText("a.ts");
-    await expect(node(page, "src (Directory)")).toBeVisible();
     await expect(node(page, /^[0-9a-f]{7} \(Commit\)$/)).toHaveCount(2);
-    await node(page, "src (Directory)").press("Enter");
-    await expect(item(page, "src/a.ts")).toBeVisible();
+    await expect(node(page, /\(Directory\)$/)).toHaveCount(0);
   });
 
   test("Record Explorer lists the workspace's records and acts, and leaves files and history to their own sections", async ({

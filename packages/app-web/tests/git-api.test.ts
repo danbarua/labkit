@@ -6,7 +6,7 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: response bodies are read loosely; each test asserts only the part of the shape it is about
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { DIFF_LIMIT, FILE_LIMIT } from "../src/server/git-handler";
+import { FILE_LIMIT, PATCH_LIMIT } from "../src/server/git-handler";
 import { handle } from "../src/server/handler";
 import { createRuntime, type Runtime } from "../src/server/runtime";
 import { createFixture, type Fixture } from "./support/fixture";
@@ -219,7 +219,6 @@ describe("a workspace's history", () => {
       // latin1.txt 1, plan.md 2, readme-link 1, a.ts 1.
       insertions: 5,
       deletions: 1,
-      diff_truncated: false,
       _links: {
         index: { href: `${ORIGIN}/workspace/alpha/commit` },
         changes: { href: `${commitHref(second!)}/changes` },
@@ -236,7 +235,34 @@ describe("a workspace's history", () => {
     expect(body._embedded["changes:file"][3]).toMatchObject({ path: "src/a.ts", dir: "out" });
     expect(body._embedded["changes:file"][3].status).toBeUndefined();
     expect(body._embedded["parent:commit"][0]).toMatchObject({ id: first, dir: "out" });
-    expect(body.diff).toContain("-export const a = 1;\n+export const a = 2;");
+    // The diff is not on the commit: it is a child resource per file.
+    expect(body.diff).toBeUndefined();
+    expect(body._links.diff.href).toBe(`${commitHref(second!)}/diff`);
+  });
+
+  test("a commit's diff is one resource per changed file, listed by its diff collection", async () => {
+    const second = git.commits[1]!;
+    const { body } = await get(`/workspace/alpha/commit/${second}/diff`);
+    expect(body._embedded.diff.map((d: any) => [d.type, d.path, d.status])).toEqual([
+      ["Diff", "notes/latin1.txt", "Added"],
+      ["Diff", "notes/plan.md", "Added"],
+      ["Diff", "readme-link", "Added"],
+      ["Diff", "src/a.ts", "Modified"],
+    ]);
+    const one = await get(`/workspace/alpha/commit/${second}/diff/src/a.ts`);
+    expect(one.body).toMatchObject({
+      id: "src/a.ts",
+      type: "Diff",
+      status: "Modified",
+      patch_truncated: false,
+      _links: {
+        self: { href: `${commitHref(second)}/diff/src/a.ts`, type: "Diff" },
+        file: { href: `${commitHref(second)}/file/src/a.ts`, type: "File" },
+      },
+    });
+    expect(one.body.patch).toContain("-export const a = 1;\n+export const a = 2;");
+    const none = await get(`/workspace/alpha/commit/${second}/diff/README.md`);
+    expect(none.status).toBe(404);
   });
 
   test("a root commit has no parents, and its diff adds every file", async () => {
@@ -248,10 +274,13 @@ describe("a workspace's history", () => {
       "Added",
       "Added",
     ]);
-    expect(body.diff).toContain(
+    const diff = await get(`/workspace/alpha/commit/${git.commits[0]}/diff`);
+    const patch = (path: string) =>
+      diff.body._embedded.diff.find((d: any) => d.path === path).patch;
+    expect(patch("data/blob.bin")).toBe(
       "diff --git a/data/blob.bin b/data/blob.bin\nBinary files differ\n",
     );
-    expect(body.diff).toContain(
+    expect(patch("src/a.ts")).toContain(
       "--- /dev/null\n+++ b/src/a.ts\n@@ -0,0 +1,1 @@\n+export const a = 1;",
     );
   });
@@ -276,10 +305,10 @@ describe("a workspace's history", () => {
     ]);
   });
 
-  test("a diff longer than the limit is cut there and flagged", async () => {
-    const { body } = await get(`/workspace/alpha/commit/${git.commits[2]}`);
-    expect(body.diff_truncated).toBe(true);
-    expect(body.diff).toHaveLength(DIFF_LIMIT);
+  test("a file's diff longer than the limit is cut there and flagged", async () => {
+    const { body } = await get(`/workspace/alpha/commit/${git.commits[2]}/diff/big.txt`);
+    expect(body.patch_truncated).toBe(true);
+    expect(body.patch).toHaveLength(PATCH_LIMIT);
   });
 
   test("a commit the repository does not hold is not found, and says so", async () => {
@@ -333,14 +362,12 @@ describe("a commit's changed files, past the page size", () => {
 });
 
 describe("a file's relations", () => {
-  test("a file relates its directory and the commits that changed it, newest first", async () => {
+  test("a file relates the commits that changed it, newest first, and links its directory", async () => {
     const [first, second] = git.commits;
     const { body } = await get("/workspace/alpha/file/src/a.ts");
-    expect(body._links["contained_in:directory"]).toEqual({
-      href: fileHref("src"),
-      type: "Directory",
-      dir: "out",
-    });
+    // The directory is where the file is listed, not a relation: its path names it.
+    expect(body._links.index).toEqual({ href: fileHref("src") });
+    expect(body._links["contained_in:directory"]).toBeUndefined();
     expect(body._links["commit:changes"]).toEqual([
       { href: commitHref(second!), type: "Commit", dir: "in" },
       { href: commitHref(first!), type: "Commit", dir: "in" },
@@ -364,13 +391,11 @@ describe("a file's relations", () => {
     expect(rest.body._links.next).toBeUndefined();
   });
 
-  test("a file read at a commit relates the commits up to that one, and a top-level file the top directory", async () => {
+  test("a file read at a commit relates the commits up to that one", async () => {
     const [first, second] = git.commits;
     const { body } = await get(`/workspace/alpha/commit/${second}/file/data/blob.bin`);
     expect(body._links["commit:changes"].map((l: any) => l.href)).toEqual([commitHref(first!)]);
     expect(body._links.history.href).toBe(`${commitHref(second!)}/history/data/blob.bin`);
-    const top = await get("/workspace/alpha/file/README.md");
-    expect(top.body._links["contained_in:directory"].href).toBe(fileHref("").slice(0, -1));
   });
 });
 
@@ -382,6 +407,14 @@ describe("acts and the commits they ran against", () => {
       type: "Commit",
       dir: "out",
     });
+    // The commit's summary is embedded, so a page shows it without asking for the commit.
+    expect(one.body._embedded["ran_against:commit"]).toMatchObject({
+      id: git.commits[0],
+      type: "Commit",
+      name: "Start the project",
+      dir: "out",
+    });
+    expect(one.body._embedded["ran_against:commit"].diff).toBeUndefined();
     const two = await get("/workspace/alpha/act/2");
     expect(two.body.git_hash).toBe("f".repeat(40));
     expect(two.body._links["ran_against:commit"]).toBeUndefined();
