@@ -90,6 +90,7 @@
   .trace .spinner,
   .trace .skeleton .bar,
   .trace .active-box,
+  .trace .explorer,
   .trace .sidebar {
     animation: none;
     transition: none;
@@ -344,16 +345,26 @@
 /* The sidebar's sections fold under their headers. Record Explorer's Items pane scrolls; File
    Explorer and Source Explorer scroll as a whole. */
 .trace .explorer {
-  flex: none;
+  /* A folded section has no share, and its minimum height, which is its header's, keeps it
+     visible. An open one has a share, set inline, of the height the others leave. Both have a
+     basis of 0, so the share animates. */
+  flex: 0 1 0;
   border-bottom: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
-/* Open sections share the height the folded ones leave, in proportion to their shares, whatever
-   their content. */
-.trace .explorer.open {
-  flex: 1 1 0;
+.trace .explorer.moving {
+  transition: flex-grow 220ms ease;
+}
+/* An open section may be shorter than its content, which is cut off. A section that is folding
+   keeps its header's height, set inline. */
+.trace .explorer.open,
+.trace .explorer.closing {
+  min-height: 0;
+  overflow: hidden;
+}
+.trace .explorer-top {
+  flex: none;
 }
 /* The border between two open sections, which a drag moves. It lies over the border and takes no
    height of its own, and shows the accent while it is hovered, dragged or focused. */
@@ -1406,8 +1417,29 @@
 
 /* ---------- full width: the sidebar is shown or hidden ---------- */
 @media (min-width: 861px) {
+  /* The sidebar slides shut to nothing and then leaves the tab order. Its contents keep their width,
+     so they are cut off at its edge rather than squeezed. */
+  .trace .sidebar {
+    transition:
+      flex-basis 220ms ease,
+      width 220ms ease,
+      min-width 220ms ease,
+      visibility 0s;
+  }
+  .trace .sidebar > * {
+    min-width: 287px;
+  }
   .trace .sidebar.collapsed {
-    display: none;
+    flex-basis: 0;
+    width: 0;
+    min-width: 0;
+    border-right-width: 0;
+    visibility: hidden;
+    transition:
+      flex-basis 220ms ease,
+      width 220ms ease,
+      min-width 220ms ease,
+      visibility 0s 220ms;
   }
 }
 

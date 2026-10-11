@@ -41,6 +41,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useId,
   useMemo,
   useRef,
@@ -696,6 +697,9 @@ function Lists({
   );
 }
 
+/** How long a section takes to open or fold, in milliseconds: trace.css's `.explorer` transition. */
+const SECTION_MOTION_MS = 220;
+
 /**
  * A section of the sidebar that folds under its header. While `unavailable` is set, the header is
  * disabled and says why, and the section stays folded.
@@ -725,31 +729,67 @@ function Explorer({
 }) {
   const shown = open && unavailable === undefined;
   const why = useId();
+  // The body stays drawn while the section shrinks to its header, so it does not vanish first.
+  const [mounted, setMounted] = useState(shown);
+  // True while the section opens or folds, the only time its share changes by transition: a drag
+  // of the border must move it at once.
+  const [moving, setMoving] = useState(false);
+  const was = useRef(shown);
+  const top = useRef<HTMLDivElement>(null);
+  // The header's height, which the section keeps while it shrinks to nothing else.
+  const topHeight = useRef(0);
+  useEffect(() => {
+    const changed = was.current !== shown;
+    was.current = shown;
+    if (shown) setMounted(true);
+    if (!changed) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setMounted(shown);
+      return;
+    }
+    setMoving(true);
+    const timer = setTimeout(() => {
+      setMoving(false);
+      if (!shown) setMounted(false);
+    }, SECTION_MOTION_MS);
+    return () => clearTimeout(timer);
+  }, [shown]);
+  useLayoutEffect(() => {
+    if (!mounted || shown) topHeight.current = top.current?.offsetHeight ?? topHeight.current;
+  });
+  const closing = mounted && !shown;
   return (
     <section
       ref={sectionRef}
-      className={shown ? "explorer open" : "explorer"}
-      style={shown ? { flexGrow: grow } : undefined}
+      className={["explorer", shown ? "open" : "", closing ? "closing" : "", moving ? "moving" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      style={{
+        flexGrow: shown ? grow : 0,
+        minHeight: closing ? topHeight.current : undefined,
+      }}
       aria-label={title}
     >
-      <button
-        type="button"
-        className="explorer-head"
-        aria-expanded={shown}
-        disabled={unavailable !== undefined}
-        aria-describedby={unavailable === undefined ? undefined : why}
-        onClick={onToggle}
-      >
-        <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
-        {icon}
-        <span className="explorer-title">{title}</span>
-      </button>
-      {unavailable === undefined ? null : (
-        <div id={why} className="explorer-note">
-          {unavailable}
-        </div>
-      )}
-      {shown ? (
+      <div ref={top} className="explorer-top">
+        <button
+          type="button"
+          className="explorer-head"
+          aria-expanded={shown}
+          disabled={unavailable !== undefined}
+          aria-describedby={unavailable === undefined ? undefined : why}
+          onClick={onToggle}
+        >
+          <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
+          {icon}
+          <span className="explorer-title">{title}</span>
+        </button>
+        {unavailable === undefined ? null : (
+          <div id={why} className="explorer-note">
+            {unavailable}
+          </div>
+        )}
+      </div>
+      {mounted ? (
         <div className={scrolls ? "explorer-body scrolls" : "explorer-body"}>{children}</div>
       ) : null}
     </section>
