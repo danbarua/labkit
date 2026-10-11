@@ -143,7 +143,9 @@ Open sections divide the sidebar's height in proportion to their shares. Record 
 holds two panes, starts with twice the share of the others, and its Collections pane scrolls when
 it is short. Dragging the border between two open sections, or pressing Up or Down while the border
 has focus, moves height from one section to the other. Each section keeps at least 72 px, and the
-browser keeps the shares for the next visit. The workspace the sections serve is the
+browser keeps the shares for the next visit. Double-clicking a border, or pressing Home while it has
+focus, returns the two sections it divides to their initial proportion of the height they share;
+no other border moves. The workspace the sections serve is the
 open resource's, or else the one Record Explorer lists. File Explorer and Source Explorer are
 enabled when that workspace's index lists a collection of type `File` or `Commit` ("Files and
 history" above). Otherwise each is disabled, with the reason

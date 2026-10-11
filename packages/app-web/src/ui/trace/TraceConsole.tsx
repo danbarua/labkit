@@ -537,11 +537,9 @@ function Lists({
   const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.trace.records", true);
   const [filesOpen, setFilesOpen] = useSavedFlag("labkit.trace.files", false);
   const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.trace.history", false);
-  // Each open section's share of the height the open sections divide. Record Explorer holds two
-  // panes, Collections and Items, so it starts with twice the share of the others.
-  const [filesGrow, setFilesGrow] = useSavedNumber("labkit.trace.files.grow", 1);
-  const [historyGrow, setHistoryGrow] = useSavedNumber("labkit.trace.history.grow", 1);
-  const [recordsGrow, setRecordsGrow] = useSavedNumber("labkit.trace.records.grow", 2);
+  const [filesGrow, setFilesGrow] = useSavedNumber("labkit.trace.files.grow", FILES_SHARE);
+  const [historyGrow, setHistoryGrow] = useSavedNumber("labkit.trace.history.grow", HISTORY_SHARE);
+  const [recordsGrow, setRecordsGrow] = useSavedNumber("labkit.trace.records.grow", RECORDS_SHARE);
   const filesSection = useRef<HTMLElement>(null);
   const historySection = useRef<HTMLElement>(null);
   const recordsSection = useRef<HTMLElement>(null);
@@ -571,11 +569,18 @@ function Lists({
   // The open sections, in order. A border that can be dragged sits after each but the last.
   const shares: Share[] = [
     filesOpen && filesUnavailable === undefined
-      ? { name: "File Explorer", grow: filesGrow, setGrow: setFilesGrow, element: filesSection }
+      ? {
+          name: "File Explorer",
+          initial: FILES_SHARE,
+          grow: filesGrow,
+          setGrow: setFilesGrow,
+          element: filesSection,
+        }
       : undefined,
     historyOpen && historyUnavailable === undefined
       ? {
           name: "Source Explorer",
+          initial: HISTORY_SHARE,
           grow: historyGrow,
           setGrow: setHistoryGrow,
           element: historySection,
@@ -584,6 +589,7 @@ function Lists({
     recordsOpen
       ? {
           name: "Record Explorer",
+          initial: RECORDS_SHARE,
           grow: recordsGrow,
           setGrow: setRecordsGrow,
           element: recordsSection,
@@ -756,9 +762,19 @@ function Explorer({
   );
 }
 
+/**
+ * Each section's share of the height the open sections divide, until a border is moved. Record
+ * Explorer holds two panes, Collections and Items, so it starts with twice the share of the others.
+ */
+const FILES_SHARE = 1;
+const HISTORY_SHARE = 1;
+const RECORDS_SHARE = 2;
+
 /** An open sidebar section, as the border below or above it sees it. */
 interface Share {
   name: string;
+  /** The section's share before any border is moved. */
+  initial: number;
   grow: number;
   setGrow: (next: number) => void;
   element: RefObject<HTMLElement | null>;
@@ -772,7 +788,9 @@ const SPLITTER_STEP = 16;
 /**
  * The border between two open sidebar sections, which a drag or the Up and Down keys move. The two
  * sections divide their height in the new proportion, and keep it on the next visit; each keeps at
- * least MIN_SECTION pixels. A folded section between them moves with the border.
+ * least MIN_SECTION pixels. A folded section between them moves with the border. A double-click or
+ * the Home key returns the two sections to their initial proportion of the height they share, so
+ * no other border moves.
  */
 function Splitter({ above, below }: { above: Share; below: Share }) {
   const drag = useRef<{ y: number; a: number; b: number } | undefined>(undefined);
@@ -789,6 +807,12 @@ function Splitter({ above, below }: { above: Share; below: Share }) {
     const grow = above.grow + below.grow;
     above.setGrow((grow * a) / total);
     below.setGrow((grow * (total - a)) / total);
+  };
+  const reset = () => {
+    const grow = above.grow + below.grow;
+    const initial = above.initial + below.initial;
+    above.setGrow((grow * above.initial) / initial);
+    below.setGrow((grow * below.initial) / initial);
   };
   const stop = () => {
     drag.current = undefined;
@@ -817,7 +841,13 @@ function Splitter({ above, below }: { above: Share; below: Share }) {
       }}
       onPointerUp={stop}
       onPointerCancel={stop}
+      onDoubleClick={reset}
       onKeyDown={(e) => {
+        if (e.key === "Home") {
+          e.preventDefault();
+          reset();
+          return;
+        }
         if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
         e.preventDefault();
         move(sizes(), e.key === "ArrowUp" ? -SPLITTER_STEP : SPLITTER_STEP);
