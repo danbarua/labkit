@@ -17,8 +17,11 @@ import {
   ChatCircleTextIcon,
   CheckCircleIcon,
   CompassIcon,
+  DatabaseIcon,
   EyeIcon,
   FlagCheckeredIcon,
+  FolderIcon,
+  GitCommitIcon,
   HouseIcon,
   type Icon,
   IconContext,
@@ -38,6 +41,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -320,6 +324,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
               drawer === "items" ? "open" : "",
               sidebarShown ? "" : "collapsed",
             ].join(" ")}
+            workspace={workspace}
             listKey={listKey}
             root={listKey === ENTRY}
             openKey={path}
@@ -452,6 +457,7 @@ const readCollection =
  */
 function Lists({
   className,
+  workspace,
   listKey,
   root,
   openKey,
@@ -461,6 +467,8 @@ function Lists({
   onList,
 }: {
   className: string;
+  /** The open workspace's directory, `/workspace/<slug>/`, or undefined when none is open. */
+  workspace: string | undefined;
   listKey: string;
   root: boolean;
   openKey: string;
@@ -508,61 +516,131 @@ function Lists({
     if (behind) loadMore();
   }, [behind, loadMore]);
 
+  const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.trace.records", true);
+  const slug = workspace?.split("/")[2];
   return (
     <aside className={className}>
-      <div className="sidebar-section">
-        <div className="section-label">
-          Collections
-          <span className="count">{upper.items.length > 0 ? upper.items.length : ""}</span>
-        </div>
-        <div className="faint mono pane-path">{upperKey}</div>
-        <div className="type-list" ref={upperList}>
-          {lowerRow === undefined ? null : (
-            <ActiveBox
-              list={upperList}
-              activeKey={lowerRow}
-              rows={`${upper.items.length} ${term}`}
-            />
-          )}
-          <Pane
-            pages={upper}
-            empty={`Loading ${ENTRY}…`}
-            {...{ held, term, openKey, onOpen, onList }}
-            lowerKey={lowerRow}
-            pageable={false}
-          />
-        </div>
-      </div>
-      <div className="sidebar-section grow">
-        <div className="section-label">
-          Items
-          <span className="count">
-            {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
-          </span>
-        </div>
-        <div className="faint mono pane-path">{lowerKey ?? ""}</div>
-        <div className="res-list" ref={lowerList}>
-          {lowerKey === undefined ? (
-            <div className="empty-note">Pick a collection above to list its items.</div>
-          ) : (
-            <>
+      <Explorer
+        title="File Explorer"
+        icon={<FolderIcon aria-hidden="true" />}
+        unavailable={
+          slug === undefined ? "Open a workspace to browse its files." : `${slug} serves no files.`
+        }
+      />
+      <Explorer
+        title="Source Explorer"
+        icon={<GitCommitIcon aria-hidden="true" />}
+        unavailable={
+          slug === undefined
+            ? "Open a workspace to browse its history."
+            : `${slug} serves no history.`
+        }
+      />
+      <Explorer
+        title="Record Explorer"
+        icon={<DatabaseIcon aria-hidden="true" />}
+        open={recordsOpen}
+        onToggle={() => setRecordsOpen(!recordsOpen)}
+      >
+        <div className="sidebar-section">
+          <div className="section-label">
+            Collections
+            <span className="count">{upper.items.length > 0 ? upper.items.length : ""}</span>
+          </div>
+          <div className="faint mono pane-path">{upperKey}</div>
+          <div className="type-list" ref={upperList}>
+            {lowerRow === undefined ? null : (
               <ActiveBox
-                list={lowerList}
-                activeKey={openKey}
-                rows={`${lower.items.length} ${term}`}
+                list={upperList}
+                activeKey={lowerRow}
+                rows={`${upper.items.length} ${term}`}
               />
-              <Pane
-                pages={lower}
-                empty=""
-                {...{ held, term, openKey, onOpen, onList }}
-                lowerKey={lowerRow}
-                pageable
-              />
-            </>
-          )}
+            )}
+            <Pane
+              pages={upper}
+              empty={`Loading ${ENTRY}…`}
+              {...{ held, term, openKey, onOpen, onList }}
+              lowerKey={lowerRow}
+              pageable={false}
+            />
+          </div>
         </div>
-      </div>
+        <div className="sidebar-section grow">
+          <div className="section-label">
+            Items
+            <span className="count">
+              {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
+            </span>
+          </div>
+          <div className="faint mono pane-path">{lowerKey ?? ""}</div>
+          <div className="res-list" ref={lowerList}>
+            {lowerKey === undefined ? (
+              <div className="empty-note">Pick a collection above to list its items.</div>
+            ) : (
+              <>
+                <ActiveBox
+                  list={lowerList}
+                  activeKey={openKey}
+                  rows={`${lower.items.length} ${term}`}
+                />
+                <Pane
+                  pages={lower}
+                  empty=""
+                  {...{ held, term, openKey, onOpen, onList }}
+                  lowerKey={lowerRow}
+                  pageable
+                />
+              </>
+            )}
+          </div>
+        </div>
+      </Explorer>
     </aside>
+  );
+}
+
+/**
+ * A section of the sidebar that folds under its header. While `unavailable` is set, the header is
+ * disabled and says why, and the section stays folded.
+ */
+function Explorer({
+  title,
+  icon,
+  open = false,
+  unavailable,
+  onToggle,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  open?: boolean;
+  unavailable?: string;
+  onToggle?: () => void;
+  children?: ReactNode;
+}) {
+  const shown = open && unavailable === undefined;
+  const why = useId();
+  return (
+    <section className={shown ? "explorer open" : "explorer"} aria-label={title}>
+      <button
+        type="button"
+        className="explorer-head"
+        aria-expanded={shown}
+        disabled={unavailable !== undefined}
+        aria-describedby={unavailable === undefined ? undefined : why}
+        onClick={onToggle}
+      >
+        <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
+        {icon}
+        <span className="explorer-title">{title}</span>
+      </button>
+      {unavailable === undefined ? null : (
+        <div id={why} className="explorer-note">
+          {unavailable}
+        </div>
+      )}
+      {shown ? <div className="explorer-body">{children}</div> : null}
+    </section>
   );
 }
 

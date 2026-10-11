@@ -151,6 +151,8 @@ test.describe("the sidebar", () => {
   const sidebar = (page: import("@playwright/test").Page) => page.locator("aside.sidebar");
   const toggle = (page: import("@playwright/test").Page) =>
     page.getByRole("button", { name: "Show or hide the sidebar" });
+  const explorer = (page: import("@playwright/test").Page, name: string) =>
+    page.getByRole("button", { name, exact: true });
 
   test("at full width, the toggle hides and shows the sidebar, and a reload keeps it hidden", async ({
     page,
@@ -166,6 +168,45 @@ test.describe("the sidebar", () => {
     await expect(sidebar(page)).toBeHidden();
     await toggle(page).click();
     await expect(sidebar(page)).toBeVisible();
+  });
+
+  test("Record Explorer folds Collections and Items away, and a reload keeps it folded", async ({
+    page,
+  }) => {
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    await expect(item(page, "Q_1")).toBeVisible();
+    await explorer(page, "Record Explorer").click();
+    await expect(explorer(page, "Record Explorer")).toHaveAttribute("aria-expanded", "false");
+    await expect(item(page, "Q_1")).toBeHidden();
+    await expect(row(page, "Question")).toBeHidden();
+    await page.reload();
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(item(page, "Q_1")).toBeHidden();
+    await explorer(page, "Record Explorer").click();
+    await expect(item(page, "Q_1")).toBeVisible();
+  });
+
+  test("File and Source Explorers are disabled, and say why: no workspace is open, or it serves none", async ({
+    page,
+  }) => {
+    await page.goto("/app/");
+    await expect(row(page, "alpha")).toBeVisible();
+    await expect(explorer(page, "File Explorer")).toBeDisabled();
+    await expect(explorer(page, "File Explorer")).toHaveAccessibleDescription(
+      "Open a workspace to browse its files.",
+    );
+    await expect(explorer(page, "Source Explorer")).toBeDisabled();
+    await expect(explorer(page, "Source Explorer")).toHaveAccessibleDescription(
+      "Open a workspace to browse its history.",
+    );
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(explorer(page, "File Explorer")).toHaveAccessibleDescription(
+      "alpha serves no files.",
+    );
+    await expect(explorer(page, "Source Explorer")).toHaveAccessibleDescription(
+      "alpha serves no history.",
+    );
   });
 
   test("in a narrow window, the toggle opens the sidebar over the page, and opening a resource closes it", async ({
