@@ -144,13 +144,16 @@
 .lk-code {
   margin: 0;
 }
+/* The frame always keeps room for its horizontal scrollbar. A scrollbar that appears after the
+   first layout, as when a web font arrives and widens the lines, would otherwise grow the frame
+   after the "Show N more lines" button below it was placed, and the frame drew over it. */
 .lk-code-frame {
   margin-top: 4px;
   padding: 6px 0;
   border: 1px solid var(--lk-line);
   border-radius: 6px;
   background: var(--lk-bg);
-  overflow-x: auto;
+  overflow-x: scroll;
 }
 /* Cut by height when it is not open, so no padding of its own: a cut line would show in it. */
 .lk-code-text {
