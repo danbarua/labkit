@@ -102,6 +102,17 @@ describe("a workspace's files", () => {
     });
   });
 
+  test("a listed file names its media type only when its extension does", async () => {
+    const { body } = await get("/workspace/alpha/file");
+    expect(body._embedded.file.map((e: any) => [e.name, e.media_type])).toEqual([
+      ["notes", undefined],
+      ["src", undefined],
+      ["big.txt", "text/plain"],
+      ["readme-link", undefined],
+      ["README.md", "text/markdown"],
+    ]);
+  });
+
   test("a directory pages its entries and links up to the directory it is in", async () => {
     const { body } = await get("/workspace/alpha/file/notes?limit=1");
     expect(body.path).toBe("notes");

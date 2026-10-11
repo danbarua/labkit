@@ -30,13 +30,17 @@ const BY_EXTENSION: Readonly<Record<string, string>> = {
   ts: "text/x-typescript",
 };
 
+/** The media type the table names for the extension of the file at `path`, if it names one. */
+export function mediaTypeByExtension(path: string): string | undefined {
+  const extension = /\.([A-Za-z0-9]+)$/.exec(path)?.[1]?.toLowerCase();
+  return extension === undefined ? undefined : BY_EXTENSION[extension];
+}
+
 /**
  * The media type of the file at `path`: by its extension, or, for an extension the table does not
  * name, `text/plain` for a text file and `application/octet-stream` for a binary one, by git's own
  * test of its content.
  */
 export function mediaTypeOf(path: string, binary: boolean): string {
-  const extension = /\.([A-Za-z0-9]+)$/.exec(path)?.[1]?.toLowerCase();
-  const known = extension === undefined ? undefined : BY_EXTENSION[extension];
-  return known ?? (binary ? "application/octet-stream" : "text/plain");
+  return mediaTypeByExtension(path) ?? (binary ? "application/octet-stream" : "text/plain");
 }

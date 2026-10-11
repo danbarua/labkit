@@ -24,7 +24,7 @@ import { DEFAULT_LIMIT, halJson, MAX_LIMIT, pageParam, pagingLinks } from "./col
 import { problem, publicOrigin } from "./graph-handler";
 import { summaryOf } from "./commit-summary";
 import { actItem, actsRanAgainst, RAN_AGAINST } from "./events-handler";
-import { mediaTypeOf } from "./media-types";
+import { mediaTypeByExtension, mediaTypeOf } from "./media-types";
 import { isNotFound } from "./repositories";
 import type { TenantScope } from "./runtime";
 
@@ -617,14 +617,18 @@ function directory(req: Request, tree: Tree, at: string, path: string, up: strin
     count: page.length,
     total: entries.length,
     _embedded: {
+      // A listed file names its media type only when its extension does: the test git makes for
+      // the rest reads the file's content, which a listing of hundreds of entries does not.
       [FILE_SLUG]: page.map((entry) => {
         const child = path === "" ? entry.name() : `${path}/${entry.name()}`;
         const type = typeOf(entry);
+        const mediaType = type === FILE_TYPE ? mediaTypeByExtension(child) : undefined;
         return {
           id: child,
           type,
           name: entry.name(),
           path: child,
+          ...(mediaType === undefined ? {} : { media_type: mediaType }),
           _links: { self: { href: `${at}/${pathHref(child)}`, type } },
         };
       }),
