@@ -13,6 +13,7 @@ import {
   screenAxes,
   tickPhysics,
   yawToward,
+  rimToRim,
 } from "../src/ui/GraphView";
 
 describe("the graph's depth fade", () => {
@@ -438,5 +439,21 @@ describe("the camera's pivot", () => {
     const held = { ...sim.pivot! };
     followPivot(sim);
     expect(sim.pivot).toEqual(held);
+  });
+});
+
+describe("an edge between two nodes", () => {
+  test("runs from the rim of one node to the rim of the other", () => {
+    expect(rimToRim({ sx: 0, sy: 0 }, 5, { sx: 30, sy: 40 }, 10)).toEqual({
+      x1: 3,
+      y1: 4,
+      x2: 24,
+      y2: 32,
+    });
+  });
+
+  test("is not drawn when the two nodes touch or overlap", () => {
+    expect(rimToRim({ sx: 0, sy: 0 }, 5, { sx: 15, sy: 0 }, 10)).toBeUndefined();
+    expect(rimToRim({ sx: 0, sy: 0 }, 5, { sx: 4, sy: 0 }, 10)).toBeUndefined();
   });
 });

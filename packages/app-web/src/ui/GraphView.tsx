@@ -818,33 +818,35 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
 
   ctx.lineWidth = 1;
   // The edges of the open node and of the node under the pointer are drawn last, in the accent
-  // colour and twice as wide, unfaded, so they stand out from the rest.
-  const hotEdges: [Projected, Projected][] = [];
+  // colour and twice as wide, unfaded, so they stand out from the rest. Each edge is drawn from
+  // the rim of one node to the rim of the other, so a node drawn see-through has no line inside it.
+  const hotEdges: Segment[] = [];
   for (const edge of sim.edges) {
     const a = projected.get(edge.from);
     const b = projected.get(edge.to);
     if (!a || !b || a.scale === 0 || b.scale === 0) continue;
-    const edgeOpacity = opacity((a.depth + b.depth) / 2);
+    const segment = rimToRim(a, nodeRadius(a), b, nodeRadius(b));
+    if (segment === undefined) continue;
     const hot = [sim.selectedId, sim.hoverId].some(
       (id) => id !== null && (edge.from === id || edge.to === id),
     );
-    if (hot) hotEdges.push([a, b]);
+    if (hot) hotEdges.push(segment);
     else {
-      ctx.globalAlpha = edgeOpacity;
+      ctx.globalAlpha = opacity((a.depth + b.depth) / 2);
       ctx.strokeStyle = "rgba(128, 138, 156, 0.35)";
       ctx.beginPath();
-      ctx.moveTo(a.sx, a.sy);
-      ctx.lineTo(b.sx, b.sy);
+      ctx.moveTo(segment.x1, segment.y1);
+      ctx.lineTo(segment.x2, segment.y2);
       ctx.stroke();
     }
   }
   ctx.globalAlpha = 0.9;
   ctx.strokeStyle = palette.accent;
   ctx.lineWidth = 2;
-  for (const [a, b] of hotEdges) {
+  for (const segment of hotEdges) {
     ctx.beginPath();
-    ctx.moveTo(a.sx, a.sy);
-    ctx.lineTo(b.sx, b.sy);
+    ctx.moveTo(segment.x1, segment.y1);
+    ctx.lineTo(segment.x2, segment.y2);
     ctx.stroke();
   }
   ctx.lineWidth = 1;
@@ -928,6 +930,34 @@ const NODE_FONT = "10px ui-monospace, monospace";
 /** A node's radius on the canvas, in pixels. */
 function nodeRadius(p: Projected): number {
   return Math.max(2, 7 * p.scale);
+}
+
+/** A line on the canvas, from (x1, y1) to (x2, y2). */
+export interface Segment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/**
+ * The part of the line between the centres of two circles that lies outside both: from the rim of
+ * the circle at `a`, of radius `ra`, to the rim of the one at `b`, of radius `rb`. Undefined when
+ * the circles touch or overlap, so no part of the line is outside both.
+ */
+export function rimToRim(
+  a: { sx: number; sy: number },
+  ra: number,
+  b: { sx: number; sy: number },
+  rb: number,
+): Segment | undefined {
+  const dx = b.sx - a.sx;
+  const dy = b.sy - a.sy;
+  const length = Math.hypot(dx, dy);
+  if (length <= ra + rb) return undefined;
+  const ux = dx / length;
+  const uy = dy / length;
+  return { x1: a.sx + ux * ra, y1: a.sy + uy * ra, x2: b.sx - ux * rb, y2: b.sy - uy * rb };
 }
 
 /**
