@@ -81,8 +81,11 @@ The browser also keeps whether each section is folded. The sections list:
 | Source Explorer | The workspace's commits, newest first. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
 | Record Explorer | The workspace's collections of records and acts, and the items of the one picked. The `file` and `commit` collections are left out. | The record. |
 
-File Explorer and Source Explorer are enabled when the open workspace's index lists a collection
-of type `File` or `Commit` ("Files and history" above). Otherwise each is disabled, with the reason
+Open sections divide the sidebar's height; Record Explorer, which holds two panes, takes twice the
+share, and its Collections pane scrolls when it is short. The workspace the sections serve is the
+open resource's, or else the one Record Explorer lists. File Explorer and Source Explorer are
+enabled when that workspace's index lists a collection of type `File` or `Commit` ("Files and
+history" above). Otherwise each is disabled, with the reason
 under its header: no workspace is open, the open workspace's index did not load (with the error),
 or the open workspace serves no files or history.
 

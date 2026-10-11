@@ -269,6 +269,31 @@ test.describe("the sidebar", () => {
     await expect(page.locator("pre.code")).toHaveText("1export const a = 2;");
   });
 
+  test("File and Source Explorers are enabled once Record Explorer lists a workspace, before any record is open", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await expect(row(page, "Question")).toBeVisible();
+    await expect(explorer(page, "File Explorer")).toBeEnabled();
+    await expect(explorer(page, "Source Explorer")).toBeEnabled();
+  });
+
+  test("with all three sections open, Record Explorer keeps its Items pane inside the sidebar", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    await explorer(page, "File Explorer").click();
+    await explorer(page, "Source Explorer").click();
+    await expect(page.locator(".file-tree .tree-row").first()).toBeVisible();
+    const bottom = await sidebar(page).evaluate((el) => el.getBoundingClientRect().bottom);
+    const items = page.locator(".explorer-body .sidebar-section.grow");
+    const box = await items.evaluate((el) => el.getBoundingClientRect());
+    expect(box.height).toBeGreaterThanOrEqual(100);
+    expect(box.bottom).toBeLessThanOrEqual(bottom + 1);
+    await expect(item(page, "Q_1")).toBeInViewport();
+  });
+
   test("Record Explorer lists the workspace's records and acts, and leaves files and history to their own sections", async ({
     page,
   }) => {

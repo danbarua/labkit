@@ -345,6 +345,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
   border-top: 1px solid var(--line);
 }
 .trace .explorer-head {
@@ -549,6 +550,18 @@
 }
 .trace .explorer-body .sidebar-section:last-child {
   border-bottom: 0;
+}
+/* In a short Record Explorer, Collections scrolls rather than pushing Items out of the sidebar,
+   and Items keeps room for a few rows. */
+.trace .explorer-body .sidebar-section:not(.grow) {
+  flex: 0 1 auto;
+  min-height: 72px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.trace .explorer-body .sidebar-section.grow {
+  flex: 1 1 0;
+  min-height: 120px;
 }
 .trace .sidebar-section.grow {
   flex: 1 1 auto;

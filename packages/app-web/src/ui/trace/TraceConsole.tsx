@@ -328,7 +328,8 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
               drawer === "items" ? "open" : "",
               sidebarShown ? "" : "collapsed",
             ].join(" ")}
-            workspace={workspace}
+            // The workspace of the open resource, or else of the collection Record Explorer lists.
+            workspace={workspace ?? workspaceOf(`${listKey}/`)}
             listKey={listKey}
             root={listKey === ENTRY}
             openKey={path}
@@ -573,6 +574,8 @@ function Lists({
       <Explorer
         title="Record Explorer"
         icon={<DatabaseIcon aria-hidden="true" />}
+        // It holds two panes, Collections and Items, so it takes twice the share of the height.
+        share={2}
         open={recordsOpen}
         onToggle={() => setRecordsOpen(!recordsOpen)}
       >
@@ -645,6 +648,7 @@ function Explorer({
   unavailable,
   onToggle,
   scrolls = false,
+  share = 1,
   children,
 }: {
   title: string;
@@ -654,12 +658,18 @@ function Explorer({
   onToggle?: () => void;
   /** Whether the section's body scrolls as a whole, rather than a list inside it. */
   scrolls?: boolean;
+  /** How many shares of the height the open sections divide this one takes. */
+  share?: number;
   children?: ReactNode;
 }) {
   const shown = open && unavailable === undefined;
   const why = useId();
   return (
-    <section className={shown ? "explorer open" : "explorer"} aria-label={title}>
+    <section
+      className={shown ? "explorer open" : "explorer"}
+      style={shown ? { flexGrow: share } : undefined}
+      aria-label={title}
+    >
       <button
         type="button"
         className="explorer-head"
