@@ -1,13 +1,13 @@
 /**
  * A small git repository in a temporary folder, built with es-git, for the API's file and history
  * routes. Its commits, oldest first:
- *
  * 1. `README.md`, `src/a.ts` and `data/blob.bin`, a binary file.
- * 2. `src/a.ts` changed and `notes/plan.md` added.
+ * 2. `src/a.ts` changed; `notes/plan.md`, `notes/latin1.txt` (text that is not UTF-8) and
+ *    `readme-link`, a symbolic link to `README.md`, added.
  * 3. `data/blob.bin` deleted and `big.txt` added, longer than the API serves a diff or a file.
  */
 
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { initRepository, type Repository } from "es-git";
@@ -33,13 +33,18 @@ export async function createGitFixture(): Promise<GitFixture> {
   async function commit(
     message: string,
     second: number,
-    files: Record<string, string | Uint8Array | null>,
+    files: Record<string, string | Uint8Array | { link: string } | null>,
   ): Promise<void> {
     const index = repo.index();
     for (const [path, content] of Object.entries(files)) {
       if (content === null) {
         await rm(join(folder, path));
         index.removePath(path);
+        continue;
+      }
+      if (typeof content === "object" && "link" in content) {
+        await symlink(content.link, join(folder, path));
+        index.addPath(path);
         continue;
       }
       await mkdir(dirname(join(folder, path)), { recursive: true });
@@ -66,6 +71,9 @@ export async function createGitFixture(): Promise<GitFixture> {
   await commit("Change a, plan the work", 60, {
     "src/a.ts": "export const a = 2;\n",
     "notes/plan.md": "- one\n- two\n",
+    // "café" in Latin-1: no NUL byte, so not binary to git, but not UTF-8.
+    "notes/latin1.txt": new Uint8Array([0x63, 0x61, 0x66, 0xe9, 0x0a]),
+    "readme-link": { link: "README.md" },
   });
   await commit("Drop the blob, add a big file", 120, {
     "data/blob.bin": null,

@@ -33,3 +33,10 @@ export function collectionPath(prefix: string, slug: string): string {
 // types: commits and files are read from the repository on each request, not kept in the graph.
 export const COMMIT_SLUG = "commit";
 export const COMMIT_TYPE = "Commit";
+
+// A workspace's committed files: a directory is a collection of its entries, a file a resource.
+export const FILE_SLUG = "file";
+export const FILE_TYPE = "File";
+export const DIRECTORY_TYPE = "Directory";
+// A tree entry that is another repository's commit: it has no content here.
+export const SUBMODULE_TYPE = "Submodule";
