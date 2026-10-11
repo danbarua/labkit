@@ -18,6 +18,8 @@ import {
 } from "./collection-paths";
 import { DEFAULT_LIMIT, halJson, MAX_LIMIT, pageParam, pagingLinks } from "./collections-handler";
 import { problem, publicOrigin } from "./graph-handler";
+import { actItem, actsRanAgainst, RAN_AGAINST } from "./events-handler";
+import { isNotFound } from "./repositories";
 import type { TenantScope } from "./runtime";
 
 /** The longest diff a commit is served with, in characters. A longer one is cut and flagged. */
@@ -29,12 +31,87 @@ export const FILE_LIMIT = 100_000;
 
 const COMMITS = /^\/commit\/?$/;
 const ONE_COMMIT = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})$/;
+// A commit's changed files, `/commit/{id}/changes`, and the acts that ran against it,
+// `/commit/{id}/acts`.
+const CHANGES = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/changes\/?$/;
+const ACTS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/acts\/?$/;
+// The commits that changed a file, from HEAD, `/history/{path}`, or from a commit,
+// `/commit/{id}/history/{path}`.
+const HISTORY = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/history\/(.+)$/;
 // The tree at HEAD, `/file/{path}`, or at a commit, `/commit/{id}/file/{path}`.
 const IN_TREE = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/file(?:\/(.*))?$/;
 
 /** Whether `rest`, the path after `/workspace/{slug}`, names the workspace's files or history. */
 export function isGitPath(rest: string): boolean {
-  return /^\/(commit|file)(\/|$)/.test(rest);
+  return /^\/(commit|file|history)(\/|$)/.test(rest);
+}
+
+/**
+ * The relations a commit and a file have, named as the graph's are: `<edge>:<type>` out, and
+ * `<type>:<edge>` in. Each lists at most DEFAULT_LIMIT resources, the page size of every
+ * collection; a collection link (`changes`, `acts`, `history`) has the rest.
+ */
+export const REL = {
+  parent: "parent:commit",
+  changes: "changes:file",
+  changedBy: "commit:changes",
+  directory: "contained_in:directory",
+} as const;
+
+/** `path` decoded from its URL form, each segment, with empty segments dropped. */
+function decodedPath(encoded: string): string {
+  return encoded
+    .split("/")
+    .filter((s) => s !== "")
+    .map(decodeURIComponent)
+    .join("/");
+}
+
+/**
+ * The ids of the commits, from `from` back along first parents, that changed `path`: that added
+ * it, changed its content, or removed it. Newest first, at most `count`. A rename is not
+ * followed: the file's history starts where it took this path.
+ */
+function changesTo(repo: Repository, from: string, path: string, count: number): string[] {
+  const found: string[] = [];
+  const entryAt = (id: string) => repo.getCommit(id).tree().getPath(path)?.id() ?? null;
+  const walk = repo.revwalk().simplifyFirstParent().push(from);
+  let id = walk.next();
+  let here = id === null ? null : entryAt(id);
+  while (id !== null && found.length < count) {
+    const parent = walk.next();
+    const before = parent === null ? null : entryAt(parent);
+    if (here !== before) found.push(id);
+    id = parent;
+    here = before;
+  }
+  return found;
+}
+
+/** A page of `items` as a collection named `slug` at `self`, by the request's `limit` and `offset`. */
+function collectionPage(
+  req: Request,
+  up: string,
+  self: string,
+  slug: string,
+  items: (offset: number, limit: number) => { page: unknown[]; more: boolean },
+): Response {
+  const url = new URL(req.url);
+  const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
+  const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
+  const { page, more } = items(offset, limit);
+  return halJson(req, {
+    _links: {
+      self: { href: `${self}?limit=${limit}&offset=${offset}` },
+      ...Object.fromEntries(
+        pagingLinks(up, self, limit, offset, more).map((l) => [l.rel, { href: l.href }]),
+      ),
+    },
+    offset,
+    limit,
+    count: page.length,
+    _embedded: { [slug]: page },
+  });
 }
 
 /** How entries are ordered by name: case aside, and numbers by value, so `f2` comes before `f10`. */
@@ -43,11 +120,6 @@ const BY_NAME = new Intl.Collator("en", { sensitivity: "base", numeric: true });
 /** Git's mode for a symbolic link, whose blob holds the path it points to. */
 const SYMLINK_MODE = 0o120000;
 const EXECUTABLE_MODE = 0o100755;
-
-/** Whether `err` is libgit2 reporting that what was asked for does not exist. */
-function isNotFound(err: unknown): boolean {
-  return err instanceof Error && err.message.includes("code=NotFound");
-}
 
 /**
  * One changed file as a unified diff, `git diff` style, built from the two versions of the file:
@@ -144,7 +216,14 @@ function history(req: Request, repo: Repository, base: string): Response {
  * `/commit/{id}`: one commit, with the files it changed and its diff from its first parent, as
  * `git show --first-parent` gives it. A root commit's diff adds every file.
  */
-function oneCommit(req: Request, repo: Repository, base: string, id: string, slug: string) {
+async function oneCommit(
+  req: Request,
+  repo: Repository,
+  scope: TenantScope,
+  base: string,
+  id: string,
+) {
+  const slug = scope.slug;
   let commit: Commit;
   try {
     commit = repo.getCommit(id);
@@ -177,36 +256,143 @@ function oneCommit(req: Request, repo: Repository, base: string, id: string, slu
   }
   const truncated = patch.length > DIFF_LIMIT;
   const summary = summaryOf(base, commit);
-  const before = first === undefined ? undefined : `${base}/${COMMIT_SLUG}/${first}`;
-  // Each changed file, at this commit, or for a deleted file at the first parent.
-  const changed = changes.map((change) => {
-    const at = change.status === "Deleted" ? before : `${base}/${COMMIT_SLUG}/${id}`;
-    return {
-      id: change.path,
-      type: FILE_TYPE,
-      name: change.path.split("/").pop(),
-      path: change.path,
-      status: change.status,
-      _links: { self: { href: `${at}/${FILE_SLUG}/${pathHref(change.path)}`, type: FILE_TYPE } },
-    };
-  });
+  const files = changedFiles(base, id, first, changes);
+  const shown = files.slice(0, DEFAULT_LIMIT);
+  const ran = await actsRanAgainst(scope, id, DEFAULT_LIMIT);
+  const origin = new URL(base).origin;
+  const actItems = ran.acts.map((event) => ({ ...actItem(origin, scope, event), dir: "in" }));
   return halJson(req, {
     ...summary,
     message: commit.message(),
     files_changed: Number(stats.filesChanged),
     insertions: Number(stats.insertions),
     deletions: Number(stats.deletions),
-    changes,
     diff: truncated ? patch.slice(0, DIFF_LIMIT) : patch,
     diff_truncated: truncated,
     _links: {
       ...summary._links,
       index: { href: `${base}/${COMMIT_SLUG}` },
-      parent: parents.map((p) => ({ href: `${base}/${COMMIT_SLUG}/${p}`, type: COMMIT_TYPE })),
       tree: { href: `${base}/${COMMIT_SLUG}/${id}/${FILE_SLUG}` },
-      changed: changed.map((file) => ({ ...file._links.self, title: file.status })),
+      changes: { href: `${base}/${COMMIT_SLUG}/${id}/changes` },
+      acts: { href: `${base}/${COMMIT_SLUG}/${id}/acts` },
+      [REL.parent]: parents.map((p) => ({
+        href: `${base}/${COMMIT_SLUG}/${p}`,
+        type: COMMIT_TYPE,
+        dir: "out",
+      })),
+      [REL.changes]: shown.map((file) => ({
+        href: file._links.self.href,
+        type: FILE_TYPE,
+        dir: "out",
+        props: { status: file.status },
+      })),
+      [RAN_AGAINST.in]: actItems.map((item) => ({ ...item._links.self, dir: "in" })),
     },
-    _embedded: { changed },
+    _embedded: {
+      [REL.parent]: parents.map((p) => ({ ...summaryOf(base, repo.getCommit(p)), dir: "out" })),
+      [REL.changes]: shown.map(({ status: _, ...file }) => ({ ...file, dir: "out" })),
+      [RAN_AGAINST.in]: actItems,
+    },
+  });
+}
+
+/**
+ * Commit `id`'s changed files as items, each at the commit, or for a deleted file at `first`, the
+ * first parent, where it last was.
+ */
+function changedFiles(
+  base: string,
+  id: string,
+  first: string | undefined,
+  changes: { path: string; status: string }[],
+) {
+  return changes.map((change) => {
+    const at = `${base}/${COMMIT_SLUG}/${change.status === "Deleted" ? (first ?? id) : id}`;
+    return {
+      id: change.path,
+      type: FILE_TYPE,
+      name: change.path.split("/").pop() ?? change.path,
+      path: change.path,
+      status: change.status,
+      _links: { self: { href: `${at}/${FILE_SLUG}/${pathHref(change.path)}`, type: FILE_TYPE } },
+    };
+  });
+}
+
+/** `/commit/{id}/changes`: the files commit `id` changed, by `limit` and `offset`. */
+function commitChanges(req: Request, repo: Repository, base: string, id: string, slug: string) {
+  let commit: Commit;
+  try {
+    commit = repo.getCommit(id);
+  } catch (err) {
+    if (isNotFound(err)) return problem(404, "Not Found", `${id} is not a commit in ${slug}`);
+    throw err;
+  }
+  const first = parentsOf(repo, id)[0];
+  const diff = repo.diffTreeToTree(
+    first === undefined ? undefined : repo.getCommit(first).tree(),
+    commit.tree(),
+  );
+  const changes = [...diff.deltas()].map((delta) => ({
+    path: delta.newFile().path() ?? delta.oldFile().path() ?? "",
+    status: delta.status(),
+  }));
+  const files = changedFiles(base, id, first, changes);
+  const self = `${base}/${COMMIT_SLUG}/${id}/changes`;
+  return collectionPage(req, `${base}/${COMMIT_SLUG}/${id}`, self, "changes", (offset, limit) => ({
+    page: files.slice(offset, offset + limit),
+    more: files.length > offset + limit,
+  }));
+}
+
+/** `/commit/{id}/acts`: the acts that ran against commit `id`, oldest first, by `limit` and `offset`. */
+async function commitActs(req: Request, scope: TenantScope, base: string, id: string) {
+  const url = new URL(req.url);
+  const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
+  const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
+  const { acts, more } = await actsRanAgainst(scope, id, limit, offset);
+  const origin = new URL(base).origin;
+  const items = acts.map((event) => actItem(origin, scope, event));
+  const self = `${base}/${COMMIT_SLUG}/${id}/acts`;
+  return collectionPage(req, `${base}/${COMMIT_SLUG}/${id}`, self, "acts", () => ({
+    page: items,
+    more,
+  }));
+}
+
+/**
+ * `/history/{path}` or `/commit/{id}/history/{path}`: the commits that changed file `path`, from
+ * HEAD or from commit `id`, newest first, by `limit` and `offset`.
+ */
+function fileHistory(
+  req: Request,
+  repo: Repository,
+  base: string,
+  slug: string,
+  id: string | undefined,
+  encoded: string,
+): Response {
+  let from: string;
+  try {
+    from = id ?? repo.revparseSingle("HEAD");
+    repo.getCommit(from);
+  } catch (err) {
+    if (isNotFound(err)) return problem(404, "Not Found", `no commit ${id ?? "HEAD"} in ${slug}`);
+    throw err;
+  }
+  const path = decodedPath(encoded);
+  const self =
+    id === undefined
+      ? `${base}/history/${pathHref(path)}`
+      : `${base}/${COMMIT_SLUG}/${id}/history/${pathHref(path)}`;
+  const at =
+    id === undefined ? `${base}/${FILE_SLUG}` : `${base}/${COMMIT_SLUG}/${id}/${FILE_SLUG}`;
+  return collectionPage(req, `${at}/${pathHref(path)}`, self, COMMIT_SLUG, (offset, limit) => {
+    const ids = changesTo(repo, from, path, offset + limit + 1);
+    return {
+      page: ids.slice(offset, offset + limit).map((c) => summaryOf(base, repo.getCommit(c))),
+      more: ids.length > offset + limit,
+    };
   });
 }
 
@@ -291,19 +477,39 @@ function file(
   const parent = path.includes("/")
     ? `${at}/${pathHref(path.slice(0, path.lastIndexOf("/")))}`
     : at;
+  // The commits that changed the file, newest first, from the commit it is read at.
+  const changedBy = changesTo(repo, commit, path, DEFAULT_LIMIT).map((c) => ({
+    ...summaryOf(base, repo.getCommit(c)),
+    dir: "in",
+  }));
+  const history = at.endsWith(`/${COMMIT_SLUG}/${commit}/${FILE_SLUG}`)
+    ? `${base}/${COMMIT_SLUG}/${commit}/history/${pathHref(path)}`
+    : `${base}/history/${pathHref(path)}`;
   const links = {
     self: { href: self, type: FILE_TYPE },
     index: { href: parent },
     commit: { href: `${base}/${COMMIT_SLUG}/${commit}`, type: COMMIT_TYPE },
+    history: { href: history },
+    [REL.directory]: { href: parent, type: DIRECTORY_TYPE, dir: "out" },
+    [REL.changedBy]: changedBy.map((c) => ({ ...c._links.self, dir: "in" })),
   };
+  const embedded = { [REL.changedBy]: changedBy };
   const blob = entry.toObject(repo).peelToBlob();
   const size = Number(blob.size());
-  if (blob.isBinary()) return halJson(req, { ...fields, size, binary: true, _links: links });
+  if (blob.isBinary())
+    return halJson(req, { ...fields, size, binary: true, _links: links, _embedded: embedded });
   let text: string;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(blob.content());
   } catch {
-    return halJson(req, { ...fields, size, binary: false, utf8: false, _links: links });
+    return halJson(req, {
+      ...fields,
+      size,
+      binary: false,
+      utf8: false,
+      _links: links,
+      _embedded: embedded,
+    });
   }
   const truncated = text.length > FILE_LIMIT;
   return halJson(req, {
@@ -313,6 +519,7 @@ function file(
     content: truncated ? text.slice(0, FILE_LIMIT) : text,
     content_truncated: truncated,
     _links: links,
+    _embedded: embedded,
   });
 }
 
@@ -345,11 +552,7 @@ function inTree(
   }
   const at =
     id === undefined ? `${base}/${FILE_SLUG}` : `${base}/${COMMIT_SLUG}/${id}/${FILE_SLUG}`;
-  const path = encoded
-    .split("/")
-    .filter((s) => s !== "")
-    .map(decodeURIComponent)
-    .join("/");
+  const path = decodedPath(encoded);
   if (path === "") return directory(req, tree, at, "", base);
   const entry = tree.getPath(path);
   if (entry === null) return problem(404, "Not Found", `${path} is not in ${slug} at ${commitId}`);
@@ -373,18 +576,25 @@ function inTree(
  * `/commit`, `/commit/{id}`, `/file/{path}` and `/commit/{id}/file/{path}`, where `rest` is the
  * path after `/workspace/{slug}`. Without a repository, every such path is not found.
  */
-export function gitHandler(
+export async function gitHandler(
   req: Request,
   scope: TenantScope,
   repo: Repository | undefined,
   rest: string,
-): Response {
+): Promise<Response> {
   if (repo === undefined)
     return problem(404, "Not Found", `${scope.slug} has no git repository mapped to it`);
   const base = `${publicOrigin(req).origin}${scope.prefix}`;
   if (COMMITS.test(rest)) return history(req, repo, base);
   const id = ONE_COMMIT.exec(rest)?.[1];
-  if (id !== undefined) return oneCommit(req, repo, base, id, scope.slug);
+  if (id !== undefined) return oneCommit(req, repo, scope, base, id);
+  const changed = CHANGES.exec(rest)?.[1];
+  if (changed !== undefined) return commitChanges(req, repo, base, changed, scope.slug);
+  const actsOf = ACTS.exec(rest)?.[1];
+  if (actsOf !== undefined) return commitActs(req, scope, base, actsOf);
+  const fileHistoryOf = HISTORY.exec(rest);
+  if (fileHistoryOf !== null)
+    return fileHistory(req, repo, base, scope.slug, fileHistoryOf[1], fileHistoryOf[2] ?? "");
   const tree = IN_TREE.exec(rest);
   if (tree !== null) return inTree(req, repo, base, scope.slug, tree[1], tree[2] ?? "");
   return problem(404, "Not Found", `${rest} names no commit or file in ${scope.slug}`);

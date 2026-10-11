@@ -81,7 +81,7 @@ import {
   useStoreVersion,
 } from "./hal-store";
 import { FileTree, History } from "./explorers";
-import { CommitView, FileView, SHOWN_APART } from "./git-views";
+import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
 import { Badge, EventRow, PropRows, type Prose } from "./values";
@@ -1072,21 +1072,23 @@ function Detail({
           ) : null}
           {loaded
             ? (["out", "in"] as const).flatMap((dir) =>
-                relGroups(res, dir).map((g) => (
-                  <div key={`${dir} ${g.rel}`}>
-                    <div className="rel-heading">
-                      {dir === "out" ? (
-                        <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
-                      ) : (
-                        <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
-                      )}
-                      {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                relGroups(res, dir)
+                  .filter((g) => !(RELATIONS_APART[res.type ?? ""] ?? []).includes(g.rel))
+                  .map((g) => (
+                    <div key={`${dir} ${g.rel}`}>
+                      <div className="rel-heading">
+                        {dir === "out" ? (
+                          <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
+                        ) : (
+                          <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
+                        )}
+                        {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                      </div>
+                      {g.keys.map((key) => (
+                        <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
+                      ))}
                     </div>
-                    {g.keys.map((key) => (
-                      <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
-                    ))}
-                  </div>
-                )),
+                  )),
               )
             : null}
         </>

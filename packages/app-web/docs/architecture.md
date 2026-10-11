@@ -51,9 +51,26 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 | `/workspace/{slug}/commit/{id}` | One commit: message, author, time, parents, changed files, and its diff from its first parent, cut at 100,000 characters (`diff_truncated`). |
 | `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). |
 | `/workspace/{slug}/commit/{id}/file/{path}` | The same, at that commit. |
+| `/workspace/{slug}/commit/{id}/changes` | The files the commit changed, with their status, paged. |
+| `/workspace/{slug}/commit/{id}/acts` | The acts that ran against the commit, oldest first, paged. |
+| `/workspace/{slug}/history/{path}` | The commits that changed the file, from HEAD back along first parents, newest first, paged. A rename is not followed. |
+| `/workspace/{slug}/commit/{id}/history/{path}` | The same, from that commit. |
 
 Only committed content is served. A path is looked up in the commit's tree, never on disk. A
 binary file and text that is not UTF-8 are served without content.
+
+Commits, files and acts relate as the graph's records do, `<edge>:<type>` out and `<type>:<edge>`
+in, each relation listing at most 25 resources, the page size of every collection; the collection
+link beside it has the rest:
+
+| On | Relation | To | The rest |
+| --- | --- | --- | --- |
+| A commit | `parent:commit` | its parents | — |
+| A commit | `changes:file`, with each file's status in the link's `props` | the files it changed | `changes` |
+| A commit | `act:ran_against` | the acts whose `git_hash` is the commit | `acts` |
+| A file | `contained_in:directory` | the directory it is in, a collection | — |
+| A file | `commit:changes` | the commits that changed it | `history` |
+| An act | `ran_against:commit` | its `git_hash`, when the workspace's repository holds it | — |
 
 ## Trace Console
 

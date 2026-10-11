@@ -25,7 +25,8 @@ const AUTHOR = { name: "Ada Tester", email: "ada@example.invalid" };
 /** A text longer than the API's diff and file limits: 2,000 lines of 80 characters. */
 export const BIG_TEXT = `${"x".repeat(79)}\n`.repeat(2_000);
 
-export async function createGitFixture(): Promise<GitFixture> {
+/** With `wide`, a fourth commit adds that many files under `wide/`, to pass the API's page size. */
+export async function createGitFixture({ wide }: { wide?: number } = {}): Promise<GitFixture> {
   const folder = await realpath(await mkdtemp(join(tmpdir(), "labkit-git-")));
   const repo = await initRepository(folder);
   const commits: string[] = [];
@@ -79,6 +80,17 @@ export async function createGitFixture(): Promise<GitFixture> {
     "data/blob.bin": null,
     "big.txt": BIG_TEXT,
   });
+  if (wide !== undefined)
+    await commit(
+      `Add ${wide} files`,
+      180,
+      Object.fromEntries(
+        Array.from({ length: wide }, (_, i) => [
+          `wide/f${String(i).padStart(2, "0")}.txt`,
+          `${i}\n`,
+        ]),
+      ),
+    );
 
   return { folder, repo, commits, close: () => rm(folder, { recursive: true, force: true }) };
 }
