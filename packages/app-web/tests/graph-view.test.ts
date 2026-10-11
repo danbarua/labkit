@@ -3,6 +3,7 @@ import {
   createSim,
   depthOpacity,
   distanceToFit,
+  followPivot,
   INITIAL_CAMERA,
   labelAngle,
   mergeSeeds,
@@ -128,5 +129,25 @@ describe("the camera's framing", () => {
     );
     expect(nearer).toBeCloseTo(400);
     expect(distanceToFit([], { yaw: 0, pitch: 0 }, 160)).toBeUndefined();
+  });
+});
+
+describe("the camera's pivot", () => {
+  test("eases toward the open node, and stays put while the open resource has no node", () => {
+    const sim = createSim();
+    mergeSeeds(sim, [{ id: "a", label: "a", type: "Question" }], [], "a");
+    const a = sim.nodes.get("a")!;
+    a.x = 100;
+    a.y = 50;
+    sim.selectedId = "a";
+    for (let i = 0; i < 200; i++) followPivot(sim);
+    expect(sim.pivot?.x).toBeCloseTo(100);
+    expect(sim.pivot?.y).toBeCloseTo(50);
+
+    // An act opened before its subject is known: the canvas has no node for it.
+    sim.selectedId = "/w/x/act/7";
+    const held = { ...sim.pivot! };
+    followPivot(sim);
+    expect(sim.pivot).toEqual(held);
   });
 });

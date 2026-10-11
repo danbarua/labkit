@@ -276,22 +276,26 @@ function maxCreatedZ(sim: Sim): number {
 }
 
 /**
- * Where the camera should face: the open resource's node, or, while the canvas has no node for it,
- * the middle of the graph's depth at the plane's origin, which the layout is pulled towards.
+ * Where the camera faces before it has faced any node: the middle of the graph's depth at the
+ * plane's origin, which the layout is pulled towards.
  */
-function pivotTarget(sim: Sim): Point3 {
-  const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
-  if (open) return { x: open.x, y: open.y, z: zOf(sim, open) };
+function startingPivot(sim: Sim): Point3 {
   return { x: 0, y: 0, z: maxCreatedZ(sim) / 2 };
 }
 
-/** Eases the pivot toward its target, so opening another resource turns the view rather than jumping it. */
-function followPivot(sim: Sim): void {
-  const target = pivotTarget(sim);
+/**
+ * Eases the pivot toward the open resource's node, so opening another resource turns the view
+ * rather than jumping it. While the canvas has no node for the open resource, such as an act whose
+ * subject is not known yet, the pivot stays where it is.
+ */
+export function followPivot(sim: Sim): void {
+  const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
   if (sim.pivot === null) {
-    sim.pivot = target;
+    sim.pivot = open ? { x: open.x, y: open.y, z: zOf(sim, open) } : startingPivot(sim);
     return;
   }
+  if (!open) return;
+  const target = { x: open.x, y: open.y, z: zOf(sim, open) };
   const k = 0.12;
   sim.pivot.x += (target.x - sim.pivot.x) * k;
   sim.pivot.y += (target.y - sim.pivot.y) * k;
@@ -408,7 +412,7 @@ function frameCamera(sim: Sim, width: number, height: number): void {
 
 function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
   const { yaw, pitch, distance } = sim.camera;
-  const pivot = sim.pivot ?? pivotTarget(sim);
+  const pivot = sim.pivot ?? startingPivot(sim);
   const x0 = node.x - pivot.x;
   const y0 = node.y - pivot.y;
   const zc = zOf(sim, node) - pivot.z;
