@@ -73,3 +73,19 @@ export async function openRepositories(
   }
   return repositories;
 }
+
+/** Whether `err` is libgit2 reporting that what was asked for does not exist. */
+export function isNotFound(err: unknown): boolean {
+  return err instanceof Error && err.message.includes("code=NotFound");
+}
+
+/** Whether `repo` holds the commit `hash`. Any error other than its absence is thrown. */
+export function holdsCommit(repo: Repository, hash: string): boolean {
+  try {
+    repo.getCommit(hash);
+    return true;
+  } catch (err) {
+    if (isNotFound(err)) return false;
+    throw err;
+  }
+}

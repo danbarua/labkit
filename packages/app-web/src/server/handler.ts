@@ -90,11 +90,12 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
     const rest = workspace[2] ?? "";
     console.debug("request: workspace", slug, rest);
     if (isEventsPath(rest)) {
-      return inWorkspace(runtime, slug, (scope) => eventsHandler(req, scope, rest));
+      const repo = runtime.repositories.get(slug);
+      return inWorkspace(runtime, slug, (scope) => eventsHandler(req, scope, rest, repo));
     }
     if (isGitPath(rest)) {
       const repo = runtime.repositories.get(slug);
-      return inWorkspace(runtime, slug, async (scope) => gitHandler(req, scope, repo, rest));
+      return inWorkspace(runtime, slug, (scope) => gitHandler(req, scope, repo, rest));
     }
     const name = /^\/([^/]+)$/.exec(rest)?.[1];
     if (name !== undefined && !isCollectionSlug(name)) {

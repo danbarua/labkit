@@ -66,6 +66,7 @@ import {
   itemView,
   keyOf,
   labelFor,
+  nameOf,
   relGroups,
   shortId,
   typeColour,
@@ -81,7 +82,7 @@ import {
   useStoreVersion,
 } from "./hal-store";
 import { FileTree, History } from "./explorers";
-import { CommitView, FileView, SHOWN_APART } from "./git-views";
+import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
 import { Badge, EventRow, PropRows, type Prose } from "./values";
@@ -724,7 +725,10 @@ function Pane({
 }) {
   const needle = term.trim().toLowerCase();
   const rows = pages.items.filter((item) => {
-    if (typeof item.data.type === "string" && hidden?.has(item.data.type)) return false;
+    // Only a row for a collection is left out, not a resource of the same type, such as a file
+    // listed in a directory.
+    if (item.id === undefined && typeof item.data.type === "string" && hidden?.has(item.data.type))
+      return false;
     if (!needle) return true;
     const d = item.data;
     const text =
@@ -906,7 +910,7 @@ function HoverCard({ itemKey, held }: { itemKey: string; held: HeldIndex }) {
     <div className="hover-card">
       <div className="card-head">
         <Badge type={r?.type} />
-        <span className="cid mono">{shortId(itemKey)}</span>
+        <span className="cid mono">{nameOf(itemKey, held.get(itemKey)?.type)}</span>
         <span className="clabel">{r?.type}</span>
       </div>
       <div className="panel-body">
@@ -1006,9 +1010,7 @@ function Detail({
       <div className="detail-header">
         <div className="header-top">
           <Badge type={res?.type} />
-          <span className="header-id">
-            {res?.type === COMMIT_TYPE ? shortId(path).slice(0, 7) : shortId(path)}
-          </span>
+          <span className="header-id">{nameOf(path, res?.type)}</span>
           <span className="header-type">{res?.type}</span>
           {pills.map((k) => {
             const v = String(a?.[k]);
@@ -1072,21 +1074,23 @@ function Detail({
           ) : null}
           {loaded
             ? (["out", "in"] as const).flatMap((dir) =>
-                relGroups(res, dir).map((g) => (
-                  <div key={`${dir} ${g.rel}`}>
-                    <div className="rel-heading">
-                      {dir === "out" ? (
-                        <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
-                      ) : (
-                        <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
-                      )}
-                      {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                relGroups(res, dir)
+                  .filter((g) => !(RELATIONS_APART[res.type ?? ""] ?? []).includes(g.rel))
+                  .map((g) => (
+                    <div key={`${dir} ${g.rel}`}>
+                      <div className="rel-heading">
+                        {dir === "out" ? (
+                          <ArrowRightIcon className="rel-arrow" aria-label="outbound" />
+                        ) : (
+                          <ArrowLeftIcon className="rel-arrow" aria-label="inbound" />
+                        )}
+                        {humanRel(g.rel)} <span className="faint">{g.keys.length}</span>
+                      </div>
+                      {g.keys.map((key) => (
+                        <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
+                      ))}
                     </div>
-                    {g.keys.map((key) => (
-                      <RelCard key={key} relKey={key} held={held} prose={prose} onOpen={onOpen} />
-                    ))}
-                  </div>
-                )),
+                  )),
               )
             : null}
         </>
@@ -1140,7 +1144,7 @@ function RelCard({
     return (
       <button type="button" className="rel-chip unresolved" onClick={() => onOpen(relKey)}>
         <Badge type={r?.type} />
-        <span className="cid mono">{shortId(relKey)}</span>
+        <span className="cid mono">{nameOf(relKey, r?.type)}</span>
         <span className="clabel">not yet fetched — GET {resourcePath(relKey)}</span>
       </button>
     );
@@ -1148,7 +1152,7 @@ function RelCard({
     <div className="panel">
       <button type="button" className="card-head" onClick={() => onOpen(relKey)}>
         <Badge type={r.type} />
-        <span className="cid mono">{shortId(relKey)}</span>
+        <span className="cid mono">{nameOf(relKey, r?.type)}</span>
         <span className="clabel">{r.type}</span>
       </button>
       <div className="panel-body">
@@ -1399,8 +1403,7 @@ function graphOf(
   const node = (key: string) => {
     if (!nodes.has(key)) {
       const type = held.get(key)?.type ?? "?";
-      // A commit's id is 40 characters; its first 7 name it, as in `git log --oneline`.
-      const label = type === COMMIT_TYPE ? shortId(key).slice(0, 7) : shortId(key);
+      const label = nameOf(key, type);
       nodes.set(key, { id: key, label, type });
     }
   };
@@ -1409,8 +1412,12 @@ function graphOf(
     if (r?.own !== true || !key.startsWith(workspace)) continue;
     node(r.key);
     for (const rel of r.rels) {
-      node(rel.key);
-      const [from, to] = rel.dir === "in" ? [rel.key, r.key] : [r.key, rel.key];
+      // An act is drawn as its subject, so a relation to an act ends at the act's subject; one
+      // whose subject is not known yet is not drawn.
+      const other = drawnAs(held, rel.key);
+      if (other === undefined) continue;
+      node(other);
+      const [from, to] = rel.dir === "in" ? [other, r.key] : [r.key, other];
       edges.push({ from, to, label: edgeLabelOf(rel.rel, rel.dir) });
     }
   }

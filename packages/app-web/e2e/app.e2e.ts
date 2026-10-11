@@ -295,6 +295,33 @@ test.describe("the sidebar", () => {
     await expect(item(page, "Q_1")).toBeInViewport();
   });
 
+  test("a commit's changed files and the records its acts changed join the graph, connected to it", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "Source Explorer").click();
+    await page.locator(".history .commit-row", { hasText: "Start the project" }).click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await expect(node(page, "a.ts (File)")).toBeVisible();
+    await expect(node(page, "README.md (File)")).toBeVisible();
+    // Act 1 posed Q_1 against this commit; the graph draws the act as its subject.
+    await expect(node(page, "Q_1 (Question)")).toBeVisible();
+    await expect(node(page, /\(Act\)$/)).toHaveCount(0);
+  });
+
+  test("the commits that changed a file join the graph, and its directory does not", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    await tree.getByRole("button", { name: "src" }).click();
+    await tree.getByRole("button", { name: "a.ts" }).click();
+    await expect(header(page)).toHaveText("a.ts");
+    await expect(node(page, /^[0-9a-f]{7} \(Commit\)$/)).toHaveCount(2);
+    await expect(node(page, /\(Directory\)$/)).toHaveCount(0);
+  });
+
   test("Record Explorer lists the workspace's records and acts, and leaves files and history to their own sections", async ({
     page,
   }) => {

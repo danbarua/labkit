@@ -35,6 +35,8 @@
   --c-note: #fda4af;
   --c-workspace: #a3e635;
   --c-act: #8592b0;
+  --c-file: #c4b5fd;
+  --c-commit: #fb923c;
 
   display: flex;
   flex-direction: column;
@@ -103,6 +105,11 @@
   line-height: 1.3;
   color: #0a0f1c;
   flex: 0 0 auto;
+}
+/* A type drawn as an icon: the icon at the size of the letters it stands in for. */
+.trace .badge.icon svg {
+  width: 1.3em;
+  height: 1.3em;
 }
 .trace .header-top .badge {
   font-size: 12px;

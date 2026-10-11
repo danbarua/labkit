@@ -1,6 +1,7 @@
 import { labelForNaturalId } from "@labkit/core-db/domain";
 import { type RecordedEvent, touchedIn } from "@labkit/core-domain/events";
-import { ACT_SLUG, ACT_TYPE, EVENTS_SEGMENT } from "./collection-paths";
+import type { Repository } from "es-git";
+import { ACT_SLUG, ACT_TYPE, COMMIT_SLUG, COMMIT_TYPE, EVENTS_SEGMENT } from "./collection-paths";
 import {
   DEFAULT_LIMIT,
   extrasOf,
@@ -12,6 +13,8 @@ import {
   withExtras,
 } from "./collections-handler";
 import { nodePath, problem, publicOrigin } from "./graph-handler";
+import { summaryOf } from "./commit-summary";
+import { holdsCommit } from "./repositories";
 import type { TenantScope } from "./runtime";
 
 const HAL_JSON = "application/hal+json";
@@ -140,7 +143,7 @@ function actLinks(origin: string, scope: TenantScope, event: RecordedEvent) {
 
 // One act as a collection item: what was issued, by whom, and links to the records it affected.
 // The command's parameters and the changes themselves are on the act's own resource.
-function actItem(origin: string, scope: TenantScope, event: RecordedEvent) {
+export function actItem(origin: string, scope: TenantScope, event: RecordedEvent) {
   const { attribution: by } = event;
   return {
     id: String(event.seq),
@@ -158,6 +161,26 @@ function actItem(origin: string, scope: TenantScope, event: RecordedEvent) {
       ...actLinks(origin, scope, event),
     },
   };
+}
+
+/** The relation from an act to the commit it ran against, and from the commit back to its acts. */
+export const RAN_AGAINST = { out: "ran_against:commit", in: "act:ran_against" } as const;
+
+/**
+ * `limit` acts from `offset`, oldest first, that ran against commit `hash`, and whether there are
+ * more: the acts whose recorded `git_hash` is that commit.
+ */
+export async function actsRanAgainst(
+  scope: TenantScope,
+  hash: string,
+  limit: number,
+  offset = 0,
+): Promise<{ acts: RecordedEvent[]; more: boolean }> {
+  const { rows } = await scope.query<Row>(
+    `SELECT ${COLUMNS} FROM "${scope.graphName}".domain_event WHERE git_hash = $1 ORDER BY seq LIMIT $2 OFFSET $3`,
+    [hash, limit + 1, offset],
+  );
+  return { acts: rows.slice(0, limit).map(toEvent), more: rows.length > limit };
 }
 
 // `/act`: the workspace's whole record of acts, oldest first.
@@ -181,7 +204,12 @@ async function acts(req: Request, scope: TenantScope): Promise<Response> {
 
 // One act, whole: the command as issued, and every change it made. Its links run out to the
 // records it affected.
-async function act(req: Request, scope: TenantScope, seq: number): Promise<Response> {
+async function act(
+  req: Request,
+  scope: TenantScope,
+  seq: number,
+  repo: Repository | undefined,
+): Promise<Response> {
   const origin = publicOrigin(req).origin;
   const { rows } = await scope.query<Row>(
     `SELECT ${COLUMNS} FROM "${scope.graphName}".domain_event WHERE seq = $1`,
@@ -192,10 +220,22 @@ async function act(req: Request, scope: TenantScope, seq: number): Promise<Respo
 
   const event = toEvent(row);
   const root = `${origin}${scope.prefix}`;
+  // The commit the act ran against, when the workspace's repository holds it.
+  const hash = event.attribution.git_hash;
+  const ranAgainst = hash !== null && repo !== undefined && holdsCommit(repo, hash);
   const links = {
     self: { href: `${root}/${ACT_SLUG}/${event.seq}`, type: ACT_TYPE },
     index: { href: `${root}/${ACT_SLUG}` },
     ...actLinks(origin, scope, event),
+    ...(ranAgainst
+      ? {
+          [RAN_AGAINST.out]: {
+            href: `${root}/${COMMIT_SLUG}/${hash}`,
+            type: COMMIT_TYPE,
+            dir: "out",
+          },
+        }
+      : {}),
   };
   const extras = extrasOf(req, HANDLED);
   return json({
@@ -213,6 +253,14 @@ async function act(req: Request, scope: TenantScope, seq: number): Promise<Respo
     command: event.command,
     changes: event.changes,
     _links: extras.length === 0 ? links : withExtras(links, extras),
+    // The commit's summary, so a page shows it without asking for the commit and its relations.
+    ...(ranAgainst && repo !== undefined
+      ? {
+          _embedded: {
+            [RAN_AGAINST.out]: { ...summaryOf(root, repo.getCommit(hash)), dir: "out" },
+          },
+        }
+      : {}),
   });
 }
 
@@ -305,14 +353,16 @@ export function isEventsPath(rest: string): boolean {
   return ACTS.test(rest) || ACT.test(rest) || EVENTS.test(rest);
 }
 
+/** The routes here, in the workspace `scope`, whose git repository is `repo` when one is mapped. */
 export async function eventsHandler(
   req: Request,
   scope: TenantScope,
   rest: string,
+  repo: Repository | undefined,
 ): Promise<Response> {
   if (ACTS.test(rest)) return acts(req, scope);
   const seq = ACT.exec(rest)?.[1];
-  if (seq !== undefined) return act(req, scope, Number(seq));
+  if (seq !== undefined) return act(req, scope, Number(seq), repo);
   const handle = decodeURIComponent(EVENTS.exec(rest)?.[1] ?? "");
   if (!HANDLE.test(handle)) return problem(404, "Not Found", `${handle} is not a handle`);
   return events(req, scope, handle);

@@ -58,6 +58,14 @@ export function shortId(key: string): string {
   return key.split("/").pop() ?? key;
 }
 
+/**
+ * How a resource of `type` at `key` is named on the page: its short id, except a commit, whose
+ * 40-character id is named by its first 7, as `git log --oneline` names it.
+ */
+export function nameOf(key: string, type: string | undefined): string {
+  return type === "Commit" ? shortId(key).slice(0, 7) : shortId(key);
+}
+
 export function humanRel(rel: string): string {
   return rel.replace(/_/g, " ");
 }
@@ -75,6 +83,7 @@ export function typeColour(type: string | undefined): string {
 export const FILE_TYPE = "File";
 export const DIRECTORY_TYPE = "Directory";
 export const COMMIT_TYPE = "Commit";
+export const DIFF_TYPE = "Diff";
 
 export const TYPE_ABBR: Record<string, string> = {
   Question: "Q",
@@ -95,6 +104,7 @@ export const TYPE_ABBR: Record<string, string> = {
   File: "Fi",
   Directory: "Di",
   Commit: "Co",
+  Diff: "Df",
 };
 
 export function abbreviation(type: string): string {
@@ -219,6 +229,11 @@ export function indexOf(documents: Iterable<{ key: string; doc: HalDocument }>):
       held.own = true;
       held.rels = relsOf(node);
       held.eventsHref = linksOf(node, "events")[0]?.href;
+    } else if (!held.own) {
+      // Until its own response arrives, a resource has the relations of the document that last
+      // embedded it, such as an act's subject, embedded in the commit it ran against.
+      const rels = relsOf(node);
+      if (rels.length > 0) held.rels = rels;
     }
     for (const rel of Object.keys(node._links ?? {})) {
       if (rel === "self" || rel === "start") continue;

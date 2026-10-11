@@ -414,11 +414,22 @@ describe("what the graph draws for an opened resource", () => {
     },
   });
 
-  test("an act is drawn as its subject, once the act's own response names it", () => {
+  test("an act is drawn as its subject, named by its own response or by a document that embeds it", () => {
     expect(drawnAs(indexOf([{ key: "/w/x/act/3", doc: act }]), "/w/x/act/3")).toBe("/w/x/NOTE_6");
     expect(drawnAs(indexOf([]), "/w/x/act/3")).toBe("/w/x/act/3");
     const embeddedOnly = indexOf([{ key: "/w/x/act", doc: { _embedded: { act: [act] } } }]);
-    expect(drawnAs(embeddedOnly, "/w/x/act/3")).toBeUndefined();
+    expect(embeddedOnly.get("/w/x/act/3")?.own).toBe(false);
+    expect(drawnAs(embeddedOnly, "/w/x/act/3")).toBe("/w/x/NOTE_6");
+  });
+
+  test("an act embedded without its subject is not drawn until its subject is known", () => {
+    const bare: HalDocument = {
+      id: "4",
+      type: "Act",
+      _links: { self: { href: "http://h/w/x/act/4", type: "Act" } },
+    };
+    const held = indexOf([{ key: "/w/x/act", doc: { _embedded: { act: [bare] } } }]);
+    expect(drawnAs(held, "/w/x/act/4")).toBeUndefined();
   });
 
   test("any other resource is drawn as itself", () => {
@@ -439,10 +450,11 @@ describe("the file and history types", () => {
   test("the page names them as the server serves them", async () => {
     const page = await import("../src/ui/trace/hal");
     const server = await import("../src/server/collection-paths");
-    expect([page.FILE_TYPE, page.DIRECTORY_TYPE, page.COMMIT_TYPE]).toEqual([
+    expect([page.FILE_TYPE, page.DIRECTORY_TYPE, page.COMMIT_TYPE, page.DIFF_TYPE]).toEqual([
       server.FILE_TYPE,
       server.DIRECTORY_TYPE,
       server.COMMIT_TYPE,
+      server.DIFF_TYPE,
     ]);
   });
 });
