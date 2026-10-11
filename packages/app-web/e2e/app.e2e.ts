@@ -239,18 +239,20 @@ test.describe("the sidebar", () => {
     await expect(tree.locator(".tree-row.active")).toHaveText("a.ts");
   });
 
-  test("Source Explorer lists the history, newest first; a commit opens with its changed files and diff", async ({
+  test("Source Explorer lists every branch's commits, newest first; a commit opens with its changed files and diff", async ({
     page,
   }) => {
     await page.goto("/app/workspace/alpha/Q_1");
     await explorer(page, "Source Explorer").click();
     const history = page.locator(".history .commit-row .subject");
     await expect(history).toHaveText([
+      "Merge side",
       "Drop the blob, add a big file",
+      "Side work",
       "Change a, plan the work",
       "Start the project",
     ]);
-    await history.nth(1).click();
+    await history.nth(3).click();
     await expect(page.locator(".header-type")).toHaveText("Commit");
     await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
     const changes = page.locator(".kv:has(.change-status)");
@@ -293,6 +295,22 @@ test.describe("the sidebar", () => {
     expect(box.height).toBeGreaterThanOrEqual(100);
     expect(box.bottom).toBeLessThanOrEqual(bottom + 1);
     await expect(item(page, "Q_1")).toBeInViewport();
+  });
+
+  test("Source Explorer draws the branches' lanes and opens on HEAD's branch; picking another outlines its tip", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "Source Explorer").click();
+    const picker = page.getByRole("combobox", { name: "Branch" });
+    await expect(picker.locator("option:checked")).toHaveText(/\(HEAD\)$/);
+    await expect(page.locator(".history .timeline-row.tip .subject")).toHaveText("Merge side");
+    // The merge draws two lines down, to its two parents.
+    const merge = page.locator(".history .timeline-row", { hasText: "Merge side" });
+    await expect(merge.locator("svg line")).toHaveCount(2);
+    await expect(page.locator(".history .ref-pill", { hasText: "origin/main" })).toBeVisible();
+    await picker.selectOption("side");
+    await expect(page.locator(".history .timeline-row.tip .subject")).toHaveText("Side work");
   });
 
   test("a commit's changed files and the records its acts changed join the graph, connected to it", async ({

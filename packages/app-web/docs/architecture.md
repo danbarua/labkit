@@ -47,7 +47,10 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 
 | Path | Serves |
 | --- | --- |
-| `/workspace/{slug}/commit` | The commits from HEAD, newest first, paged by `limit` and `offset`. |
+| `/workspace/{slug}/commit` | The commits from HEAD, newest first, paged by `limit` and `offset`. It links the timeline and the branches. |
+| `/workspace/{slug}/timeline` | Every commit reachable from a branch or HEAD, newest first and never a parent before its child, each with its parents' ids and the names of the branches that point to it, paged. |
+| `/workspace/{slug}/branch` | The branches: local, then remote-tracking, HEAD's marked `current`. A remote's `HEAD` is a pointer to another branch, so it is left out. |
+| `/workspace/{slug}/branch/{name}` | One branch, its name one encoded path segment (`origin%2Fmain`). |
 | `/workspace/{slug}/commit/{id}` | One commit: message, author, time, line counts, and its relations; not its diff. |
 | `/workspace/{slug}/commit/{id}/diff` | The commit's diff from its first parent, one `Diff` resource per changed file, paged. |
 | `/workspace/{slug}/commit/{id}/diff/{path}` | One changed file's diff: its status and unified diff, cut at 20,000 characters (`patch_truncated`). |
@@ -67,6 +70,7 @@ link beside it has the rest:
 
 | On | Relation | To | The rest |
 | --- | --- | --- | --- |
+| A branch | `points_to:commit` | the commit at its tip | — |
 | A commit | `parent:commit` | its parents | — |
 | A commit | `changes:file`, with each file's status in the link's `props` | the files it changed | `changes` |
 | A commit | `act:ran_against` | the acts whose `git_hash` is the commit | `acts` |
@@ -106,7 +110,7 @@ The browser also keeps whether each section is folded. The sections list:
 | Section | Lists | Opening an item shows |
 | --- | --- | --- |
 | File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. | The file's properties and its text, numbered by line. |
-| Source Explorer | The workspace's commits, newest first. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
+| Source Explorer | Every branch's commits, newest first, with each branch's line drawn beside them as `git log --graph` draws it, and branch names on the commits they point to. A branch picker opens on HEAD's branch and scrolls to the picked branch's tip. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
 | Record Explorer | The workspace's collections of records and acts, and the items of the one picked. The `file` and `commit` collections are left out. | The record. |
 
 Open sections divide the sidebar's height; Record Explorer, which holds two panes, takes twice the
