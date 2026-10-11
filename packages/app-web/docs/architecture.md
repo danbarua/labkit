@@ -124,10 +124,15 @@ Text that is not UTF-8, or a binary file of a text type, gets the note.
 | Left | The sidebar, in three sections that fold: File Explorer, Source Explorer, and Record Explorer, which lists two collections: the one picked (`?list=`) and the collection it is listed in. Collections takes at most 40% of Record Explorer and scrolls beyond that; Items has the rest and a filter box that narrows the listed items. |
 | Centre | The graph, a card that folds: the resources opened in the workspace since its last reset and what they relate to, on a 3D canvas (`GraphView`). Clicking a node opens its resource. Below it, the open resource. Tabs: Overview (properties, then a card for each related resource, outbound then inbound), Debug, drawn as a wrench (the response; the events of the record, or of the acts that ran against the commit, each a line with chips for the records it names; and the commits those acts ran against). `?tab=` names the tab. The tabs and Reload sit at the right of the line with the resource's name. |
 
-The top bar starts with the LabKit mark and name, which are one button that opens the list of
-workspaces. The button after it shows or hides the sidebar. The theme button at the right has no
-border or background. The browser's own Back and Forward buttons step through the pages opened. The
-sidebar toggle works like this:
+The top bar holds the LabKit mark and name, which are one button that opens the list of workspaces,
+and the theme button, which has no border or background. The browser's own Back and Forward buttons
+step through the pages opened.
+
+The rail is a 44 px column at the left edge that stays when the sidebar is hidden. Its first button
+shows or hides the sidebar. Below it, one button for each section (File Explorer, Source Explorer,
+Record Explorer) folds the section when it is showing, and otherwise opens it and shows the sidebar.
+A button for a section that is unavailable is disabled, with the reason as its tooltip. The sidebar
+toggle works like this:
 
 - At full width, the sidebar is shown or hidden in place, and the browser keeps the choice for the
   next visit.

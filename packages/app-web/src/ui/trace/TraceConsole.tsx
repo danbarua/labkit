@@ -41,6 +41,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useId,
   useMemo,
   useRef,
@@ -223,19 +224,6 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
             <img className="brand-mark" src={markUrl} alt="" />
             <span className="brand-name">LabKit</span>
           </button>
-          <button
-            type="button"
-            className="hamburger"
-            aria-label="Show or hide the sidebar"
-            aria-expanded={narrow ? drawer === "items" : sidebarShown}
-            onClick={() =>
-              narrow
-                ? setDrawer((d) => (d === "items" ? undefined : "items"))
-                : setSidebarShown(!sidebarShown)
-            }
-          >
-            <SidebarSimpleIcon aria-hidden="true" />
-          </button>
           <span className="topbar-gap" />
           {import.meta.env.DEV ? <DevLinks /> : null}
           <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
@@ -261,6 +249,13 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
             root={listKey === ENTRY}
             openKey={path}
             held={held}
+            expanded={narrow ? drawer === "items" : sidebarShown}
+            onToggle={() =>
+              narrow
+                ? setDrawer((d) => (d === "items" ? undefined : "items"))
+                : setSidebarShown(!sidebarShown)
+            }
+            onShow={() => (narrow ? setDrawer("items") : setSidebarShown(true))}
             onOpen={open}
             onList={pickList}
           />
@@ -402,6 +397,9 @@ function Lists({
   root,
   openKey,
   held,
+  expanded,
+  onToggle,
+  onShow,
   onOpen,
   onList,
 }: {
@@ -412,6 +410,11 @@ function Lists({
   root: boolean;
   openKey: string;
   held: HeldIndex;
+  /** Whether the sidebar is shown, or in a narrow window, whether its drawer is open. */
+  expanded: boolean;
+  onToggle: () => void;
+  /** Shows the sidebar, or opens its drawer in a narrow window. */
+  onShow: () => void;
   onOpen: (key: string) => void;
   onList: (key: string) => void;
 }) {
@@ -526,111 +529,176 @@ function Lists({
       <Splitter above={above} below={below} />
     );
   };
+  // A section's button in the rail folds the section when it is showing, and otherwise opens it
+  // and shows the sidebar.
+  const railButton = (
+    title: string,
+    icon: ReactNode,
+    open: boolean,
+    setOpen: (next: boolean) => void,
+    unavailable: string | undefined,
+  ) => {
+    const showing = expanded && open && unavailable === undefined;
+    return (
+      <button
+        type="button"
+        className={showing ? "rail-btn on" : "rail-btn"}
+        aria-label={`Open ${title}`}
+        aria-pressed={showing}
+        title={unavailable ?? title}
+        disabled={unavailable !== undefined}
+        onClick={() => {
+          setOpen(!showing);
+          if (!showing) onShow();
+        }}
+      >
+        {icon}
+      </button>
+    );
+  };
   return (
-    <aside className={className}>
-      <Explorer
-        title="File Explorer"
-        icon={<FolderIcon aria-hidden="true" />}
-        unavailable={filesUnavailable}
-        open={filesOpen}
-        onToggle={() => setFilesOpen(!filesOpen)}
-        grow={filesGrow}
-        sectionRef={filesSection}
-        scrolls
-      >
-        {filesKey === undefined ? null : (
-          <FileTree rootKey={filesKey} openKey={openKey} onOpen={onOpen} />
+    <>
+      <nav className="rail" aria-label="Sidebar sections">
+        <button
+          type="button"
+          className="rail-btn"
+          aria-label="Show or hide the sidebar"
+          aria-expanded={expanded}
+          title="Show or hide the sidebar"
+          onClick={onToggle}
+        >
+          <SidebarSimpleIcon aria-hidden="true" />
+        </button>
+        {railButton(
+          "File Explorer",
+          <FolderIcon aria-hidden="true" />,
+          filesOpen,
+          setFilesOpen,
+          filesUnavailable,
         )}
-      </Explorer>
-      {splitterAfter(filesSection)}
-      <Explorer
-        title="Source Explorer"
-        icon={<GitCommitIcon aria-hidden="true" />}
-        unavailable={historyUnavailable}
-        open={historyOpen}
-        onToggle={() => setHistoryOpen(!historyOpen)}
-        grow={historyGrow}
-        sectionRef={historySection}
-        scrolls
-      >
-        {historyKey === undefined ? null : (
-          <History historyKey={historyKey} openKey={openKey} onOpen={onOpen} />
+        {railButton(
+          "Source Explorer",
+          <GitCommitIcon aria-hidden="true" />,
+          historyOpen,
+          setHistoryOpen,
+          historyUnavailable,
         )}
-      </Explorer>
-      {splitterAfter(historySection)}
-      <Explorer
-        title="Record Explorer"
-        icon={<DatabaseIcon aria-hidden="true" />}
-        grow={recordsGrow}
-        sectionRef={recordsSection}
-        open={recordsOpen}
-        onToggle={() => setRecordsOpen(!recordsOpen)}
-      >
-        <div className="sidebar-section">
-          <div className="section-label">
-            Collections
-            <span className="count">{upper.items.length > 0 ? upper.items.length : ""}</span>
-          </div>
-          <div className="faint mono pane-path">{upperKey}</div>
-          <div className="type-list" ref={upperList}>
-            {lowerRow === undefined ? null : (
-              <ActiveBox list={upperList} activeKey={lowerRow} rows={`${upper.items.length}`} />
-            )}
-            <Pane
-              pages={upper}
-              empty={`Loading ${ENTRY}…`}
-              {...{ held, openKey, onOpen, onList }}
-              term=""
-              lowerKey={lowerRow}
-              pageable={false}
-              hidden={IN_OTHER_EXPLORERS}
-            />
-          </div>
-        </div>
-        <div className="sidebar-section grow">
-          <div className="section-label">
-            Items
-            <span className="count">
-              {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
-            </span>
-          </div>
-          {lowerKey === undefined ? null : (
-            <input
-              type="text"
-              className="items-filter"
-              placeholder="Filter items…"
-              autoComplete="off"
-              aria-label="Filter the items"
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-            />
+        {railButton(
+          "Record Explorer",
+          <DatabaseIcon aria-hidden="true" />,
+          recordsOpen,
+          setRecordsOpen,
+          undefined,
+        )}
+      </nav>
+      <aside className={className}>
+        <Explorer
+          title="File Explorer"
+          icon={<FolderIcon aria-hidden="true" />}
+          unavailable={filesUnavailable}
+          open={filesOpen}
+          onToggle={() => setFilesOpen(!filesOpen)}
+          grow={filesGrow}
+          sectionRef={filesSection}
+          scrolls
+        >
+          {filesKey === undefined ? null : (
+            <FileTree rootKey={filesKey} openKey={openKey} onOpen={onOpen} />
           )}
-          <div className="faint mono pane-path">{lowerKey ?? ""}</div>
-          <div className="res-list" ref={lowerList}>
-            {lowerKey === undefined ? (
-              <div className="empty-note">Pick a collection above to list its items.</div>
-            ) : (
-              <>
-                <ActiveBox
-                  list={lowerList}
-                  activeKey={openKey}
-                  rows={`${lower.items.length} ${term}`}
-                />
-                <Pane
-                  pages={lower}
-                  empty=""
-                  {...{ held, term, openKey, onOpen, onList }}
-                  lowerKey={lowerRow}
-                  pageable
-                />
-              </>
-            )}
+        </Explorer>
+        {splitterAfter(filesSection)}
+        <Explorer
+          title="Source Explorer"
+          icon={<GitCommitIcon aria-hidden="true" />}
+          unavailable={historyUnavailable}
+          open={historyOpen}
+          onToggle={() => setHistoryOpen(!historyOpen)}
+          grow={historyGrow}
+          sectionRef={historySection}
+          scrolls
+        >
+          {historyKey === undefined ? null : (
+            <History historyKey={historyKey} openKey={openKey} onOpen={onOpen} />
+          )}
+        </Explorer>
+        {splitterAfter(historySection)}
+        <Explorer
+          title="Record Explorer"
+          icon={<DatabaseIcon aria-hidden="true" />}
+          grow={recordsGrow}
+          sectionRef={recordsSection}
+          open={recordsOpen}
+          onToggle={() => setRecordsOpen(!recordsOpen)}
+        >
+          <div className="sidebar-section">
+            <div className="section-label">
+              Collections
+              <span className="count">{upper.items.length > 0 ? upper.items.length : ""}</span>
+            </div>
+            <div className="faint mono pane-path">{upperKey}</div>
+            <div className="type-list" ref={upperList}>
+              {lowerRow === undefined ? null : (
+                <ActiveBox list={upperList} activeKey={lowerRow} rows={`${upper.items.length}`} />
+              )}
+              <Pane
+                pages={upper}
+                empty={`Loading ${ENTRY}…`}
+                {...{ held, openKey, onOpen, onList }}
+                term=""
+                lowerKey={lowerRow}
+                pageable={false}
+                hidden={IN_OTHER_EXPLORERS}
+              />
+            </div>
           </div>
-        </div>
-      </Explorer>
-    </aside>
+          <div className="sidebar-section grow">
+            <div className="section-label">
+              Items
+              <span className="count">
+                {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
+              </span>
+            </div>
+            {lowerKey === undefined ? null : (
+              <input
+                type="text"
+                className="items-filter"
+                placeholder="Filter items…"
+                autoComplete="off"
+                aria-label="Filter the items"
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+              />
+            )}
+            <div className="faint mono pane-path">{lowerKey ?? ""}</div>
+            <div className="res-list" ref={lowerList}>
+              {lowerKey === undefined ? (
+                <div className="empty-note">Pick a collection above to list its items.</div>
+              ) : (
+                <>
+                  <ActiveBox
+                    list={lowerList}
+                    activeKey={openKey}
+                    rows={`${lower.items.length} ${term}`}
+                  />
+                  <Pane
+                    pages={lower}
+                    empty=""
+                    {...{ held, term, openKey, onOpen, onList }}
+                    lowerKey={lowerRow}
+                    pageable
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        </Explorer>
+      </aside>
+    </>
   );
 }
+
+/** How long a section takes to open or fold, in milliseconds: trace.css's `.explorer` transition. */
+const SECTION_MOTION_MS = 220;
 
 /**
  * A section of the sidebar that folds under its header. While `unavailable` is set, the header is
@@ -661,31 +729,67 @@ function Explorer({
 }) {
   const shown = open && unavailable === undefined;
   const why = useId();
+  // The body stays drawn while the section shrinks to its header, so it does not vanish first.
+  const [mounted, setMounted] = useState(shown);
+  // True while the section opens or folds, the only time its share changes by transition: a drag
+  // of the border must move it at once.
+  const [moving, setMoving] = useState(false);
+  const was = useRef(shown);
+  const top = useRef<HTMLDivElement>(null);
+  // The header's height, which the section keeps while it shrinks to nothing else.
+  const topHeight = useRef(0);
+  useEffect(() => {
+    const changed = was.current !== shown;
+    was.current = shown;
+    if (shown) setMounted(true);
+    if (!changed) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setMounted(shown);
+      return;
+    }
+    setMoving(true);
+    const timer = setTimeout(() => {
+      setMoving(false);
+      if (!shown) setMounted(false);
+    }, SECTION_MOTION_MS);
+    return () => clearTimeout(timer);
+  }, [shown]);
+  useLayoutEffect(() => {
+    if (!mounted || shown) topHeight.current = top.current?.offsetHeight ?? topHeight.current;
+  });
+  const closing = mounted && !shown;
   return (
     <section
       ref={sectionRef}
-      className={shown ? "explorer open" : "explorer"}
-      style={shown ? { flexGrow: grow } : undefined}
+      className={["explorer", shown ? "open" : "", closing ? "closing" : "", moving ? "moving" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      style={{
+        flexGrow: shown ? grow : 0,
+        minHeight: closing ? topHeight.current : undefined,
+      }}
       aria-label={title}
     >
-      <button
-        type="button"
-        className="explorer-head"
-        aria-expanded={shown}
-        disabled={unavailable !== undefined}
-        aria-describedby={unavailable === undefined ? undefined : why}
-        onClick={onToggle}
-      >
-        <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
-        {icon}
-        <span className="explorer-title">{title}</span>
-      </button>
-      {unavailable === undefined ? null : (
-        <div id={why} className="explorer-note">
-          {unavailable}
-        </div>
-      )}
-      {shown ? (
+      <div ref={top} className="explorer-top">
+        <button
+          type="button"
+          className="explorer-head"
+          aria-expanded={shown}
+          disabled={unavailable !== undefined}
+          aria-describedby={unavailable === undefined ? undefined : why}
+          onClick={onToggle}
+        >
+          <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
+          {icon}
+          <span className="explorer-title">{title}</span>
+        </button>
+        {unavailable === undefined ? null : (
+          <div id={why} className="explorer-note">
+            {unavailable}
+          </div>
+        )}
+      </div>
+      {mounted ? (
         <div className={scrolls ? "explorer-body scrolls" : "explorer-body"}>{children}</div>
       ) : null}
     </section>

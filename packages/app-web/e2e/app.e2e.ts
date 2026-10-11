@@ -71,21 +71,19 @@ test.describe("getting around", () => {
     await expect(page.getByText("Pick a type on the left")).toBeVisible();
   });
 
-  test("the top bar has the LabKit name first, then the sidebar toggle, and no history or filter controls", async ({
+  test("the top bar has the LabKit name and no sidebar, history or filter controls", async ({
     page,
   }) => {
     await page.goto("/app/workspace/alpha/Q_1");
     const bar = page.locator(".topbar");
-    const brand = bar.getByRole("button", { name: "LabKit" });
-    const toggle = bar.getByRole("button", { name: "Show or hide the sidebar" });
-    const x = async (locator: import("@playwright/test").Locator) =>
-      (await locator.boundingBox())?.x ?? -1;
-    expect(await x(brand)).toBeLessThan(await x(toggle));
+    await expect(bar.getByRole("button", { name: "LabKit" })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Show or hide the sidebar" })).toHaveCount(0);
     await expect(bar.getByRole("button", { name: "Back" })).toHaveCount(0);
     await expect(bar.getByRole("button", { name: "Forward" })).toHaveCount(0);
     await expect(bar.getByRole("button", { name: "Entry point" })).toHaveCount(0);
     await expect(bar.getByRole("textbox")).toHaveCount(0);
     await expect(bar).not.toContainText("Trace Console");
+    await expect(bar).not.toContainText("live");
   });
 
   test("the Items filter narrows the listed items", async ({ page }) => {
@@ -103,12 +101,14 @@ test.describe("getting around", () => {
     await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
     const panes = page.locator("aside.sidebar .explorer-body .sidebar-section");
     await expect(panes).toHaveCount(2);
-    const body = (await page.locator("aside.sidebar .explorer-body").boundingBox())?.height ?? 0;
-    const collections = (await panes.nth(0).boundingBox())?.height ?? 0;
-    const items = (await panes.nth(1).boundingBox())?.height ?? 0;
-    expect(collections).toBeLessThanOrEqual(0.4 * body + 2);
-    expect(items).toBeGreaterThanOrEqual(120);
-    expect(items).toBeGreaterThan(collections);
+    const height = async (locator: import("@playwright/test").Locator) =>
+      (await locator.boundingBox())?.height ?? 0;
+    const body = page.locator("aside.sidebar .explorer-body");
+    await expect
+      .poll(async () => (await height(panes.nth(0))) <= 0.4 * (await height(body)) + 2)
+      .toBe(true);
+    expect(await height(panes.nth(1))).toBeGreaterThanOrEqual(120);
+    expect(await height(panes.nth(1))).toBeGreaterThan(await height(panes.nth(0)));
   });
 
   test("a deep link renders directly, and survives a reload", async ({ page }) => {
@@ -193,6 +193,31 @@ test.describe("the sidebar", () => {
     page.getByRole("button", { name: "Show or hide the sidebar" });
   const explorer = (page: import("@playwright/test").Page, name: string) =>
     page.getByRole("button", { name, exact: true });
+
+  test("the rail stays when the sidebar is hidden; its section buttons fold or open sections and show the sidebar", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    const rail = page.getByRole("navigation", { name: "Sidebar sections" });
+    await expect(rail).toBeVisible();
+    await toggle(page).click();
+    await expect(sidebar(page)).toBeHidden();
+    await expect(rail).toBeVisible();
+    const files = rail.getByRole("button", { name: "Open File Explorer" });
+    await files.click();
+    await expect(sidebar(page)).toBeVisible();
+    await expect(files).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("region", { name: "File Explorer" })).toBeVisible();
+    await files.click();
+    await expect(files).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      page.getByRole("region", { name: "File Explorer" }).locator(".explorer-body"),
+    ).toHaveCount(0);
+    // A folded section stays as tall as its header.
+    const folded = page.getByRole("region", { name: "File Explorer" });
+    await expect(folded.getByRole("button", { name: "File Explorer", exact: true })).toBeVisible();
+    await expect.poll(async () => (await folded.boundingBox())?.height ?? 0).toBeGreaterThan(30);
+  });
 
   test("at full width, the toggle hides and shows the sidebar, and a reload keeps it hidden", async ({
     page,
@@ -336,6 +361,8 @@ test.describe("the sidebar", () => {
     await expect
       .poll(async () => (await top(box)) - (await top(commit("Add a picture and a guide"))))
       .toBe(0);
+    // The box has rounded corners, as the boxes in the other lists do.
+    expect(await box.evaluate((e) => getComputedStyle(e).borderTopLeftRadius)).toBe("6px");
     await commit("Side work").click();
     await expect(commit("Side work")).toHaveClass(/active/);
     await expect(history.locator(".active-box.fill")).toHaveClass(/filled/);
@@ -408,6 +435,8 @@ test.describe("the sidebar", () => {
     await page.goto("/app/workspace/alpha/Q_1");
     await explorer(page, "File Explorer").click();
     await explorer(page, "Source Explorer").click();
+    // The sections' shares settle after their opening transition.
+    await expect(page.locator(".explorer.moving")).toHaveCount(0);
     const section = (name: string) => sidebar(page).getByRole("region", { name });
     const height = async (name: string) =>
       Math.round((await section(name).boundingBox())?.height ?? -1);
@@ -450,6 +479,8 @@ test.describe("the sidebar", () => {
     await page.goto("/app/workspace/alpha/Q_1");
     await explorer(page, "File Explorer").click();
     await explorer(page, "Source Explorer").click();
+    // The sections' shares settle after their opening transition.
+    await expect(page.locator(".explorer.moving")).toHaveCount(0);
     const section = (name: string) => sidebar(page).getByRole("region", { name });
     const height = async (name: string) =>
       Math.round((await section(name).boundingBox())?.height ?? -1);
@@ -496,6 +527,8 @@ test.describe("the sidebar", () => {
     await page.goto("/app/workspace/alpha/Q_1");
     await explorer(page, "File Explorer").click();
     await explorer(page, "Source Explorer").click();
+    // The sections' shares settle after their opening transition.
+    await expect(page.locator(".explorer.moving")).toHaveCount(0);
     const section = (name: string) => sidebar(page).getByRole("region", { name });
     const height = async (name: string) =>
       Math.round((await section(name).boundingBox())?.height ?? -1);

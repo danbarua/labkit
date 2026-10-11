@@ -90,6 +90,7 @@
   .trace .spinner,
   .trace .skeleton .bar,
   .trace .active-box,
+  .trace .explorer,
   .trace .sidebar {
     animation: none;
     transition: none;
@@ -241,23 +242,6 @@
   letter-spacing: 0.01em;
 }
 
-.trace .hamburger {
-  display: flex;
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-}
-.trace .hamburger:hover {
-  background: var(--panel-2);
-  color: var(--text);
-}
-
 .trace .topbar-gap {
   flex: 1 1 auto;
 }
@@ -310,6 +294,43 @@
   min-height: 0;
 }
 
+/* The rail: a narrow column of icons at the left edge that stays when the sidebar is hidden. Its
+   first button shows or hides the sidebar; the others fold or open one section each. */
+.trace .rail {
+  flex: 0 0 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+.trace .rail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 18px;
+}
+.trace .rail-btn:hover:not(:disabled) {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.trace .rail-btn.on {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+.trace .rail-btn:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
 .trace .sidebar {
   flex: 0 0 288px;
   width: 288px;
@@ -324,16 +345,26 @@
 /* The sidebar's sections fold under their headers. Record Explorer's Items pane scrolls; File
    Explorer and Source Explorer scroll as a whole. */
 .trace .explorer {
-  flex: none;
+  /* A folded section has no share, and its minimum height, which is its header's, keeps it
+     visible. An open one has a share, set inline, of the height the others leave. Both have a
+     basis of 0, so the share animates. */
+  flex: 0 1 0;
   border-bottom: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
-/* Open sections share the height the folded ones leave, in proportion to their shares, whatever
-   their content. */
-.trace .explorer.open {
-  flex: 1 1 0;
+.trace .explorer.moving {
+  transition: flex-grow 220ms ease;
+}
+/* An open section may be shorter than its content, which is cut off. A section that is folding
+   keeps its header's height, set inline. */
+.trace .explorer.open,
+.trace .explorer.closing {
+  min-height: 0;
+  overflow: hidden;
+}
+.trace .explorer-top {
+  flex: none;
 }
 /* The border between two open sections, which a drag moves. It lies over the border and takes no
    height of its own, and shows the accent while it is hovered, dragged or focused. */
@@ -498,20 +529,6 @@
   border-color: var(--accent);
   background: var(--accent-dim);
 }
-/* In File Explorer the box marks the open file, as it does in the Items pane. */
-.trace .file-tree {
-  position: relative;
-}
-.trace .file-tree .tree-row {
-  position: relative;
-}
-.trace .file-tree .tree-row.active {
-  background: none;
-  border-color: transparent;
-}
-.trace .file-tree .active-box.fill:not(.filled) ~ .tree-row.active {
-  background: var(--panel-2);
-}
 .trace .tree-icon {
   flex: none;
   color: var(--text-dim);
@@ -598,30 +615,9 @@
   gap: 6px;
   height: 38px;
   padding: 0 6px 0 2px;
-  border-radius: 0;
 }
 .trace .commit-row.timeline-row.tip {
   border-color: var(--accent);
-}
-/* In Source Explorer the box marks the open commit, as it does in File Explorer. Rows touch, so
-   the box has square corners like them. An open tip keeps the tip's outline. */
-.trace .history {
-  position: relative;
-}
-.trace .history .commit-row {
-  position: relative;
-}
-.trace .history .commit-row.active {
-  background: none;
-}
-.trace .history .commit-row.active:not(.tip) {
-  border-color: transparent;
-}
-.trace .history .active-box.fill:not(.filled) ~ .commit-row.active {
-  background: var(--panel-2);
-}
-.trace .history .active-box {
-  border-radius: 0;
 }
 .trace .lanes {
   flex: none;
@@ -741,20 +737,6 @@
   background: var(--accent-dim);
   border-color: var(--accent);
 }
-/* In the Collections pane the box marks the listed collection, as it marks the open row below. */
-.trace .type-list {
-  position: relative;
-}
-.trace .type-list .type-row {
-  position: relative;
-}
-.trace .type-list .type-row.active {
-  background: none;
-  border-color: transparent;
-}
-.trace .type-list .active-box.fill:not(.filled) ~ .type-row.active {
-  background: var(--panel-2);
-}
 .trace .type-swatch {
   width: 9px;
   height: 9px;
@@ -768,7 +750,6 @@
 }
 
 .trace .res-list {
-  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -796,6 +777,34 @@
   z-index: 2;
   border: 1px solid var(--accent);
 }
+/* Every list the box marks: Collections, Items, File Explorer and Source Explorer. The list holds
+   the box, which the rows are drawn over; the open row shows no fill or border of its own, except
+   its hover background until the box arrives, and the outline of an open branch tip. */
+.trace :is(.file-tree, .type-list, .res-list, .history) {
+  position: relative;
+}
+.trace :is(.file-tree .tree-row, .type-list .type-row, .res-list .res-item, .history .commit-row) {
+  position: relative;
+}
+.trace
+  :is(
+    .file-tree .tree-row,
+    .type-list .type-row,
+    .res-list .res-item,
+    .history .commit-row
+  ).active {
+  background: none;
+  border-color: transparent;
+}
+.trace .history .commit-row.active.tip {
+  border-color: var(--accent);
+}
+.trace
+  :is(.file-tree, .type-list, .res-list, .history)
+  .active-box.fill:not(.filled)
+  ~ :is(.tree-row, .type-row, .res-item, .commit-row).active {
+  background: var(--panel-2);
+}
 .trace .res-item {
   display: flex;
   align-items: flex-start;
@@ -815,16 +824,6 @@
 .trace .res-item.active {
   background: var(--accent-dim);
   border-color: var(--accent);
-}
-.trace .res-list .res-item {
-  position: relative;
-}
-.trace .res-list .res-item.active {
-  background: none;
-  border-color: transparent;
-}
-.trace .res-list .active-box.fill:not(.filled) ~ .res-item.active {
-  background: var(--panel-2);
 }
 .trace .res-item .badge {
   margin-top: 1px;
@@ -1386,8 +1385,29 @@
 
 /* ---------- full width: the sidebar is shown or hidden ---------- */
 @media (min-width: 861px) {
+  /* The sidebar slides shut to nothing and then leaves the tab order. Its contents keep their width,
+     so they are cut off at its edge rather than squeezed. */
+  .trace .sidebar {
+    transition:
+      flex-basis 220ms ease,
+      width 220ms ease,
+      min-width 220ms ease,
+      visibility 0s;
+  }
+  .trace .sidebar > * {
+    min-width: 287px;
+  }
   .trace .sidebar.collapsed {
-    display: none;
+    flex-basis: 0;
+    width: 0;
+    min-width: 0;
+    border-right-width: 0;
+    visibility: hidden;
+    transition:
+      flex-basis 220ms ease,
+      width 220ms ease,
+      min-width 220ms ease,
+      visibility 0s 220ms;
   }
 }
 
@@ -1403,10 +1423,10 @@
     position: fixed;
     z-index: 20;
     top: 52px;
-    left: 0;
+    left: 44px;
     bottom: 0;
     width: 288px;
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% - 44px));
     transition: transform 0.18s ease;
     box-shadow: 2px 0 16px rgba(0, 0, 0, 0.35);
   }
