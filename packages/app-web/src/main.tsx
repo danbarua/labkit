@@ -1,6 +1,7 @@
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { APP_BASE } from "./app-base";
 import { routeTree } from "./routeTree.gen";
 import { LoadError } from "./ui/LoadError";
 import "./styles.css";
@@ -8,7 +9,7 @@ import "./styles.css";
 // The API owns every other path, so the browser app answers only under this one.
 const router = createRouter({
   routeTree,
-  basepath: "/app",
+  basepath: APP_BASE,
   defaultPreload: "intent",
   defaultPendingMs: 300,
   defaultErrorComponent: LoadError,
