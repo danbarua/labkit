@@ -101,7 +101,10 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
       const id = decodeURIComponent(name);
       return inWorkspace(runtime, slug, (scope) => graphHandler(req, scope, id));
     }
-    return inWorkspace(runtime, slug, (scope) => workspaceCollectionsHandler(req, scope, rest));
+    const hasRepository = runtime.repositories.has(slug);
+    return inWorkspace(runtime, slug, (scope) =>
+      workspaceCollectionsHandler(req, scope, rest, hasRepository),
+    );
   }
 
   if (path === "/healthz") {

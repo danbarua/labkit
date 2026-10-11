@@ -38,6 +38,23 @@ HAL root (`Accept: application/hal+json` on `/`, or `/api` through Vite):
 
 The Trace Console starts at `/collections/workspace`.
 
+### Files and history
+
+A workspace serves its committed files and its git history when `workspaces.local.json` maps it to
+a repository (`docs/environment.md`, `LABKIT_WORKSPACES_FILE`). The API reads them from the
+repository with es-git on each request; they are not in the graph. Its index then lists two more
+collections, `file` (type `File`) and `commit` (type `Commit`).
+
+| Path | Serves |
+| --- | --- |
+| `/workspace/{slug}/commit` | The commits from HEAD, newest first, paged by `limit` and `offset`. |
+| `/workspace/{slug}/commit/{id}` | One commit: message, author, time, parents, changed files, and its diff from its first parent, cut at 100,000 characters (`diff_truncated`). |
+| `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). |
+| `/workspace/{slug}/commit/{id}/file/{path}` | The same, at that commit. |
+
+Only committed content is served. A path is looked up in the commit's tree, never on disk. A
+binary file and text that is not UTF-8 are served without content.
+
 ## Trace Console
 
 The browser app's page for the graph, at `/app/<API path>`: `/app/workspace/overlap_bench/Q_1` opens

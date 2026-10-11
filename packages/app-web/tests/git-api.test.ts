@@ -36,6 +36,29 @@ async function get(path: string): Promise<{ status: number; body: any }> {
 
 const commitHref = (id: string) => `${ORIGIN}/workspace/alpha/commit/${id}`;
 
+describe("a workspace's index", () => {
+  test("lists the files and history of a workspace with a repository, after its records", async () => {
+    const { body } = await get("/workspace/alpha");
+    const listed = body._embedded.collection.map((c: any) => [c.slug, c.type]);
+    expect(listed.slice(-3)).toEqual([
+      ["act", "Act"],
+      ["file", "File"],
+      ["commit", "Commit"],
+    ]);
+    expect(body._embedded.collection.at(-1)._links.self.href).toBe(
+      `${ORIGIN}/workspace/alpha/commit`,
+    );
+  });
+
+  test("lists no files or history for a workspace without one", async () => {
+    const { body } = await get("/workspace/beta");
+    const slugs = body._embedded.collection.map((c: any) => c.slug);
+    expect(slugs.at(-1)).toBe("act");
+    expect(slugs).not.toContain("file");
+    expect(slugs).not.toContain("commit");
+  });
+});
+
 const fileHref = (path: string) => `${ORIGIN}/workspace/alpha/file/${path}`;
 
 describe("a workspace's files", () => {
