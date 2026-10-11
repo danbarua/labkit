@@ -377,99 +377,60 @@
   font-size: 11px;
   color: var(--text-faint);
 }
-/* A file's text, and a commit's message and diff. */
-.trace .panel-note {
-  padding: 8px 14px;
+/* The shared content cards (`@labkit/ui`): a file's text, a commit's message, changed files and
+   diffs, the graph and the Debug response, spaced like the page's other panels. */
+.trace .lk-card {
+  margin-bottom: 18px;
+}
+.trace .card-note {
+  margin: -8px 0 18px;
   font-size: 12px;
   color: var(--text-dim);
-  border-bottom: 1px solid var(--line);
 }
-.trace .code,
+.trace .lk-card .card-note {
+  margin: 0 0 8px;
+}
 .trace .message {
   margin: 0;
-  padding: 10px 14px;
-  overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
-  white-space: pre;
-  tab-size: 4;
-}
-.trace .message {
   white-space: pre-wrap;
 }
-.trace .code .ln {
-  display: inline-block;
-  min-width: 4ch;
-  margin-right: 2ch;
-  text-align: right;
-  color: var(--text-faint);
-  user-select: none;
-}
-.trace .diff .d-file {
-  color: var(--text);
-  font-weight: 600;
-}
-.trace .diff .d-head,
-.trace .diff .d-hunk {
-  color: var(--text-dim);
-}
-.trace .diff .d-add {
-  color: #22c55e;
-  background: color-mix(in srgb, #22c55e 10%, transparent);
-}
-.trace .diff .d-del {
-  color: #ef4444;
-  background: color-mix(in srgb, #ef4444 10%, transparent);
-}
-.trace .panel-body.changes {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-}
-.trace .parents {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 4px 6px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.trace .sha-link {
-  background: none;
-  border: 0;
+.trace .ref {
   padding: 0;
+  border: 0;
+  background: none;
   color: var(--accent);
   font-size: 12px;
-}
-.trace .change-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 3px 4px;
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  color: var(--text);
-  font-size: 12px;
   text-align: left;
+  cursor: pointer;
 }
-.trace .change-row:hover {
-  background: var(--panel-2);
+.trace .ref + .ref {
+  margin-left: 10px;
 }
-.trace .change-status {
-  flex: none;
-  width: 9ch;
-  font-size: 11px;
-  color: var(--text-dim);
+.trace .ref:hover {
+  text-decoration: underline;
 }
 .trace .change-status.s-added {
   color: #22c55e;
 }
 .trace .change-status.s-deleted {
   color: #ef4444;
+}
+.trace .response-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.trace .lk-card-actions a {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
 }
 
 /* File Explorer and Source Explorer scroll as a whole. */
@@ -866,15 +827,6 @@
 .trace .caret.open {
   transform: rotate(90deg);
 }
-.trace .response-head {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.trace .response-chip {
-  gap: 4px;
-}
 
 .trace .kv {
   display: flex;
@@ -1027,25 +979,6 @@
   padding-top: 8px;
 }
 
-.trace pre.jsonview {
-  margin: 0;
-  padding: 12px 14px;
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-dim);
-  background: var(--panel-2);
-}
-.trace pre.jsonview .k {
-  color: var(--c-lineofenquiry);
-}
-.trace pre.jsonview .s {
-  color: var(--c-evidenceunit);
-}
-.trace pre.jsonview .n {
-  color: var(--c-decision);
-}
-
 .trace .fetch-error {
   border: 1px solid var(--danger);
   border-radius: 8px;
@@ -1185,17 +1118,9 @@
   font-size: 11.5px;
   color: var(--text-dim);
 }
-.trace .graph-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .trace .graph-stage {
   display: flex;
   height: min(48vh, 460px);
-}
-.trace .graph-stage[hidden] {
-  display: none;
 }
 .trace .graph-stage .hint {
   color: var(--text-dim);

@@ -17,7 +17,7 @@ import {
 } from "../src/ui/trace/hal";
 import { docOf, HalStore } from "../src/ui/trace/hal-store";
 import { findMathSpans, proseSegments } from "../src/ui/trace/prose";
-import { EventRow, JsonView, PropRows, Value } from "../src/ui/trace/values";
+import { EventRow, PropRows, Value } from "../src/ui/trace/values";
 
 const asText = (text: string) => text;
 const html = (v: unknown, k = "k") =>
@@ -94,13 +94,6 @@ describe("values", () => {
     expect(renderToStaticMarkup(<PropRows attrs={{}} prose={asText} />)).toContain(
       "No additional properties",
     );
-  });
-
-  test("JSON is coloured by keys, strings and numbers, and stays text", () => {
-    const out = renderToStaticMarkup(<JsonView value={{ "<k>": "<s>", n: 2 }} />);
-    expect(out).toContain('<span class="k">&quot;&lt;k&gt;&quot;</span>');
-    expect(out).toContain('<span class="s">&quot;&lt;s&gt;&quot;</span>');
-    expect(out).toContain('<span class="n">2</span>');
   });
 });
 
