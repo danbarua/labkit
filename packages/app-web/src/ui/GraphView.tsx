@@ -373,32 +373,29 @@ function spreadOf(points: Point3[], camera: Pick<Camera, "yaw" | "pitch">): numb
 }
 
 /**
- * The yaw, among `yaw` and 72 evenly spaced, that draws `rest`, the centroid of the nodes that are
- * not the open node or its neighbours, furthest toward the canvas's bottom-right corner, among the
- * yaws that draw `near`, the neighbours, at SPREAD_KEEP of the best spread and `rest` at or behind
- * the pivot's depth. When no such yaw puts `rest` behind, the depth condition is dropped. It keeps
- * `yaw` unless another draws `rest` a tenth of its length further, so a graph spread evenly around
- * the pivot does not swing from side to side. Points are relative to the pivot.
+ * The yaw at which the camera frames the open node, among `yaw` and 72 evenly spaced. Points are
+ * relative to the pivot. The yaw draws `near`, the open node's neighbours, at SPREAD_KEEP of the
+ * best spread, and `rest`, the centroid of the other nodes, at or behind the pivot's depth; the
+ * depth condition is dropped when no such yaw meets it. Among those yaws, the ones that draw `rest`
+ * within a tenth of its length of furthest toward the bottom-right corner qualify, and the one
+ * nearest `yaw` is chosen, so opening another node turns the camera no further than it must.
  */
 export function yawToward(view: { rest: Point3; near: Point3[]; pitch: number; yaw: number }) {
   const { rest, near, pitch, yaw } = view;
   const candidates = [yaw, ...Array.from({ length: 72 }, (_, i) => -Math.PI + (i * Math.PI) / 36)];
   const spread = candidates.map((c) => spreadOf(near, { yaw: c, pitch }));
-  const best = Math.max(...spread);
-  const shows = candidates.filter((_, i) => (spread[i] ?? 0) >= SPREAD_KEEP * best);
+  const most = Math.max(...spread);
+  const shows = candidates.filter((_, i) => (spread[i] ?? 0) >= SPREAD_KEEP * most);
   const behind = shows.filter((c) => onScreen(rest, { yaw: c, pitch }).z2 >= 0);
   // `shows` always holds the yaw with the best spread, so the pool is never empty.
   const pool = behind.length > 0 ? behind : shows;
   const score = (c: number) => towardCorner(rest, c, pitch);
-  // Between yaws that score the same, the smaller turn from `yaw` wins.
-  const chosen = pool.reduce((a, c) => {
-    const gain = score(c) - score(a);
-    const shorter = Math.abs(turnBetween(yaw, c)) < Math.abs(turnBetween(yaw, a));
-    return gain > 1e-9 || (gain > -1e-9 && shorter) ? c : a;
-  });
-  const keep =
-    pool.includes(yaw) && score(chosen) - score(yaw) < 0.1 * Math.hypot(rest.x, rest.y, rest.z);
-  return keep ? yaw : chosen;
+  const best = Math.max(...pool.map(score));
+  const margin = 0.1 * Math.hypot(rest.x, rest.y, rest.z);
+  const turn = (c: number) => Math.abs(turnBetween(yaw, c));
+  return pool
+    .filter((c) => score(c) >= best - margin)
+    .reduce((a, c) => (turn(c) < turn(a) ? c : a));
 }
 
 /**

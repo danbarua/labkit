@@ -61,9 +61,10 @@ it:
 - The camera tilts to 20° above the plane of the force layout.
 - The camera turns so that the node's neighbours are drawn spread out. The neighbours that arrive
   with a resource's response lie close together on the time axis, and a turn that looks along
-  them would draw them in a line. Among the turns that draw them spread out, the camera picks the
-  one that puts the rest of the graph behind them and furthest toward the bottom-right corner,
-  behind the hover card.
+  them would draw them in a line. Among the turns that draw them spread out, the camera considers
+  those that put the rest of the graph behind them and nearly as far toward the bottom-right
+  corner, behind the hover card, as the best one does. Of those, it takes the turn nearest its
+  current one, so opening another node turns the camera no further than it must.
 - The camera zooms so the node's neighbours fill 30% of the canvas's shorter side.
 - The camera swings 30° either side of that turn, about the vertical through the node, once every
   16 seconds, so depth shows by parallax. It holds still while the pointer is on the canvas and

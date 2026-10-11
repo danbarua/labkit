@@ -130,6 +130,13 @@ describe("the camera's framing", () => {
     expect(yawToward({ rest, near: [], pitch: 0, yaw: 0 })).toBe(0);
   });
 
+  test("turns no further than it must: to the nearest yaw within a tenth of the best", () => {
+    // Looking along the layout's plane, `rest` is drawn furthest right at yaw 0, and within a
+    // tenth of its length of that up to about 31°. From 57°, the nearest such candidate is 30°.
+    const rest = { x: 100, y: 0, z: 0 };
+    expect(yawToward({ rest, near: [], pitch: 0, yaw: 1 })).toBeCloseTo(Math.PI / 6);
+  });
+
   test("sees a cluster that shares the open node's time spread out, not edge-on, with the earlier graph behind it", () => {
     // Eight neighbours that arrived with the open node's response: around it in the layout's
     // plane, a few units later on the time axis. The rest of the graph is earlier.
