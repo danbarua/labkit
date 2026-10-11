@@ -54,7 +54,7 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 | `/workspace/{slug}/commit/{id}` | One commit: message, author, time, line counts, and its relations; not its diff. |
 | `/workspace/{slug}/commit/{id}/diff` | The commit's diff from its first parent, one `Diff` resource per changed file, paged. |
 | `/workspace/{slug}/commit/{id}/diff/{path}` | One changed file's diff: its status and unified diff, cut at 20,000 characters (`patch_truncated`). |
-| `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). |
+| `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). A listed file carries `media_type` only when the extension table names its extension; the file's own resource always carries it. |
 | `/workspace/{slug}/commit/{id}/file/{path}` | The same, at that commit. |
 | `/workspace/{slug}/raw/{path}` | A file's committed bytes at HEAD, as its media type. A file over 20 MiB gets a 413 that names its size. |
 | `/workspace/{slug}/commit/{id}/raw/{path}` | The same, at that commit. |
@@ -134,12 +134,15 @@ The browser also keeps whether each section is folded. The sections list:
 
 | Section | Lists | Opening an item shows |
 | --- | --- | --- |
-| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. | The file's properties and its text, numbered by line. |
+| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. Each file's icon and colour come from its listed `media_type` (`file-icons.tsx`); a file listed without one has the plain file icon. The box that marks the open file slides to the next file opened. | The file, shown as its media type. |
 | Source Explorer | Every branch's commits, newest first, with each branch's line drawn beside them as `git log --graph` draws it, and branch names on the commits they point to. A branch picker opens on HEAD's branch and scrolls to the picked branch's tip. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
 | Record Explorer | The workspace's collections of records and acts, and the items of the one picked. The `file` and `commit` collections are left out. | The record. |
 
-Open sections divide the sidebar's height; Record Explorer, which holds two panes, takes twice the
-share, and its Collections pane scrolls when it is short. The workspace the sections serve is the
+Open sections divide the sidebar's height in proportion to their shares. Record Explorer, which
+holds two panes, starts with twice the share of the others, and its Collections pane scrolls when
+it is short. Dragging the border between two open sections, or pressing Up or Down while the border
+has focus, moves height from one section to the other. Each section keeps at least 72 px, and the
+browser keeps the shares for the next visit. The workspace the sections serve is the
 open resource's, or else the one Record Explorer lists. File Explorer and Source Explorer are
 enabled when that workspace's index lists a collection of type `File` or `Commit` ("Files and
 history" above). Otherwise each is disabled, with the reason

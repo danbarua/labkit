@@ -340,6 +340,47 @@ test.describe("the sidebar", () => {
     await expect(item(page, "Q_1")).toBeInViewport();
   });
 
+  test("dragging the border between two open sections moves height from one to the other, and a reload keeps it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    await explorer(page, "Source Explorer").click();
+    const section = (name: string) => sidebar(page).getByRole("region", { name });
+    const height = async (name: string) =>
+      Math.round((await section(name).boundingBox())?.height ?? -1);
+    const heights = async () => ({
+      files: await height("File Explorer"),
+      history: await height("Source Explorer"),
+      records: await height("Record Explorer"),
+    });
+    const border = page.getByRole("separator", {
+      name: "Resize File Explorer and Source Explorer",
+    });
+    const before = await heights();
+    const at = await border.boundingBox();
+    if (at === null) throw new Error("the border has no box");
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2 + 60, { steps: 5 });
+    await page.mouse.up();
+    const dragged = await heights();
+    expect(Math.abs(dragged.files - (before.files + 60))).toBeLessThanOrEqual(2);
+    expect(Math.abs(dragged.history - (before.history - 60))).toBeLessThanOrEqual(2);
+    expect(dragged.records).toBe(before.records);
+
+    await border.focus();
+    await page.keyboard.press("ArrowUp");
+    const pressed = await heights();
+    expect(Math.abs(pressed.files - (dragged.files - 16))).toBeLessThanOrEqual(2);
+
+    await page.reload();
+    await expect(section("File Explorer")).toBeVisible();
+    const reloaded = await heights();
+    expect(Math.abs(reloaded.files - pressed.files)).toBeLessThanOrEqual(2);
+  });
+
   test("Source Explorer draws the branches' lanes and opens on HEAD's branch; picking another outlines its tip", async ({
     page,
   }) => {

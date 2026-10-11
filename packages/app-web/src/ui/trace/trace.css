@@ -357,9 +357,38 @@
   flex-direction: column;
   min-height: 0;
 }
-/* Open sections share the height the folded ones leave, equally, whatever their content. */
+/* Open sections share the height the folded ones leave, in proportion to their shares, whatever
+   their content. */
 .trace .explorer.open {
   flex: 1 1 0;
+}
+/* The border between two open sections, which a drag moves. It lies over the border and takes no
+   height of its own, and shows the accent while it is hovered, dragged or focused. */
+.trace .splitter {
+  flex: none;
+  position: relative;
+  z-index: 3;
+  height: 7px;
+  margin: -4px 0 -3px;
+  cursor: row-resize;
+  touch-action: none;
+}
+.trace .splitter::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  height: 3px;
+  transition: background-color 120ms ease;
+}
+.trace .splitter:hover::after,
+.trace .splitter.dragging::after,
+.trace .splitter:focus-visible::after {
+  background: var(--accent);
+}
+.trace .splitter:focus-visible {
+  outline: none;
 }
 .trace .explorer-body {
   flex: 1 1 auto;

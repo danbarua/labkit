@@ -39,6 +39,7 @@ import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-ro
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useId,
@@ -47,7 +48,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useSavedFlag } from "../saved-flag";
+import { useSavedFlag, useSavedNumber } from "../saved-flag";
 import { useSavedTheme } from "../saved-theme";
 import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
@@ -525,6 +526,14 @@ function Lists({
   const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.trace.records", true);
   const [filesOpen, setFilesOpen] = useSavedFlag("labkit.trace.files", false);
   const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.trace.history", false);
+  // Each open section's share of the height the open sections divide. Record Explorer holds two
+  // panes, Collections and Items, so it starts with twice the share of the others.
+  const [filesGrow, setFilesGrow] = useSavedNumber("labkit.trace.files.grow", 1);
+  const [historyGrow, setHistoryGrow] = useSavedNumber("labkit.trace.history.grow", 1);
+  const [recordsGrow, setRecordsGrow] = useSavedNumber("labkit.trace.records.grow", 2);
+  const filesSection = useRef<HTMLElement>(null);
+  const historySection = useRef<HTMLElement>(null);
+  const recordsSection = useRef<HTMLElement>(null);
   // The open workspace's index says whether it serves files and history, and where.
   const indexKey = workspace?.replace(/\/$/, "");
   const indexEntry = useDocument(indexKey === undefined ? undefined : requestPath(indexKey));
@@ -546,37 +555,75 @@ function Lists({
           : key === undefined
             ? `${slug} serves no ${what}.`
             : undefined;
+  const filesUnavailable = unavailable(filesKey, "files");
+  const historyUnavailable = unavailable(historyKey, "history");
+  // The open sections, in order. A border that can be dragged sits after each but the last.
+  const shares: Share[] = [
+    filesOpen && filesUnavailable === undefined
+      ? { name: "File Explorer", grow: filesGrow, setGrow: setFilesGrow, element: filesSection }
+      : undefined,
+    historyOpen && historyUnavailable === undefined
+      ? {
+          name: "Source Explorer",
+          grow: historyGrow,
+          setGrow: setHistoryGrow,
+          element: historySection,
+        }
+      : undefined,
+    recordsOpen
+      ? {
+          name: "Record Explorer",
+          grow: recordsGrow,
+          setGrow: setRecordsGrow,
+          element: recordsSection,
+        }
+      : undefined,
+  ].filter((share) => share !== undefined);
+  const splitterAfter = (element: RefObject<HTMLElement | null>) => {
+    const at = shares.findIndex((share) => share.element === element);
+    const above = shares[at];
+    const below = shares[at + 1];
+    return above === undefined || below === undefined ? null : (
+      <Splitter above={above} below={below} />
+    );
+  };
   return (
     <aside className={className}>
       <Explorer
         title="File Explorer"
         icon={<FolderIcon aria-hidden="true" />}
-        unavailable={unavailable(filesKey, "files")}
+        unavailable={filesUnavailable}
         open={filesOpen}
         onToggle={() => setFilesOpen(!filesOpen)}
+        grow={filesGrow}
+        sectionRef={filesSection}
         scrolls
       >
         {filesKey === undefined ? null : (
           <FileTree rootKey={filesKey} openKey={openKey} onOpen={onOpen} />
         )}
       </Explorer>
+      {splitterAfter(filesSection)}
       <Explorer
         title="Source Explorer"
         icon={<GitCommitIcon aria-hidden="true" />}
-        unavailable={unavailable(historyKey, "history")}
+        unavailable={historyUnavailable}
         open={historyOpen}
         onToggle={() => setHistoryOpen(!historyOpen)}
+        grow={historyGrow}
+        sectionRef={historySection}
         scrolls
       >
         {historyKey === undefined ? null : (
           <History historyKey={historyKey} openKey={openKey} onOpen={onOpen} />
         )}
       </Explorer>
+      {splitterAfter(historySection)}
       <Explorer
         title="Record Explorer"
         icon={<DatabaseIcon aria-hidden="true" />}
-        // It holds two panes, Collections and Items, so it takes twice the share of the height.
-        share={2}
+        grow={recordsGrow}
+        sectionRef={recordsSection}
         open={recordsOpen}
         onToggle={() => setRecordsOpen(!recordsOpen)}
       >
@@ -649,7 +696,8 @@ function Explorer({
   unavailable,
   onToggle,
   scrolls = false,
-  share = 1,
+  grow,
+  sectionRef,
   children,
 }: {
   title: string;
@@ -660,15 +708,17 @@ function Explorer({
   /** Whether the section's body scrolls as a whole, rather than a list inside it. */
   scrolls?: boolean;
   /** How many shares of the height the open sections divide this one takes. */
-  share?: number;
+  grow: number;
+  sectionRef: RefObject<HTMLElement | null>;
   children?: ReactNode;
 }) {
   const shown = open && unavailable === undefined;
   const why = useId();
   return (
     <section
+      ref={sectionRef}
       className={shown ? "explorer open" : "explorer"}
-      style={shown ? { flexGrow: share } : undefined}
+      style={shown ? { flexGrow: grow } : undefined}
       aria-label={title}
     >
       <button
@@ -692,6 +742,76 @@ function Explorer({
         <div className={scrolls ? "explorer-body scrolls" : "explorer-body"}>{children}</div>
       ) : null}
     </section>
+  );
+}
+
+/** An open sidebar section, as the border below or above it sees it. */
+interface Share {
+  name: string;
+  grow: number;
+  setGrow: (next: number) => void;
+  element: RefObject<HTMLElement | null>;
+}
+
+/** The fewest pixels a drag leaves an open section: its header and a row or two. */
+const MIN_SECTION = 72;
+/** How far one press of an arrow key moves a border, in pixels. */
+const SPLITTER_STEP = 16;
+
+/**
+ * The border between two open sidebar sections, which a drag or the Up and Down keys move. The two
+ * sections divide their height in the new proportion, and keep it on the next visit; each keeps at
+ * least MIN_SECTION pixels. A folded section between them moves with the border.
+ */
+function Splitter({ above, below }: { above: Share; below: Share }) {
+  const drag = useRef<{ y: number; a: number; b: number } | undefined>(undefined);
+  const [dragging, setDragging] = useState(false);
+  const sizes = () => ({
+    a: above.element.current?.getBoundingClientRect().height ?? 0,
+    b: below.element.current?.getBoundingClientRect().height ?? 0,
+  });
+  // Gives `above` `delta` more pixels of the two sections' height, and `below` that many fewer.
+  const move = (from: { a: number; b: number }, delta: number) => {
+    const total = from.a + from.b;
+    if (total < 2 * MIN_SECTION) return;
+    const a = Math.min(Math.max(from.a + delta, MIN_SECTION), total - MIN_SECTION);
+    const grow = above.grow + below.grow;
+    above.setGrow((grow * a) / total);
+    below.setGrow((grow * (total - a)) / total);
+  };
+  const stop = () => {
+    drag.current = undefined;
+    setDragging(false);
+  };
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: an <hr> takes no focus or drag; this is the ARIA window splitter pattern.
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label={`Resize ${above.name} and ${below.name}`}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round((100 * above.grow) / (above.grow + below.grow))}
+      tabIndex={0}
+      className={dragging ? "splitter dragging" : "splitter"}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { y: e.clientY, ...sizes() };
+        setDragging(true);
+      }}
+      onPointerMove={(e) => {
+        const start = drag.current;
+        if (start !== undefined) move(start, e.clientY - start.y);
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        move(sizes(), e.key === "ArrowUp" ? -SPLITTER_STEP : SPLITTER_STEP);
+      }}
+    />
   );
 }
 
