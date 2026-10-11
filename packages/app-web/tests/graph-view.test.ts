@@ -8,6 +8,7 @@ import {
   INITIAL_CAMERA,
   labelAngle,
   mergeSeeds,
+  placeLabels,
   screenAxes,
   tickPhysics,
   yawToward,
@@ -241,6 +242,60 @@ describe("the camera's framing", () => {
     );
     expect(nearer).toBeCloseTo(400);
     expect(distanceToFit([], { yaw: 0, pitch: 0 }, 160)).toBeUndefined();
+  });
+});
+
+describe("label placement", () => {
+  const box = (
+    key: string,
+    at: { rank?: number; depth?: number; cx: number; cy: number; angle?: number },
+  ) => ({ key, rank: 2, depth: 500, halfW: 20, halfH: 5, angle: 0, ...at });
+  const place = (boxes: ReturnType<typeof box>[], shown: string[] = []) =>
+    [...placeLabels(boxes, new Set(shown), 400, 300)].sort();
+
+  test("of two labels that overlap, the nearer is drawn and the other is not", () => {
+    const far = box("far", { depth: 600, cx: 100, cy: 100 });
+    const near = box("near", { depth: 400, cx: 110, cy: 104 });
+    expect(place([far, near])).toEqual(["near"]);
+  });
+
+  test("labels that do not overlap are all drawn", () => {
+    const a = box("a", { cx: 100, cy: 100 });
+    const b = box("b", { cx: 100, cy: 114 });
+    const c = box("c", { cx: 150, cy: 100 });
+    expect(place([a, b, c])).toEqual(["a", "b", "c"]);
+  });
+
+  test("a label drawn in the last frame keeps its place over a nearer label of its rank", () => {
+    const shown = box("shown", { depth: 600, cx: 100, cy: 100 });
+    const near = box("near", { depth: 400, cx: 110, cy: 104 });
+    expect(place([shown, near], ["shown"])).toEqual(["shown"]);
+  });
+
+  test("a lower rank is placed first, whatever its depth or the last frame", () => {
+    const neighbour = box("neighbour", { rank: 1, depth: 900, cx: 100, cy: 100 });
+    const other = box("other", { rank: 2, depth: 100, cx: 110, cy: 104 });
+    expect(place([other, neighbour], ["other"])).toEqual(["neighbour"]);
+  });
+
+  test("rank 0 is drawn even where it overlaps another label", () => {
+    const open = box("open", { rank: 0, cx: 100, cy: 100 });
+    const hot = box("hot", { rank: 0, cx: 105, cy: 102 });
+    const other = box("other", { rank: 1, depth: 100, cx: 110, cy: 104 });
+    expect(place([open, hot, other])).toEqual(["hot", "open"]);
+  });
+
+  test("rotated labels that cross overlap; parallel diagonal labels side by side do not", () => {
+    const up = box("up", { cx: 200, cy: 150, angle: Math.PI / 4 });
+    const down = box("down", { cx: 200, cy: 150, angle: -Math.PI / 4 });
+    expect(place([up, down])).toHaveLength(1);
+    // 14 pixels apart, across their direction: further than their 10-pixel height.
+    const beside = box("beside", {
+      cx: 200 + 14 * Math.cos((3 * Math.PI) / 4),
+      cy: 150 + 14 * Math.sin((3 * Math.PI) / 4),
+      angle: Math.PI / 4,
+    });
+    expect(place([up, beside])).toEqual(["beside", "up"]);
   });
 });
 

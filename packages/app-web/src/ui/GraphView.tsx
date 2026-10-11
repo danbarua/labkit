@@ -62,6 +62,8 @@ type Sim = {
   selectedId: string | null;
   hoverId: string | null;
   screenPos: Map<string, Projected>;
+  /** The keys of the labels drawn in the last frame. They keep their place over others of their rank. */
+  shownLabels: Set<string>;
   camera: Camera;
   /** The point the camera orbits and faces: it follows the open resource's node. */
   pivot: Point3 | null;
@@ -568,6 +570,78 @@ function drawCompass(
   ctx.restore();
 }
 
+/**
+ * A label's rectangle on the canvas, in pixels: its centre, half its width and height, and its
+ * rotation about the centre in radians.
+ */
+export type LabelBox = {
+  key: string;
+  /** Labels are placed by rank, lowest first. Rank 0 is drawn even where it overlaps another. */
+  rank: number;
+  /** The distance from the camera of what the label names: nearer labels are placed first. */
+  depth: number;
+  cx: number;
+  cy: number;
+  halfW: number;
+  halfH: number;
+  angle: number;
+};
+
+/** The side of the square cells in which `placeLabels` records the canvas a label covers, in pixels. */
+const LABEL_CELL = 4;
+
+/** The indices of the cells, in a grid `cols` wide and `rows` high, whose centres lie in `box`. */
+function cellsOf(box: LabelBox, cols: number, rows: number): number[] {
+  const cos = Math.cos(box.angle);
+  const sin = Math.sin(box.angle);
+  const ex = Math.abs(box.halfW * cos) + Math.abs(box.halfH * sin);
+  const ey = Math.abs(box.halfW * sin) + Math.abs(box.halfH * cos);
+  const cells: number[] = [];
+  const c0 = Math.max(0, Math.floor((box.cx - ex) / LABEL_CELL));
+  const c1 = Math.min(cols - 1, Math.floor((box.cx + ex) / LABEL_CELL));
+  const r0 = Math.max(0, Math.floor((box.cy - ey) / LABEL_CELL));
+  const r1 = Math.min(rows - 1, Math.floor((box.cy + ey) / LABEL_CELL));
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      const dx = (c + 0.5) * LABEL_CELL - box.cx;
+      const dy = (r + 0.5) * LABEL_CELL - box.cy;
+      const along = dx * cos + dy * sin;
+      const across = -dx * sin + dy * cos;
+      if (Math.abs(along) <= box.halfW && Math.abs(across) <= box.halfH) cells.push(r * cols + c);
+    }
+  }
+  return cells;
+}
+
+/**
+ * The keys of the labels to draw on a canvas `width` by `height` pixels, so that no two overlap
+ * except where one has rank 0. Labels are placed by rank; within a rank, those in `shown`, the
+ * labels drawn in the last frame, come first, so a label does not flicker as the camera moves;
+ * then the nearest. A label that would overlap one already placed is not drawn.
+ */
+export function placeLabels(
+  boxes: LabelBox[],
+  shown: ReadonlySet<string>,
+  width: number,
+  height: number,
+): Set<string> {
+  const cols = Math.max(1, Math.ceil(width / LABEL_CELL));
+  const rows = Math.max(1, Math.ceil(height / LABEL_CELL));
+  const taken = new Uint8Array(cols * rows);
+  const order = [...boxes].sort(
+    (a, b) =>
+      a.rank - b.rank || Number(shown.has(b.key)) - Number(shown.has(a.key)) || a.depth - b.depth,
+  );
+  const placed = new Set<string>();
+  for (const box of order) {
+    const cells = cellsOf(box, cols, rows);
+    if (box.rank > 0 && cells.some((i) => taken[i] === 1)) continue;
+    for (const i of cells) taken[i] = 1;
+    placed.add(box.key);
+  }
+  return placed;
+}
+
 /** How much of its opacity the farthest node loses: depth is shown by fading, nearest to farthest. */
 const DEPTH_FADE = 0.7;
 
@@ -596,7 +670,17 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   const opacity = (depth: number) => depthOpacity(depth, near, far);
 
   ctx.lineWidth = 1;
-  const labels: { a: Projected; b: Projected; text: string; hot: boolean; opacity: number }[] = [];
+  type EdgeLabel = {
+    key: string;
+    a: Projected;
+    b: Projected;
+    text: string;
+    hot: boolean;
+    opacity: number;
+    font: string;
+    width: number;
+  } & ReturnType<typeof labelAngle>;
+  const edgeLabels: EdgeLabel[] = [];
   // The edges of the open node and of the node under the pointer are drawn last, in the accent
   // colour and twice as wide, unfaded, so they stand out from the rest.
   const hotEdges: [Projected, Projected][] = [];
@@ -618,16 +702,23 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
       ctx.stroke();
     }
 
-    const scale = Math.min(a.scale, b.scale);
-    if (hot || scale > 0.55) {
-      labels.push({
-        a,
-        b,
-        text: edge.label,
-        hot,
-        opacity: hot ? 1 : edgeOpacity,
-      });
-    }
+    if (!hot && Math.min(a.scale, b.scale) <= 0.55) continue;
+    const font = hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
+    ctx.font = font;
+    const span = ctx.measureText(edge.label).width + LABEL_MARKER;
+    // A label longer than its edge on screen would run over the nodes, so only a hot one is drawn.
+    if (!hot && span > Math.hypot(b.sx - a.sx, b.sy - a.sy)) continue;
+    edgeLabels.push({
+      key: `e\0${edge.from}\0${edge.label}\0${edge.to}`,
+      a,
+      b,
+      text: edge.label,
+      hot,
+      opacity: hot ? 1 : edgeOpacity,
+      font,
+      width: span,
+      ...labelAngle(a.sx, a.sy, b.sx, b.sy),
+    });
   }
   ctx.globalAlpha = 0.9;
   ctx.strokeStyle = palette.accent;
@@ -640,11 +731,52 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   }
   ctx.lineWidth = 1;
 
+  // Which labels are drawn: the open and hovered nodes' and their edges' always, then the open
+  // node's neighbours', then other nodes', then other edges', each only where it overlaps none.
+  const neighbours = new Set<string>();
+  for (const edge of sim.edges) {
+    if (edge.from === sim.selectedId) neighbours.add(edge.to);
+    else if (edge.to === sim.selectedId) neighbours.add(edge.from);
+  }
+  const boxes: LabelBox[] = [];
+  ctx.font = NODE_FONT;
+  for (const [id, p] of projected) {
+    const node = sim.nodes.get(id);
+    if (!node || p.scale <= 0.55) continue;
+    const half = ctx.measureText(node.label).width / 2;
+    const focus = id === sim.selectedId || id === sim.hoverId;
+    boxes.push({
+      key: `n\0${id}`,
+      rank: focus ? 0 : neighbours.has(id) ? 1 : 2,
+      depth: p.depth,
+      cx: p.sx + nodeRadius(p) + 3 + half,
+      cy: p.sy,
+      halfW: half,
+      halfH: 5,
+      angle: 0,
+    });
+  }
+  for (const lab of edgeLabels) {
+    // The label is drawn 6 pixels above its edge, as the label reads.
+    boxes.push({
+      key: lab.key,
+      rank: lab.hot ? 0 : 3,
+      depth: (lab.a.depth + lab.b.depth) / 2,
+      cx: (lab.a.sx + lab.b.sx) / 2 + 6 * Math.sin(lab.angle),
+      cy: (lab.a.sy + lab.b.sy) / 2 - 6 * Math.cos(lab.angle),
+      halfW: lab.width / 2,
+      halfH: 5,
+      angle: lab.angle,
+    });
+  }
+  const placed = placeLabels(boxes, sim.shownLabels, width, height);
+  sim.shownLabels = placed;
+
   for (const [id] of order) {
     const node = sim.nodes.get(id);
     const p = projected.get(id);
     if (!node || !p || p.scale === 0) continue;
-    const r = Math.max(2, 7 * p.scale);
+    const r = nodeRadius(p);
     const isHover = id === sim.hoverId;
     const isSelected = id === sim.selectedId;
     const alpha = node.alpha * (isHover || isSelected ? 1 : opacity(p.depth));
@@ -660,10 +792,10 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
       ctx.stroke();
     }
 
-    if (p.scale > 0.55) {
+    if (placed.has(`n\0${id}`)) {
       ctx.globalAlpha = alpha * 0.9;
       ctx.fillStyle = palette.dim;
-      ctx.font = "10px ui-monospace, monospace";
+      ctx.font = NODE_FONT;
       ctx.fillText(node.label, p.sx + r + 3, p.sy + 3);
     }
     ctx.globalAlpha = 1;
@@ -672,13 +804,10 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   // The hot edges' labels are drawn last, larger and bold, so no other label covers them.
-  for (const lab of [...labels.filter((l) => !l.hot), ...labels.filter((l) => l.hot)]) {
-    ctx.font = lab.hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
-    const width = ctx.measureText(lab.text).width + LABEL_MARKER;
-    const length = Math.hypot(lab.b.sx - lab.a.sx, lab.b.sy - lab.a.sy);
-    // A label longer than its edge on screen would run over the nodes, so only a hot one is drawn.
-    if (!lab.hot && width > length) continue;
-    const { angle, flipped } = labelAngle(lab.a.sx, lab.a.sy, lab.b.sx, lab.b.sy);
+  const drawn = edgeLabels.filter((l) => placed.has(l.key));
+  for (const lab of [...drawn.filter((l) => !l.hot), ...drawn.filter((l) => l.hot)]) {
+    const { angle, flipped, width } = lab;
+    ctx.font = lab.font;
     ctx.save();
     ctx.translate((lab.a.sx + lab.b.sx) / 2, (lab.a.sy + lab.b.sy) / 2);
     ctx.rotate(angle);
@@ -706,6 +835,12 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
 
 /** The room an edge label leaves for its direction marker, in pixels. */
 const LABEL_MARKER = 9;
+const NODE_FONT = "10px ui-monospace, monospace";
+
+/** A node's radius on the canvas, in pixels. */
+function nodeRadius(p: Projected): number {
+  return Math.max(2, 7 * p.scale);
+}
 
 /**
  * The rotation for the label of an edge drawn from (ax, ay) to (bx, by): along the edge, turned at
@@ -748,6 +883,7 @@ export function createSim(): Sim {
     selectedId: null,
     hoverId: null,
     screenPos: new Map(),
+    shownLabels: new Set(),
     camera: { ...INITIAL_CAMERA },
     pivot: null,
     heat: 1,

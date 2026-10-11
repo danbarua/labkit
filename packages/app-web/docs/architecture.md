@@ -72,6 +72,17 @@ it:
   does not swing when the reader's system asks for reduced motion.
 
 A drag or a scroll stops the framing until the next node opens; Reset starts it again. The graph colours nodes by record type or by how they relate to the open resource (temporal).
+
+No two labels on the canvas overlap. In each frame, labels are placed in this order, and a label
+that would overlap one already placed is not drawn:
+
+1. The open and hovered nodes' labels and their edges' labels, drawn even where they overlap.
+2. The open node's neighbours' labels.
+3. Other nodes' labels.
+4. Other edges' labels.
+
+Within each step, a label drawn in the previous frame comes first, so labels do not flicker as the
+camera moves; then the nearest. Hovering a node shows its card whether or not its label is drawn.
 The API returns no standing for a resource, so there is no standing overlay.
 
 The graph card's Play button steps through later acts, one at a time, in the order the acts were
