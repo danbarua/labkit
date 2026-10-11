@@ -270,6 +270,23 @@ async function act(
 
 type Ends = { id?: string; from?: string; to?: string };
 
+/**
+ * A function giving, for an act, a link to the commit it ran against, under `ran_against:commit`,
+ * or nothing when the act names no commit or the workspace's repository `repo` does not hold it.
+ * Each commit is looked up in the repository once.
+ */
+function ranAgainstOf(root: string, repo: Repository | undefined) {
+  const held = new Map<string, boolean>();
+  return (event: RecordedEvent) => {
+    const hash = event.attribution.git_hash;
+    if (hash === null || repo === undefined) return {};
+    if (!held.has(hash)) held.set(hash, holdsCommit(repo, hash));
+    return held.get(hash)
+      ? { [RAN_AGAINST.out]: { href: `${root}/${COMMIT_SLUG}/${hash}`, type: COMMIT_TYPE } }
+      : {};
+  };
+}
+
 /** The fields of a change that name a record: a node's `id`, and an edge's `from` and `to`. */
 const ENDS = ["id", "from", "to"] as const;
 
@@ -289,14 +306,20 @@ function endLinks(origin: string, scope: TenantScope, change: object) {
 
 // `/{handle}/events`: what happened to one record, change by change. The changes that name it are
 // rolled up out of the acts that made them, so these are changes and not acts. Not a resource of
-// its own, so it has no `self`; each event says which act it belongs to. `dir` is the event as seen
-// from the record: `in` when an edge ends at it, `out` when one starts at it, and `subject` when
-// the change is to the record itself.
-async function events(req: Request, scope: TenantScope, handle: string): Promise<Response> {
+// its own, so it has no `self`; each event links the act it belongs to, the records it names, and
+// the commit the act ran against. `dir` is the event as seen from the record: `in` when an edge
+// ends at it, `out` when one starts at it, and `subject` when the change is to the record itself.
+async function events(
+  req: Request,
+  scope: TenantScope,
+  handle: string,
+  repo: Repository | undefined,
+): Promise<Response> {
   const origin = publicOrigin(req).origin;
   const root = `${origin}${scope.prefix}`;
   const self = `${root}/${handle}/${EVENTS_SEGMENT}`;
   const p = await page(req, scope, { naming: handle });
+  const ranAgainst = ranAgainstOf(root, repo);
   const extras = extrasOf(req, HANDLED);
   const carry = <T>(value: T): T =>
     extras.length === 0 ? value : (withExtras(value, extras) as T);
@@ -340,6 +363,7 @@ async function events(req: Request, scope: TenantScope, handle: string): Promise
           _links: carry({
             parent: { href: act, type: ACT_TYPE },
             ...endLinks(origin, scope, change),
+            ...ranAgainst(event),
           }),
         },
       ];
@@ -371,12 +395,14 @@ export async function commitEvents(
   scope: TenantScope,
   base: string,
   hash: string,
+  repo: Repository,
 ): Promise<Response> {
   const origin = publicOrigin(req).origin;
   const root = `${origin}${scope.prefix}`;
   const commit = `${base}/${COMMIT_SLUG}/${hash}`;
   const self = `${commit}/${EVENTS_SEGMENT}`;
   const p = await page(req, scope, { ranAgainst: hash });
+  const ranAgainst = ranAgainstOf(root, repo);
   const extras = extrasOf(req, HANDLED);
   const carry = <T>(value: T): T =>
     extras.length === 0 ? value : (withExtras(value, extras) as T);
@@ -390,6 +416,7 @@ export async function commitEvents(
       _links: carry({
         parent: { href: `${root}/${ACT_SLUG}/${event.seq}`, type: ACT_TYPE },
         ...endLinks(origin, scope, change),
+        ...ranAgainst(event),
       }),
     })),
   );
@@ -428,5 +455,5 @@ export async function eventsHandler(
   if (seq !== undefined) return act(req, scope, Number(seq), repo);
   const handle = decodeURIComponent(EVENTS.exec(rest)?.[1] ?? "");
   if (!HANDLE.test(handle)) return problem(404, "Not Found", `${handle} is not a handle`);
-  return events(req, scope, handle);
+  return events(req, scope, handle, repo);
 }

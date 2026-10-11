@@ -865,7 +865,7 @@ export async function gitHandler(
   const actsOf = ACTS.exec(rest)?.[1];
   if (actsOf !== undefined) return commitActs(req, scope, base, actsOf);
   const eventsOf = EVENTS.exec(rest)?.[1];
-  if (eventsOf !== undefined) return commitEvents(req, scope, base, eventsOf);
+  if (eventsOf !== undefined) return commitEvents(req, scope, base, eventsOf, repo);
   const diffs = DIFFS.exec(rest)?.[1];
   if (diffs !== undefined) return commitDiffs(req, repo, base, diffs, scope.slug);
   const diff = ONE_DIFF.exec(rest);
