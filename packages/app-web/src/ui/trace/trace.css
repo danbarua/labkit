@@ -241,23 +241,6 @@
   letter-spacing: 0.01em;
 }
 
-.trace .hamburger {
-  display: flex;
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-}
-.trace .hamburger:hover {
-  background: var(--panel-2);
-  color: var(--text);
-}
-
 .trace .topbar-gap {
   flex: 1 1 auto;
 }
@@ -310,6 +293,43 @@
   min-height: 0;
 }
 
+/* The rail: a narrow column of icons at the left edge that stays when the sidebar is hidden. Its
+   first button shows or hides the sidebar; the others fold or open one section each. */
+.trace .rail {
+  flex: 0 0 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+.trace .rail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 18px;
+}
+.trace .rail-btn:hover:not(:disabled) {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.trace .rail-btn.on {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+.trace .rail-btn:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
 .trace .sidebar {
   flex: 0 0 288px;
   width: 288px;
@@ -1403,10 +1423,10 @@
     position: fixed;
     z-index: 20;
     top: 52px;
-    left: 0;
+    left: 44px;
     bottom: 0;
     width: 288px;
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% - 44px));
     transition: transform 0.18s ease;
     box-shadow: 2px 0 16px rgba(0, 0, 0, 0.35);
   }

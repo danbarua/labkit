@@ -71,21 +71,19 @@ test.describe("getting around", () => {
     await expect(page.getByText("Pick a type on the left")).toBeVisible();
   });
 
-  test("the top bar has the LabKit name first, then the sidebar toggle, and no history or filter controls", async ({
+  test("the top bar has the LabKit name and no sidebar, history or filter controls", async ({
     page,
   }) => {
     await page.goto("/app/workspace/alpha/Q_1");
     const bar = page.locator(".topbar");
-    const brand = bar.getByRole("button", { name: "LabKit" });
-    const toggle = bar.getByRole("button", { name: "Show or hide the sidebar" });
-    const x = async (locator: import("@playwright/test").Locator) =>
-      (await locator.boundingBox())?.x ?? -1;
-    expect(await x(brand)).toBeLessThan(await x(toggle));
+    await expect(bar.getByRole("button", { name: "LabKit" })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Show or hide the sidebar" })).toHaveCount(0);
     await expect(bar.getByRole("button", { name: "Back" })).toHaveCount(0);
     await expect(bar.getByRole("button", { name: "Forward" })).toHaveCount(0);
     await expect(bar.getByRole("button", { name: "Entry point" })).toHaveCount(0);
     await expect(bar.getByRole("textbox")).toHaveCount(0);
     await expect(bar).not.toContainText("Trace Console");
+    await expect(bar).not.toContainText("live");
   });
 
   test("the Items filter narrows the listed items", async ({ page }) => {
@@ -193,6 +191,27 @@ test.describe("the sidebar", () => {
     page.getByRole("button", { name: "Show or hide the sidebar" });
   const explorer = (page: import("@playwright/test").Page, name: string) =>
     page.getByRole("button", { name, exact: true });
+
+  test("the rail stays when the sidebar is hidden; its section buttons fold or open sections and show the sidebar", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    const rail = page.getByRole("navigation", { name: "Sidebar sections" });
+    await expect(rail).toBeVisible();
+    await toggle(page).click();
+    await expect(sidebar(page)).toBeHidden();
+    await expect(rail).toBeVisible();
+    const files = rail.getByRole("button", { name: "Open File Explorer" });
+    await files.click();
+    await expect(sidebar(page)).toBeVisible();
+    await expect(files).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("region", { name: "File Explorer" })).toBeVisible();
+    await files.click();
+    await expect(files).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      page.getByRole("region", { name: "File Explorer" }).locator(".explorer-body"),
+    ).toHaveCount(0);
+  });
 
   test("at full width, the toggle hides and shows the sidebar, and a reload keeps it hidden", async ({
     page,
