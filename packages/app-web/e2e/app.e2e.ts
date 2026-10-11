@@ -937,12 +937,42 @@ test.describe("playback", () => {
     await expect(header(page)).toHaveText("LOE_1");
   });
 
-  test("from a resource no act records, says so", async ({ page }) => {
+  test("from a record no act changed, says so", async ({ page }) => {
     await page.goto("/app/workspace/alpha/EU_1");
     await expect(header(page)).toHaveText("EU_1");
     await play(page).click();
-    await expect(page.locator(".playback-status")).toHaveText("No act records EU_1.");
+    await expect(page.locator(".playback-status")).toHaveText("No act changed EU_1.");
     await expect(play(page)).toBeVisible();
+  });
+
+  test("from a commit an act ran against, plays the later acts; from one no act ran against, or a file, Play is disabled", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await page.getByRole("button", { name: "Source Explorer", exact: true }).click();
+    const commit = (subject: string) => page.locator(".history .commit-row", { hasText: subject });
+    // Act 1 ran against the first commit; acts 2 and 3 come after it.
+    await commit("Start the project").click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await play(page).click();
+    await expect(page).toHaveURL(/\/NOTE_1/, { timeout: 10_000 });
+    await expect(header(page)).toHaveText("LOE_1", { timeout: 10_000 });
+    await expect(page.locator(".playback-status")).toHaveText("No later act.", {
+      timeout: 10_000,
+    });
+    // The browser reports the 404 for NOTE_1, which the graph does not hold, as a console error.
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+
+    await commit("Change a, plan the work").click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
+    await expect(play(page)).toBeDisabled();
+    await page.getByRole("button", { name: "File Explorer", exact: true }).click();
+    await page.locator(".file-tree").getByRole("button", { name: "README.md" }).click();
+    await expect(header(page)).toHaveText("README.md");
+    await expect(play(page)).toBeDisabled();
   });
 });
 

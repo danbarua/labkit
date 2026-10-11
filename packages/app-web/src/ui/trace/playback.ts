@@ -48,10 +48,10 @@ async function startOf(key: string, acts: string): Promise<{ since: number; fram
   await fetched(resourcePath(key));
   const held = store.index().get(key);
   if (held?.type === "Act") return { since: Number(shortId(key)), frames: true };
-  if (held?.eventsHref === undefined) throw new Stop(`No act records ${shortId(key)}.`);
+  if (held?.eventsHref === undefined) throw new Stop(`No act changed ${shortId(key)}.`);
   const events = (await fetched(requestPath(held.eventsHref)))._embedded?.events;
   const first = Array.isArray(events) ? (events[0] as { seq?: unknown } | undefined) : undefined;
-  if (typeof first?.seq !== "number") throw new Stop(`No act records ${shortId(key)}.`);
+  if (typeof first?.seq !== "number") throw new Stop(`No act changed ${shortId(key)}.`);
   return { since: first.seq, frames: false };
 }
 

@@ -230,7 +230,8 @@ export function EventRow({ event, onOpen }: { event: HalDocument; onOpen: (key: 
       <span className="ev-what">
         <span className="ev-kind">
           <b>{String(event.change)}</b>
-          <span className="pill">{String(event.dir)}</span>
+          {/* A commit's events are not in, out of or about it, so they have no direction. */}
+          {typeof event.dir === "string" ? <span className="pill">{event.dir}</span> : null}
         </span>
         <span title={text}>{truncate(text, 220)}</span>
       </span>

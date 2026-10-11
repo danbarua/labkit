@@ -351,7 +351,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
                   held={held}
                   selected={path}
                   playback={playback.playback}
-                  canPlay={held.get(path)?.own === true || (openIsCollection && listsActs(path))}
+                  canPlay={playsFrom(held, path) || (openIsCollection && listsActs(path))}
                   onToggle={() => setGraphOpen((o) => !o)}
                   onOpen={open}
                   onReset={explored.reset}
@@ -439,6 +439,15 @@ function indexOfList(key: string): string | undefined {
 }
 
 /** Whether collection `key` is the acts collection: the type its own index lists it under is Act. */
+/**
+ * Whether playback can start from resource `key`: an act, or a resource that links its events, once
+ * its own response has arrived. A file, or a commit no act ran against, links none.
+ */
+function playsFrom(held: HeldIndex, key: string): boolean {
+  const res = held.get(key);
+  return res?.own === true && (res.type === "Act" || res.eventsHref !== undefined);
+}
+
 function listsActs(key: string): boolean {
   const upper = indexOfList(key);
   return upper !== undefined && rowIn(upper, key)?.data.type === "Act";
@@ -1391,7 +1400,9 @@ function GraphCard({
             title={
               playing
                 ? "Stop stepping through the acts"
-                : "Step through the later acts, one at a time"
+                : canPlay
+                  ? "Step through the later acts, one at a time"
+                  : "No act changed this or ran against it, so there are no acts to step through from here"
             }
             disabled={!playing && !canPlay}
             onClick={playing ? onPause : onPlay}
