@@ -914,6 +914,42 @@
 .trace .header-top .pill {
   align-self: center;
 }
+/* The view tabs and Reload sit at the right of the header's line. */
+.trace .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  margin-left: auto;
+}
+.trace .view-tabs {
+  display: flex;
+  gap: 2px;
+}
+.trace .view-tab {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.trace .view-tab:hover {
+  color: var(--text);
+}
+.trace .view-tab.on {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.trace .tbtn.icon {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+}
 
 .trace .skeleton .bar {
   display: block;
@@ -929,11 +965,6 @@
   }
 }
 
-.trace .toolbar {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-}
 .trace .tbtn {
   background: var(--panel-2);
   border: 1px solid var(--line);

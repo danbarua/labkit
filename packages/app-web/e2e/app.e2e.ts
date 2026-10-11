@@ -591,6 +591,32 @@ test.describe("an open resource", () => {
     await expect(page.locator(".response-card .lk-code-text")).toContainText("alpha question");
   });
 
+  test("Overview, Debug and Reload sit on the header's line, at its right", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    const middle = async (locator: import("@playwright/test").Locator) => {
+      const b = await locator.boundingBox();
+      return b === null ? -1 : b.y + b.height / 2;
+    };
+    const handle = await middle(header(page));
+    for (const control of [
+      page.getByRole("tab", { name: "Overview" }),
+      page.getByRole("tab", { name: "Debug" }),
+      page.getByRole("button", { name: "Reload from the API" }),
+    ])
+      expect(Math.abs((await middle(control)) - handle)).toBeLessThanOrEqual(6);
+    const right = async (locator: import("@playwright/test").Locator) => {
+      const b = await locator.boundingBox();
+      return b === null ? -1 : b.x + b.width;
+    };
+    expect(
+      Math.abs(
+        (await right(page.getByRole("button", { name: "Reload from the API" }))) -
+          (await right(page.locator(".header-top"))),
+      ),
+    ).toBeLessThanOrEqual(1);
+  });
+
   test("an unknown tab in the address opens the overview", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1?tab=nonsense");
     await expect(header(page)).toHaveText("Q_1");

@@ -122,7 +122,7 @@ Text that is not UTF-8, or a binary file of a text type, gets the note.
 | Column | Shows |
 |--------|-------|
 | Left | The sidebar, in three sections that fold: File Explorer, Source Explorer, and Record Explorer, which lists two collections: the one picked (`?list=`) and the collection it is listed in. |
-| Centre | The graph, a card that folds: the resources opened in the workspace since its last reset and what they relate to, on a 3D canvas (`GraphView`). Clicking a node opens its resource. Below it, the open resource. Tabs: Overview (properties, then a card for each related resource, outbound then inbound), Debug (the response and the record's events). `?tab=` names the tab. |
+| Centre | The graph, a card that folds: the resources opened in the workspace since its last reset and what they relate to, on a 3D canvas (`GraphView`). Clicking a node opens its resource. Below it, the open resource. Tabs: Overview (properties, then a card for each related resource, outbound then inbound), Debug, drawn as a wrench (the response, and the events of the record, or of the acts that ran against the commit). `?tab=` names the tab. The tabs and Reload sit at the right of the line with the resource's name. |
 
 The button at the left of the top bar shows or hides the sidebar:
 

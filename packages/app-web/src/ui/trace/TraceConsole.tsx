@@ -31,6 +31,7 @@ import {
   PlayIcon,
   SealCheckIcon,
   SidebarSimpleIcon,
+  WrenchIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
@@ -1078,31 +1079,42 @@ function Detail({
               </span>
             );
           })}
-        </div>
-        <div className="toolbar" role="tablist">
-          {(["overview", "debug"] as const).map((t) => (
+          {/* Overview and Debug are views of the resource, so they are tabs; Reload is an action. */}
+          <div className="header-actions">
+            <div className="view-tabs" role="tablist" aria-label="View">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "overview"}
+                className={tab === "overview" ? "view-tab on" : "view-tab"}
+                onClick={() => onTab("overview")}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "debug"}
+                aria-label="Debug"
+                title="Debug: the API's response, and the events that changed this"
+                className={tab === "debug" ? "view-tab on" : "view-tab"}
+                onClick={() => onTab("debug")}
+              >
+                <WrenchIcon aria-hidden="true" />
+              </button>
+            </div>
             <button
-              key={t}
               type="button"
-              role="tab"
-              aria-selected={tab === t}
-              className={tab === t ? "tbtn on" : "tbtn"}
-              onClick={() => onTab(t)}
+              className="tbtn icon"
+              title="Reload from the API"
+              aria-label="Reload from the API"
+              onClick={() =>
+                store.reload((p) => p === resourcePath(path) || p.startsWith(`${path}/events`))
+              }
             >
-              {t === "overview" ? "Overview" : "Debug"}
+              <ArrowClockwiseIcon aria-hidden="true" />
             </button>
-          ))}
-          <button
-            type="button"
-            className="tbtn"
-            title="Reload from the API"
-            aria-label="Reload from the API"
-            onClick={() =>
-              store.reload((p) => p === resourcePath(path) || p.startsWith(`${path}/events`))
-            }
-          >
-            <ArrowClockwiseIcon aria-hidden="true" />
-          </button>
+          </div>
         </div>
       </div>
       {tab === "debug" && res !== undefined ? (
