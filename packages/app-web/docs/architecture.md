@@ -54,7 +54,10 @@ keeps each response as it arrived and draws from them; a resource's own response
 that lists all of its relations. The palette comes from `@labkit/design`.
 
 An act records a change to a resource rather than being one, so the graph draws an opened act as
-the act's subject and has no nodes for acts. The graph colours nodes by record type or by how they relate to the open resource (temporal).
+the act's subject and has no nodes for acts. When a node opens, the camera eases toward framing
+it: the node up and left of centre, the rest of the graph turned toward the bottom-right corner
+behind the hover card, and the node's neighbours filling 30% of the canvas's shorter side. A drag
+or a scroll stops the framing until the next node opens; Reset starts it again. The graph colours nodes by record type or by how they relate to the open resource (temporal).
 The API returns no standing for a resource, so there is no standing overlay.
 
 The graph card's Play button steps through later acts, one at a time, in the order the acts were

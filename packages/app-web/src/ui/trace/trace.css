@@ -968,8 +968,10 @@
 .trace .graph-stage .hint {
   color: var(--text-dim);
 }
+/* The card lets the graph behind it show through, blurred, so it covers less of the graph. */
 .trace .graph-stage .popover {
-  background: var(--panel);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  backdrop-filter: blur(6px);
   border-color: var(--line);
   padding: 0;
   width: 340px;

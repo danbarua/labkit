@@ -314,7 +314,7 @@ test.describe("the graph", () => {
       .toBeGreaterThan(2);
   });
 
-  test("the camera faces the open resource: its node is drawn in the lower-left quadrant", async ({
+  test("the camera faces the open resource: its node is drawn left of centre, clear of the card", async ({
     page,
   }) => {
     await page.goto("/app/workspace/alpha/LOE_1");
@@ -326,8 +326,8 @@ test.describe("the graph", () => {
         const data = c
           .getContext("2d")
           ?.getImageData(
-            Math.floor(c.width * 0.25) - 2,
-            Math.floor(c.height * 0.75) - 2,
+            Math.floor(c.width * 0.35) - 2,
+            Math.floor(c.height * 0.45) - 2,
             5,
             5,
           ).data;
@@ -493,7 +493,7 @@ test.describe("playback", () => {
     const kind = page.locator('[data-overlay="structural"]');
     const box = async () => {
       const b = await kind.boundingBox();
-      return b && [b.x, b.y, b.width, b.height].map(Math.round);
+      return b ? [b.x, b.y, b.width, b.height] : [];
     };
     const before = await box();
     await expect(page.locator(".graph-foot").getByRole("button", { name: "Play" })).toBeVisible();
@@ -501,7 +501,11 @@ test.describe("playback", () => {
     await expect(page.locator(".graph-foot .playback-status")).toHaveText("pose Q_1", {
       timeout: 10_000,
     });
-    expect(await box()).toEqual(before);
+    // Within a pixel: layout rounds fractional positions differently from one frame to the next.
+    const after = await box();
+    expect(after).toHaveLength(4);
+    for (const [i, value] of after.entries())
+      expect(Math.abs(value - (before[i] ?? 0))).toBeLessThanOrEqual(1);
     await pause(page).click();
     // Act 2's subject, NOTE_1, may have been fetched: the browser reports its 404.
     expect(errors.every((e) => e.includes("404"))).toBe(true);

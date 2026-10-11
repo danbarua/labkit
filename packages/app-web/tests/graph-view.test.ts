@@ -2,11 +2,14 @@ import { describe, expect, test } from "bun:test";
 import {
   createSim,
   depthOpacity,
+  distanceToFit,
+  followPivot,
   INITIAL_CAMERA,
   labelAngle,
   mergeSeeds,
   screenAxes,
   tickPhysics,
+  yawToward,
 } from "../src/ui/GraphView";
 
 describe("the graph's depth fade", () => {
@@ -84,5 +87,67 @@ describe("an edge label's rotation", () => {
     ] as const) {
       expect(Math.abs(labelAngle(ax, ay, bx, by).angle)).toBeLessThanOrEqual(Math.PI / 2);
     }
+  });
+});
+
+describe("the camera's framing", () => {
+  // Where a point relative to the pivot is drawn, ignoring perspective, as the canvas does.
+  const drawn = (v: { x: number; y: number; z: number }, yaw: number, pitch: number) => {
+    const x1 = v.x * Math.cos(yaw) - v.z * Math.sin(yaw);
+    const z1 = v.x * Math.sin(yaw) + v.z * Math.cos(yaw);
+    return { x: x1, y: v.y * Math.cos(pitch) - z1 * Math.sin(pitch) };
+  };
+
+  test("turns the rest of the graph toward the bottom-right corner", () => {
+    for (const v of [
+      { x: 0, y: 0, z: 100 },
+      { x: -80, y: -40, z: 20 },
+      { x: 30, y: 10, z: -90 },
+    ]) {
+      const yaw = yawToward(v, 0.35, 0);
+      const at = drawn(v, yaw, 0.35);
+      expect(at.x).toBeGreaterThan(0);
+      expect(at.x + at.y).toBeGreaterThan(0);
+    }
+  });
+
+  test("keeps its yaw when no other turns the graph a tenth of its length further", () => {
+    const v = { x: 100, y: 100, z: 0 };
+    expect(yawToward(v, 0, 0)).toBe(0);
+  });
+
+  test("zooms so the farthest neighbour is drawn at the given radius", () => {
+    const d = distanceToFit([{ x: 100, y: 0, z: 0 }], { yaw: 0, pitch: 0 }, 160);
+    expect(d).toBeCloseTo(400);
+    const nearer = distanceToFit(
+      [
+        { x: 50, y: 0, z: 0 },
+        { x: 100, y: 0, z: 0 },
+      ],
+      { yaw: 0, pitch: 0 },
+      160,
+    );
+    expect(nearer).toBeCloseTo(400);
+    expect(distanceToFit([], { yaw: 0, pitch: 0 }, 160)).toBeUndefined();
+  });
+});
+
+describe("the camera's pivot", () => {
+  test("eases toward the open node, and stays put while the open resource has no node", () => {
+    const sim = createSim();
+    mergeSeeds(sim, [{ id: "a", label: "a", type: "Question" }], [], "a");
+    const a = sim.nodes.get("a")!;
+    a.x = 100;
+    a.y = 50;
+    sim.selectedId = "a";
+    for (let i = 0; i < 200; i++) followPivot(sim);
+    expect(sim.pivot?.x).toBeCloseTo(100);
+    expect(sim.pivot?.y).toBeCloseTo(50);
+
+    // An act opened before its subject is known: the canvas has no node for it.
+    sim.selectedId = "/w/x/act/7";
+    const held = { ...sim.pivot! };
+    followPivot(sim);
+    expect(sim.pivot).toEqual(held);
   });
 });
