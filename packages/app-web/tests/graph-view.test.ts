@@ -256,6 +256,7 @@ describe("label placement", () => {
     frame: 100,
     shown: new Set(shown),
     hiddenAt: new Map(hiddenAt),
+    faded: new Map(shown.map((key) => [key, 10])),
   });
   const place = (boxes: ReturnType<typeof box>[], before = memory()) =>
     [...placeLabels(boxes, before, 400, 300).shown].sort();
@@ -314,6 +315,31 @@ describe("label placement", () => {
     const after = placeLabels([neighbour, other], memory(["other"]), 400, 300);
     expect(after.frame).toBe(101);
     expect(after.hiddenAt.get("other")).toBe(101);
+  });
+
+  test("a placed label fades in over 10 frames; one no longer placed fades out over 10 and is dropped", () => {
+    const a = box("a", { cx: 100, cy: 100 });
+    const near = box("near", { rank: 1, cx: 110, cy: 104 });
+    let state = memory();
+    const seen: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      state = placeLabels([a], state, 400, 300);
+      seen.push(state.faded.get("a") ?? 0);
+    }
+    expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10]);
+    // A neighbour's label takes the place: `a` fades out, still drawn but taking no room.
+    state = placeLabels([a, near], state, 400, 300);
+    expect([...state.shown]).toEqual(["near"]);
+    expect(state.faded.get("a")).toBe(9);
+    for (let i = 0; i < 8; i++) state = placeLabels([a, near], state, 400, 300);
+    expect(state.faded.get("a")).toBe(1);
+    state = placeLabels([a, near], state, 400, 300);
+    expect(state.faded.has("a")).toBe(false);
+  });
+
+  test("a label that is no longer a candidate is dropped at once", () => {
+    const after = placeLabels([], memory(["a"]), 400, 300);
+    expect(after.faded.size).toBe(0);
   });
 
   test("a lower rank is placed first, whatever its depth or the last frame", () => {

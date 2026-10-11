@@ -93,6 +93,10 @@ frame is favoured over one that was not:
 | Smallest node size, as the perspective scale | 0.5 | 0.55 |
 | Longest edge label, as a share of its edge's length on screen | 120% | 100% |
 | After being hidden | — | Not drawn for 0.5 s, except steps 1 and 2 above |
+
+A label fades in over 10 frames, about 0.17 s, once placed, and fades out over the same time once
+not. A label fading out takes no room, so another may fade in where it was. A label whose node
+becomes too small, or whose edge becomes too short, is not faded out.
 The API returns no standing for a resource, so there is no standing overlay.
 
 The graph card's Play button steps through later acts, one at a time, in the order the acts were

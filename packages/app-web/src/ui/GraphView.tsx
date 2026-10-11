@@ -599,15 +599,26 @@ const LABEL_CLEAR = 6;
  * label that a turning neighbour sweeps across is hidden and drawn again several times a second.
  */
 const LABEL_HOLD = 30;
+/**
+ * How many frames, about 0.17s at 60 frames a second, a label takes to fade in once placed, and to
+ * fade out once not. A label fading out takes no room, so another may fade in where it was.
+ */
+const LABEL_FADE = 10;
 
 /** What label placement keeps from one frame to the next. */
 export type LabelMemory = {
   /** How many frames have been placed. */
   frame: number;
-  /** The keys of the labels drawn in the last frame. */
+  /** The keys of the labels placed in the last frame. Each is drawn, fading in until it is opaque. */
   shown: Set<string>;
   /** For each label hidden within the last LABEL_HOLD frames, the frame in which it was hidden. */
   hiddenAt: Map<string, number>;
+  /**
+   * For each label to draw, placed or fading out, how far it has faded in: from 1 to LABEL_FADE
+   * steps, drawn at that share of LABEL_FADE of its opacity. A label that is no longer a
+   * candidate, such as one whose node is now too small, is not drawn.
+   */
+  faded: Map<string, number>;
 };
 
 /** The indices of the cells, in a grid `cols` wide and `rows` high, whose centres lie in `box`. */
@@ -638,7 +649,8 @@ function cellsOf(box: LabelBox, cols: number, rows: number): number[] {
  * that no two overlap except where one has rank 0. Labels are placed by rank; within a rank,
  * those drawn in the last frame come first, then the nearest. A label that would overlap one
  * already placed is not drawn. One not drawn in the last frame also needs LABEL_CLEAR of space
- * around it, and, from rank 2, is not drawn within LABEL_HOLD frames of being hidden.
+ * around it, and, from rank 2, is not drawn within LABEL_HOLD frames of being hidden. Labels
+ * fade in and out over LABEL_FADE frames.
  */
 export function placeLabels(
   boxes: LabelBox[],
@@ -669,7 +681,13 @@ export function placeLabels(
   }
   const hidden = new Map([...hiddenAt].filter(([, at]) => frame - at < LABEL_HOLD));
   for (const key of shown) if (!placed.has(key)) hidden.set(key, frame);
-  return { frame, shown: placed, hiddenAt: hidden };
+  const faded = new Map<string, number>();
+  for (const { key } of boxes) {
+    const was = memory.faded.get(key) ?? 0;
+    const now = placed.has(key) ? Math.min(LABEL_FADE, was + 1) : was - 1;
+    if (now > 0) faded.set(key, now);
+  }
+  return { frame, shown: placed, hiddenAt: hidden, faded };
 }
 
 /** How much of its opacity the farthest node loses: depth is shown by fading, nearest to farthest. */
@@ -826,7 +844,8 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
     return ctx.measureText(text).width;
   });
   sim.labels = placeLabels(boxes, sim.labels, width, height);
-  const placed = sim.labels.shown;
+  // The share of its opacity a label is drawn at as it fades in or out; 0 for one not drawn.
+  const fade = (key: string) => (sim.labels.faded.get(key) ?? 0) / LABEL_FADE;
 
   for (const [id] of order) {
     const node = sim.nodes.get(id);
@@ -848,8 +867,9 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
       ctx.stroke();
     }
 
-    if (placed.has(`n\0${id}`)) {
-      ctx.globalAlpha = alpha * 0.9;
+    const labelOpacity = fade(`n\0${id}`);
+    if (labelOpacity > 0) {
+      ctx.globalAlpha = alpha * 0.9 * labelOpacity;
       ctx.fillStyle = palette.dim;
       ctx.font = NODE_FONT;
       ctx.fillText(node.label, p.sx + r + 3, p.sy + 3);
@@ -860,14 +880,16 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   // The hot edges' labels are drawn last, larger and bold, so no other label covers them.
-  const drawn = edgeLabels.filter((l) => placed.has(l.key));
+  const drawn = edgeLabels.filter((l) => fade(l.key) > 0);
   for (const lab of [...drawn.filter((l) => !l.hot), ...drawn.filter((l) => l.hot)]) {
     const { angle, flipped, width } = lab;
+    const labelOpacity = fade(lab.key);
     ctx.font = lab.font;
     ctx.save();
     ctx.translate((lab.a.sx + lab.b.sx) / 2, (lab.a.sy + lab.b.sy) / 2);
     ctx.rotate(angle);
-    ctx.globalAlpha = lab.hot ? 0.95 : 0.75 * opacity((lab.a.depth + lab.b.depth) / 2);
+    ctx.globalAlpha =
+      labelOpacity * (lab.hot ? 0.95 : 0.75 * opacity((lab.a.depth + lab.b.depth) / 2));
     ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
     const y = -6;
     ctx.fillText(lab.text, flipped ? LABEL_MARKER / 2 : -LABEL_MARKER / 2, y);
@@ -939,7 +961,7 @@ export function createSim(): Sim {
     selectedId: null,
     hoverId: null,
     screenPos: new Map(),
-    labels: { frame: 0, shown: new Set(), hiddenAt: new Map() },
+    labels: { frame: 0, shown: new Set(), hiddenAt: new Map(), faded: new Map() },
     camera: { ...INITIAL_CAMERA },
     pivot: null,
     heat: 1,
