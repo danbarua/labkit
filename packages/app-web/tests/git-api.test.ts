@@ -465,6 +465,7 @@ describe("acts and the commits they ran against", () => {
       subject: "Q_1",
       _links: { parent: { href: `${ORIGIN}/workspace/alpha/act/1`, type: "Act" } },
     });
+    expect(all[0]._links.id).toEqual({ href: `${ORIGIN}/workspace/alpha/Q_1`, type: "Question" });
     // No change names the commit, so none is in, out of, or about it.
     expect(all.some((e: any) => "dir" in e)).toBe(false);
     // No act ran against the third commit, so it has no events to link.

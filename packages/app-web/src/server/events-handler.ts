@@ -270,6 +270,23 @@ async function act(
 
 type Ends = { id?: string; from?: string; to?: string };
 
+/** The fields of a change that name a record: a node's `id`, and an edge's `from` and `to`. */
+const ENDS = ["id", "from", "to"] as const;
+
+// Links to the records `change` names, each under the name of the field that names it, so a page
+// shows them without building an address from a handle.
+function endLinks(origin: string, scope: TenantScope, change: object) {
+  const named = change as Ends;
+  return Object.fromEntries(
+    ENDS.flatMap((field) => {
+      const handle = named[field];
+      return typeof handle === "string"
+        ? [[field, { href: `${origin}${nodePath(scope.prefix, handle)}`, type: typeOf(handle) }]]
+        : [];
+    }),
+  );
+}
+
 // `/{handle}/events`: what happened to one record, change by change. The changes that name it are
 // rolled up out of the acts that made them, so these are changes and not acts. Not a resource of
 // its own, so it has no `self`; each event says which act it belongs to. `dir` is the event as seen
@@ -320,7 +337,10 @@ async function events(req: Request, scope: TenantScope, handle: string): Promise
           subject: event.subject,
           dir,
           ...change,
-          _links: carry({ parent: { href: act, type: ACT_TYPE } }),
+          _links: carry({
+            parent: { href: act, type: ACT_TYPE },
+            ...endLinks(origin, scope, change),
+          }),
         },
       ];
     }),
@@ -367,7 +387,10 @@ export async function commitEvents(
       operation: event.operation,
       subject: event.subject,
       ...change,
-      _links: carry({ parent: { href: `${root}/${ACT_SLUG}/${event.seq}`, type: ACT_TYPE } }),
+      _links: carry({
+        parent: { href: `${root}/${ACT_SLUG}/${event.seq}`, type: ACT_TYPE },
+        ...endLinks(origin, scope, change),
+      }),
     })),
   );
   const paging = carry([...pageLinks(root, self, p), { rel: "about", href: commit }]).reduce(

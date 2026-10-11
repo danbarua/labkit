@@ -474,6 +474,20 @@ describe("acts", () => {
       href: `${PUBLIC}/workspace/alpha/act/2`,
       type: "Act",
     });
+    // Each event links the records its change names, under the field that names each.
+    expect(events[0]._links.id).toEqual({
+      href: `${PUBLIC}/workspace/alpha/Q_1`,
+      type: "Question",
+    });
+    expect(events[1]._links.from).toEqual({
+      href: `${PUBLIC}/workspace/alpha/NOTE_1`,
+      type: "Note",
+    });
+    expect(events[1]._links.to).toEqual({
+      href: `${PUBLIC}/workspace/alpha/Q_1`,
+      type: "Question",
+    });
+    expect(events[1]._links.id).toBeUndefined();
 
     const note = await get("/workspace/alpha/NOTE_1/events");
     expect(note.body._embedded.events.map((e: any) => [e.seq, e.index, e.dir])).toEqual([
