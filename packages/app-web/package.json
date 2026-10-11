@@ -36,6 +36,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@tanstack/react-router": "^1.170.38",
+    "diff": "^8.0.4",
     "effect": "catalog:",
     "effective-acp": "catalog:",
     "es-git": "^0.7.0",

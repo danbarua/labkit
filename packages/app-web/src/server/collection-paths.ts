@@ -28,3 +28,8 @@ export const EVENTS_SEGMENT = "events";
 export function collectionPath(prefix: string, slug: string): string {
   return `${prefix}/${slug}`;
 }
+
+// A workspace's git history, newest first, when a repository is mapped to the workspace. Not node
+// types: commits and files are read from the repository on each request, not kept in the graph.
+export const COMMIT_SLUG = "commit";
+export const COMMIT_TYPE = "Commit";

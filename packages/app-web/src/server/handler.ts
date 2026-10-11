@@ -6,6 +6,7 @@ import {
 } from "./collections-handler";
 import { docsHandler } from "./docs-handler";
 import { eventsHandler, isEventsPath } from "./events-handler";
+import { gitHandler, isGitPath } from "./git-handler";
 import { apiCatalogHandler, graphHandler, publicOrigin } from "./graph-handler";
 
 function json(data: unknown, status = 200): Response {
@@ -90,6 +91,10 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
     console.debug("request: workspace", slug, rest);
     if (isEventsPath(rest)) {
       return inWorkspace(runtime, slug, (scope) => eventsHandler(req, scope, rest));
+    }
+    if (isGitPath(rest)) {
+      const repo = runtime.repositories.get(slug);
+      return inWorkspace(runtime, slug, async (scope) => gitHandler(req, scope, repo, rest));
     }
     const name = /^\/([^/]+)$/.exec(rest)?.[1];
     if (name !== undefined && !isCollectionSlug(name)) {
