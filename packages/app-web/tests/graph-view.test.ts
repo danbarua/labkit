@@ -161,6 +161,55 @@ describe("the camera's framing", () => {
     expect(sim.camera.pitch).toBeCloseTo(INITIAL_CAMERA.pitch, 3);
   });
 
+  describe("the sway", () => {
+    const degrees = (r: number) => (r * 180) / Math.PI;
+    // A followed camera on two linked nodes, settled on its framing with the sway held still.
+    const settled = () => {
+      const sim = createSim();
+      mergeSeeds(sim, [seed("a"), seed("b")], [{ from: "a", to: "b", label: "R" }], "a");
+      sim.selectedId = "a";
+      sim.nodes.get("b")!.x = sim.nodes.get("a")!.x + 90;
+      sim.pointerOn = true;
+      for (let i = 0; i < 600; i++) frameCamera(sim, 800, 400);
+      sim.pointerOn = false;
+      return sim;
+    };
+    // The spread of yaws the camera passes through in `frames` frames.
+    const swing = (sim: ReturnType<typeof createSim>, frames: number) => {
+      let min = Number.POSITIVE_INFINITY;
+      let max = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < frames; i++) {
+        frameCamera(sim, 800, 400);
+        min = Math.min(min, sim.camera.yaw);
+        max = Math.max(max, sim.camera.yaw);
+      }
+      return degrees(max - min);
+    };
+
+    test("swings the camera about 30° either side of its framing over 16s", () => {
+      const sim = settled();
+      const aim = sim.aim;
+      const range = swing(sim, 2 * 16 * 60);
+      expect(range).toBeGreaterThan(55);
+      expect(range).toBeLessThan(61);
+      expect(sim.aim).toBe(aim);
+    });
+
+    test("holds still while the pointer is on the canvas", () => {
+      const sim = settled();
+      swing(sim, 200);
+      sim.pointerOn = true;
+      swing(sim, 400);
+      expect(swing(sim, 400)).toBeLessThan(0.01);
+    });
+
+    test("does not sway when the reader asks for reduced motion", () => {
+      const sim = settled();
+      sim.reducedMotion = true;
+      expect(swing(sim, 16 * 60)).toBeLessThan(0.01);
+    });
+  });
+
   test("zooms so the farthest neighbour is drawn at the given radius", () => {
     const d = distanceToFit([{ x: 100, y: 0, z: 0 }], { yaw: 0, pitch: 0 }, 160);
     expect(d).toBeCloseTo(400);

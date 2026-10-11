@@ -69,6 +69,14 @@ type Sim = {
   heat: number;
   /** Whether the camera frames the open node by itself: set when a node opens, cleared by a drag or a scroll. */
   follow: boolean;
+  /** The yaw the framing chose, which the sway swings about; null until it chooses after following starts. */
+  aim: number | null;
+  /** Where the sway is in its cycle, in radians. */
+  swayPhase: number;
+  /** Whether the pointer is over the canvas. The sway holds still while it is. */
+  pointerOn: boolean;
+  /** Whether the reader's system asks for reduced motion. The camera does not sway when it does. */
+  reducedMotion: boolean;
   drag: Drag | null;
   dragged: boolean;
 };
@@ -315,6 +323,12 @@ const FRAME_EASE = 0.05;
  */
 const SPREAD_KEEP = 0.87;
 /**
+ * While the camera follows, it swings about the vertical through the pivot, SWAY either side of
+ * the yaw the framing chose, over a cycle of 16s at 60 frames a second, so depth shows by parallax.
+ */
+const SWAY = Math.PI / 6;
+const SWAY_STEP = (2 * Math.PI) / (16 * 60);
+/**
  * The nearest and farthest the camera frames from. A small graph spaces its few nodes far apart
  * along the time axis, and fitting them all would draw every node a pixel or two across.
  */
@@ -411,7 +425,8 @@ export function distanceToFit(
  * While the camera follows, eases it toward framing the open node: tilted to the initial camera's
  * pitch, turned as `yawToward` chooses, so the open node's neighbours are seen spread out and the
  * rest of the graph lies behind them toward the bottom-right corner, and zoomed so the
- * neighbours fill FIT of the canvas's shorter side.
+ * neighbours fill FIT of the canvas's shorter side. The turn sways by SWAY either side, except
+ * while the pointer is on the canvas or the reader asks for reduced motion.
  */
 export function frameCamera(sim: Sim, width: number, height: number): void {
   const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
@@ -442,8 +457,15 @@ export function frameCamera(sim: Sim, width: number, height: number): void {
   });
   const centroid =
     count > 0 ? { x: rest.x / count, y: rest.y / count, z: rest.z / count } : { x: 0, y: 0, z: 0 };
-  const target = yawToward({ rest: centroid, near: points, pitch, yaw: camera.yaw });
-  camera.yaw += turnBetween(camera.yaw, target) * FRAME_EASE;
+  if (sim.aim === null) {
+    sim.aim = camera.yaw;
+    sim.swayPhase = 0;
+  }
+  sim.aim = yawToward({ rest: centroid, near: points, pitch, yaw: sim.aim });
+  if (!sim.pointerOn && !sim.reducedMotion)
+    sim.swayPhase = (sim.swayPhase + SWAY_STEP) % (2 * Math.PI);
+  const goal = sim.aim + SWAY * Math.sin(sim.swayPhase);
+  camera.yaw += turnBetween(camera.yaw, goal) * FRAME_EASE;
   const fit = distanceToFit(points, camera, FIT * Math.min(width, height));
   if (fit !== undefined) {
     const target = Math.min(FRAME_DISTANCE.max, Math.max(FRAME_DISTANCE.min, fit));
@@ -727,6 +749,10 @@ export function createSim(): Sim {
     pivot: null,
     heat: 1,
     follow: true,
+    aim: null,
+    swayPhase: 0,
+    pointerOn: false,
+    reducedMotion: false,
     drag: null,
     dragged: false,
   };
@@ -797,6 +823,12 @@ export function GraphView({
     });
     const wrap = canvas.parentElement;
     if (wrap) ro.observe(wrap);
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onMotion = () => {
+      simRef.current.reducedMotion = motion.matches;
+    };
+    onMotion();
+    motion.addEventListener("change", onMotion);
 
     const onPointerDown = (event: PointerEvent) => {
       const s = simRef.current;
@@ -813,6 +845,7 @@ export function GraphView({
         if (Math.hypot(dx, dy) > 4) {
           s.dragged = true;
           s.follow = false;
+          s.aim = null;
         }
         s.camera.yaw = s.drag.yaw + dx * 0.006;
         s.camera.pitch = s.drag.pitch - dy * 0.006;
@@ -823,6 +856,7 @@ export function GraphView({
       const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
       const hit = inside ? hitTest(s, mx, my) : null;
       s.hoverId = hit !== null && s.nodes.has(hit) ? hit : null;
+      s.pointerOn = inside;
       setHoverId(s.hoverId);
       setPointerOn(inside);
     };
@@ -842,11 +876,13 @@ export function GraphView({
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       simRef.current.follow = false;
+      simRef.current.aim = null;
       const cam = simRef.current.camera;
       cam.distance = Math.max(120, Math.min(2200, cam.distance + event.deltaY * 0.6));
     };
     const onLeave = () => {
       simRef.current.hoverId = null;
+      simRef.current.pointerOn = false;
       setHoverId(null);
       setPointerOn(false);
     };
@@ -860,6 +896,7 @@ export function GraphView({
 
     return () => {
       ro.disconnect();
+      motion.removeEventListener("change", onMotion);
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);

@@ -65,6 +65,9 @@ it:
   one that puts the rest of the graph behind them and furthest toward the bottom-right corner,
   behind the hover card.
 - The camera zooms so the node's neighbours fill 30% of the canvas's shorter side.
+- The camera swings 30° either side of that turn, about the vertical through the node, once every
+  16 seconds, so depth shows by parallax. It holds still while the pointer is on the canvas and
+  does not swing when the reader's system asks for reduced motion.
 
 A drag or a scroll stops the framing until the next node opens; Reset starts it again. The graph colours nodes by record type or by how they relate to the open resource (temporal).
 The API returns no standing for a resource, so there is no standing overlay.
