@@ -73,9 +73,17 @@ The button at the left of the top bar shows or hides the sidebar:
 - In a window 860 px wide or narrower, the sidebar is a drawer over the page, closed until the
   button opens it. Opening a resource closes it.
 
-The browser also keeps whether Record Explorer is folded. File Explorer and Source Explorer are
-disabled, with the reason under each header: no workspace is open, or the open workspace serves no
-files or history. No workspace serves them yet.
+The browser also keeps whether each section is folded. The sections list:
+
+| Section | Lists | Opening an item shows |
+| --- | --- | --- |
+| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. | The file's properties and its text, numbered by line. |
+| Source Explorer | The workspace's commits, newest first. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
+| Record Explorer | The workspace's collections of records and acts, and the items of the one picked. The `file` and `commit` collections are left out. | The record. |
+
+File Explorer and Source Explorer are enabled when the open workspace's index lists a collection
+of type `File` or `Commit` ("Files and history" above). Otherwise each is disabled, with the reason
+under its header: no workspace is open, or the open workspace serves no files or history.
 
 Every resource is requested at `depth=2`, so its neighbours arrive with their properties. The page
 keeps each response as it arrived and draws from them; a resource's own response is the only one

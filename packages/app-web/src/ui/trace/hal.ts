@@ -68,6 +68,14 @@ export function typeColour(type: string | undefined): string {
   return name === "" ? "var(--text-faint)" : `var(--c-${name}, var(--text-faint))`;
 }
 
+/**
+ * The types the API serves a workspace's files and git history as. They are the server's
+ * (`src/server/collection-paths.ts`); a unit test keeps the two the same.
+ */
+export const FILE_TYPE = "File";
+export const DIRECTORY_TYPE = "Directory";
+export const COMMIT_TYPE = "Commit";
+
 export const TYPE_ABBR: Record<string, string> = {
   Question: "Q",
   LineOfEnquiry: "LoE",
@@ -84,6 +92,9 @@ export const TYPE_ABBR: Record<string, string> = {
   Review: "Rv",
   Note: "No",
   Workspace: "Ws",
+  File: "Fi",
+  Directory: "Di",
+  Commit: "Co",
 };
 
 export function abbreviation(type: string): string {

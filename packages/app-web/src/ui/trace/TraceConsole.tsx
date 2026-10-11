@@ -52,10 +52,12 @@ import { useSavedFlag } from "../saved-flag";
 import { useSavedTheme } from "../saved-theme";
 import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
+  COMMIT_TYPE,
   type CollectionItem,
   collectionOf,
   drawnAs,
   edgeLabelOf,
+  FILE_TYPE,
   type HalDocument,
   type Held,
   type HeldIndex,
@@ -77,6 +79,8 @@ import {
   usePages,
   useStoreVersion,
 } from "./hal-store";
+import { FileTree, History } from "./explorers";
+import { CommitView, FileView, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
 import { Badge, EventRow, JsonView, PropRows, type Prose } from "./values";
@@ -517,25 +521,52 @@ function Lists({
   }, [behind, loadMore]);
 
   const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.trace.records", true);
+  const [filesOpen, setFilesOpen] = useSavedFlag("labkit.trace.files", false);
+  const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.trace.history", false);
+  // The open workspace's index says whether it serves files and history, and where.
+  const indexKey = workspace?.replace(/\/$/, "");
+  const indexDoc = docOf(useDocument(indexKey === undefined ? undefined : requestPath(indexKey)));
+  const served = (type: string) =>
+    indexKey === undefined || indexDoc === undefined
+      ? undefined
+      : collectionOf(indexKey, indexDoc).items.find((item) => item.data.type === type)?.key;
+  const filesKey = served(FILE_TYPE);
+  const historyKey = served(COMMIT_TYPE);
   const slug = workspace?.split("/")[2];
+  const unavailable = (key: string | undefined, what: string) =>
+    slug === undefined
+      ? `Open a workspace to browse its ${what}.`
+      : indexDoc === undefined
+        ? `Loading ${slug}…`
+        : key === undefined
+          ? `${slug} serves no ${what}.`
+          : undefined;
   return (
     <aside className={className}>
       <Explorer
         title="File Explorer"
         icon={<FolderIcon aria-hidden="true" />}
-        unavailable={
-          slug === undefined ? "Open a workspace to browse its files." : `${slug} serves no files.`
-        }
-      />
+        unavailable={unavailable(filesKey, "files")}
+        open={filesOpen}
+        onToggle={() => setFilesOpen(!filesOpen)}
+        scrolls
+      >
+        {filesKey === undefined ? null : (
+          <FileTree rootKey={filesKey} openKey={openKey} onOpen={onOpen} />
+        )}
+      </Explorer>
       <Explorer
         title="Source Explorer"
         icon={<GitCommitIcon aria-hidden="true" />}
-        unavailable={
-          slug === undefined
-            ? "Open a workspace to browse its history."
-            : `${slug} serves no history.`
-        }
-      />
+        unavailable={unavailable(historyKey, "history")}
+        open={historyOpen}
+        onToggle={() => setHistoryOpen(!historyOpen)}
+        scrolls
+      >
+        {historyKey === undefined ? null : (
+          <History historyKey={historyKey} openKey={openKey} onOpen={onOpen} />
+        )}
+      </Explorer>
       <Explorer
         title="Record Explorer"
         icon={<DatabaseIcon aria-hidden="true" />}
@@ -562,6 +593,7 @@ function Lists({
               {...{ held, term, openKey, onOpen, onList }}
               lowerKey={lowerRow}
               pageable={false}
+              hidden={IN_OTHER_EXPLORERS}
             />
           </div>
         </div>
@@ -609,6 +641,7 @@ function Explorer({
   open = false,
   unavailable,
   onToggle,
+  scrolls = false,
   children,
 }: {
   title: string;
@@ -616,6 +649,8 @@ function Explorer({
   open?: boolean;
   unavailable?: string;
   onToggle?: () => void;
+  /** Whether the section's body scrolls as a whole, rather than a list inside it. */
+  scrolls?: boolean;
   children?: ReactNode;
 }) {
   const shown = open && unavailable === undefined;
@@ -639,10 +674,15 @@ function Explorer({
           {unavailable}
         </div>
       )}
-      {shown ? <div className="explorer-body">{children}</div> : null}
+      {shown ? (
+        <div className={scrolls ? "explorer-body scrolls" : "explorer-body"}>{children}</div>
+      ) : null}
     </section>
   );
 }
+
+/** The collections the File and Source Explorers list, which Record Explorer leaves out. */
+const IN_OTHER_EXPLORERS: ReadonlySet<string> = new Set([FILE_TYPE, COMMIT_TYPE]);
 
 function Pane({
   pages,
@@ -654,6 +694,7 @@ function Pane({
   onOpen,
   onList,
   pageable,
+  hidden,
 }: {
   pages: Pages<CollectionItem>;
   empty: string;
@@ -664,9 +705,12 @@ function Pane({
   onOpen: (key: string) => void;
   onList: (key: string) => void;
   pageable: boolean;
+  /** The types of the items not listed here. */
+  hidden?: ReadonlySet<string>;
 }) {
   const needle = term.trim().toLowerCase();
   const rows = pages.items.filter((item) => {
+    if (typeof item.data.type === "string" && hidden?.has(item.data.type)) return false;
     if (!needle) return true;
     const d = item.data;
     const text =
@@ -934,14 +978,23 @@ function Detail({
     );
   // Until the resource's own response arrives, the page keeps the layout it will have: the header,
   // the tabs, and Properties with placeholder rows when no properties are held yet.
-  const a = res?.attrs;
+  const attrs = res?.attrs;
+  const apart = SHOWN_APART[res?.type ?? ""] ?? [];
+  // A file's text and a commit's diff are drawn in panels of their own, not as property rows.
+  const a =
+    attrs === undefined
+      ? undefined
+      : Object.fromEntries(Object.entries(attrs).filter(([k]) => !apart.includes(k)));
+  const doc = docOf(entry);
   const pills = PILL_KEYS.filter((k) => typeof a?.[k] === "string" && a[k]);
   return (
     <>
       <div className="detail-header">
         <div className="header-top">
           <Badge type={res?.type} />
-          <span className="header-id">{shortId(path)}</span>
+          <span className="header-id">
+            {res?.type === COMMIT_TYPE ? shortId(path).slice(0, 7) : shortId(path)}
+          </span>
           <span className="header-type">{res?.type}</span>
           {pills.map((k) => {
             const v = String(a?.[k]);
@@ -997,6 +1050,12 @@ function Detail({
               )}
             </div>
           </div>
+          {loaded && attrs !== undefined && res?.type === FILE_TYPE ? (
+            <FileView attrs={attrs} />
+          ) : null}
+          {loaded && attrs !== undefined && doc !== undefined && res?.type === COMMIT_TYPE ? (
+            <CommitView doc={doc} attrs={attrs} onOpen={onOpen} />
+          ) : null}
           {loaded
             ? (["out", "in"] as const).flatMap((dir) =>
                 relGroups(res, dir).map((g) => (
@@ -1343,7 +1402,10 @@ function graphOf(
   const edges: GraphEdgeSeed[] = [];
   const node = (key: string) => {
     if (!nodes.has(key)) {
-      nodes.set(key, { id: key, label: shortId(key), type: held.get(key)?.type ?? "?" });
+      const type = held.get(key)?.type ?? "?";
+      // A commit's id is 40 characters; its first 7 name it, as in `git log --oneline`.
+      const label = type === COMMIT_TYPE ? shortId(key).slice(0, 7) : shortId(key);
+      nodes.set(key, { id: key, label, type });
     }
   };
   for (const key of explored) {
