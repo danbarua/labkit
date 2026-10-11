@@ -22,20 +22,45 @@ export interface GitFixture {
 
 const AUTHOR = { name: "Ada Tester", email: "ada@example.invalid" };
 
+/** A 1×1 transparent PNG. */
+export const PIXEL_PNG = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+  0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+  0x42, 0x60, 0x82,
+]);
+
+/** A markdown document with a picture and a link given relative to it, and an anchor. */
+export const GUIDE_MD = [
+  "# Guide",
+  "",
+  "![a pixel](../pixel.png)",
+  "",
+  "See [the plan](../notes/plan.md), the [top](#guide), and [the web](https://example.com).",
+  "",
+].join("\n");
+
 /** A text longer than the API's diff and file limits: 2,000 lines of 80 characters. */
 export const BIG_TEXT = `${"x".repeat(79)}\n`.repeat(2_000);
 
 /**
  * With `wide`, a fourth commit adds that many files under `wide/`, to pass the API's page size.
  * With `branches`, a branch `side` forks from the second commit, HEAD's branch merges it, and a
- * remote-tracking `origin/main` points at the third commit.
+ * remote-tracking `origin/main` points at the third commit. With `media`, a last commit adds
+ * `pixel.png` and `docs/guide.md`, which shows the picture and links the plan; with `huge`, one
+ * adds `huge.bin` of that many bytes.
  */
 export async function createGitFixture({
   wide,
   branches,
+  media,
+  huge,
 }: {
   wide?: number;
   branches?: boolean;
+  media?: boolean;
+  huge?: number;
 } = {}): Promise<GitFixture> {
   const folder = await realpath(await mkdtemp(join(tmpdir(), "labkit-git-")));
   const repo = await initRepository(folder);
@@ -124,5 +149,12 @@ export async function createGitFixture({
     await mkdir(join(folder, ".git/refs/remotes/origin"), { recursive: true });
     await writeFile(join(folder, ".git/refs/remotes/origin/main"), `${third}\n`);
   }
+  if (media)
+    await commit("Add a picture and a guide", 250, {
+      "pixel.png": PIXEL_PNG,
+      "docs/guide.md": GUIDE_MD,
+    });
+  if (huge !== undefined)
+    await commit("Add a huge file", 300, { "huge.bin": new Uint8Array(huge) });
   return { folder, repo, commits, close: () => rm(folder, { recursive: true, force: true }) };
 }
