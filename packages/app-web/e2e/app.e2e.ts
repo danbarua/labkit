@@ -361,6 +361,8 @@ test.describe("the sidebar", () => {
     await expect
       .poll(async () => (await top(box)) - (await top(commit("Add a picture and a guide"))))
       .toBe(0);
+    // The box has rounded corners, as the boxes in the other lists do.
+    expect(await box.evaluate((e) => getComputedStyle(e).borderTopLeftRadius)).toBe("6px");
     await commit("Side work").click();
     await expect(commit("Side work")).toHaveClass(/active/);
     await expect(history.locator(".active-box.fill")).toHaveClass(/filled/);

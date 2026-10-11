@@ -529,20 +529,6 @@
   border-color: var(--accent);
   background: var(--accent-dim);
 }
-/* In File Explorer the box marks the open file, as it does in the Items pane. */
-.trace .file-tree {
-  position: relative;
-}
-.trace .file-tree .tree-row {
-  position: relative;
-}
-.trace .file-tree .tree-row.active {
-  background: none;
-  border-color: transparent;
-}
-.trace .file-tree .active-box.fill:not(.filled) ~ .tree-row.active {
-  background: var(--panel-2);
-}
 .trace .tree-icon {
   flex: none;
   color: var(--text-dim);
@@ -629,30 +615,9 @@
   gap: 6px;
   height: 38px;
   padding: 0 6px 0 2px;
-  border-radius: 0;
 }
 .trace .commit-row.timeline-row.tip {
   border-color: var(--accent);
-}
-/* In Source Explorer the box marks the open commit, as it does in File Explorer. Rows touch, so
-   the box has square corners like them. An open tip keeps the tip's outline. */
-.trace .history {
-  position: relative;
-}
-.trace .history .commit-row {
-  position: relative;
-}
-.trace .history .commit-row.active {
-  background: none;
-}
-.trace .history .commit-row.active:not(.tip) {
-  border-color: transparent;
-}
-.trace .history .active-box.fill:not(.filled) ~ .commit-row.active {
-  background: var(--panel-2);
-}
-.trace .history .active-box {
-  border-radius: 0;
 }
 .trace .lanes {
   flex: none;
@@ -772,20 +737,6 @@
   background: var(--accent-dim);
   border-color: var(--accent);
 }
-/* In the Collections pane the box marks the listed collection, as it marks the open row below. */
-.trace .type-list {
-  position: relative;
-}
-.trace .type-list .type-row {
-  position: relative;
-}
-.trace .type-list .type-row.active {
-  background: none;
-  border-color: transparent;
-}
-.trace .type-list .active-box.fill:not(.filled) ~ .type-row.active {
-  background: var(--panel-2);
-}
 .trace .type-swatch {
   width: 9px;
   height: 9px;
@@ -799,7 +750,6 @@
 }
 
 .trace .res-list {
-  position: relative;
   display: flex;
   flex-direction: column;
 }
@@ -827,6 +777,34 @@
   z-index: 2;
   border: 1px solid var(--accent);
 }
+/* Every list the box marks: Collections, Items, File Explorer and Source Explorer. The list holds
+   the box, which the rows are drawn over; the open row shows no fill or border of its own, except
+   its hover background until the box arrives, and the outline of an open branch tip. */
+.trace :is(.file-tree, .type-list, .res-list, .history) {
+  position: relative;
+}
+.trace :is(.file-tree .tree-row, .type-list .type-row, .res-list .res-item, .history .commit-row) {
+  position: relative;
+}
+.trace
+  :is(
+    .file-tree .tree-row,
+    .type-list .type-row,
+    .res-list .res-item,
+    .history .commit-row
+  ).active {
+  background: none;
+  border-color: transparent;
+}
+.trace .history .commit-row.active.tip {
+  border-color: var(--accent);
+}
+.trace
+  :is(.file-tree, .type-list, .res-list, .history)
+  .active-box.fill:not(.filled)
+  ~ :is(.tree-row, .type-row, .res-item, .commit-row).active {
+  background: var(--panel-2);
+}
 .trace .res-item {
   display: flex;
   align-items: flex-start;
@@ -846,16 +824,6 @@
 .trace .res-item.active {
   background: var(--accent-dim);
   border-color: var(--accent);
-}
-.trace .res-list .res-item {
-  position: relative;
-}
-.trace .res-list .res-item.active {
-  background: none;
-  border-color: transparent;
-}
-.trace .res-list .active-box.fill:not(.filled) ~ .res-item.active {
-  background: var(--panel-2);
 }
 .trace .res-item .badge {
   margin-top: 1px;
