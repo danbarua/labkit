@@ -236,7 +236,6 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
           >
             <SidebarSimpleIcon aria-hidden="true" />
           </button>
-          <span className="brand-sub">live · {window.location.host}</span>
           <span className="topbar-gap" />
           {import.meta.env.DEV ? <DevLinks /> : null}
           <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
