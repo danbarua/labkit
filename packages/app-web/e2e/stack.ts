@@ -23,7 +23,7 @@ const ports = {
 };
 
 const fixture = await createFixture("pglite");
-const git = await createGitFixture();
+const git = await createGitFixture({ branches: true });
 // Act 1, posing Q_1, ran against the repository's first commit.
 {
   const session = await fixture.connections.connect();

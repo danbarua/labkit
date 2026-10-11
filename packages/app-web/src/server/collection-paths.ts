@@ -43,3 +43,9 @@ export const SUBMODULE_TYPE = "Submodule";
 // One changed file's diff in a commit, `/commit/{id}/diff/{path}`: a child of the commit, fetched
 // only where the diff is shown.
 export const DIFF_TYPE = "Diff";
+
+// A workspace's branches, local and remote-tracking, `/branch`, and every branch's commits in one
+// list, `/timeline`, linked from the history at `/commit`.
+export const BRANCH_SLUG = "branch";
+export const BRANCH_TYPE = "Branch";
+export const TIMELINE_SLUG = "timeline";

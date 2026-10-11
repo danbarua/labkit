@@ -25,8 +25,18 @@ const AUTHOR = { name: "Ada Tester", email: "ada@example.invalid" };
 /** A text longer than the API's diff and file limits: 2,000 lines of 80 characters. */
 export const BIG_TEXT = `${"x".repeat(79)}\n`.repeat(2_000);
 
-/** With `wide`, a fourth commit adds that many files under `wide/`, to pass the API's page size. */
-export async function createGitFixture({ wide }: { wide?: number } = {}): Promise<GitFixture> {
+/**
+ * With `wide`, a fourth commit adds that many files under `wide/`, to pass the API's page size.
+ * With `branches`, a branch `side` forks from the second commit, HEAD's branch merges it, and a
+ * remote-tracking `origin/main` points at the third commit.
+ */
+export async function createGitFixture({
+  wide,
+  branches,
+}: {
+  wide?: number;
+  branches?: boolean;
+} = {}): Promise<GitFixture> {
   const folder = await realpath(await mkdtemp(join(tmpdir(), "labkit-git-")));
   const repo = await initRepository(folder);
   const commits: string[] = [];
@@ -92,5 +102,27 @@ export async function createGitFixture({ wide }: { wide?: number } = {}): Promis
       ),
     );
 
+  if (branches) {
+    const [, second, third] = commits;
+    const at = (seconds: number) => ({
+      ...AUTHOR,
+      timeOptions: { timestamp: 1_790_000_000 + seconds, offset: 0 },
+    });
+    const side = repo.commit(repo.getCommit(second!).tree(), "Side work", {
+      updateRef: "refs/heads/side",
+      parents: [second!],
+      author: at(90),
+      committer: at(90),
+    });
+    const merge = repo.commit(repo.getCommit(third!).tree(), "Merge side", {
+      updateRef: "HEAD",
+      parents: [third!, side],
+      author: at(200),
+      committer: at(200),
+    });
+    commits.push(side, merge);
+    await mkdir(join(folder, ".git/refs/remotes/origin"), { recursive: true });
+    await writeFile(join(folder, ".git/refs/remotes/origin/main"), `${third}\n`);
+  }
   return { folder, repo, commits, close: () => rm(folder, { recursive: true, force: true }) };
 }

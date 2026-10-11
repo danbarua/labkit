@@ -506,6 +506,65 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A timeline row: the lanes, then the commit's text. Rows touch, so the lanes' lines run on. */
+.trace .history:has(.timeline-row) {
+  display: flex;
+  flex-direction: column;
+}
+.trace .commit-row.timeline-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 6px 0 2px;
+  border-radius: 0;
+}
+.trace .commit-row.timeline-row.tip {
+  border-color: var(--accent);
+}
+.trace .lanes {
+  flex: none;
+  stroke-width: 1.5;
+}
+.trace .commit-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.trace .ref-pill {
+  flex: none;
+  max-width: 9em;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+.trace .ref-pill.head {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.trace .branch-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.trace .branch-pick select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
 .trace .commit-meta {
   font-size: 11px;
   overflow: hidden;

@@ -436,3 +436,64 @@ describe("acts and the commits they ran against", () => {
     expect(acts.body._embedded.acts.map((a: any) => a.id)).toEqual(["3"]);
   });
 });
+
+describe("a workspace's branches and timeline", () => {
+  let forked: GitFixture;
+  let head: string;
+  const getForked = async (path: string) => {
+    const res = await handle(
+      new Request(ORIGIN + path),
+      createRuntime(fixture.connections, new Map([["alpha", forked.repo]])),
+    );
+    return { status: res.status, body: (await res.json()) as any };
+  };
+  beforeAll(async () => {
+    forked = await createGitFixture({ branches: true });
+    head = forked.repo.head().shorthand();
+  });
+  afterAll(() => forked?.close());
+
+  test("lists the local branches, then the remote-tracking ones, HEAD's marked current", async () => {
+    const [, , third, side, merge] = forked.commits;
+    const { body } = await getForked("/workspace/alpha/branch");
+    expect(body._embedded.branch.map((b: any) => [b.name, b.remote, b.current, b.tip])).toEqual([
+      [head, false, true, merge],
+      ["side", false, false, side],
+      ["origin/main", true, false, third],
+    ]);
+    expect(body._embedded.branch[2]._links["points_to:commit"]).toEqual({
+      href: commitHref(third!),
+      type: "Commit",
+      dir: "out",
+    });
+    expect(body._embedded.branch[2]._embedded["points_to:commit"].name).toBe(
+      "Drop the blob, add a big file",
+    );
+  });
+
+  test("serves one branch by its name, a slash in it encoded", async () => {
+    const one = await getForked("/workspace/alpha/branch/origin%2Fmain");
+    expect(one.status).toBe(200);
+    expect(one.body._links.self.href).toBe(`${ORIGIN}/workspace/alpha/branch/origin%2Fmain`);
+    const none = await getForked("/workspace/alpha/branch/nope");
+    expect(none.status).toBe(404);
+  });
+
+  test("the timeline lists every branch's commits, children first, with parents and branch names", async () => {
+    const [first, second, third, side, merge] = forked.commits;
+    const { body } = await getForked("/workspace/alpha/timeline");
+    expect(body._embedded.timeline.map((c: any) => [c.id, c.parents, c.branches, c.head])).toEqual([
+      [merge, [third, side], [head], true],
+      [third, [second], ["origin/main"], false],
+      [side, [second], ["side"], false],
+      [second, [first], [], false],
+      [first, [], [], false],
+    ]);
+  });
+
+  test("the history at /commit links the timeline and the branches", async () => {
+    const { body } = await getForked("/workspace/alpha/commit?limit=1");
+    expect(body._links.timeline.href).toBe(`${ORIGIN}/workspace/alpha/timeline`);
+    expect(body._links.branches.href).toBe(`${ORIGIN}/workspace/alpha/branch`);
+  });
+});
