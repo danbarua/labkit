@@ -617,6 +617,25 @@ test.describe("an open resource", () => {
     ).toBeLessThanOrEqual(1);
   });
 
+  test("an event draws the records its change names as chips: the open one marked, the others opening theirs", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=debug");
+    const created = page.locator(".ev", { hasText: "#1.1" });
+    await expect(created.locator(".mention.current")).toHaveText("Q_1");
+    // Act 2 drew an edge from NOTE_1 to Q_1: its ends either side of its label, on one line.
+    const edge = page.locator(".ev", { hasText: "#2.2" });
+    await expect(edge.locator(".ev-kind")).toHaveText(/EdgeCreated\s*NOTE_1\s*\S+\s*Q_1/);
+    await expect(edge.locator(".mention.current")).toHaveText("Q_1");
+    await edge.getByRole("button", { name: "NOTE_1" }).click();
+    await expect(page).toHaveURL(/\/NOTE_1/);
+    // The graph does not hold NOTE_1: the browser reports its 404.
+    await expect(page.locator(".fetch-error")).toContainText("404");
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+  });
+
   test("an unknown tab in the address opens the overview", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1?tab=nonsense");
     await expect(header(page)).toHaveText("Q_1");

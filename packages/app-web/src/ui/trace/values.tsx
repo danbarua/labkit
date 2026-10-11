@@ -4,13 +4,14 @@
  */
 
 import { FileTextIcon, GitCommitIcon, type Icon } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   abbreviation,
   fmtDate,
   type HalDocument,
   isDateKey,
   keyOf,
+  linksOf,
   truncate,
   typeColour,
 } from "./hal";
@@ -195,21 +196,80 @@ export function PropRows({ attrs, prose }: { attrs: Record<string, unknown>; pro
   );
 }
 
-/** The members of an event shown in its own columns, left out of its detail. */
+/** The members of an event shown in its own columns or as its chips, left out of its detail. */
 const EVENT_COLUMNS = new Set(["seq", "index", "operation", "subject", "dir", "change", "_links"]);
+
+/** The members of a change that name a record, each linked under its own name. */
+const ENDS = ["id", "from", "to"] as const;
+
+/**
+ * A record a change names, as a chip on its type's colour that opens it. The open record,
+ * `current`, is marked rather than linked; a handle the event links no record for is drawn dashed.
+ */
+function EndChip({
+  event,
+  field,
+  current,
+  onOpen,
+}: {
+  event: HalDocument;
+  field: (typeof ENDS)[number];
+  current: string | undefined;
+  onOpen: (key: string) => void;
+}) {
+  const handle = String(event[field]);
+  const link = linksOf(event, field)[0];
+  if (link === undefined) return <span className="mention unknown">{handle}</span>;
+  const key = keyOf(link.href);
+  const style = { "--mention": typeColour(link.type) } as CSSProperties;
+  return key === current ? (
+    <span className="mention current" style={style} aria-current="true" title={link.type}>
+      {handle}
+    </span>
+  ) : (
+    <button
+      type="button"
+      className="mention"
+      style={style}
+      title={link.type}
+      onClick={() => onOpen(key)}
+    >
+      {handle}
+    </button>
+  );
+}
 
 /**
  * One change in a record's history: its position in the log, which opens the act that made it,
- * the operation, the kind of change and its direction, and the rest as JSON.
+ * the operation, and the change on one line. An edge is its two ends either side of its label; a
+ * node, or a change to one, is the record it names, whose chip's colour and title give its type.
+ * Each record is a chip that opens it, except `current`, the open one. The change's other members,
+ * such as `props`, follow as JSON; a change that names no record is all JSON.
  */
-export function EventRow({ event, onOpen }: { event: HalDocument; onOpen: (key: string) => void }) {
-  const detail: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(event)) if (!EVENT_COLUMNS.has(k)) detail[k] = v;
-  const text = JSON.stringify(detail);
-  const parent = event._links?.parent;
-  const parentHref = Array.isArray(parent) ? parent[0]?.href : parent?.href;
+export function EventRow({
+  event,
+  current,
+  onOpen,
+}: {
+  event: HalDocument;
+  current?: string;
+  onOpen: (key: string) => void;
+}) {
+  const edge = typeof event.from === "string" && typeof event.to === "string";
+  const node = !edge && typeof event.id === "string";
+  // A node's label is its type, which its chip gives; an edge's is drawn between its ends.
+  const shown = new Set<string>([...EVENT_COLUMNS, ...(edge || node ? [...ENDS, "label"] : [])]);
+  const rest = Object.fromEntries(Object.entries(event).filter(([k]) => !shown.has(k)));
+  const keys = Object.keys(rest);
+  const detail =
+    keys.length === 0 ? undefined : keys.length === 1 && "props" in rest ? rest.props : rest;
+  const text = detail === undefined ? undefined : JSON.stringify(detail);
+  const parentHref = linksOf(event, "parent")[0]?.href;
   const label = `#${String(event.seq)}.${String(event.index)}`;
   const operation = String(event.operation);
+  const chip = (field: (typeof ENDS)[number]) => (
+    <EndChip event={event} field={field} current={current} onOpen={onOpen} />
+  );
   return (
     <div className="ev">
       {parentHref === undefined ? (
@@ -230,10 +290,17 @@ export function EventRow({ event, onOpen }: { event: HalDocument; onOpen: (key: 
       <span className="ev-what">
         <span className="ev-kind">
           <b>{String(event.change)}</b>
-          {/* A commit's events are not in, out of or about it, so they have no direction. */}
-          {typeof event.dir === "string" ? <span className="pill">{event.dir}</span> : null}
+          {edge ? (
+            <>
+              {chip("from")}
+              <span className="ev-label">{String(event.label)}</span>
+              {chip("to")}
+            </>
+          ) : node ? (
+            chip("id")
+          ) : null}
         </span>
-        <span title={text}>{truncate(text, 220)}</span>
+        {text === undefined ? null : <span title={text}>{truncate(text, 220)}</span>}
       </span>
     </div>
   );

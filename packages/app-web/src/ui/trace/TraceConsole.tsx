@@ -1262,7 +1262,9 @@ function Debug({
       >
         {doc === undefined ? <Spinner>loading…</Spinner> : <JsonView value={doc} preview={40} />}
       </ContentCard>
-      {res.eventsHref === undefined ? null : <Events href={res.eventsHref} onOpen={onOpen} />}
+      {res.eventsHref === undefined ? null : (
+        <Events href={res.eventsHref} current={res.key} onOpen={onOpen} />
+      )}
     </>
   );
 }
@@ -1277,7 +1279,16 @@ const readEvents = (doc: HalDocument) => {
 };
 
 /** A record's events, from its `events` link: one row per change, oldest first, a page at a time. */
-function Events({ href, onOpen }: { href: string; onOpen: (key: string) => void }) {
+function Events({
+  href,
+  current,
+  onOpen,
+}: {
+  href: string;
+  /** The open resource, whose chip in each event is marked rather than linked. */
+  current: string;
+  onOpen: (key: string) => void;
+}) {
   const path = requestPath(href);
   const events = usePages(path, readEvents);
   return (
@@ -1290,7 +1301,12 @@ function Events({ href, onOpen }: { href: string; onOpen: (key: string) => void 
       </div>
       <div className="panel-body">
         {events.items.map((e) => (
-          <EventRow key={`${String(e.seq)}.${String(e.index)}`} event={e} onOpen={onOpen} />
+          <EventRow
+            key={`${String(e.seq)}.${String(e.index)}`}
+            event={e}
+            current={current}
+            onOpen={onOpen}
+          />
         ))}
         {events.error !== undefined ? (
           <div className="empty-panel">Fetch failed: {events.error}</div>

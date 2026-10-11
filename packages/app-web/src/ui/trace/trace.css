@@ -1264,12 +1264,22 @@
 }
 .trace .ev-kind {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 3px 8px;
 }
 .trace .ev-what b {
   color: var(--text);
   font-weight: 600;
+}
+.trace .ev-label {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+/* The open record, in an event that names it: filled with its colour rather than linked. */
+.trace .mention.current {
+  background: color-mix(in srgb, var(--mention) 22%, transparent);
 }
 .trace .events-more {
   margin: 8px 0;

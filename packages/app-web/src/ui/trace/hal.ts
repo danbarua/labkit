@@ -158,7 +158,8 @@ export function fmtDate(iso: string): string {
   return `${d.toLocaleString("en-GB", opts)} UTC`;
 }
 
-function linksOf(node: HalDocument, rel: string): HalLink[] {
+/** The links of `node` named `rel`: none, one, or each of several. */
+export function linksOf(node: HalDocument, rel: string): HalLink[] {
   const value = node._links?.[rel];
   return value === undefined ? [] : [value].flat();
 }
