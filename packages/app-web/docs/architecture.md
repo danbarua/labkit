@@ -81,8 +81,18 @@ that would overlap one already placed is not drawn:
 3. Other nodes' labels.
 4. Other edges' labels.
 
-Within each step, a label drawn in the previous frame comes first, so labels do not flicker as the
-camera moves; then the nearest. Hovering a node shows its card whether or not its label is drawn.
+Within each step, a label drawn in the previous frame comes first, then the nearest. Hovering a
+node shows its card whether or not its label is drawn.
+
+So that labels do not flicker while the camera or the layout moves, a label drawn in the previous
+frame is favoured over one that was not:
+
+| Rule | Label drawn in the previous frame | Label not drawn in the previous frame |
+| --- | --- | --- |
+| Space it needs | Its own box | Its box and 6 px clear on every side |
+| Smallest node size, as the perspective scale | 0.5 | 0.55 |
+| Longest edge label, as a share of its edge's length on screen | 120% | 100% |
+| After being hidden | — | Not drawn for 0.5 s, except steps 1 and 2 above |
 The API returns no standing for a resource, so there is no standing overlay.
 
 The graph card's Play button steps through later acts, one at a time, in the order the acts were

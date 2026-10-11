@@ -8,6 +8,7 @@ import {
   INITIAL_CAMERA,
   labelAngle,
   mergeSeeds,
+  labelCandidates,
   placeLabels,
   screenAxes,
   tickPhysics,
@@ -250,8 +251,14 @@ describe("label placement", () => {
     key: string,
     at: { rank?: number; depth?: number; cx: number; cy: number; angle?: number },
   ) => ({ key, rank: 2, depth: 500, halfW: 20, halfH: 5, angle: 0, ...at });
-  const place = (boxes: ReturnType<typeof box>[], shown: string[] = []) =>
-    [...placeLabels(boxes, new Set(shown), 400, 300)].sort();
+  // What placement kept from frame 100: the labels drawn in it, and when others were hidden.
+  const memory = (shown: string[] = [], hiddenAt: [string, number][] = []) => ({
+    frame: 100,
+    shown: new Set(shown),
+    hiddenAt: new Map(hiddenAt),
+  });
+  const place = (boxes: ReturnType<typeof box>[], before = memory()) =>
+    [...placeLabels(boxes, before, 400, 300).shown].sort();
 
   test("of two labels that overlap, the nearer is drawn and the other is not", () => {
     const far = box("far", { depth: 600, cx: 100, cy: 100 });
@@ -261,21 +268,58 @@ describe("label placement", () => {
 
   test("labels that do not overlap are all drawn", () => {
     const a = box("a", { cx: 100, cy: 100 });
-    const b = box("b", { cx: 100, cy: 114 });
-    const c = box("c", { cx: 150, cy: 100 });
+    const b = box("b", { cx: 100, cy: 122 });
+    const c = box("c", { cx: 160, cy: 100 });
     expect(place([a, b, c])).toEqual(["a", "b", "c"]);
   });
 
   test("a label drawn in the last frame keeps its place over a nearer label of its rank", () => {
     const shown = box("shown", { depth: 600, cx: 100, cy: 100 });
     const near = box("near", { depth: 400, cx: 110, cy: 104 });
-    expect(place([shown, near], ["shown"])).toEqual(["shown"]);
+    expect(place([shown, near], memory(["shown"]))).toEqual(["shown"]);
+  });
+
+  test("a label not drawn in the last frame needs clear space around it; one that was drawn does not", () => {
+    const a = box("a", { depth: 400, cx: 100, cy: 100 });
+    // 2 pixels below `a`, and 12 pixels below it.
+    const close = box("close", { depth: 600, cx: 100, cy: 112 });
+    const clear = box("clear", { depth: 600, cx: 100, cy: 122 });
+    expect(place([a, close], memory(["a"]))).toEqual(["a"]);
+    expect(place([a, close], memory(["a", "close"]))).toEqual(["a", "close"]);
+    expect(place([a, clear], memory(["a"]))).toEqual(["a", "clear"]);
+  });
+
+  test("a label hidden within the last 30 frames is not drawn, even where it fits", () => {
+    const held = box("held", { cx: 100, cy: 100 });
+    expect(place([held], memory([], [["held", 72]]))).toEqual([]);
+    expect(place([held], memory([], [["held", 71]]))).toEqual(["held"]);
+  });
+
+  test("the open node's, its edges' and its neighbours' labels are drawn as soon as they fit", () => {
+    const open = box("open", { rank: 0, cx: 100, cy: 100 });
+    const neighbour = box("neighbour", { rank: 1, cx: 100, cy: 200 });
+    const hidden = memory(
+      [],
+      [
+        ["open", 99],
+        ["neighbour", 99],
+      ],
+    );
+    expect(place([open, neighbour], hidden)).toEqual(["neighbour", "open"]);
+  });
+
+  test("a label drawn in the last frame and not in this one is recorded as hidden in this frame", () => {
+    const neighbour = box("neighbour", { rank: 1, cx: 100, cy: 100 });
+    const other = box("other", { cx: 110, cy: 104 });
+    const after = placeLabels([neighbour, other], memory(["other"]), 400, 300);
+    expect(after.frame).toBe(101);
+    expect(after.hiddenAt.get("other")).toBe(101);
   });
 
   test("a lower rank is placed first, whatever its depth or the last frame", () => {
     const neighbour = box("neighbour", { rank: 1, depth: 900, cx: 100, cy: 100 });
     const other = box("other", { rank: 2, depth: 100, cx: 110, cy: 104 });
-    expect(place([other, neighbour], ["other"])).toEqual(["neighbour"]);
+    expect(place([other, neighbour], memory(["other"]))).toEqual(["neighbour"]);
   });
 
   test("rank 0 is drawn even where it overlaps another label", () => {
@@ -289,13 +333,49 @@ describe("label placement", () => {
     const up = box("up", { cx: 200, cy: 150, angle: Math.PI / 4 });
     const down = box("down", { cx: 200, cy: 150, angle: -Math.PI / 4 });
     expect(place([up, down])).toHaveLength(1);
-    // 14 pixels apart, across their direction: further than their 10-pixel height.
+    // 24 pixels apart, across their direction: 14 pixels clear of each other.
     const beside = box("beside", {
-      cx: 200 + 14 * Math.cos((3 * Math.PI) / 4),
-      cy: 150 + 14 * Math.sin((3 * Math.PI) / 4),
+      cx: 200 + 24 * Math.cos((3 * Math.PI) / 4),
+      cy: 150 + 24 * Math.sin((3 * Math.PI) / 4),
       angle: Math.PI / 4,
     });
     expect(place([up, beside])).toEqual(["beside", "up"]);
+  });
+
+  describe("which labels are candidates", () => {
+    const seed = (id: string) => ({ id, label: id, type: "Question" });
+    const measure = (text: string) => 6 * text.length;
+    const at = (sx: number, scale: number) => ({ sx, sy: 100, scale, depth: 500 });
+    const keys = (
+      sim: ReturnType<typeof createSim>,
+      projected: Map<string, ReturnType<typeof at>>,
+    ) =>
+      labelCandidates(sim, projected, measure)
+        .boxes.map((b) => b.key.replace(/\0/g, " "))
+        .sort();
+
+    test("a node's label drawn in the last frame stays a candidate down to scale 0.5; a new one needs 0.55", () => {
+      const sim = createSim();
+      mergeSeeds(sim, [seed("a")], [], null);
+      const projected = new Map([["a", at(100, 0.53)]]);
+      expect(keys(sim, projected)).toEqual([]);
+      sim.labels.shown.add("n\0a");
+      expect(keys(sim, projected)).toEqual(["n a"]);
+    });
+
+    test("an edge's label drawn in the last frame may run 20% past its edge; a new one may not", () => {
+      const sim = createSim();
+      const edges = [{ from: "a", to: "b", label: "R" }];
+      mergeSeeds(sim, [seed("a"), seed("b")], edges, null);
+      // The label is 6 pixels wide and its direction marker 9; the edge is 14 pixels long.
+      const projected = new Map([
+        ["a", at(100, 0.8)],
+        ["b", at(114, 0.8)],
+      ]);
+      expect(keys(sim, projected)).toEqual(["n a", "n b"]);
+      sim.labels.shown.add("e\0a\0R\0b");
+      expect(keys(sim, projected)).toEqual(["e a R b", "n a", "n b"]);
+    });
   });
 });
 
