@@ -433,3 +433,11 @@ describe("what the graph draws for an opened resource", () => {
     expect(drawnAs(q, "/w/x/Q_1")).toBe("/w/x/Q_1");
   });
 });
+
+describe("the sidebar's narrow-window query", () => {
+  test("matches the media query of trace.css's narrow-window rules", async () => {
+    const { NARROW } = await import("../src/ui/trace/TraceConsole");
+    const css = await Bun.file(new URL("../src/ui/trace/trace.css", import.meta.url)).text();
+    expect(css).toContain(`@media ${NARROW} {`);
+  });
+});
