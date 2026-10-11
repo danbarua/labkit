@@ -66,6 +66,7 @@ import {
   itemView,
   keyOf,
   labelFor,
+  nameOf,
   relGroups,
   shortId,
   typeColour,
@@ -909,7 +910,7 @@ function HoverCard({ itemKey, held }: { itemKey: string; held: HeldIndex }) {
     <div className="hover-card">
       <div className="card-head">
         <Badge type={r?.type} />
-        <span className="cid mono">{shortId(itemKey)}</span>
+        <span className="cid mono">{nameOf(itemKey, held.get(itemKey)?.type)}</span>
         <span className="clabel">{r?.type}</span>
       </div>
       <div className="panel-body">
@@ -1009,9 +1010,7 @@ function Detail({
       <div className="detail-header">
         <div className="header-top">
           <Badge type={res?.type} />
-          <span className="header-id">
-            {res?.type === COMMIT_TYPE ? shortId(path).slice(0, 7) : shortId(path)}
-          </span>
+          <span className="header-id">{nameOf(path, res?.type)}</span>
           <span className="header-type">{res?.type}</span>
           {pills.map((k) => {
             const v = String(a?.[k]);
@@ -1145,7 +1144,7 @@ function RelCard({
     return (
       <button type="button" className="rel-chip unresolved" onClick={() => onOpen(relKey)}>
         <Badge type={r?.type} />
-        <span className="cid mono">{shortId(relKey)}</span>
+        <span className="cid mono">{nameOf(relKey, r?.type)}</span>
         <span className="clabel">not yet fetched — GET {resourcePath(relKey)}</span>
       </button>
     );
@@ -1153,7 +1152,7 @@ function RelCard({
     <div className="panel">
       <button type="button" className="card-head" onClick={() => onOpen(relKey)}>
         <Badge type={r.type} />
-        <span className="cid mono">{shortId(relKey)}</span>
+        <span className="cid mono">{nameOf(relKey, r?.type)}</span>
         <span className="clabel">{r.type}</span>
       </button>
       <div className="panel-body">
@@ -1404,8 +1403,7 @@ function graphOf(
   const node = (key: string) => {
     if (!nodes.has(key)) {
       const type = held.get(key)?.type ?? "?";
-      // A commit's id is 40 characters; its first 7 name it, as in `git log --oneline`.
-      const label = type === COMMIT_TYPE ? shortId(key).slice(0, 7) : shortId(key);
+      const label = nameOf(key, type);
       nodes.set(key, { id: key, label, type });
     }
   };

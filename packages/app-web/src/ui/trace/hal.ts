@@ -58,6 +58,14 @@ export function shortId(key: string): string {
   return key.split("/").pop() ?? key;
 }
 
+/**
+ * How a resource of `type` at `key` is named on the page: its short id, except a commit, whose
+ * 40-character id is named by its first 7, as `git log --oneline` names it.
+ */
+export function nameOf(key: string, type: string | undefined): string {
+  return type === "Commit" ? shortId(key).slice(0, 7) : shortId(key);
+}
+
 export function humanRel(rel: string): string {
   return rel.replace(/_/g, " ");
 }

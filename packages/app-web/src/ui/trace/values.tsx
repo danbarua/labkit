@@ -3,6 +3,7 @@
  * through `prose`, which the page supplies, so handles in it can become links.
  */
 
+import { FileTextIcon, GitCommitIcon, type Icon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import {
   abbreviation,
@@ -17,10 +18,25 @@ import {
 export type Prose = (text: string) => ReactNode;
 
 /** A record type's chip: its abbreviation, or `text`, on the type's colour. */
+/** The types a badge draws as an icon, the one the sidebar's explorers draw them with, not as letters. */
+const TYPE_ICON: Readonly<Record<string, Icon>> = {
+  File: FileTextIcon,
+  Commit: GitCommitIcon,
+};
+
 export function Badge({ type, text }: { type: string | undefined; text?: string }) {
+  const Glyph = text === undefined && type !== undefined ? TYPE_ICON[type] : undefined;
   return (
-    <span className="badge" style={{ background: typeColour(type) }}>
-      {text ?? (type === undefined ? "?" : abbreviation(type))}
+    <span
+      className={Glyph === undefined ? "badge" : "badge icon"}
+      style={{ background: typeColour(type) }}
+      {...(Glyph === undefined ? {} : { title: type, "aria-label": type })}
+    >
+      {Glyph !== undefined ? (
+        <Glyph aria-hidden="true" />
+      ) : (
+        (text ?? (type === undefined ? "?" : abbreviation(type)))
+      )}
     </span>
   );
 }
