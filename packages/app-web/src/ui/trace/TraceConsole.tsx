@@ -525,7 +525,8 @@ function Lists({
   const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.trace.history", false);
   // The open workspace's index says whether it serves files and history, and where.
   const indexKey = workspace?.replace(/\/$/, "");
-  const indexDoc = docOf(useDocument(indexKey === undefined ? undefined : requestPath(indexKey)));
+  const indexEntry = useDocument(indexKey === undefined ? undefined : requestPath(indexKey));
+  const indexDoc = docOf(indexEntry);
   const served = (type: string) =>
     indexKey === undefined || indexDoc === undefined
       ? undefined
@@ -536,11 +537,13 @@ function Lists({
   const unavailable = (key: string | undefined, what: string) =>
     slug === undefined
       ? `Open a workspace to browse its ${what}.`
-      : indexDoc === undefined
-        ? `Loading ${slug}…`
-        : key === undefined
-          ? `${slug} serves no ${what}.`
-          : undefined;
+      : indexEntry?.status === "failed"
+        ? `${slug}'s collections did not load: ${indexEntry.error}`
+        : indexDoc === undefined
+          ? `Loading ${slug}…`
+          : key === undefined
+            ? `${slug} serves no ${what}.`
+            : undefined;
   return (
     <aside className={className}>
       <Explorer

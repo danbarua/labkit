@@ -83,7 +83,8 @@ The browser also keeps whether each section is folded. The sections list:
 
 File Explorer and Source Explorer are enabled when the open workspace's index lists a collection
 of type `File` or `Commit` ("Files and history" above). Otherwise each is disabled, with the reason
-under its header: no workspace is open, or the open workspace serves no files or history.
+under its header: no workspace is open, the open workspace's index did not load (with the error),
+or the open workspace serves no files or history.
 
 Every resource is requested at `depth=2`, so its neighbours arrive with their properties. The page
 keeps each response as it arrived and draws from them; a resource's own response is the only one

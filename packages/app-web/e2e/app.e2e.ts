@@ -770,6 +770,20 @@ test.describe("when something is not there", () => {
     errors.length = 0;
   });
 
+  test("in an unknown workspace, File and Source Explorers say its collections did not load", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/nowhere/Q_1");
+    await expect(page.locator(".fetch-error")).toContainText("404");
+    for (const name of ["File Explorer", "Source Explorer"]) {
+      const head = page.getByRole("button", { name, exact: true });
+      await expect(head).toBeDisabled();
+      await expect(head).toHaveAccessibleDescription(/^nowhere's collections did not load: .*404/);
+    }
+    errors.length = 0;
+  });
+
   test("an unknown handle says so", async ({ page, errors }) => {
     await page.goto("/app/workspace/alpha/Q_999");
     await expect(page.locator(".fetch-error")).toContainText("404");
