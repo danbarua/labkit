@@ -60,6 +60,7 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 | `/workspace/{slug}/commit/{id}/raw/{path}` | The same, at that commit. |
 | `/workspace/{slug}/commit/{id}/changes` | The files the commit changed, with their status, paged. |
 | `/workspace/{slug}/commit/{id}/acts` | The acts that ran against the commit, oldest first, paged. |
+| `/workspace/{slug}/commit/{id}/events` | Every change the acts that ran against the commit made, a page of acts at a time, as a record's `events` are. The commit links it only when an act ran against it. |
 | `/workspace/{slug}/history/{path}` | The commits that changed the file, from HEAD back along first parents, newest first, paged. A rename is not followed. |
 | `/workspace/{slug}/commit/{id}/history/{path}` | The same, from that commit. |
 

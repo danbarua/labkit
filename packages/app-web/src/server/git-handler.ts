@@ -15,6 +15,7 @@ import {
   COMMIT_TYPE,
   DIFF_TYPE,
   DIRECTORY_TYPE,
+  EVENTS_SEGMENT,
   FILE_SLUG,
   FILE_TYPE,
   SUBMODULE_TYPE,
@@ -23,7 +24,7 @@ import {
 import { DEFAULT_LIMIT, halJson, MAX_LIMIT, pageParam, pagingLinks } from "./collections-handler";
 import { problem, publicOrigin } from "./graph-handler";
 import { summaryOf } from "./commit-summary";
-import { actItem, actsRanAgainst, RAN_AGAINST } from "./events-handler";
+import { actItem, actsRanAgainst, commitEvents, RAN_AGAINST } from "./events-handler";
 import { mediaTypeByExtension, mediaTypeOf } from "./media-types";
 import { isNotFound } from "./repositories";
 import type { TenantScope } from "./runtime";
@@ -48,6 +49,7 @@ const ONE_COMMIT = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})$/;
 // `/commit/{id}/acts`.
 const CHANGES = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/changes\/?$/;
 const ACTS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/acts\/?$/;
+const EVENTS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/events\/?$/;
 // A commit's diff, one resource per changed file: `/commit/{id}/diff` lists them, and
 // `/commit/{id}/diff/{path}` is one.
 const DIFFS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/diff\/?$/;
@@ -368,6 +370,11 @@ async function oneCommit(
       tree: { href: `${base}/${COMMIT_SLUG}/${id}/${FILE_SLUG}` },
       changes: { href: `${base}/${COMMIT_SLUG}/${id}/changes` },
       acts: { href: `${base}/${COMMIT_SLUG}/${id}/acts` },
+      // What the acts that ran against the commit did, where a page finds the commit's history of
+      // changes, as a record's: only when an act ran against it.
+      ...(ran.acts.length === 0
+        ? {}
+        : { events: { href: `${base}/${COMMIT_SLUG}/${id}/${EVENTS_SEGMENT}` } }),
       diff: { href: `${base}/${COMMIT_SLUG}/${id}/diff` },
       [REL.parent]: parents.map((p) => ({
         href: `${base}/${COMMIT_SLUG}/${p}`,
@@ -857,6 +864,8 @@ export async function gitHandler(
   if (changed !== undefined) return commitChanges(req, repo, base, changed, scope.slug);
   const actsOf = ACTS.exec(rest)?.[1];
   if (actsOf !== undefined) return commitActs(req, scope, base, actsOf);
+  const eventsOf = EVENTS.exec(rest)?.[1];
+  if (eventsOf !== undefined) return commitEvents(req, scope, base, eventsOf);
   const diffs = DIFFS.exec(rest)?.[1];
   if (diffs !== undefined) return commitDiffs(req, repo, base, diffs, scope.slug);
   const diff = ONE_DIFF.exec(rest);
