@@ -64,11 +64,51 @@ test.describe("getting around", () => {
     await expect(item(page, "Q_1")).toHaveClass(/active/);
   });
 
-  test("the home button leads back to the workspaces", async ({ page }) => {
+  test("the LabKit name in the top bar leads back to the workspaces", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1");
-    await page.getByRole("button", { name: "Entry point" }).click();
+    await page.getByRole("button", { name: "LabKit" }).click();
     await expect(page).toHaveURL(/\/app\/$/);
     await expect(page.getByText("Pick a type on the left")).toBeVisible();
+  });
+
+  test("the top bar has the LabKit name first, then the sidebar toggle, and no history or filter controls", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    const bar = page.locator(".topbar");
+    const brand = bar.getByRole("button", { name: "LabKit" });
+    const toggle = bar.getByRole("button", { name: "Show or hide the sidebar" });
+    const x = async (locator: import("@playwright/test").Locator) =>
+      (await locator.boundingBox())?.x ?? -1;
+    expect(await x(brand)).toBeLessThan(await x(toggle));
+    await expect(bar.getByRole("button", { name: "Back" })).toHaveCount(0);
+    await expect(bar.getByRole("button", { name: "Forward" })).toHaveCount(0);
+    await expect(bar.getByRole("button", { name: "Entry point" })).toHaveCount(0);
+    await expect(bar.getByRole("textbox")).toHaveCount(0);
+    await expect(bar).not.toContainText("Trace Console");
+  });
+
+  test("the Items filter narrows the listed items", async ({ page }) => {
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    await expect(item(page, "Q_2")).toBeVisible();
+    await page.getByRole("textbox", { name: "Filter the items" }).fill("Q_2");
+    await expect(item(page, "Q_2")).toBeVisible();
+    await expect(item(page, "Q_1")).toHaveCount(0);
+  });
+
+  test("in a short window, Collections takes at most 40% of Record Explorer and Items keeps the rest", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 520 });
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    const panes = page.locator("aside.sidebar .explorer-body .sidebar-section");
+    await expect(panes).toHaveCount(2);
+    const body = (await page.locator("aside.sidebar .explorer-body").boundingBox())?.height ?? 0;
+    const collections = (await panes.nth(0).boundingBox())?.height ?? 0;
+    const items = (await panes.nth(1).boundingBox())?.height ?? 0;
+    expect(collections).toBeLessThanOrEqual(0.4 * body + 2);
+    expect(items).toBeGreaterThanOrEqual(120);
+    expect(items).toBeGreaterThan(collections);
   });
 
   test("a deep link renders directly, and survives a reload", async ({ page }) => {
@@ -637,28 +677,24 @@ test.describe("an open resource", () => {
     expect(await page.evaluate(() => (window as unknown as { kept?: boolean }).kept)).toBe(true);
   });
 
-  test("back and forward, the browser's or the page's, step through what was opened", async ({
-    page,
-  }) => {
+  test("the browser's back and forward step through what was opened", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1");
     await page.locator(".card-head", { hasText: "LOE_1" }).click();
     await expect(header(page)).toHaveText("LOE_1");
 
     await page.goBack();
     await expect(header(page)).toHaveText("Q_1");
-    await page.getByRole("button", { name: "Forward" }).click();
+    await page.goForward();
     await expect(header(page)).toHaveText("LOE_1");
-    await expect(page.getByRole("button", { name: "Forward" })).toBeDisabled();
-    await page.getByRole("button", { name: "Back" }).click();
-    await expect(header(page)).toHaveText("Q_1");
   });
 
   test("opening the resource that is open adds no history entry", async ({ page }) => {
     await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
     await expect(header(page)).toHaveText("Q_1");
+    const entries = await page.evaluate(() => history.length);
     await item(page, "Q_1").click();
     await expect(header(page)).toHaveText("Q_1");
-    await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
+    expect(await page.evaluate(() => history.length)).toBe(entries);
   });
 
   test("while its response is on its way, the page keeps its layout with placeholder rows", async ({

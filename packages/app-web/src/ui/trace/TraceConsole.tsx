@@ -23,10 +23,8 @@ import {
   FlagCheckeredIcon,
   FolderIcon,
   GitCommitIcon,
-  HouseIcon,
   type Icon,
   IconContext,
-  MagnifyingGlassIcon,
   PauseIcon,
   PlayIcon,
   SealCheckIcon,
@@ -36,7 +34,7 @@ import {
 } from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
 import "@labkit/design/tokens.css";
-import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   type CSSProperties,
   type ReactNode,
@@ -108,34 +106,6 @@ function Spinner({ children }: { children: ReactNode }) {
 }
 
 /**
- * The history entries this page has seen, by their position in the browser's history, which enable
- * or disable the Back and Forward buttons. The browser does not let a page read its history, so
- * the page keeps the path it showed at each position: an entry is replaced when the page arrives at
- * its position again by a new navigation, and the entries after it are dropped, as the browser
- * drops them. The position and the path are read from one location, so a render between two
- * navigations never pairs one's position with the other's path.
- */
-function useTrail(): { trail: string[]; at: number } {
-  const here = useRouterState({
-    select: (s) =>
-      `${(s.location.state as { __TSR_index?: number }).__TSR_index ?? 0} ${s.location.pathname}`,
-  });
-  const space = here.indexOf(" ");
-  const at = Number(here.slice(0, space));
-  const path = here.slice(space + 1);
-  const [trail, setTrail] = useState<string[]>([]);
-  useEffect(() => {
-    setTrail((t) => {
-      if (t[at] === path) return t;
-      const next = t.slice(0, at);
-      next[at] = path;
-      return next;
-    });
-  }, [at, path]);
-  return { trail, at };
-}
-
-/**
  * The resources the reader has opened since the graph was last reset, in the order they were first
  * opened. The graph draws these and what they relate to. `generation` counts the resets, so the
  * canvas can start a new layout on each one.
@@ -186,9 +156,7 @@ export interface TraceConsoleProps {
 
 export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const navigate = useNavigate();
-  const router = useRouter();
   const [theme, setTheme] = useSavedTheme();
-  const [term, setTerm] = useState("");
   const [drawer, setDrawer] = useState<"items" | undefined>();
   // At full width the sidebar is shown or hidden, as this browser last left it; in a narrow
   // window it is a drawer over the page, closed until opened.
@@ -244,10 +212,6 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
     void navigate({ to: "/$", params: { _splat: "" }, search: {} });
   };
 
-  const { trail, at } = useTrail();
-  const canBack = trail.slice(0, at).some((e) => e !== undefined);
-  const canForward = trail.slice(at + 1).some((e) => e !== undefined);
-
   const listKey = openIsCollection ? path : (list ?? ENTRY);
   const prose = proseFor(held, path, open);
 
@@ -255,6 +219,10 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
     <IconContext.Provider value={ICONS}>
       <div className="lk-root trace" data-theme={theme === "system" ? undefined : theme}>
         <header className="topbar">
+          <button type="button" className="brand" title="Back to the workspaces" onClick={home}>
+            <img className="brand-mark" src={markUrl} alt="" />
+            <span className="brand-name">LabKit</span>
+          </button>
           <button
             type="button"
             className="hamburger"
@@ -268,53 +236,9 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
           >
             <SidebarSimpleIcon aria-hidden="true" />
           </button>
-          <div className="brand">
-            <img className="brand-mark" src={markUrl} alt="" />
-            <span className="brand-name">Trace Console</span>
-            <span className="brand-sub">live · {window.location.host}</span>
-          </div>
-          <div className="nav-controls">
-            <button
-              type="button"
-              className="nav-btn"
-              aria-label="Entry point"
-              title="Back to the workspaces"
-              onClick={home}
-            >
-              <HouseIcon aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="nav-btn"
-              aria-label="Back"
-              disabled={!canBack}
-              onClick={() => router.history.back()}
-            >
-              <ArrowLeftIcon aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="nav-btn"
-              aria-label="Forward"
-              disabled={!canForward}
-              onClick={() => router.history.forward()}
-            >
-              <ArrowRightIcon aria-hidden="true" />
-            </button>
-          </div>
+          <span className="brand-sub">live · {window.location.host}</span>
           <span className="topbar-gap" />
           {import.meta.env.DEV ? <DevLinks /> : null}
-          <div className="search-wrap">
-            <MagnifyingGlassIcon className="icon" aria-hidden="true" />
-            <input
-              type="text"
-              placeholder="Filter…"
-              autoComplete="off"
-              aria-label="Filter the lists"
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-            />
-          </div>
           <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
         </header>
 
@@ -338,7 +262,6 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
             root={listKey === ENTRY}
             openKey={path}
             held={held}
-            term={term}
             onOpen={open}
             onList={pickList}
           />
@@ -480,7 +403,6 @@ function Lists({
   root,
   openKey,
   held,
-  term,
   onOpen,
   onList,
 }: {
@@ -491,10 +413,11 @@ function Lists({
   root: boolean;
   openKey: string;
   held: HeldIndex;
-  term: string;
   onOpen: (key: string) => void;
   onList: (key: string) => void;
 }) {
+  // Narrows the Items pane to the items whose text holds it.
+  const [term, setTerm] = useState("");
   const listEntry = useDocument(requestPath(listKey));
   // Until the picked collection's first page arrives, the collection it was picked from stays the
   // upper one, so the upper pane does not show the picked collection and then swap back.
@@ -652,16 +575,13 @@ function Lists({
           <div className="faint mono pane-path">{upperKey}</div>
           <div className="type-list" ref={upperList}>
             {lowerRow === undefined ? null : (
-              <ActiveBox
-                list={upperList}
-                activeKey={lowerRow}
-                rows={`${upper.items.length} ${term}`}
-              />
+              <ActiveBox list={upperList} activeKey={lowerRow} rows={`${upper.items.length}`} />
             )}
             <Pane
               pages={upper}
               empty={`Loading ${ENTRY}…`}
-              {...{ held, term, openKey, onOpen, onList }}
+              {...{ held, openKey, onOpen, onList }}
+              term=""
               lowerKey={lowerRow}
               pageable={false}
               hidden={IN_OTHER_EXPLORERS}
@@ -675,6 +595,17 @@ function Lists({
               {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
             </span>
           </div>
+          {lowerKey === undefined ? null : (
+            <input
+              type="text"
+              className="items-filter"
+              placeholder="Filter items…"
+              autoComplete="off"
+              aria-label="Filter the items"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+            />
+          )}
           <div className="faint mono pane-path">{lowerKey ?? ""}</div>
           <div className="res-list" ref={lowerList}>
             {lowerKey === undefined ? (

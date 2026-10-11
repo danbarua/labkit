@@ -214,11 +214,21 @@
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
+/* The brand is the link to the workspaces. */
 .trace .brand {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font-size: inherit;
   white-space: nowrap;
+}
+.trace .brand:hover {
+  background: var(--panel-2);
 }
 .trace .brand-mark {
   width: 21px;
@@ -238,41 +248,18 @@
 .trace .hamburger {
   display: flex;
   background: none;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 6px;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   align-items: center;
   justify-content: center;
-  color: var(--text);
+  color: var(--text-dim);
 }
-
-.trace .nav-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.trace .nav-btn {
+.trace .hamburger:hover {
   background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   color: var(--text);
-  font-size: 14px;
-}
-.trace .nav-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-.trace .nav-btn:not(:disabled):hover {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 .trace .topbar-gap {
@@ -293,41 +280,31 @@
   color: var(--accent);
 }
 
-.trace .search-wrap {
-  position: relative;
-  flex: 0 0 220px;
-}
-.trace .search-wrap input {
-  width: 100%;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 6px 10px 6px 28px;
-  color: var(--text);
-}
-.trace .search-wrap input::placeholder {
-  color: var(--text-faint);
-}
-.trace .search-wrap .icon {
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-faint);
-}
-
 .trace .theme-btn {
   display: inline-flex;
   align-items: center;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
+  background: none;
+  border: 0;
   border-radius: 6px;
-  padding: 5px 9px;
+  padding: 6px 8px;
   color: var(--text-dim);
 }
 .trace .theme-btn:hover {
+  background: var(--panel-2);
   color: var(--text);
-  border-color: var(--accent);
+}
+.trace .items-filter {
+  width: 100%;
+  margin-bottom: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--text);
+  font-size: 12.5px;
+}
+.trace .items-filter::placeholder {
+  color: var(--text-faint);
 }
 
 /* ---------- body layout ---------- */
@@ -706,10 +683,11 @@
 .trace .explorer-body .sidebar-section:last-child {
   border-bottom: 0;
 }
-/* In a short Record Explorer, Collections scrolls rather than pushing Items out of the sidebar,
-   and Items keeps room for a few rows. */
+/* In Record Explorer, Collections takes at most 40% of the height and scrolls beyond that, so
+   Items, which the reader works in more, keeps the rest and room for a few rows. */
 .trace .explorer-body .sidebar-section:not(.grow) {
   flex: 0 1 auto;
+  max-height: 40%;
   min-height: 72px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1419,7 +1397,6 @@
 
 /* ---------- narrow windows: the side column becomes a drawer ---------- */
 @media (max-width: 860px) {
-  .trace .search-wrap,
   .trace .dev-links {
     display: none;
   }
