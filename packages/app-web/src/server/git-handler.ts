@@ -9,6 +9,8 @@ import {
   type TreeEntry,
 } from "es-git";
 import {
+  BRANCH_SLUG,
+  BRANCH_TYPE,
   COMMIT_SLUG,
   COMMIT_TYPE,
   DIFF_TYPE,
@@ -16,6 +18,7 @@ import {
   FILE_SLUG,
   FILE_TYPE,
   SUBMODULE_TYPE,
+  TIMELINE_SLUG,
 } from "./collection-paths";
 import { DEFAULT_LIMIT, halJson, MAX_LIMIT, pageParam, pagingLinks } from "./collections-handler";
 import { problem, publicOrigin } from "./graph-handler";
@@ -32,6 +35,11 @@ const EDIT_LIMIT = 20_000;
 export const FILE_LIMIT = 100_000;
 
 const COMMITS = /^\/commit\/?$/;
+// The branches, `/branch`, one branch, `/branch/{name}` with its name as one encoded segment, and
+// every branch's commits, `/timeline`.
+const BRANCHES = /^\/branch\/?$/;
+const ONE_BRANCH = /^\/branch\/([^/]+)$/;
+const TIMELINE = /^\/timeline\/?$/;
 const ONE_COMMIT = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})$/;
 // A commit's changed files, `/commit/{id}/changes`, and the acts that ran against it,
 // `/commit/{id}/acts`.
@@ -49,7 +57,7 @@ const IN_TREE = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/file(?:\/(.*))?$/;
 
 /** Whether `rest`, the path after `/workspace/{slug}`, names the workspace's files or history. */
 export function isGitPath(rest: string): boolean {
-  return /^\/(commit|file|history)(\/|$)/.test(rest);
+  return /^\/(commit|file|history|branch|timeline)(\/|$)/.test(rest);
 }
 
 /**
@@ -59,6 +67,7 @@ export function isGitPath(rest: string): boolean {
  */
 export const REL = {
   parent: "parent:commit",
+  tip: "points_to:commit",
   changes: "changes:file",
   changedBy: "commit:changes",
 } as const;
@@ -191,6 +200,8 @@ function history(req: Request, repo: Repository, base: string): Response {
   return halJson(req, {
     _links: {
       self: { href: `${self}?limit=${limit}&offset=${offset}` },
+      timeline: { href: `${base}/${TIMELINE_SLUG}` },
+      branches: { href: `${base}/${BRANCH_SLUG}` },
       ...Object.fromEntries(
         pagingLinks(base, self, limit, offset, ids.length > offset + limit).map((l) => [
           l.rel,
@@ -202,6 +213,99 @@ function history(req: Request, repo: Repository, base: string): Response {
     limit,
     count: page.length,
     _embedded: { [COMMIT_SLUG]: page.map((id) => summaryOf(base, repo.getCommit(id))) },
+  });
+}
+
+type BranchTip = { name: string; remote: boolean; current: boolean; tip: string };
+
+/**
+ * The repository's branches: local ones, then remote-tracking ones, each in BY_NAME order. The
+ * branch HEAD is on is `current`. A remote's `HEAD`, such as `origin/HEAD`, points at another
+ * branch rather than at a commit, so it is not a branch and is left out.
+ */
+function branchesOf(repo: Repository): BranchTip[] {
+  const head = repo.isEmpty() || repo.headDetached() ? undefined : repo.head().shorthand();
+  const tips: BranchTip[] = [];
+  for (const { name, type } of repo.branches()) {
+    const tip = repo.getBranch(name, type).referenceTarget();
+    if (tip === null) continue;
+    const remote = type === "Remote";
+    tips.push({ name, remote, current: !remote && name === head, tip });
+  }
+  return tips.sort(
+    (a, b) => Number(a.remote) - Number(b.remote) || BY_NAME.compare(a.name, b.name),
+  );
+}
+
+/** A branch as a resource: its name, whether it is remote or HEAD's, and the commit it points to. */
+function branchOf(repo: Repository, base: string, branch: BranchTip) {
+  const tip = { href: `${base}/${COMMIT_SLUG}/${branch.tip}`, type: COMMIT_TYPE };
+  return {
+    id: branch.name,
+    type: BRANCH_TYPE,
+    name: branch.name,
+    remote: branch.remote,
+    current: branch.current,
+    tip: branch.tip,
+    _links: {
+      self: {
+        href: `${base}/${BRANCH_SLUG}/${encodeURIComponent(branch.name)}`,
+        type: BRANCH_TYPE,
+      },
+      index: { href: `${base}/${BRANCH_SLUG}` },
+      [REL.tip]: { ...tip, dir: "out" },
+    },
+    _embedded: { [REL.tip]: { ...summaryOf(base, repo.getCommit(branch.tip)), dir: "out" } },
+  };
+}
+
+/** `/branch`: the branches, by `limit` and `offset`. */
+function branches(req: Request, repo: Repository, base: string): Response {
+  const all = branchesOf(repo);
+  return collectionPage(req, base, `${base}/${BRANCH_SLUG}`, BRANCH_SLUG, (offset, limit) => ({
+    page: all.slice(offset, offset + limit).map((b) => branchOf(repo, base, b)),
+    more: all.length > offset + limit,
+  }));
+}
+
+/** `/branch/{name}`: one branch, by its name, local or remote-tracking. */
+function oneBranch(req: Request, repo: Repository, base: string, encoded: string, slug: string) {
+  const name = decodeURIComponent(encoded);
+  const branch = branchesOf(repo).find((b) => b.name === name);
+  if (branch === undefined) return problem(404, "Not Found", `${name} is not a branch in ${slug}`);
+  return halJson(req, branchOf(repo, base, branch));
+}
+
+/**
+ * `/timeline`: every commit reachable from a branch or HEAD, newest first and never a parent
+ * before its child, by `limit` and `offset`. Each carries its parents' ids and the names of the
+ * branches that point to it, so a page can draw the branches' lines.
+ */
+function timeline(req: Request, repo: Repository, base: string): Response {
+  const tips = branchesOf(repo);
+  const at = new Map<string, string[]>();
+  for (const b of tips) at.set(b.tip, [...(at.get(b.tip) ?? []), b.name]);
+  const head = repo.isEmpty() ? undefined : repo.revparseSingle("HEAD");
+  const self = `${base}/${TIMELINE_SLUG}`;
+  return collectionPage(req, base, self, TIMELINE_SLUG, (offset, limit) => {
+    const ids: string[] = [];
+    if (!repo.isEmpty()) {
+      const walk = repo.revwalk().setSorting(RevwalkSort.Topological | RevwalkSort.Time);
+      walk.pushGlob("refs/heads/*");
+      walk.pushGlob("refs/remotes/*");
+      walk.pushHead();
+      for (let id = walk.next(); id !== null && ids.length <= offset + limit; id = walk.next())
+        ids.push(id);
+    }
+    return {
+      page: ids.slice(offset, offset + limit).map((id) => ({
+        ...summaryOf(base, repo.getCommit(id)),
+        parents: parentsOf(repo, id),
+        branches: at.get(id) ?? [],
+        head: id === head,
+      })),
+      more: ids.length > offset + limit,
+    };
   });
 }
 
@@ -644,9 +748,9 @@ function inTree(
 }
 
 /**
- * The workspace's files and git history, read from `repo`, the repository mapped to it:
- * `/commit`, `/commit/{id}`, `/file/{path}` and `/commit/{id}/file/{path}`, where `rest` is the
- * path after `/workspace/{slug}`. Without a repository, every such path is not found.
+ * The workspace's files, git history and branches, read from `repo`, the repository mapped to it,
+ * at the paths `isGitPath` names, where `rest` is the path after `/workspace/{slug}`. Without a
+ * repository, every such path is not found.
  */
 export async function gitHandler(
   req: Request,
@@ -658,6 +762,10 @@ export async function gitHandler(
     return problem(404, "Not Found", `${scope.slug} has no git repository mapped to it`);
   const base = `${publicOrigin(req).origin}${scope.prefix}`;
   if (COMMITS.test(rest)) return history(req, repo, base);
+  if (BRANCHES.test(rest)) return branches(req, repo, base);
+  const branchName = ONE_BRANCH.exec(rest)?.[1];
+  if (branchName !== undefined) return oneBranch(req, repo, base, branchName, scope.slug);
+  if (TIMELINE.test(rest)) return timeline(req, repo, base);
   const id = ONE_COMMIT.exec(rest)?.[1];
   if (id !== undefined) return oneCommit(req, repo, scope, base, id);
   const changed = CHANGES.exec(rest)?.[1];
