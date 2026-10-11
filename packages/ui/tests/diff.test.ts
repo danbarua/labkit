@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type DiffLine, foldUnchanged, diffLines } from "../format";
+import { type DiffLine, diffLines, filesOfPatch, foldUnchanged, rowsOfPatch } from "../format";
 
 describe("diffLines", () => {
   test("marks what stayed, what went and what was added", () => {
@@ -64,5 +64,48 @@ describe("folding a diff's unchanged stretches", () => {
     expect(first?.kind === "fold" && first.lines.map((l) => l.text)).toEqual(
       same(7).map((l) => l.text),
     );
+  });
+});
+
+describe("reading a unified patch", () => {
+  const patch = [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -1,2 +1,2 @@",
+    " keep",
+    "-export const a = 1;",
+    "+export const a = 2;",
+    "\\ No newline at end of file",
+    "diff --git a/data/blob.bin b/data/blob.bin",
+    "Binary files differ",
+    "diff --git a/old.md b/old.md",
+    "--- a/old.md",
+    "+++ /dev/null",
+    "@@ -1,1 +0,0 @@",
+    "-gone",
+    "",
+  ].join("\n");
+
+  test("splits a commit's patch into one part per file, named by the file it changes", () => {
+    expect(filesOfPatch(patch).map((f) => f.path)).toEqual(["src/a.ts", "data/blob.bin", "old.md"]);
+  });
+
+  test("reads a file's part as hunk headers and marked lines, leaving out the lines that name the file", () => {
+    const [first] = filesOfPatch(patch);
+    expect(rowsOfPatch(first!.patch)).toEqual([
+      { kind: "hunk", text: "@@ -1,2 +1,2 @@", at: 3 },
+      { kind: "line", line: { kind: "same", text: "keep" }, at: 4 },
+      { kind: "line", line: { kind: "remove", text: "export const a = 1;" }, at: 5 },
+      { kind: "line", line: { kind: "add", text: "export const a = 2;" }, at: 6 },
+      { kind: "note", text: "\\ No newline at end of file", at: 7 },
+    ]);
+  });
+
+  test("a line outside any hunk, such as a binary file's, is a note", () => {
+    const binary = filesOfPatch(patch)[1]!;
+    expect(rowsOfPatch(binary.patch)).toEqual([
+      { kind: "note", text: "Binary files differ", at: 1 },
+    ]);
   });
 });

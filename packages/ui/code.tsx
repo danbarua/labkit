@@ -52,40 +52,51 @@ export function previewLength(lines: readonly string[], count = PREVIEW_LINES): 
 }
 
 /**
- * A whole file as code: numbered, highlighted by the language its path names, and cut to its
- * opening lines until the rest is asked for. The whole file is highlighted and the cut is one of
- * height, so a string or a comment that runs past the cut is still coloured as what it is.
+ * A whole file as code: numbered, highlighted by its language, and cut to its first `preview`
+ * non-blank lines until the rest is asked for. The language is `language` when given, else the
+ * one `path`'s extension names; one highlight.js does not know is drawn as plain text. The cut is
+ * one of height, so a string that runs past it is still coloured as what it is.
  */
 export function CodeView({
   path,
   title,
   text,
   note,
+  language: named,
+  preview = PREVIEW_LINES,
+  caption = true,
 }: {
   path: string;
   /** The hover text of the caption: the file's full path, when `path` is a shorter name for it. */
   title?: string;
   text: string;
   note?: string;
+  language?: string;
+  preview?: number;
+  /** Whether the path, the note and the line count are shown above the code. */
+  caption?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const source = text.replace(/\n$/, "");
   const lines = useMemo(() => source.split("\n"), [source]);
-  const language = languageOf(path);
+  const language =
+    named === undefined ? languageOf(path) : lowlight.registered(named) ? named : undefined;
   const code = useMemo(
     () =>
       language === undefined ? source : lowlight.highlight(language, source).children.map(draw),
     [language, source],
   );
-  const shown = previewLength(lines);
+  const shown = previewLength(lines, preview);
   const hidden = lines.length - shown;
   return (
     <figure className="lk-code">
-      <figcaption className="lk-caption" {...(title === undefined ? {} : { title })}>
-        {[path, note, `${lines.length} ${lines.length === 1 ? "line" : "lines"}`]
-          .filter((part) => part !== undefined)
-          .join(" · ")}
-      </figcaption>
+      {caption ? (
+        <figcaption className="lk-caption" {...(title === undefined ? {} : { title })}>
+          {[path, note, `${lines.length} ${lines.length === 1 ? "line" : "lines"}`]
+            .filter((part) => part !== undefined)
+            .join(" · ")}
+        </figcaption>
+      ) : null}
       <div className="lk-code-frame">
         <pre
           className="lk-code-text"
@@ -108,5 +119,19 @@ export function CodeView({
         </button>
       ) : null}
     </figure>
+  );
+}
+
+/** A JSON value as code: formatted two spaces to a level, highlighted, and cut like a file. */
+export function JsonView({ value, preview }: { value: unknown; preview?: number }) {
+  const text = useMemo(() => JSON.stringify(value, null, 2) ?? String(value), [value]);
+  return (
+    <CodeView
+      path="value.json"
+      text={text}
+      language="json"
+      caption={false}
+      {...(preview === undefined ? {} : { preview })}
+    />
   );
 }
