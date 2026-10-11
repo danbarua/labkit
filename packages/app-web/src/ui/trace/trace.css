@@ -630,6 +630,26 @@
 .trace .commit-row.timeline-row.tip {
   border-color: var(--accent);
 }
+/* In Source Explorer the box marks the open commit, as it does in File Explorer. Rows touch, so
+   the box has square corners like them. An open tip keeps the tip's outline. */
+.trace .history {
+  position: relative;
+}
+.trace .history .commit-row {
+  position: relative;
+}
+.trace .history .commit-row.active {
+  background: none;
+}
+.trace .history .commit-row.active:not(.tip) {
+  border-color: transparent;
+}
+.trace .history .active-box.fill:not(.filled) ~ .commit-row.active {
+  background: var(--panel-2);
+}
+.trace .history .active-box {
+  border-radius: 0;
+}
 .trace .lanes {
   flex: none;
   stroke-width: 1.5;

@@ -207,7 +207,8 @@ function LaneCell({ row, width }: { row: LaneRow; width: number }) {
  * The workspace's history across every branch, newest first, from the timeline the history at
  * `historyKey` links to: each commit with the lanes `git log --graph` draws, and the names of
  * the branches that point to it. A branch picker, opening on HEAD's branch, scrolls to the
- * picked branch's tip, loading pages until it is listed. Clicking a commit opens it.
+ * picked branch's tip, loading pages until it is listed. Clicking a commit opens it, and the box
+ * that marks the open commit slides to it.
  */
 export function History({
   historyKey,
@@ -263,6 +264,7 @@ export function History({
   const width = widthOf(rows);
   return (
     <div className="history" ref={list}>
+      <ActiveBox list={list} activeKey={openKey} />
       {branches.length === 0 ? null : (
         <label className="branch-pick">
           <span>Branch</span>

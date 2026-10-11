@@ -281,6 +281,27 @@ test.describe("the sidebar", () => {
     await expect.poll(async () => (await top(box)) - (await top(file("big.txt")))).toBe(0);
   });
 
+  test("in Source Explorer, a box marks the open commit and slides to the next one opened", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "Source Explorer").click();
+    const history = page.locator(".history");
+    const box = history.locator(".active-box.outline");
+    const commit = (subject: string) => history.locator(".commit-row", { hasText: subject });
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    await commit("Add a picture and a guide").click();
+    await expect(commit("Add a picture and a guide")).toHaveClass(/active/);
+    await expect
+      .poll(async () => (await top(box)) - (await top(commit("Add a picture and a guide"))))
+      .toBe(0);
+    await commit("Side work").click();
+    await expect(commit("Side work")).toHaveClass(/active/);
+    await expect(history.locator(".active-box.fill")).toHaveClass(/filled/);
+    await expect.poll(async () => (await top(box)) - (await top(commit("Side work")))).toBe(0);
+  });
+
   test("Source Explorer lists every branch's commits, newest first; a commit opens with its changed files and diff", async ({
     page,
   }) => {
