@@ -17,9 +17,9 @@ import {
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
-import { type DiffLine, diffLines, foldUnchanged, STATUS_LABEL } from "./format";
+import { STATUS_LABEL } from "./format";
 import { CodeView } from "./code";
+import { TextDiff } from "./diff";
 import { toolTally } from "./grouping";
 import { useLink } from "./links";
 import { isVegaLite, VegaLitePlot } from "./plot";
@@ -143,53 +143,6 @@ export function ContentView({ block }: { block: ContentBlock }) {
   }
 }
 
-function DiffView({
-  path,
-  title,
-  before,
-  after,
-}: {
-  path: string;
-  title: string;
-  before?: string | null;
-  after: string;
-}) {
-  const rows = useMemo(() => foldUnchanged(diffLines(before ?? "", after)), [before, after]);
-  // Folds the reader has opened, by where their hidden lines start.
-  const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set());
-  const marker = { same: "  ", add: "+ ", remove: "- " } as const;
-  const line = (l: DiffLine, key: string) => (
-    <code key={key} className={`lk-diff-line ${l.kind}`}>
-      {marker[l.kind] + l.text}
-    </code>
-  );
-  return (
-    <div className="lk-diff">
-      <div className="lk-diff-path" title={title}>
-        {path}
-      </div>
-      {/* A diff has no ids: the same text can appear on many lines, so lines are keyed by
-          where they stand in it. */}
-      {rows.flatMap((row) =>
-        row.kind === "line"
-          ? [line(row.line, String(row.at))]
-          : opened.has(row.from)
-            ? row.lines.map((l, j) => line(l, String(row.from + j)))
-            : [
-                <button
-                  key={`fold:${row.from}`}
-                  type="button"
-                  className="lk-diff-fold"
-                  onClick={() => setOpened(new Set([...opened, row.from]))}
-                >
-                  ⋯ {row.lines.length} unchanged lines
-                </button>,
-              ],
-      )}
-    </div>
-  );
-}
-
 /** Whether an argument names the file at `path`: the same path, or one relative to where it is. */
 const namesPath = (path: string, value: string): boolean =>
   value === path || path.endsWith(`/${value}`);
@@ -227,7 +180,7 @@ function ToolContentView({ item, input }: { item: ToolCallContent; input: unknow
           note="new file"
         />
       ) : (
-        <DiffView
+        <TextDiff
           path={asNamed(item.path, input)}
           title={item.path}
           before={item.oldText}

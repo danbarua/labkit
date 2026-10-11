@@ -11,10 +11,14 @@ const linesOf = (text: string): string[] => {
   return lines.at(-1) === "" ? lines.slice(0, -1) : lines;
 };
 
-/** A diff as drawn: lines, with each long unchanged stretch folded away. */
+/**
+ * A diff as drawn: lines, with each long unchanged stretch folded away. A diff read from a patch
+ * also has its hunks' headers, and notes such as "Binary files differ" in place of lines.
+ */
 export type DiffRow =
   | { readonly kind: "line"; readonly line: DiffLine; readonly at: number }
-  | { readonly kind: "fold"; readonly from: number; readonly lines: readonly DiffLine[] };
+  | { readonly kind: "fold"; readonly from: number; readonly lines: readonly DiffLine[] }
+  | { readonly kind: "hunk" | "note"; readonly text: string; readonly at: number };
 
 /** Unchanged lines kept in view on each side of a change. */
 export const DIFF_CONTEXT = 3;
@@ -116,4 +120,47 @@ export function formatCost(cost: Cost): string {
 export function fillPercent(used: number, size: number): number {
   if (size <= 0) return 0;
   return Math.min(100, Math.max(0, Math.round((used / size) * 100)));
+}
+
+/** A patch's header lines before its first hunk, which name the file rather than change it. */
+const PATCH_HEADER =
+  /^(diff --git |index |--- |\+\+\+ |new file mode|deleted file mode|old mode|new mode|similarity index|rename from|rename to)/;
+
+/**
+ * One file's unified diff, as `git diff` prints it, as rows: each hunk's header, then its lines.
+ * The header lines that name the file are left out. Any other line outside a hunk, and the
+ * "\\ No newline at end of file" marker, is a note.
+ */
+export function rowsOfPatch(patch: string): DiffRow[] {
+  const rows: DiffRow[] = [];
+  let inHunk = false;
+  linesOf(patch).forEach((text, at) => {
+    if (text.startsWith("@@")) {
+      inHunk = true;
+      rows.push({ kind: "hunk", text, at });
+    } else if (!inHunk) {
+      if (!PATCH_HEADER.test(text)) rows.push({ kind: "note", text, at });
+    } else if (text.startsWith("\\")) rows.push({ kind: "note", text, at });
+    else {
+      const kind = text.startsWith("+") ? "add" : text.startsWith("-") ? "remove" : "same";
+      rows.push({ kind: "line", line: { kind, text: text.slice(1) }, at });
+    }
+  });
+  return rows;
+}
+
+/**
+ * A multi-file unified diff split at each `diff --git a/<old> b/<new>` line, with the file each
+ * part changes: its new path, or its old one when it was deleted.
+ */
+export function filesOfPatch(patch: string): { path: string; patch: string }[] {
+  const files: { path: string; patch: string }[] = [];
+  for (const part of patch.split(/^(?=diff --git )/m)) {
+    if (part.trim() === "") continue;
+    const head = /^diff --git a\/(.*) b\/(.*)$/m.exec(part);
+    const deleted = /^\+\+\+ \/dev\/null$/m.test(part);
+    const path = head === null ? "" : deleted ? (head[1] ?? "") : (head[2] ?? "");
+    files.push({ path, patch: part });
+  }
+  return files;
 }

@@ -235,7 +235,7 @@ test.describe("the sidebar", () => {
     await tree.getByRole("button", { name: "a.ts" }).click();
     await expect(header(page)).toHaveText("a.ts");
     await expect(page).toHaveURL(/\/app\/workspace\/alpha\/file\/src\/a\.ts/);
-    await expect(page.locator("pre.code")).toHaveText("1export const a = 2;");
+    await expect(page.locator(".file-card .lk-code-text")).toHaveText("1export const a = 2;");
     await expect(tree.locator(".tree-row.active")).toHaveText("a.ts");
   });
 
@@ -253,20 +253,21 @@ test.describe("the sidebar", () => {
     await history.nth(1).click();
     await expect(page.locator(".header-type")).toHaveText("Commit");
     await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
-    const changes = page.locator(".change-row");
+    const changes = page.locator(".kv:has(.change-status)");
     await expect(changes).toHaveText([
       "Addednotes/latin1.txt",
       "Addednotes/plan.md",
       "Addedreadme-link",
       "Modifiedsrc/a.ts",
     ]);
-    await expect(page.locator("pre.diff .d-del")).toContainText(["-export const a = 1;"]);
-    await expect(page.locator("pre.diff .d-add")).toContainText(["+export const a = 2;"]);
+    const diff = page.locator(".diff-card", { hasText: "src/a.ts" });
+    await expect(diff.locator(".lk-diff-line.remove")).toHaveText(["- export const a = 1;"]);
+    await expect(diff.locator(".lk-diff-line.add")).toHaveText(["+ export const a = 2;"]);
     // A changed file opens as it was at that commit.
-    await changes.filter({ hasText: "src/a.ts" }).click();
+    await changes.getByRole("button", { name: "src/a.ts" }).click();
     await expect(header(page)).toHaveText("a.ts");
     await expect(page).toHaveURL(/\/commit\/[0-9a-f]{40}\/file\/src\/a\.ts/);
-    await expect(page.locator("pre.code")).toHaveText("1export const a = 2;");
+    await expect(page.locator(".file-card .lk-code-text")).toHaveText("1export const a = 2;");
   });
 
   test("File and Source Explorers are enabled once Record Explorer lists a workspace, before any record is open", async ({
@@ -404,7 +405,7 @@ test.describe("an open resource", () => {
     await expect(page).toHaveURL(/tab=debug/);
     await expect(page.locator(".ev").first()).toBeVisible();
     await page.getByRole("button", { name: "Show or hide the response" }).click();
-    await expect(page.locator("pre.jsonview")).toContainText("alpha question");
+    await expect(page.locator(".response-card .lk-code-text")).toContainText("alpha question");
   });
 
   test("an unknown tab in the address opens the overview", async ({ page }) => {

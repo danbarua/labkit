@@ -179,35 +179,6 @@ export function PropRows({ attrs, prose }: { attrs: Record<string, unknown>; pro
   );
 }
 
-const JSON_TOKEN = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g;
-
-/** A document as indented JSON, with its keys, strings and numbers coloured. */
-export function JsonView({ value }: { value: unknown }) {
-  const text = JSON.stringify(value, null, 2) ?? "";
-  const parts: ReactNode[] = [];
-  let last = 0;
-  for (const m of text.matchAll(JSON_TOKEN)) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    const [whole, string, colon, number] = m;
-    if (string !== undefined && colon !== undefined)
-      parts.push(
-        <span key={m.index} className="k">
-          {string}
-        </span>,
-        colon,
-      );
-    else
-      parts.push(
-        <span key={m.index} className={string !== undefined ? "s" : "n"}>
-          {string ?? number}
-        </span>,
-      );
-    last = m.index + whole.length;
-  }
-  parts.push(text.slice(last));
-  return <pre className="jsonview">{parts}</pre>;
-}
-
 /** The members of an event shown in its own columns, left out of its detail. */
 const EVENT_COLUMNS = new Set(["seq", "index", "operation", "subject", "dir", "change", "_links"]);
 

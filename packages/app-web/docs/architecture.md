@@ -61,6 +61,16 @@ The browser app's page for the graph, at `/app/<API path>`: `/app/workspace/over
 `/workspace/overlap_bench/Q_1`. The page fetches that path and shows a resource or a collection
 according to what the API answers, never by the shape of the path. Its code is `src/ui/trace/`.
 
+Content of unknown length is drawn with the views the chat uses, from `@labkit/ui`, whose styles
+are `@labkit/ui/content.css`:
+
+| View | Draws | In the Trace Console |
+| --- | --- | --- |
+| `ContentCard` | A card that folds under its header, with controls beside the title. | The graph, the Debug response, a file's text, a commit's message, changed files and each file's diff. |
+| `CodeView` | Text numbered by line and highlighted by its language, showing its first lines until the rest is asked for. | A file's text, its first 40 lines. |
+| `JsonView` | A JSON value through `CodeView`. | The Debug response, its first 40 lines. |
+| `DiffView` | One file's diff, from two texts or from a unified patch, with the same cut. | Each changed file of a commit, its first 40 rows. |
+
 | Column | Shows |
 |--------|-------|
 | Left | The sidebar, in three sections that fold: File Explorer, Source Explorer, and Record Explorer, which lists two collections: the one picked (`?list=`) and the collection it is listed in. |

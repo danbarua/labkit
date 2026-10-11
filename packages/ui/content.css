@@ -1,0 +1,224 @@
+@import "@labkit/design/tokens.css";
+
+/*
+ * Content of unknown length, shared by the chat and the Trace Console: a file as code, a diff, and
+ * the card either sits in. Inside an element with the `lk-root` class, which carries the tokens.
+ */
+.lk-caption {
+  color: var(--lk-muted);
+  font-size: 12px;
+  font-family: var(--lk-font-mono);
+  overflow-wrap: anywhere;
+}
+.lk-diff {
+  margin: 0;
+  border: 1px solid var(--lk-line);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+}
+.lk-diff-path {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--lk-line);
+  background: var(--lk-surface-2);
+  color: var(--lk-muted);
+}
+.lk-diff-line {
+  display: block;
+  padding: 0 10px;
+  white-space: pre;
+}
+.lk-diff-line.add {
+  background: var(--lk-accent-soft);
+}
+.lk-diff-fold {
+  display: block;
+  width: 100%;
+  padding: 2px 10px;
+  border: 0;
+  border-block: 1px dashed var(--lk-line);
+  background: var(--lk-surface-2);
+  color: var(--lk-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lk-diff-fold:hover {
+  color: var(--lk-text);
+}
+.lk-diff-line.remove {
+  background: var(--lk-danger-soft);
+}
+.lk-diff-hunk {
+  display: block;
+  padding: 2px 10px;
+  border-block: 1px solid var(--lk-line);
+  background: var(--lk-surface-2);
+  color: var(--lk-muted);
+  white-space: pre;
+}
+.lk-diff > .lk-code-more {
+  margin: 0;
+  padding: 4px 10px;
+}
+.lk-diff-note {
+  padding: 4px 10px;
+  color: var(--lk-muted);
+  font-family: var(--lk-font-sans);
+}
+
+/* A card whose content may be any length: a header that folds it, and a body. */
+.lk-card {
+  border: 1px solid var(--lk-line);
+  border-radius: 9px;
+  background: var(--lk-panel);
+  overflow: hidden;
+}
+.lk-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 0;
+  font-size: 12px;
+  color: var(--lk-muted);
+}
+.lk-card.open > .lk-card-head {
+  border-bottom: 1px solid var(--lk-line);
+}
+.lk-card-toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 0 10px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lk-card-toggle:hover {
+  color: var(--lk-text);
+}
+.lk-card-caret {
+  flex: none;
+  color: var(--lk-faint);
+  transition: transform 120ms ease;
+}
+.lk-card.open .lk-card-caret {
+  transform: rotate(90deg);
+}
+.lk-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-card-meta {
+  margin-left: auto;
+  color: var(--lk-faint);
+  white-space: nowrap;
+}
+.lk-card-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+.lk-card-body {
+  padding: 10px 14px;
+}
+.lk-card-body.flush {
+  padding: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lk-card-caret {
+    transition: none;
+  }
+}
+
+/* a whole file as code */
+.lk-code {
+  margin: 0;
+}
+/* The frame always keeps room for its horizontal scrollbar. A scrollbar that appears after the
+   first layout, as when a web font arrives and widens the lines, would otherwise grow the frame
+   after the "Show N more lines" button below it was placed, and the frame drew over it. */
+.lk-code-frame {
+  margin-top: 4px;
+  padding: 6px 0;
+  border: 1px solid var(--lk-line);
+  border-radius: 6px;
+  background: var(--lk-bg);
+  overflow-x: scroll;
+}
+/* Cut by height when it is not open, so no padding of its own: a cut line would show in it. */
+.lk-code-text {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--lk-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+.lk-code-text code {
+  padding: 0 12px;
+  font: inherit;
+}
+.lk-code-gutter {
+  min-width: 4ch;
+  padding: 0 8px;
+  border-right: 1px solid var(--lk-line);
+  color: var(--lk-muted);
+  text-align: right;
+  user-select: none;
+}
+.lk-code-more {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lk-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lk-code-more:hover {
+  color: var(--lk-text);
+}
+.hljs-keyword,
+.hljs-literal,
+.hljs-built_in,
+.hljs-type,
+.hljs-selector-tag {
+  color: var(--lk-accent-text);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-attr,
+.hljs-symbol {
+  color: var(--lk-warn);
+}
+.hljs-number {
+  color: var(--lk-danger);
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--lk-muted);
+  font-style: italic;
+}
+/* A decorator, a shebang, a preprocessor line: code that is read, not a comment. */
+.hljs-meta {
+  color: var(--lk-accent-text);
+}
+.hljs-title,
+.hljs-section {
+  font-weight: 600;
+}

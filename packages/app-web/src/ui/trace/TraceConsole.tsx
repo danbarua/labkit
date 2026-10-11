@@ -5,7 +5,8 @@
  * pasted link opens it again.
  */
 
-import { ICONS, ThemeToggle } from "@labkit/ui";
+import { ContentCard, ICONS, JsonView, ThemeToggle } from "@labkit/ui";
+import "@labkit/ui/content.css";
 import {
   ArrowClockwiseIcon,
   ArrowCounterClockwiseIcon,
@@ -83,7 +84,7 @@ import { FileTree, History } from "./explorers";
 import { CommitView, FileView, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
-import { Badge, EventRow, JsonView, PropRows, type Prose } from "./values";
+import { Badge, EventRow, PropRows, type Prose } from "./values";
 import "./trace.css";
 
 /** Where the left column starts: the list of workspaces. */
@@ -1172,44 +1173,24 @@ function Debug({
   const self = resourcePath(res.key);
   return (
     <>
-      <div className="panel">
-        <div className="panel-head">
-          <span className="response-head">
-            <button
-              type="button"
-              className="toggle-btn"
-              title="Show or hide the response"
-              aria-label="Show or hide the response"
-              aria-expanded={responseOpen}
-              onClick={() => setResponseOpen((o) => !o)}
-            >
-              <CaretRightIcon
-                className={responseOpen ? "caret open" : "caret"}
-                aria-hidden="true"
-              />
-            </button>
-            <a href={self} target="_blank" rel="noopener" title="Open in a new tab">
-              {self}
-            </a>
+      <ContentCard
+        className="response-card"
+        title={
+          <span className="response-title">
+            <BracketsCurlyIcon aria-hidden="true" /> response
           </span>
-          <button
-            type="button"
-            className="toggle-btn response-chip"
-            aria-expanded={responseOpen}
-            onClick={() => setResponseOpen((o) => !o)}
-          >
-            <BracketsCurlyIcon aria-hidden="true" />
-            response
-          </button>
-        </div>
-        {responseOpen ? (
-          doc === undefined ? (
-            <Spinner>loading…</Spinner>
-          ) : (
-            <JsonView value={doc} />
-          )
-        ) : null}
-      </div>
+        }
+        toggleLabel="Show or hide the response"
+        open={responseOpen}
+        onToggle={() => setResponseOpen((o) => !o)}
+        actions={
+          <a href={self} target="_blank" rel="noopener" title="Open in a new tab">
+            {self}
+          </a>
+        }
+      >
+        {doc === undefined ? <Spinner>loading…</Spinner> : <JsonView value={doc} preview={40} />}
+      </ContentCard>
       {res.eventsHref === undefined ? null : <Events href={res.eventsHref} onOpen={onOpen} />}
     </>
   );
@@ -1308,20 +1289,19 @@ function GraphCard({
     [held, drawnJoined, workspace],
   );
   return (
-    <div className="panel graph-card">
-      <div className="panel-head">
-        <span className="graph-title">
-          <button
-            type="button"
-            className="toggle-btn"
-            aria-label="Show or hide the graph"
-            aria-expanded={open}
-            onClick={onToggle}
-          >
-            <CaretRightIcon className={open ? "caret open" : "caret"} aria-hidden="true" />
-          </button>
-          Graph<span className="faint">{nodes.length}</span>
-        </span>
+    <ContentCard
+      className="graph-card"
+      title={
+        <>
+          Graph <span className="faint">{nodes.length}</span>
+        </>
+      }
+      toggleLabel="Show or hide the graph"
+      open={open}
+      onToggle={onToggle}
+      keep
+      flush
+      actions={
         <span className="graph-controls">
           colour
           {(
@@ -1350,8 +1330,32 @@ function GraphCard({
             <ArrowCounterClockwiseIcon aria-hidden="true" /> Reset
           </button>
         </span>
-      </div>
-      <div className="graph-stage" hidden={!open}>
+      }
+      // Playback's controls sit under the canvas, so the act's name, which changes length at every
+      // step, never moves the header's controls. They stay while the card is folded.
+      footer={
+        <div className="graph-foot">
+          <button
+            type="button"
+            className={playing ? "tbtn on" : "tbtn"}
+            title={
+              playing
+                ? "Stop stepping through the acts"
+                : "Step through the later acts, one at a time"
+            }
+            disabled={!playing && !canPlay}
+            onClick={playing ? onPause : onPlay}
+          >
+            {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
+            {playing ? "Pause" : "Play"}
+          </button>
+          <span className="playback-status" aria-live="polite">
+            {status}
+          </span>
+        </div>
+      }
+    >
+      <div className="graph-stage">
         <GraphView
           key={`${workspace} ${generation}`}
           nodes={nodes}
@@ -1377,28 +1381,7 @@ function GraphCard({
           ))}
         </ul>
       ) : null}
-      {/* Playback's controls sit under the canvas, so the act's name, which changes length at every
-          step, never moves the header's controls. They stay while the card is folded. */}
-      <div className="graph-foot">
-        <button
-          type="button"
-          className={playing ? "tbtn on" : "tbtn"}
-          title={
-            playing
-              ? "Stop stepping through the acts"
-              : "Step through the later acts, one at a time"
-          }
-          disabled={!playing && !canPlay}
-          onClick={playing ? onPause : onPlay}
-        >
-          {playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}
-          {playing ? "Pause" : "Play"}
-        </button>
-        <span className="playback-status" aria-live="polite">
-          {status}
-        </span>
-      </div>
-    </div>
+    </ContentCard>
   );
 }
 
