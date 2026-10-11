@@ -994,7 +994,9 @@
 .trace .toggle-btn:hover {
   color: var(--text);
 }
+/* A caret never shrinks, so a row whose name is cut keeps its icon in line with the rows around it. */
 .trace .caret {
+  flex: none;
   color: var(--text-faint);
   transition: transform 120ms ease;
 }
