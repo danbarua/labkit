@@ -397,9 +397,10 @@ test.describe("the sidebar", () => {
     expect(Math.abs(pressed.files - (dragged.files - 16))).toBeLessThanOrEqual(2);
 
     await page.reload();
-    await expect(section("File Explorer")).toBeVisible();
-    const reloaded = await heights();
-    expect(Math.abs(reloaded.files - pressed.files)).toBeLessThanOrEqual(2);
+    // File Explorer takes its share once the workspace's index arrives, after it is first drawn.
+    await expect
+      .poll(async () => Math.abs((await heights()).files - pressed.files))
+      .toBeLessThanOrEqual(2);
   });
 
   test("a double-click or Home on a border returns the two sections it divides to their initial proportion, and no other border moves", async ({
@@ -751,7 +752,7 @@ test.describe("the Items pane's open row", () => {
     await expect(fill(page)).toHaveClass(/filled/);
     const top = async (locator: import("@playwright/test").Locator) =>
       Math.round((await locator.boundingBox())?.y ?? -1);
-    expect(await top(box(page))).toBe(await top(item(page, "Q_1")));
+    await expect.poll(async () => (await top(box(page))) - (await top(item(page, "Q_1")))).toBe(0);
 
     await item(page, "Q_2").click();
     await expect(header(page)).toHaveText("Q_2");
