@@ -121,8 +121,14 @@ keeps each response as it arrived and draws from them; a resource's own response
 that lists all of its relations. The palette comes from `@labkit/design`.
 
 An act records a change to a resource rather than being one, so the graph draws an opened act as
-the act's subject and has no nodes for acts. When a node opens, the camera eases toward framing
-it:
+the act's subject and has no nodes for acts. A relation to an act ends at the act's subject too:
+a commit's acts are drawn as edges from the records they changed to the commit. Until an act's
+own response arrives, its subject is the one the document that embeds it names.
+
+Files, directories and commits are drawn with their relations, as records are: a commit with its
+parents and changed files, a file with its directory and the commits that changed it. A directory
+is a collection, not a resource, so opening its node lists its entries in Record Explorer's Items
+pane rather than drawing them. When a node opens, the camera eases toward framing it:
 
 - The camera draws the node up and left of centre.
 - The camera tilts to 20° above the plane of the force layout.

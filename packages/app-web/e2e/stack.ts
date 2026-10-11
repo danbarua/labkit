@@ -24,6 +24,21 @@ const ports = {
 
 const fixture = await createFixture("pglite");
 const git = await createGitFixture();
+// Act 1, posing Q_1, ran against the repository's first commit.
+{
+  const session = await fixture.connections.connect();
+  try {
+    const { rows } = await session.query<{ graph_name: string }>(
+      "SELECT graph_name FROM public.tenants WHERE slug = 'alpha'",
+    );
+    await session.query(
+      `UPDATE "${rows[0]?.graph_name}".domain_event SET git_hash = $1 WHERE seq = 1`,
+      [git.commits[0]],
+    );
+  } finally {
+    session.release();
+  }
+}
 const api = serve(
   createRuntime(fixture.connections, new Map([["alpha", git.repo]])),
   Number(ports.api),

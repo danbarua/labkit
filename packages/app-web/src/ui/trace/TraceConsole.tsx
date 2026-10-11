@@ -724,7 +724,10 @@ function Pane({
 }) {
   const needle = term.trim().toLowerCase();
   const rows = pages.items.filter((item) => {
-    if (typeof item.data.type === "string" && hidden?.has(item.data.type)) return false;
+    // Only a row for a collection is left out, not a resource of the same type, such as a file
+    // listed in a directory.
+    if (item.id === undefined && typeof item.data.type === "string" && hidden?.has(item.data.type))
+      return false;
     if (!needle) return true;
     const d = item.data;
     const text =
@@ -1411,8 +1414,12 @@ function graphOf(
     if (r?.own !== true || !key.startsWith(workspace)) continue;
     node(r.key);
     for (const rel of r.rels) {
-      node(rel.key);
-      const [from, to] = rel.dir === "in" ? [rel.key, r.key] : [r.key, rel.key];
+      // An act is drawn as its subject, so a relation to an act ends at the act's subject; one
+      // whose subject is not known yet is not drawn.
+      const other = drawnAs(held, rel.key);
+      if (other === undefined) continue;
+      node(other);
+      const [from, to] = rel.dir === "in" ? [other, r.key] : [r.key, other];
       edges.push({ from, to, label: edgeLabelOf(rel.rel, rel.dir) });
     }
   }

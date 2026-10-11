@@ -35,6 +35,9 @@
   --c-note: #fda4af;
   --c-workspace: #a3e635;
   --c-act: #8592b0;
+  --c-file: #c4b5fd;
+  --c-directory: #fcd34d;
+  --c-commit: #fb923c;
 
   display: flex;
   flex-direction: column;

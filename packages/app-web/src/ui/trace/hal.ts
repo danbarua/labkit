@@ -219,6 +219,11 @@ export function indexOf(documents: Iterable<{ key: string; doc: HalDocument }>):
       held.own = true;
       held.rels = relsOf(node);
       held.eventsHref = linksOf(node, "events")[0]?.href;
+    } else if (!held.own) {
+      // Until its own response arrives, a resource has the relations of the document that last
+      // embedded it, such as an act's subject, embedded in the commit it ran against.
+      const rels = relsOf(node);
+      if (rels.length > 0) held.rels = rels;
     }
     for (const rel of Object.keys(node._links ?? {})) {
       if (rel === "self" || rel === "start") continue;
