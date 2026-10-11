@@ -397,6 +397,18 @@
 .trace .lk-card .card-note {
   margin: 0 0 8px;
 }
+/* A file shown as a picture, never wider than its card, on a checkerboard that shows where it
+   is transparent. */
+.trace .file-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: repeating-conic-gradient(var(--line) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+}
+.trace .file-markdown {
+  font-size: 13px;
+  line-height: 1.55;
+}
 .trace .message {
   margin: 0;
   font-family: var(--font-mono);

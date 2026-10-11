@@ -1066,8 +1066,8 @@ function Detail({
               )}
             </div>
           </div>
-          {loaded && attrs !== undefined && res?.type === FILE_TYPE ? (
-            <FileView attrs={attrs} />
+          {loaded && attrs !== undefined && doc !== undefined && res?.type === FILE_TYPE ? (
+            <FileView doc={doc} attrs={attrs} onOpen={onOpen} />
           ) : null}
           {loaded && attrs !== undefined && doc !== undefined && res?.type === COMMIT_TYPE ? (
             <CommitView doc={doc} attrs={attrs} onOpen={onOpen} />

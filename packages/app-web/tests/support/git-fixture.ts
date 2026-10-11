@@ -46,10 +46,10 @@ export const BIG_TEXT = `${"x".repeat(79)}\n`.repeat(2_000);
 
 /**
  * With `wide`, a fourth commit adds that many files under `wide/`, to pass the API's page size.
- * With `branches`, a branch `side` forks from the second commit, HEAD's branch merges it, and a
- * remote-tracking `origin/main` points at the third commit. With `media`, a last commit adds
- * `pixel.png` and `docs/guide.md`, which shows the picture and links the plan; with `huge`, one
- * adds `huge.bin` of that many bytes.
+ * With `media`, a commit after the third adds `pixel.png` and `docs/guide.md`, which shows the
+ * picture and links the plan. With `branches`, a branch `side` forks from the second commit,
+ * HEAD's branch merges it last, and a remote-tracking `origin/main` points at the third commit.
+ * With `huge`, a last commit adds `huge.bin` of that many bytes.
  */
 export async function createGitFixture({
   wide,
@@ -127,8 +127,15 @@ export async function createGitFixture({
       ),
     );
 
+  if (media)
+    await commit("Add a picture and a guide", 150, {
+      "pixel.png": PIXEL_PNG,
+      "docs/guide.md": GUIDE_MD,
+    });
+
   if (branches) {
     const [, second, third] = commits;
+    const head = commits.at(-1)!;
     const at = (seconds: number) => ({
       ...AUTHOR,
       timeOptions: { timestamp: 1_790_000_000 + seconds, offset: 0 },
@@ -139,9 +146,9 @@ export async function createGitFixture({
       author: at(90),
       committer: at(90),
     });
-    const merge = repo.commit(repo.getCommit(third!).tree(), "Merge side", {
+    const merge = repo.commit(repo.getCommit(head).tree(), "Merge side", {
       updateRef: "HEAD",
-      parents: [third!, side],
+      parents: [head, side],
       author: at(200),
       committer: at(200),
     });
@@ -149,11 +156,6 @@ export async function createGitFixture({
     await mkdir(join(folder, ".git/refs/remotes/origin"), { recursive: true });
     await writeFile(join(folder, ".git/refs/remotes/origin/main"), `${third}\n`);
   }
-  if (media)
-    await commit("Add a picture and a guide", 250, {
-      "pixel.png": PIXEL_PNG,
-      "docs/guide.md": GUIDE_MD,
-    });
   if (huge !== undefined)
     await commit("Add a huge file", 300, { "huge.bin": new Uint8Array(huge) });
   return { folder, repo, commits, close: () => rm(folder, { recursive: true, force: true }) };
