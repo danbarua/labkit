@@ -296,15 +296,17 @@ export function followPivot(sim: Sim): void {
   }
   if (!open) return;
   const target = { x: open.x, y: open.y, z: zOf(sim, open) };
-  const k = 0.12;
-  sim.pivot.x += (target.x - sim.pivot.x) * k;
-  sim.pivot.y += (target.y - sim.pivot.y) * k;
-  sim.pivot.z += (target.z - sim.pivot.z) * k;
+  sim.pivot.x += (target.x - sim.pivot.x) * FRAME_EASE;
+  sim.pivot.y += (target.y - sim.pivot.y) * FRAME_EASE;
+  sim.pivot.z += (target.z - sim.pivot.z) * FRAME_EASE;
 }
 
 /** How much of the canvas's shorter side the open node's neighbourhood is zoomed to fill. */
 const FIT = 0.3;
-/** How far the camera moves toward its framing on each frame. */
+/**
+ * How far the camera moves toward its framing on each frame: its pan, turn and zoom. At 60 frames
+ * a second it covers 98% of the way in 1.2s, one playback step.
+ */
 const FRAME_EASE = 0.05;
 /**
  * The nearest and farthest the camera frames from. A small graph spaces its few nodes far apart
