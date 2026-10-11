@@ -55,9 +55,51 @@ that lists all of its relations. The palette comes from `@labkit/design`.
 
 An act records a change to a resource rather than being one, so the graph draws an opened act as
 the act's subject and has no nodes for acts. When a node opens, the camera eases toward framing
-it: the node up and left of centre, the rest of the graph turned toward the bottom-right corner
-behind the hover card, and the node's neighbours filling 30% of the canvas's shorter side. A drag
-or a scroll stops the framing until the next node opens; Reset starts it again. The graph colours nodes by record type or by how they relate to the open resource (temporal).
+it:
+
+- The camera draws the node up and left of centre.
+- The camera tilts to 20° above the plane of the force layout.
+- The camera turns so that the node's neighbours are drawn spread out. The neighbours that arrive
+  with a resource's response lie close together on the time axis, and a turn that looks along
+  them would draw them in a line. Among the turns that draw them spread out, the camera considers
+  those that put the rest of the graph behind them and nearly as far toward the bottom-right
+  corner, behind the hover card, as the best one does. Of those, it takes the turn nearest its
+  current one, so opening another node turns the camera no further than it must.
+  The camera turns at most 45° a second, so a large turn sweeps over seconds rather than snaps.
+- The camera zooms so the node's neighbours fill 30% of the canvas's shorter side.
+- The camera swings 30° either side of that turn, about the vertical through the node, once every
+  16 seconds, so depth shows by parallax. It holds still while the pointer is on the canvas and
+  does not swing when the reader's system asks for reduced motion.
+
+A drag or a scroll stops the framing until the next node opens; Reset starts it again. The graph colours nodes by record type or by how they relate to the open resource (temporal).
+
+No two labels on the canvas overlap. In each frame, labels are placed in this order, and a label
+that would overlap one already placed is not drawn:
+
+1. The open and hovered nodes' labels and their edges' labels, drawn even where they overlap.
+2. The open node's neighbours' labels.
+3. Other nodes' labels.
+4. Other edges' labels.
+
+Within each step, a label drawn in the previous frame comes first, then the nearest. Hovering a
+node shows its card whether or not its label is drawn.
+
+So that labels do not flicker while the camera or the layout moves, a label drawn in the previous
+frame is favoured over one that was not:
+
+| Rule | Label drawn in the previous frame | Label not drawn in the previous frame |
+| --- | --- | --- |
+| Space it needs | Its own box | Its box and 6 px clear on every side |
+| Smallest node size, as the perspective scale | 0.5 | 0.55 |
+| Longest edge label, as a share of its edge's length on screen | 120% | 100% |
+| After being hidden | — | Not drawn for 0.5 s, except steps 1 and 2 above |
+
+A label fades in over 10 frames, about 0.17 s, once placed, and fades out over the same time once
+not. A label fading out takes no room, so another may fade in where it was. A label whose node
+becomes too small, or whose edge becomes too short, is not faded out.
+
+A new edge is drawn for 0.5 s before its label may be placed, so the relation appears first and
+what it means fades in after it. This holds for the open node's own edges too.
 The API returns no standing for a resource, so there is no standing overlay.
 
 The graph card's Play button steps through later acts, one at a time, in the order the acts were

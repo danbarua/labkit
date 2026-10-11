@@ -46,6 +46,9 @@ type SimNode = GraphNodeSeed & {
 
 type Projected = { sx: number; sy: number; scale: number; depth: number };
 
+/** An edge on the canvas. `born` is the label frame in which it was added. */
+type SimEdge = GraphEdgeSeed & { born: number };
+
 type Camera = { yaw: number; pitch: number; distance: number };
 
 /** A point in the graph's space: the plane of the force layout, and depth by order first seen. */
@@ -55,13 +58,14 @@ type Drag = { x: number; y: number; yaw: number; pitch: number };
 
 type Sim = {
   nodes: Map<string, SimNode>;
-  edges: GraphEdgeSeed[];
+  edges: SimEdge[];
   edgeKeys: Set<string>;
   nextStep: number;
   overlay: Overlay;
   selectedId: string | null;
   hoverId: string | null;
   screenPos: Map<string, Projected>;
+  labels: LabelMemory;
   camera: Camera;
   /** The point the camera orbits and faces: it follows the open resource's node. */
   pivot: Point3 | null;
@@ -69,6 +73,14 @@ type Sim = {
   heat: number;
   /** Whether the camera frames the open node by itself: set when a node opens, cleared by a drag or a scroll. */
   follow: boolean;
+  /** The yaw the framing chose, which the sway swings about; null until it chooses after following starts. */
+  aim: number | null;
+  /** Where the sway is in its cycle, in radians. */
+  swayPhase: number;
+  /** Whether the pointer is over the canvas. The sway holds still while it is. */
+  pointerOn: boolean;
+  /** Whether the reader's system asks for reduced motion. The camera does not sway when it does. */
+  reducedMotion: boolean;
   drag: Drag | null;
   dragged: boolean;
 };
@@ -204,7 +216,7 @@ export function mergeSeeds(
     const key = `${edge.from}\0${edge.label}\0${edge.to}`;
     if (sim.edgeKeys.has(key)) continue;
     sim.edgeKeys.add(key);
-    sim.edges.push(edge);
+    sim.edges.push({ ...edge, born: sim.labels.frame });
   }
   if (sim.nodes.size + sim.edges.length > before) sim.heat = Math.max(sim.heat, REHEAT);
 }
@@ -304,10 +316,27 @@ export function followPivot(sim: Sim): void {
 /** How much of the canvas's shorter side the open node's neighbourhood is zoomed to fill. */
 const FIT = 0.3;
 /**
- * How far the camera moves toward its framing on each frame: its pan, turn and zoom. At 60 frames
- * a second it covers 98% of the way in 1.2s, one playback step.
+ * How far the camera moves toward its framing on each frame: its pan, turn, tilt and zoom. At 60
+ * frames a second it covers 98% of the way in 1.2s, one playback step.
  */
 const FRAME_EASE = 0.05;
+/**
+ * The least spread, as a share of the best turn's, at which a turn draws the open node's
+ * neighbours. The neighbours that arrive with a resource's response lie close together on the
+ * time axis, a flat cluster; for one, this admits turns up to about 45° from facing it.
+ */
+const SPREAD_KEEP = 0.87;
+/**
+ * While the camera follows, it swings about the vertical through the pivot, SWAY either side of
+ * the yaw the framing chose, over a cycle of 16s at 60 frames a second, so depth shows by parallax.
+ */
+const SWAY = Math.PI / 6;
+const SWAY_STEP = (2 * Math.PI) / (16 * 60);
+/**
+ * The most the camera turns in one frame: 0.75°, 45° a second at 60 frames a second. A large turn,
+ * such as one that brings a cluster from edge-on into view, sweeps over seconds rather than snaps.
+ */
+const TURN_MAX = (0.75 * Math.PI) / 180;
 /**
  * The nearest and farthest the camera frames from. A small graph spaces its few nodes far apart
  * along the time axis, and fitting them all would draw every node a pixel or two across.
@@ -329,24 +358,53 @@ function towardCorner(v: Point3, yaw: number, pitch: number): number {
   return (x1 + y1) / Math.SQRT2;
 }
 
+/** The signed turn, between -π and π, from angle `from` to angle `to`. */
+function turnBetween(from: number, to: number): number {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+
 /**
- * The yaw, among 72 evenly spaced, that draws `v` furthest toward the canvas's bottom-right
- * corner, where the card is. It keeps `yaw` unless another draws `v` at least a tenth of its
- * length further, so a graph spread evenly around the pivot does not swing from side to side.
+ * How far from the pivot the camera draws `points`, relative to the pivot, as the mean over the
+ * points of each one's drawn distance divided by its distance in the graph's space. 1 when every
+ * point is drawn at its full distance; lower when the camera looks along their directions.
  */
-export function yawToward(v: Point3, pitch: number, yaw: number): number {
-  let best = yaw;
-  let bestScore = towardCorner(v, yaw, pitch);
-  const keep = bestScore;
-  for (let i = 0; i < 72; i++) {
-    const candidate = -Math.PI + (i * Math.PI) / 36;
-    const score = towardCorner(v, candidate, pitch);
-    if (score > bestScore) {
-      best = candidate;
-      bestScore = score;
-    }
+function spreadOf(points: Point3[], camera: Pick<Camera, "yaw" | "pitch">): number {
+  let sum = 0;
+  let count = 0;
+  for (const v of points) {
+    const length = Math.hypot(v.x, v.y, v.z);
+    if (length === 0) continue;
+    const { x1, y1 } = onScreen(v, camera);
+    sum += Math.hypot(x1, y1) / length;
+    count++;
   }
-  return bestScore - keep < 0.1 * Math.hypot(v.x, v.y, v.z) ? yaw : best;
+  return count === 0 ? 1 : sum / count;
+}
+
+/**
+ * The yaw at which the camera frames the open node, among `yaw` and 72 evenly spaced. Points are
+ * relative to the pivot. The yaw draws `near`, the open node's neighbours, at SPREAD_KEEP of the
+ * best spread, and `rest`, the centroid of the other nodes, at or behind the pivot's depth; the
+ * depth condition is dropped when no such yaw meets it. Among those yaws, the ones that draw `rest`
+ * within a tenth of its length of furthest toward the bottom-right corner qualify, and the one
+ * nearest `yaw` is chosen, so opening another node turns the camera no further than it must.
+ */
+export function yawToward(view: { rest: Point3; near: Point3[]; pitch: number; yaw: number }) {
+  const { rest, near, pitch, yaw } = view;
+  const candidates = [yaw, ...Array.from({ length: 72 }, (_, i) => -Math.PI + (i * Math.PI) / 36)];
+  const spread = candidates.map((c) => spreadOf(near, { yaw: c, pitch }));
+  const most = Math.max(...spread);
+  const shows = candidates.filter((_, i) => (spread[i] ?? 0) >= SPREAD_KEEP * most);
+  const behind = shows.filter((c) => onScreen(rest, { yaw: c, pitch }).z2 >= 0);
+  // `shows` always holds the yaw with the best spread, so the pool is never empty.
+  const pool = behind.length > 0 ? behind : shows;
+  const score = (c: number) => towardCorner(rest, c, pitch);
+  const best = Math.max(...pool.map(score));
+  const margin = 0.1 * Math.hypot(rest.x, rest.y, rest.z);
+  const turn = (c: number) => Math.abs(turnBetween(yaw, c));
+  return pool
+    .filter((c) => score(c) >= best - margin)
+    .reduce((a, c) => (turn(c) < turn(a) ? c : a));
 }
 
 /**
@@ -370,13 +428,18 @@ export function distanceToFit(
 }
 
 /**
- * While the camera follows, eases it toward framing the open node: turned so the rest of the
- * graph lies toward the bottom-right corner, behind the card, and zoomed so the open node's
- * neighbours fill FIT of the canvas's shorter side.
+ * While the camera follows, eases it toward framing the open node: tilted to the initial camera's
+ * pitch, turned as `yawToward` chooses, so the open node's neighbours are seen spread out and the
+ * rest of the graph lies behind them toward the bottom-right corner, and zoomed so the
+ * neighbours fill FIT of the canvas's shorter side. The turn sways by SWAY either side, except
+ * while the pointer is on the canvas or the reader asks for reduced motion.
  */
-function frameCamera(sim: Sim, width: number, height: number): void {
+export function frameCamera(sim: Sim, width: number, height: number): void {
   const open = sim.selectedId === null ? undefined : sim.nodes.get(sim.selectedId);
   if (!sim.follow || !open || width === 0 || height === 0) return;
+  const camera = sim.camera;
+  const pitch = INITIAL_CAMERA.pitch;
+  camera.pitch += turnBetween(camera.pitch, pitch) * FRAME_EASE;
   const at = zOf(sim, open);
   const rel = (n: SimNode): Point3 => ({ x: n.x - open.x, y: n.y - open.y, z: zOf(sim, n) - at });
   const near = new Set<string>();
@@ -394,17 +457,22 @@ function frameCamera(sim: Sim, width: number, height: number): void {
     rest.z += r.z;
     count++;
   }
-  const camera = sim.camera;
-  if (count > 0) {
-    const centroid = { x: rest.x / count, y: rest.y / count, z: rest.z / count };
-    const target = yawToward(centroid, camera.pitch, camera.yaw);
-    const turn = Math.atan2(Math.sin(target - camera.yaw), Math.cos(target - camera.yaw));
-    camera.yaw += turn * FRAME_EASE;
-  }
   const points = [...near].flatMap((id) => {
     const n = sim.nodes.get(id);
     return n === undefined ? [] : [rel(n)];
   });
+  const centroid =
+    count > 0 ? { x: rest.x / count, y: rest.y / count, z: rest.z / count } : { x: 0, y: 0, z: 0 };
+  if (sim.aim === null) {
+    sim.aim = camera.yaw;
+    sim.swayPhase = 0;
+  }
+  sim.aim = yawToward({ rest: centroid, near: points, pitch, yaw: sim.aim });
+  if (!sim.pointerOn && !sim.reducedMotion)
+    sim.swayPhase = (sim.swayPhase + SWAY_STEP) % (2 * Math.PI);
+  const goal = sim.aim + SWAY * Math.sin(sim.swayPhase);
+  const step = turnBetween(camera.yaw, goal) * FRAME_EASE;
+  camera.yaw += Math.max(-TURN_MAX, Math.min(TURN_MAX, step));
   const fit = distanceToFit(points, camera, FIT * Math.min(width, height));
   if (fit !== undefined) {
     const target = Math.min(FRAME_DISTANCE.max, Math.max(FRAME_DISTANCE.min, fit));
@@ -412,7 +480,7 @@ function frameCamera(sim: Sim, width: number, height: number): void {
   }
 }
 
-function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
+export function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
   const { yaw, pitch, distance } = sim.camera;
   const pivot = sim.pivot ?? startingPivot(sim);
   const x0 = node.x - pivot.x;
@@ -504,6 +572,132 @@ function drawCompass(
   ctx.restore();
 }
 
+/**
+ * A label's rectangle on the canvas, in pixels: its centre, half its width and height, and its
+ * rotation about the centre in radians.
+ */
+export type LabelBox = {
+  key: string;
+  /** Labels are placed by rank, lowest first. Rank 0 is drawn even where it overlaps another. */
+  rank: number;
+  /** The distance from the camera of what the label names: nearer labels are placed first. */
+  depth: number;
+  cx: number;
+  cy: number;
+  halfW: number;
+  halfH: number;
+  angle: number;
+};
+
+/** The side of the square cells in which `placeLabels` records the canvas a label covers, in pixels. */
+const LABEL_CELL = 4;
+/**
+ * The clear space, in pixels, a label not drawn in the last frame needs on every side before it is
+ * drawn. Without it, two labels a few pixels apart that slide past each other take turns being
+ * drawn, as the cells they cover change.
+ */
+const LABEL_CLEAR = 6;
+/**
+ * How many frames, 0.5s at 60 frames a second, a hidden label stays hidden. Without it, an edge
+ * label that a turning neighbour sweeps across is hidden and drawn again several times a second.
+ */
+const LABEL_HOLD = 30;
+/**
+ * How many frames, about 0.17s at 60 frames a second, a label takes to fade in once placed, and to
+ * fade out once not. A label fading out takes no room, so another may fade in where it was.
+ */
+const LABEL_FADE = 10;
+/**
+ * How many frames, 0.5s at 60 frames a second, a new edge is drawn before its label may be: the
+ * relation appears first, then what it means.
+ */
+const EDGE_LABEL_DELAY = 30;
+
+/** What label placement keeps from one frame to the next. */
+export type LabelMemory = {
+  /** How many frames have been placed. */
+  frame: number;
+  /** The keys of the labels placed in the last frame. Each is drawn, fading in until it is opaque. */
+  shown: Set<string>;
+  /** For each label hidden within the last LABEL_HOLD frames, the frame in which it was hidden. */
+  hiddenAt: Map<string, number>;
+  /**
+   * For each label to draw, placed or fading out, how far it has faded in: from 1 to LABEL_FADE
+   * steps, drawn at that share of LABEL_FADE of its opacity. A label that is no longer a
+   * candidate, such as one whose node is now too small, is not drawn.
+   */
+  faded: Map<string, number>;
+};
+
+/** The indices of the cells, in a grid `cols` wide and `rows` high, whose centres lie in `box`. */
+function cellsOf(box: LabelBox, cols: number, rows: number): number[] {
+  const cos = Math.cos(box.angle);
+  const sin = Math.sin(box.angle);
+  const ex = Math.abs(box.halfW * cos) + Math.abs(box.halfH * sin);
+  const ey = Math.abs(box.halfW * sin) + Math.abs(box.halfH * cos);
+  const cells: number[] = [];
+  const c0 = Math.max(0, Math.floor((box.cx - ex) / LABEL_CELL));
+  const c1 = Math.min(cols - 1, Math.floor((box.cx + ex) / LABEL_CELL));
+  const r0 = Math.max(0, Math.floor((box.cy - ey) / LABEL_CELL));
+  const r1 = Math.min(rows - 1, Math.floor((box.cy + ey) / LABEL_CELL));
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      const dx = (c + 0.5) * LABEL_CELL - box.cx;
+      const dy = (r + 0.5) * LABEL_CELL - box.cy;
+      const along = dx * cos + dy * sin;
+      const across = -dx * sin + dy * cos;
+      if (Math.abs(along) <= box.halfW && Math.abs(across) <= box.halfH) cells.push(r * cols + c);
+    }
+  }
+  return cells;
+}
+
+/**
+ * Which labels to draw on a canvas `width` by `height` pixels in the frame after `memory`, so
+ * that no two overlap except where one has rank 0. Labels are placed by rank; within a rank,
+ * those drawn in the last frame come first, then the nearest. A label that would overlap one
+ * already placed is not drawn. One not drawn in the last frame also needs LABEL_CLEAR of space
+ * around it, and, from rank 2, is not drawn within LABEL_HOLD frames of being hidden. Labels
+ * fade in and out over LABEL_FADE frames.
+ */
+export function placeLabels(
+  boxes: LabelBox[],
+  memory: LabelMemory,
+  width: number,
+  height: number,
+): LabelMemory {
+  const { shown, hiddenAt } = memory;
+  const frame = memory.frame + 1;
+  const cols = Math.max(1, Math.ceil(width / LABEL_CELL));
+  const rows = Math.max(1, Math.ceil(height / LABEL_CELL));
+  const taken = new Uint8Array(cols * rows);
+  const order = [...boxes].sort(
+    (a, b) =>
+      a.rank - b.rank || Number(shown.has(b.key)) - Number(shown.has(a.key)) || a.depth - b.depth,
+  );
+  const placed = new Set<string>();
+  for (const box of order) {
+    const cells = cellsOf(box, cols, rows);
+    if (box.rank > 0 && !shown.has(box.key)) {
+      const held = frame - (hiddenAt.get(box.key) ?? Number.NEGATIVE_INFINITY) < LABEL_HOLD;
+      if (box.rank > 1 && held) continue;
+      const clear = { ...box, halfW: box.halfW + LABEL_CLEAR, halfH: box.halfH + LABEL_CLEAR };
+      if (cellsOf(clear, cols, rows).some((i) => taken[i] === 1)) continue;
+    } else if (box.rank > 0 && cells.some((i) => taken[i] === 1)) continue;
+    for (const i of cells) taken[i] = 1;
+    placed.add(box.key);
+  }
+  const hidden = new Map([...hiddenAt].filter(([, at]) => frame - at < LABEL_HOLD));
+  for (const key of shown) if (!placed.has(key)) hidden.set(key, frame);
+  const faded = new Map<string, number>();
+  for (const { key } of boxes) {
+    const was = memory.faded.get(key) ?? 0;
+    const now = placed.has(key) ? Math.min(LABEL_FADE, was + 1) : was - 1;
+    if (now > 0) faded.set(key, now);
+  }
+  return { frame, shown: placed, hiddenAt: hidden, faded };
+}
+
 /** How much of its opacity the farthest node loses: depth is shown by fading, nearest to farthest. */
 const DEPTH_FADE = 0.7;
 
@@ -515,6 +709,97 @@ export function depthOpacity(depth: number, near: number, far: number): number {
   if (far <= near) return 1;
   const t = Math.min(1, Math.max(0, (depth - near) / (far - near)));
   return 1 - DEPTH_FADE * t;
+}
+
+/** An edge label the canvas may draw: its edge's ends, its font, and its width with its marker. */
+type EdgeLabel = {
+  key: string;
+  a: Projected;
+  b: Projected;
+  text: string;
+  /** Whether the edge is the open or hovered node's, drawn in the accent colour. */
+  hot: boolean;
+  font: string;
+  width: number;
+} & ReturnType<typeof labelAngle>;
+
+/**
+ * The labels the canvas may draw in this frame, before overlaps are resolved, and their boxes.
+ * `measure` returns a text's width in pixels in a font. An edge's label is not a candidate until
+ * EDGE_LABEL_DELAY frames after the edge was added. Ranks: the open and hovered nodes' labels
+ * and their edges' labels 0, the open node's neighbours' 1, other nodes' 2, other edges' 3.
+ */
+export function labelCandidates(
+  sim: Sim,
+  projected: Map<string, Projected>,
+  measure: (text: string, font: string) => number,
+): { boxes: LabelBox[]; edgeLabels: EdgeLabel[] } {
+  const boxes: LabelBox[] = [];
+  const edgeLabels: EdgeLabel[] = [];
+  const neighbours = new Set<string>();
+  for (const edge of sim.edges) {
+    if (edge.from === sim.selectedId) neighbours.add(edge.to);
+    else if (edge.to === sim.selectedId) neighbours.add(edge.from);
+  }
+  // A label drawn in the last frame stays a candidate a little past the size at which it appears,
+  // so one at that size does not flicker as the camera moves.
+  const big = (scale: number, key: string) => scale > (sim.labels.shown.has(key) ? 0.5 : 0.55);
+  for (const [id, p] of projected) {
+    const node = sim.nodes.get(id);
+    if (!node || !big(p.scale, `n\0${id}`)) continue;
+    const half = measure(node.label, NODE_FONT) / 2;
+    const focus = id === sim.selectedId || id === sim.hoverId;
+    boxes.push({
+      key: `n\0${id}`,
+      rank: focus ? 0 : neighbours.has(id) ? 1 : 2,
+      depth: p.depth,
+      cx: p.sx + nodeRadius(p) + 3 + half,
+      cy: p.sy,
+      halfW: half,
+      halfH: 5,
+      angle: 0,
+    });
+  }
+  for (const edge of sim.edges) {
+    const a = projected.get(edge.from);
+    const b = projected.get(edge.to);
+    if (!a || !b || a.scale === 0 || b.scale === 0) continue;
+    const hot = [sim.selectedId, sim.hoverId].some(
+      (id) => id !== null && (edge.from === id || edge.to === id),
+    );
+    const key = `e\0${edge.from}\0${edge.label}\0${edge.to}`;
+    if (sim.labels.frame - edge.born < EDGE_LABEL_DELAY) continue;
+    if (!hot && !big(Math.min(a.scale, b.scale), key)) continue;
+    const font = hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
+    const width = measure(edge.label, font) + LABEL_MARKER;
+    // A label longer than its edge on screen would run over the nodes, so only a hot one is drawn;
+    // one drawn in the last frame may run 20% past its edge before it is not.
+    const room = Math.hypot(b.sx - a.sx, b.sy - a.sy) * (sim.labels.shown.has(key) ? 1.2 : 1);
+    if (!hot && width > room) continue;
+    const label: EdgeLabel = {
+      key,
+      a,
+      b,
+      text: edge.label,
+      hot,
+      font,
+      width,
+      ...labelAngle(a.sx, a.sy, b.sx, b.sy),
+    };
+    edgeLabels.push(label);
+    // The label is drawn 6 pixels above its edge, as the label reads.
+    boxes.push({
+      key: label.key,
+      rank: hot ? 0 : 3,
+      depth: (a.depth + b.depth) / 2,
+      cx: (a.sx + b.sx) / 2 + 6 * Math.sin(label.angle),
+      cy: (a.sy + b.sy) / 2 - 6 * Math.cos(label.angle),
+      halfW: width / 2,
+      halfH: 5,
+      angle: label.angle,
+    });
+  }
+  return { boxes, edgeLabels };
 }
 
 function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, height: number): void {
@@ -532,7 +817,6 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   const opacity = (depth: number) => depthOpacity(depth, near, far);
 
   ctx.lineWidth = 1;
-  const labels: { a: Projected; b: Projected; text: string; hot: boolean; opacity: number }[] = [];
   // The edges of the open node and of the node under the pointer are drawn last, in the accent
   // colour and twice as wide, unfaded, so they stand out from the rest.
   const hotEdges: [Projected, Projected][] = [];
@@ -553,17 +837,6 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
       ctx.lineTo(b.sx, b.sy);
       ctx.stroke();
     }
-
-    const scale = Math.min(a.scale, b.scale);
-    if (hot || scale > 0.55) {
-      labels.push({
-        a,
-        b,
-        text: edge.label,
-        hot,
-        opacity: hot ? 1 : edgeOpacity,
-      });
-    }
   }
   ctx.globalAlpha = 0.9;
   ctx.strokeStyle = palette.accent;
@@ -576,11 +849,19 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   }
   ctx.lineWidth = 1;
 
+  const { boxes, edgeLabels } = labelCandidates(sim, projected, (text, font) => {
+    ctx.font = font;
+    return ctx.measureText(text).width;
+  });
+  sim.labels = placeLabels(boxes, sim.labels, width, height);
+  // The share of its opacity a label is drawn at as it fades in or out; 0 for one not drawn.
+  const fade = (key: string) => (sim.labels.faded.get(key) ?? 0) / LABEL_FADE;
+
   for (const [id] of order) {
     const node = sim.nodes.get(id);
     const p = projected.get(id);
     if (!node || !p || p.scale === 0) continue;
-    const r = Math.max(2, 7 * p.scale);
+    const r = nodeRadius(p);
     const isHover = id === sim.hoverId;
     const isSelected = id === sim.selectedId;
     const alpha = node.alpha * (isHover || isSelected ? 1 : opacity(p.depth));
@@ -596,10 +877,11 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
       ctx.stroke();
     }
 
-    if (p.scale > 0.55) {
-      ctx.globalAlpha = alpha * 0.9;
+    const labelOpacity = fade(`n\0${id}`);
+    if (labelOpacity > 0) {
+      ctx.globalAlpha = alpha * 0.9 * labelOpacity;
       ctx.fillStyle = palette.dim;
-      ctx.font = "10px ui-monospace, monospace";
+      ctx.font = NODE_FONT;
       ctx.fillText(node.label, p.sx + r + 3, p.sy + 3);
     }
     ctx.globalAlpha = 1;
@@ -608,17 +890,16 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   // The hot edges' labels are drawn last, larger and bold, so no other label covers them.
-  for (const lab of [...labels.filter((l) => !l.hot), ...labels.filter((l) => l.hot)]) {
-    ctx.font = lab.hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
-    const width = ctx.measureText(lab.text).width + LABEL_MARKER;
-    const length = Math.hypot(lab.b.sx - lab.a.sx, lab.b.sy - lab.a.sy);
-    // A label longer than its edge on screen would run over the nodes, so only a hot one is drawn.
-    if (!lab.hot && width > length) continue;
-    const { angle, flipped } = labelAngle(lab.a.sx, lab.a.sy, lab.b.sx, lab.b.sy);
+  const drawn = edgeLabels.filter((l) => fade(l.key) > 0);
+  for (const lab of [...drawn.filter((l) => !l.hot), ...drawn.filter((l) => l.hot)]) {
+    const { angle, flipped, width } = lab;
+    const labelOpacity = fade(lab.key);
+    ctx.font = lab.font;
     ctx.save();
     ctx.translate((lab.a.sx + lab.b.sx) / 2, (lab.a.sy + lab.b.sy) / 2);
     ctx.rotate(angle);
-    ctx.globalAlpha = (lab.hot ? 0.95 : 0.75) * lab.opacity;
+    ctx.globalAlpha =
+      labelOpacity * (lab.hot ? 0.95 : 0.75 * opacity((lab.a.depth + lab.b.depth) / 2));
     ctx.fillStyle = lab.hot ? palette.accent : palette.dim;
     const y = -6;
     ctx.fillText(lab.text, flipped ? LABEL_MARKER / 2 : -LABEL_MARKER / 2, y);
@@ -642,6 +923,12 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
 
 /** The room an edge label leaves for its direction marker, in pixels. */
 const LABEL_MARKER = 9;
+const NODE_FONT = "10px ui-monospace, monospace";
+
+/** A node's radius on the canvas, in pixels. */
+function nodeRadius(p: Projected): number {
+  return Math.max(2, 7 * p.scale);
+}
 
 /**
  * The rotation for the label of an edge drawn from (ax, ay) to (bx, by): along the edge, turned at
@@ -684,10 +971,15 @@ export function createSim(): Sim {
     selectedId: null,
     hoverId: null,
     screenPos: new Map(),
+    labels: { frame: 0, shown: new Set(), hiddenAt: new Map(), faded: new Map() },
     camera: { ...INITIAL_CAMERA },
     pivot: null,
     heat: 1,
     follow: true,
+    aim: null,
+    swayPhase: 0,
+    pointerOn: false,
+    reducedMotion: false,
     drag: null,
     dragged: false,
   };
@@ -758,6 +1050,12 @@ export function GraphView({
     });
     const wrap = canvas.parentElement;
     if (wrap) ro.observe(wrap);
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onMotion = () => {
+      simRef.current.reducedMotion = motion.matches;
+    };
+    onMotion();
+    motion.addEventListener("change", onMotion);
 
     const onPointerDown = (event: PointerEvent) => {
       const s = simRef.current;
@@ -774,6 +1072,7 @@ export function GraphView({
         if (Math.hypot(dx, dy) > 4) {
           s.dragged = true;
           s.follow = false;
+          s.aim = null;
         }
         s.camera.yaw = s.drag.yaw + dx * 0.006;
         s.camera.pitch = s.drag.pitch - dy * 0.006;
@@ -784,6 +1083,7 @@ export function GraphView({
       const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
       const hit = inside ? hitTest(s, mx, my) : null;
       s.hoverId = hit !== null && s.nodes.has(hit) ? hit : null;
+      s.pointerOn = inside;
       setHoverId(s.hoverId);
       setPointerOn(inside);
     };
@@ -803,11 +1103,13 @@ export function GraphView({
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       simRef.current.follow = false;
+      simRef.current.aim = null;
       const cam = simRef.current.camera;
       cam.distance = Math.max(120, Math.min(2200, cam.distance + event.deltaY * 0.6));
     };
     const onLeave = () => {
       simRef.current.hoverId = null;
+      simRef.current.pointerOn = false;
       setHoverId(null);
       setPointerOn(false);
     };
@@ -821,6 +1123,7 @@ export function GraphView({
 
     return () => {
       ro.disconnect();
+      motion.removeEventListener("change", onMotion);
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
