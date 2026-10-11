@@ -1105,7 +1105,7 @@ function Detail({
             </div>
             <button
               type="button"
-              className="tbtn icon"
+              className="view-action"
               title="Reload from the API"
               aria-label="Reload from the API"
               onClick={() =>
