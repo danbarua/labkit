@@ -39,11 +39,9 @@ import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-ro
 import {
   type CSSProperties,
   type ReactNode,
-  type RefObject,
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -82,6 +80,7 @@ import {
   useStoreVersion,
 } from "./hal-store";
 import { FileTree, History } from "./explorers";
+import { ActiveBox } from "./active-box";
 import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
@@ -789,79 +788,6 @@ function Pane({
           Load more
         </button>
       ) : null}
-    </>
-  );
-}
-
-/** How long the open row's box takes to slide from one row to another, in milliseconds. */
-const SLIDE_MS = 220;
-
-/**
- * The box around a sidebar list's current row: the open resource in the Items pane, or the listed
- * collection in the Collections pane. When the current row changes, the box loses its fill, slides
- * to the new row, and fills again on arrival. When that row is out of the list's view, the list
- * scrolls to show it at the top, a page at a time rather than a row at a time.
- */
-function ActiveBox({
-  list,
-  activeKey,
-  rows,
-}: {
-  list: RefObject<HTMLDivElement | null>;
-  activeKey: string;
-  /** Changes whenever the rows drawn change, so the box is measured again. */
-  rows: string;
-}) {
-  const [box, setBox] = useState<{ top: number; height: number; slide: boolean }>();
-  const [filled, setFilled] = useState(true);
-  const lastTop = useRef<number | undefined>(undefined);
-  // The row the list has yet to scroll to: set when another row opens, cleared once it is shown,
-  // so rows added below by Load more do not pull the list back to the open row.
-  const scrollTo = useRef<string | undefined>(activeKey);
-  const shownKey = useRef<string | undefined>(undefined);
-  if (shownKey.current !== activeKey) {
-    shownKey.current = activeKey;
-    scrollTo.current = activeKey;
-  }
-  useLayoutEffect(() => {
-    const row = list.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(activeKey)}"]`);
-    if (!row) {
-      lastTop.current = undefined;
-      setBox(undefined);
-      return;
-    }
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const top = row.offsetTop;
-    const slide = lastTop.current !== undefined && lastTop.current !== top && !reduced;
-    lastTop.current = top;
-    setBox({ top, height: row.offsetHeight, slide });
-    if (slide) setFilled(false);
-    if (scrollTo.current !== activeKey) return;
-    scrollTo.current = undefined;
-    const scroller = row.closest<HTMLElement>(".sidebar-section");
-    if (!scroller) return;
-    const view = scroller.getBoundingClientRect();
-    const at = row.getBoundingClientRect();
-    if (at.top >= view.top && at.bottom <= view.bottom) return;
-    scroller.scrollTo({
-      top: scroller.scrollTop + (at.top - view.top) - 4,
-      behavior: reduced ? "auto" : "smooth",
-    });
-  }, [list, activeKey, rows]);
-  useEffect(() => {
-    if (filled) return;
-    const timer = setTimeout(() => setFilled(true), SLIDE_MS);
-    return () => clearTimeout(timer);
-  }, [filled]);
-  if (box === undefined) return null;
-  // Two layers: the fill under the rows, so it does not tint their text, and the outline over
-  // them, so the hover background of the row it slides to does not hide it.
-  const style = { transform: `translateY(${box.top}px)`, height: box.height };
-  const state = [box.slide ? "" : "placed", filled ? "filled" : ""].join(" ");
-  return (
-    <>
-      <div className={`active-box fill ${state}`} style={style} aria-hidden="true" />
-      <div className={`active-box outline ${state}`} style={style} aria-hidden="true" />
     </>
   );
 }

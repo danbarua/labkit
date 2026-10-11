@@ -241,6 +241,46 @@ test.describe("the sidebar", () => {
     await expect(tree.locator(".tree-row.active")).toHaveText("a.ts");
   });
 
+  test("File Explorer draws each file's icon by its media type, and folders as folders", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    const kind = (name: string) =>
+      tree.getByRole("button", { name, exact: true }).locator(".tree-icon");
+    await expect(kind("src")).toHaveAttribute("data-kind", "folder");
+    await expect(kind("README.md")).toHaveAttribute("data-kind", "markdown");
+    await expect(kind("pixel.png")).toHaveAttribute("data-kind", "image");
+    await expect(kind("big.txt")).toHaveAttribute("data-kind", "text");
+    // The API's table names no media type for a name with no extension.
+    await expect(kind("readme-link")).toHaveAttribute("data-kind", "other");
+    await tree.getByRole("button", { name: "src" }).click();
+    await expect(kind("a.ts")).toHaveAttribute("data-kind", "typescript");
+  });
+
+  test("in File Explorer, a box marks the open file, slides to the next one opened, and moves with it when a folder above opens", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    const box = tree.locator(".active-box.outline");
+    const file = (name: string) => tree.getByRole("button", { name, exact: true });
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    await file("README.md").click();
+    await expect(header(page)).toHaveText("README.md");
+    await expect.poll(async () => (await top(box)) - (await top(file("README.md")))).toBe(0);
+    await file("big.txt").click();
+    await expect(header(page)).toHaveText("big.txt");
+    await expect(tree.locator(".active-box.fill")).toHaveClass(/filled/);
+    await expect.poll(async () => (await top(box)) - (await top(file("big.txt")))).toBe(0);
+    await file("notes").click();
+    await expect(file("plan.md")).toBeVisible();
+    await expect.poll(async () => (await top(box)) - (await top(file("big.txt")))).toBe(0);
+  });
+
   test("Source Explorer lists every branch's commits, newest first; a commit opens with its changed files and diff", async ({
     page,
   }) => {

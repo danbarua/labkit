@@ -15,6 +15,7 @@ import {
   hrefOf,
   keyOf,
 } from "./hal";
+import { ActiveBox } from "./active-box";
 import { fileLook } from "./file-icons";
 import { docOf, requestPath, useDocument, usePages } from "./hal-store";
 import { type LaneRow, lanesOf, widthOf } from "./lanes";
@@ -56,7 +57,8 @@ function Tail({
 
 /**
  * The workspace's files as a tree, from the directory `rootKey`. A directory's entries are
- * fetched when it is first opened. Clicking a file opens it.
+ * fetched when it is first opened. Clicking a file opens it, and the box around the open file
+ * slides to it.
  */
 export function FileTree({
   rootKey,
@@ -68,6 +70,7 @@ export function FileTree({
   onOpen: (key: string) => void;
 }) {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+  const list = useRef<HTMLDivElement>(null);
   const toggle = (key: string) =>
     setOpened((was) => {
       const now = new Set(was);
@@ -75,7 +78,8 @@ export function FileTree({
       return now;
     });
   return (
-    <div className="file-tree">
+    <div className="file-tree" ref={list}>
+      <ActiveBox list={list} activeKey={openKey} />
       <Directory dirKey={rootKey} depth={0} {...{ opened, toggle, openKey, onOpen }} />
     </div>
   );
