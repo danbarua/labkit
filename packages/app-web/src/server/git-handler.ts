@@ -24,6 +24,7 @@ import { DEFAULT_LIMIT, halJson, MAX_LIMIT, pageParam, pagingLinks } from "./col
 import { problem, publicOrigin } from "./graph-handler";
 import { summaryOf } from "./commit-summary";
 import { actItem, actsRanAgainst, RAN_AGAINST } from "./events-handler";
+import { mediaTypeOf } from "./media-types";
 import { isNotFound } from "./repositories";
 import type { TenantScope } from "./runtime";
 
@@ -33,6 +34,8 @@ export const PATCH_LIMIT = 20_000;
 const EDIT_LIMIT = 20_000;
 /** The longest text a file is served with, in characters. A longer one is cut and flagged. */
 export const FILE_LIMIT = 100_000;
+/** The largest file served as raw bytes, `/raw/{path}`, in bytes: 20 MB. A larger one is refused. */
+export const RAW_LIMIT = 20 * 1024 * 1024;
 
 const COMMITS = /^\/commit\/?$/;
 // The branches, `/branch`, one branch, `/branch/{name}` with its name as one encoded segment, and
@@ -49,6 +52,8 @@ const ACTS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/acts\/?$/;
 // `/commit/{id}/diff/{path}` is one.
 const DIFFS = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/diff\/?$/;
 const ONE_DIFF = /^\/commit\/([0-9a-f]{40}|[0-9a-f]{64})\/diff\/(.+)$/;
+// A file's committed bytes, from HEAD, `/raw/{path}`, or from a commit, `/commit/{id}/raw/{path}`.
+const RAW = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/raw\/(.+)$/;
 // The commits that changed a file, from HEAD, `/history/{path}`, or from a commit,
 // `/commit/{id}/history/{path}`.
 const HISTORY = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/history\/(.+)$/;
@@ -57,7 +62,7 @@ const IN_TREE = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/file(?:\/(.*))?$/;
 
 /** Whether `rest`, the path after `/workspace/{slug}`, names the workspace's files or history. */
 export function isGitPath(rest: string): boolean {
-  return /^\/(commit|file|history|branch|timeline)(\/|$)/.test(rest);
+  return /^\/(commit|file|history|raw|branch|timeline)(\/|$)/.test(rest);
 }
 
 /**
@@ -659,21 +664,33 @@ function file(
     ...summaryOf(base, repo.getCommit(c)),
     dir: "in",
   }));
-  const history = at.endsWith(`/${COMMIT_SLUG}/${commit}/${FILE_SLUG}`)
-    ? `${base}/${COMMIT_SLUG}/${commit}/history/${pathHref(path)}`
-    : `${base}/history/${pathHref(path)}`;
+  const atCommit = at.endsWith(`/${COMMIT_SLUG}/${commit}/${FILE_SLUG}`);
+  const sibling = (route: string) =>
+    atCommit
+      ? `${base}/${COMMIT_SLUG}/${commit}/${route}/${pathHref(path)}`
+      : `${base}/${route}/${pathHref(path)}`;
+  const blob = entry.toObject(repo).peelToBlob();
+  const size = Number(blob.size());
+  const binary = blob.isBinary();
+  const mediaType = mediaTypeOf(path, binary);
   const links = {
     self: { href: self, type: FILE_TYPE },
     index: { href: parent },
     commit: { href: `${base}/${COMMIT_SLUG}/${commit}`, type: COMMIT_TYPE },
-    history: { href: history },
+    history: { href: sibling("history") },
+    raw: { href: sibling("raw"), type: mediaType },
     [REL.changedBy]: changedBy.map((c) => ({ ...c._links.self, dir: "in" })),
   };
   const embedded = { [REL.changedBy]: changedBy };
-  const blob = entry.toObject(repo).peelToBlob();
-  const size = Number(blob.size());
-  if (blob.isBinary())
-    return halJson(req, { ...fields, size, binary: true, _links: links, _embedded: embedded });
+  if (binary)
+    return halJson(req, {
+      ...fields,
+      size,
+      media_type: mediaType,
+      binary: true,
+      _links: links,
+      _embedded: embedded,
+    });
   let text: string;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(blob.content());
@@ -681,6 +698,7 @@ function file(
     return halJson(req, {
       ...fields,
       size,
+      media_type: mediaType,
       binary: false,
       utf8: false,
       _links: links,
@@ -691,6 +709,7 @@ function file(
   return halJson(req, {
     ...fields,
     size,
+    media_type: mediaType,
     binary: false,
     content: truncated ? text.slice(0, FILE_LIMIT) : text,
     content_truncated: truncated,
@@ -748,6 +767,68 @@ function inTree(
 }
 
 /**
+ * `/raw/{path}` at HEAD or `/commit/{id}/raw/{path}` at a commit: the file's committed bytes, as
+ * its media type. A path is looked up in the commit's tree only, as for `/file/{path}`. The bytes
+ * are served as they are, never sniffed (`nosniff`), and in a sandbox that runs no script and
+ * loads nothing (`Content-Security-Policy`), so a committed HTML or SVG file shows and does no
+ * more. A file larger than RAW_LIMIT is refused with 413.
+ */
+function rawFile(
+  repo: Repository,
+  slug: string,
+  id: string | undefined,
+  encoded: string,
+): Response {
+  let tree: Tree;
+  let commitId: string;
+  try {
+    commitId = id ?? repo.revparseSingle("HEAD");
+    tree = repo.getCommit(commitId).tree();
+  } catch (err) {
+    if (isNotFound(err)) return problem(404, "Not Found", `no commit ${id ?? "HEAD"} in ${slug}`);
+    throw err;
+  }
+  const path = decodedPath(encoded);
+  const entry = path === "" ? null : tree.getPath(path);
+  if (entry === null || typeOf(entry) !== FILE_TYPE)
+    return problem(404, "Not Found", `${path} is not a file in ${slug} at ${commitId}`);
+  const blob = entry.toObject(repo).peelToBlob();
+  const size = Number(blob.size());
+  if (size > RAW_LIMIT)
+    return problem(
+      413,
+      "Content Too Large",
+      `${path} is ${size} bytes; files over ${RAW_LIMIT} bytes are not served raw`,
+    );
+  const bytes = blob.content();
+  const binary = blob.isBinary();
+  const mediaType = mediaTypeOf(path, binary);
+  let utf8 = false;
+  if (!binary) {
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      utf8 = true;
+    } catch {
+      // Not UTF-8: served without a charset, as bytes.
+    }
+  }
+  const name = entry.name();
+  // The plain filename keeps only printable ASCII other than quotes and backslashes; the full
+  // name, in UTF-8, is the `filename*` beside it, which browsers prefer (RFC 6266).
+  const plain = name.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  return new Response(new Uint8Array(bytes), {
+    headers: {
+      "content-type": utf8 ? `${mediaType}; charset=utf-8` : mediaType,
+      "content-length": String(size),
+      "content-disposition": `inline; filename="${plain}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "x-content-type-options": "nosniff",
+      "content-security-policy":
+        "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
+    },
+  });
+}
+
+/**
  * The workspace's files, git history and branches, read from `repo`, the repository mapped to it,
  * at the paths `isGitPath` names, where `rest` is the path after `/workspace/{slug}`. Without a
  * repository, every such path is not found.
@@ -777,6 +858,8 @@ export async function gitHandler(
   const diff = ONE_DIFF.exec(rest);
   if (diff !== null && diff[1] !== undefined)
     return oneDiff(req, repo, base, diff[1], diff[2] ?? "", scope.slug);
+  const raw = RAW.exec(rest);
+  if (raw !== null) return rawFile(repo, scope.slug, raw[1], raw[2] ?? "");
   const fileHistoryOf = HISTORY.exec(rest);
   if (fileHistoryOf !== null)
     return fileHistory(req, repo, base, scope.slug, fileHistoryOf[1], fileHistoryOf[2] ?? "");

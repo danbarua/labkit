@@ -6,11 +6,11 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: response bodies are read loosely; each test asserts only the part of the shape it is about
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { FILE_LIMIT, PATCH_LIMIT } from "../src/server/git-handler";
+import { FILE_LIMIT, PATCH_LIMIT, RAW_LIMIT } from "../src/server/git-handler";
 import { handle } from "../src/server/handler";
 import { createRuntime, type Runtime } from "../src/server/runtime";
 import { createFixture, type Fixture } from "./support/fixture";
-import { BIG_TEXT, createGitFixture, type GitFixture } from "./support/git-fixture";
+import { BIG_TEXT, createGitFixture, type GitFixture, PIXEL_PNG } from "./support/git-fixture";
 
 const ORIGIN = "http://127.0.0.1:8899";
 
@@ -496,4 +496,85 @@ describe("a workspace's branches and timeline", () => {
     expect(body._links.timeline.href).toBe(`${ORIGIN}/workspace/alpha/timeline`);
     expect(body._links.branches.href).toBe(`${ORIGIN}/workspace/alpha/branch`);
   });
+});
+
+describe("a file's media type and raw bytes", () => {
+  let media: GitFixture;
+  const raw = (repo: GitFixture, path: string) =>
+    handle(
+      new Request(ORIGIN + path),
+      createRuntime(fixture.connections, new Map([["alpha", repo.repo]])),
+    );
+  const json = async (repo: GitFixture, path: string) =>
+    (await (await raw(repo, path)).json()) as any;
+  beforeAll(async () => {
+    media = await createGitFixture({ media: true });
+  });
+  afterAll(() => media?.close());
+
+  test("each file names its media type, by extension, or text or bytes by its content", async () => {
+    const types: [string, string][] = [];
+    for (const path of ["pixel.png", "docs/guide.md", "src/a.ts", "big.txt", "readme-link"])
+      types.push([path, (await json(media, `/workspace/alpha/file/${path}`)).media_type]);
+    expect(types).toEqual([
+      ["pixel.png", "image/png"],
+      ["docs/guide.md", "text/markdown"],
+      ["src/a.ts", "text/x-typescript"],
+      ["big.txt", "text/plain"],
+      ["readme-link", "text/plain"],
+    ]);
+    const blob = await json(
+      media,
+      `/workspace/alpha/commit/${media.commits[0]}/file/data/blob.bin`,
+    );
+    expect(blob.media_type).toBe("application/octet-stream");
+    expect(blob._links.raw).toEqual({
+      href: `${commitHref(media.commits[0]!)}/raw/data/blob.bin`,
+      type: "application/octet-stream",
+    });
+  });
+
+  test("raw serves the committed bytes as the media type, unsniffed and sandboxed", async () => {
+    const res = await raw(media, "/workspace/alpha/raw/pixel.png");
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(PIXEL_PNG);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("content-security-policy")).toStartWith("sandbox;");
+    expect(res.headers.get("content-disposition")).toBe(
+      `inline; filename="pixel.png"; filename*=UTF-8''pixel.png`,
+    );
+  });
+
+  test("raw text carries a charset only when it is UTF-8", async () => {
+    const guide = await raw(media, "/workspace/alpha/raw/docs/guide.md");
+    expect(guide.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+    const latin1 = await raw(media, "/workspace/alpha/raw/notes/latin1.txt");
+    expect(latin1.headers.get("content-type")).toBe("text/plain");
+  });
+
+  test("raw at a commit serves the file as it was then", async () => {
+    const res = await raw(media, `/workspace/alpha/commit/${media.commits[0]}/raw/data/blob.bin`);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([0, 1, 2, 3, 0, 255]));
+  });
+
+  test("raw serves nothing that is not a committed file", async () => {
+    for (const path of ["missing.png", "src", "..%2F..%2Fetc%2Fpasswd"]) {
+      const res = await raw(media, `/workspace/alpha/raw/${path}`);
+      expect([path, res.status]).toEqual([path, 404]);
+    }
+  });
+
+  test("raw refuses a file larger than its limit, and says how large", async () => {
+    const huge = await createGitFixture({ huge: RAW_LIMIT + 1 });
+    try {
+      const res = await raw(huge, "/workspace/alpha/raw/huge.bin");
+      expect(res.status).toBe(413);
+      expect(((await res.json()) as any).detail).toBe(
+        `huge.bin is ${RAW_LIMIT + 1} bytes; files over ${RAW_LIMIT} bytes are not served raw`,
+      );
+    } finally {
+      await huge.close();
+    }
+  }, 30_000);
 });

@@ -56,6 +56,8 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 | `/workspace/{slug}/commit/{id}/diff/{path}` | One changed file's diff: its status and unified diff, cut at 20,000 characters (`patch_truncated`). |
 | `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). |
 | `/workspace/{slug}/commit/{id}/file/{path}` | The same, at that commit. |
+| `/workspace/{slug}/raw/{path}` | A file's committed bytes at HEAD, as its media type. A file over 20 MiB gets a 413 that names its size. |
+| `/workspace/{slug}/commit/{id}/raw/{path}` | The same, at that commit. |
 | `/workspace/{slug}/commit/{id}/changes` | The files the commit changed, with their status, paged. |
 | `/workspace/{slug}/commit/{id}/acts` | The acts that ran against the commit, oldest first, paged. |
 | `/workspace/{slug}/history/{path}` | The commits that changed the file, from HEAD back along first parents, newest first, paged. A rename is not followed. |
@@ -63,6 +65,15 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 
 Only committed content is served. A path is looked up in the commit's tree, never on disk. A
 binary file and text that is not UTF-8 are served without content.
+
+A file's `media_type` comes from its extension, by the table in `src/server/media-types.ts`. A file
+whose extension the table does not name is `text/plain` when git finds it is text, and
+`application/octet-stream` when git finds it is binary. The file links its bytes as `raw`. The raw
+response sets:
+
+- `content-type` to the media type, with `charset=utf-8` only on text that is UTF-8;
+- `x-content-type-options: nosniff`, so a browser never reads it as another type;
+- `content-security-policy: sandbox`, so an HTML or SVG file opened on its own runs no script.
 
 Commits, files and acts relate as the graph's records do, `<edge>:<type>` out and `<type>:<edge>`
 in, each relation listing at most 25 resources, the page size of every collection; the collection
@@ -92,6 +103,20 @@ are `@labkit/ui/content.css`:
 | `CodeView` | Text numbered by line and highlighted by its language, showing its first lines until the rest is asked for. | A file's text, its first 40 lines. |
 | `JsonView` | A JSON value through `CodeView`. | The Debug response, its first 40 lines. |
 | `DiffView` | One file's diff, from two texts or from a unified patch, with the same cut. | Each changed file of a commit, its first 40 rows. |
+| `MarkdownText` | Markdown, with raw HTML dropped. `resolveUrl` rewrites its images' and links' addresses. | A markdown file. |
+
+The page shows a file by the `media_type` its resource names, never by its extension
+(`viewerOf` in `git-views.tsx`):
+
+| Media type | Shown as |
+| --- | --- |
+| `text/markdown` | Rendered, with a toggle to its source as code. A relative image address resolves to the repository's `raw` file, and a relative link opens that file on the page. An address starting with `/` resolves against the repository's root. |
+| `text/*`, `application/json`, `application/yaml`, `application/toml` | Code. |
+| `image/*` | The picture, from `raw`. When it does not load, a note links the raw response, which says why. |
+| `application/pdf` | A link that opens it in a new tab. |
+| Anything else | A note with a download link. |
+
+Text that is not UTF-8, or a binary file of a text type, gets the note.
 
 | Column | Shows |
 |--------|-------|

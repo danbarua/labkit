@@ -221,9 +221,11 @@ test.describe("the sidebar", () => {
     await explorer(page, "File Explorer").click();
     const tree = page.locator(".file-tree");
     await expect(tree.locator(".tree-row .tree-name")).toHaveText([
+      "docs",
       "notes",
       "src",
       "big.txt",
+      "pixel.png",
       "readme-link",
       "README.md",
     ]);
@@ -247,12 +249,13 @@ test.describe("the sidebar", () => {
     const history = page.locator(".history .commit-row .subject");
     await expect(history).toHaveText([
       "Merge side",
+      "Add a picture and a guide",
       "Drop the blob, add a big file",
       "Side work",
       "Change a, plan the work",
       "Start the project",
     ]);
-    await history.nth(3).click();
+    await history.filter({ hasText: "Change a, plan the work" }).click();
     await expect(page.locator(".header-type")).toHaveText("Commit");
     await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
     const changes = page.locator(".kv:has(.change-status)");
@@ -311,6 +314,60 @@ test.describe("the sidebar", () => {
     await expect(page.locator(".history .ref-pill", { hasText: "origin/main" })).toBeVisible();
     await picker.selectOption("side");
     await expect(page.locator(".history .timeline-row.tip .subject")).toHaveText("Side work");
+  });
+
+  test("a picture is shown as itself, from its committed bytes", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/file/pixel.png");
+    const picture = page.locator(".file-card img.file-image");
+    await expect(picture).toHaveAttribute("src", "/workspace/alpha/raw/pixel.png");
+    await expect.poll(() => picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+  });
+
+  test("a markdown file is rendered, with its picture from the repository, and its source a toggle away", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/file/docs/guide.md");
+    const card = page.locator(".file-card");
+    await expect(card.locator(".file-markdown h1")).toHaveText("Guide");
+    const picture = card.locator(".file-markdown img");
+    await expect(picture).toHaveAttribute("src", "/workspace/alpha/raw/pixel.png");
+    await expect.poll(() => picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+    await expect(card.getByRole("link", { name: "the web" })).toHaveAttribute(
+      "href",
+      "https://example.com",
+    );
+    await card.getByRole("button", { name: "Source" }).click();
+    await expect(card.locator(".lk-code-text")).toContainText("# Guide");
+    await expect(card.locator(".file-markdown")).toHaveCount(0);
+    await card.getByRole("button", { name: "Rendered" }).click();
+    await expect(card.locator(".file-markdown h1")).toHaveText("Guide");
+  });
+
+  test("a link in a markdown file to another file opens that file on the page", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/file/docs/guide.md");
+    await page.locator(".file-markdown").getByRole("link", { name: "the plan" }).click();
+    await expect(header(page)).toHaveText("plan.md");
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/file\/notes\/plan\.md/);
+    expect(page.context().pages()).toHaveLength(1);
+  });
+
+  test("a binary file is a note with a download link", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "Source Explorer").click();
+    await page.locator(".history .commit-row", { hasText: "Start the project" }).click();
+    await page
+      .locator(".kv:has(.change-status)")
+      .getByRole("button", { name: "data/blob.bin" })
+      .click();
+    await expect(header(page)).toHaveText("blob.bin");
+    const card = page.locator(".file-card");
+    await expect(card.locator(".card-note")).toContainText("A binary file of 6 bytes.");
+    await expect(card.getByRole("link", { name: "Download" })).toHaveAttribute(
+      "href",
+      /^\/workspace\/alpha\/commit\/[0-9a-f]{40}\/raw\/data\/blob\.bin$/,
+    );
   });
 
   test("a commit's changed files and the records its acts changed join the graph, connected to it", async ({

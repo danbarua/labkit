@@ -1,11 +1,10 @@
 import { spawnSync } from "node:child_process";
+import { statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Connect, Logger, Plugin, ViteDevServer } from "vite";
+import { APP_BASE } from "../app-base";
 import { LABKIT_PG_URL } from "./postgres";
-
-/** The router's base path. Everything the browser app serves lives under it. */
-const APP_BASE = "/app";
 
 function isApp(pathname: string): boolean {
   return pathname === APP_BASE || pathname.startsWith(`${APP_BASE}/`);
@@ -53,13 +52,15 @@ function appOrNotFound(logger: Logger, page: Page): Connect.NextHandleFunction {
 
 // `vite preview` takes the base off the path before this runs, and answers `/` and anything outside
 // the base itself, so every path that arrives is inside the app. It also runs this before serving
-// the built files, so a path with a file extension is left for it.
-function previewPage(page: Page): Connect.NextHandleFunction {
+// the built files, so a path naming one of them is left for it. Any other path is the app's, with
+// or without a file extension: `/app/workspace/w/file/a.png` opens the file `a.png`.
+function previewPage(page: Page, outDir: string): Connect.NextHandleFunction {
   return async (req, res, next) => {
     try {
       const pathname = (req.url ?? "/").split("?")[0] ?? "/";
       const isRead = req.method === "GET" || req.method === "HEAD";
-      if (!isRead || path.extname(pathname) !== "") {
+      const built = statSync(path.join(outDir, pathname), { throwIfNoEntry: false });
+      if (!isRead || built?.isFile() === true) {
         next();
         return;
       }
@@ -92,9 +93,9 @@ export function labkitDev(): Plugin {
     },
     // The built bundle is served the same way, so what `vite preview` shows is what would ship.
     configurePreviewServer(server) {
-      const built = path.resolve(server.config.root, server.config.build.outDir, "index.html");
-      const page: Page = () => readFile(built, "utf8");
-      return () => server.middlewares.use(previewPage(page));
+      const outDir = path.resolve(server.config.root, server.config.build.outDir);
+      const page: Page = () => readFile(path.join(outDir, "index.html"), "utf8");
+      return () => server.middlewares.use(previewPage(page, outDir));
     },
   };
 }
