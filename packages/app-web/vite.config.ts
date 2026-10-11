@@ -3,6 +3,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { labkitDev } from "./src/infra/dev-plugin";
+import { APP_BASE } from "./src/app-base";
 import { agentBackend } from "./src/infra/agent-backend";
 import { transcripts } from "./src/infra/transcripts-plugin";
 
@@ -19,7 +20,7 @@ const agent = agentBackend(process.env);
 export default defineConfig(({ command, isPreview }) => ({
   // The browser app is served under /app. Dev keeps Vite's own paths at the root, so only the
   // bundle is built for it, and the preview of that bundle serves it from the same place.
-  base: command === "build" || isPreview ? "/app/" : "/",
+  base: command === "build" || isPreview ? `${APP_BASE}/` : "/",
   // The router plugin writes `src/routeTree.gen.ts` from `src/routes`, and must come before react().
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
