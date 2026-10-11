@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   collectionOf,
+  commitsRanAgainst,
   drawnAs,
   edgeLabelOf,
   type HalDocument,
@@ -301,6 +302,71 @@ describe("items and events", () => {
     expect(out).toContain("#60.2");
     expect(out).toContain('title="Open the act"');
     expect(out).not.toContain("<script>");
+  });
+
+  test("an edge reads as its ends either side of its label, the open record marked and the other a link", () => {
+    const out = renderToStaticMarkup(
+      <EventRow
+        event={{
+          seq: 2,
+          index: 2,
+          operation: "note",
+          change: "EdgeCreated",
+          from: "NOTE_1",
+          label: "CONCERNS",
+          to: "Q_1",
+          _links: {
+            parent: { href: "https://h/workspace/w/act/2" },
+            from: { href: "https://h/workspace/w/NOTE_1", type: "Note" },
+            to: { href: "https://h/workspace/w/Q_1", type: "Question" },
+          },
+        }}
+        current="/workspace/w/Q_1"
+        onOpen={() => {}}
+      />,
+    );
+    const text = out.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(text).toContain("EdgeCreated NOTE_1 CONCERNS Q_1");
+    expect(out).toMatch(/<button[^>]*class="mention"[^>]*>NOTE_1<\/button>/);
+    expect(out).toMatch(/<span[^>]*class="mention current"[^>]*>Q_1<\/span>/);
+    // Everything the row draws as chips and label is left out of the JSON after it.
+    expect(out).not.toContain("{");
+  });
+});
+
+describe("the commits the acts behind some events ran against", () => {
+  const event = (seq: number, commit?: string) => ({
+    seq,
+    _links: {
+      parent: { href: `https://h/workspace/w/act/${seq}` },
+      ...(commit === undefined
+        ? {}
+        : { "ran_against:commit": { href: `https://h/workspace/w/commit/${commit}` } }),
+    },
+  });
+
+  test("are listed in the order the events name them, each with its acts once, in order", () => {
+    const events = [
+      event(85, "aaa"),
+      event(85, "aaa"),
+      event(90, "aaa"),
+      event(98),
+      event(126, "bbb"),
+    ];
+    expect(commitsRanAgainst(events, "/workspace/w/GATE_5")).toEqual([
+      {
+        commit: "/workspace/w/commit/aaa",
+        acts: [
+          { seq: 85, key: "/workspace/w/act/85" },
+          { seq: 90, key: "/workspace/w/act/90" },
+        ],
+      },
+      { commit: "/workspace/w/commit/bbb", acts: [{ seq: 126, key: "/workspace/w/act/126" }] },
+    ]);
+  });
+
+  test("leave out the open commit, which every one of its own events names", () => {
+    expect(commitsRanAgainst([event(1, "aaa")], "/workspace/w/commit/aaa")).toEqual([]);
   });
 });
 

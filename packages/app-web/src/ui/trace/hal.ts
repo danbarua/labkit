@@ -66,6 +66,33 @@ export function nameOf(key: string, type: string | undefined): string {
   return type === "Commit" ? shortId(key).slice(0, 7) : shortId(key);
 }
 
+/** A commit the acts behind some events ran against, and those acts, by position and address. */
+export interface RanAgainst {
+  commit: string;
+  acts: { seq: number; key: string }[];
+}
+
+/**
+ * The commits the acts that made `events` ran against, from each event's `ran_against:commit`
+ * link, in the order the events name them, each with its acts in order. A commit that is
+ * `current`, the open resource, is left out: every event of a commit's own names it.
+ */
+export function commitsRanAgainst(events: readonly HalDocument[], current: string): RanAgainst[] {
+  const byCommit = new Map<string, RanAgainst>();
+  for (const event of events) {
+    const commit = linksOf(event, "ran_against:commit")[0];
+    const act = linksOf(event, "parent")[0];
+    if (commit === undefined || act === undefined || typeof event.seq !== "number") continue;
+    const key = keyOf(commit.href);
+    if (key === current) continue;
+    const entry = byCommit.get(key) ?? { commit: key, acts: [] };
+    if (!entry.acts.some((a) => a.seq === event.seq))
+      entry.acts.push({ seq: event.seq, key: keyOf(act.href) });
+    byCommit.set(key, entry);
+  }
+  return [...byCommit.values()];
+}
+
 export function humanRel(rel: string): string {
   return rel.replace(/_/g, " ");
 }
@@ -158,7 +185,8 @@ export function fmtDate(iso: string): string {
   return `${d.toLocaleString("en-GB", opts)} UTC`;
 }
 
-function linksOf(node: HalDocument, rel: string): HalLink[] {
+/** The links of `node` named `rel`: none, one, or each of several. */
+export function linksOf(node: HalDocument, rel: string): HalLink[] {
   const value = node._links?.[rel];
   return value === undefined ? [] : [value].flat();
 }

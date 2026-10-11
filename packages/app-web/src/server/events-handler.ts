@@ -68,11 +68,14 @@ interface Page {
   since: number | undefined;
 }
 
-// One page of acts, oldest first. With a handle, the acts that made a change naming it: `id` for
+/** Which acts a page lists: those that changed record `naming`, or those that ran against a commit. */
+type ActsOf = { naming: string } | { ranAgainst: string };
+
+// One page of acts, oldest first. Naming a handle, the acts that made a change naming it: `id` for
 // a node created or given properties, `from` or `to` for an edge created or given properties.
 // Matched on those fields rather than on the kind of change, and served by the GIN index on
 // `changes`. An act that was only about the handle, and changed nothing that names it, is not here.
-async function page(req: Request, scope: TenantScope, handle?: string): Promise<Page> {
+async function page(req: Request, scope: TenantScope, of?: ActsOf): Promise<Page> {
   const url = new URL(req.url);
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
@@ -83,12 +86,13 @@ async function page(req: Request, scope: TenantScope, handle?: string): Promise<
   const params: unknown[] = [];
   const bind = (value: unknown) => `$${params.push(value)}`;
   const conditions: string[] = [];
-  if (handle !== undefined) {
+  if (of !== undefined && "naming" in of) {
     const named = ["id", "from", "to"].map(
-      (field) => `changes @> ${bind(JSON.stringify([{ [field]: handle }]))}::jsonb`,
+      (field) => `changes @> ${bind(JSON.stringify([{ [field]: of.naming }]))}::jsonb`,
     );
     conditions.push(`(${named.join(" OR ")})`);
   }
+  if (of !== undefined && "ranAgainst" in of) conditions.push(`git_hash = ${bind(of.ranAgainst)}`);
   if (since !== undefined) conditions.push(`seq > ${bind(since)}`);
   const where = conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`;
 
@@ -266,16 +270,56 @@ async function act(
 
 type Ends = { id?: string; from?: string; to?: string };
 
+/**
+ * A function giving, for an act, a link to the commit it ran against, under `ran_against:commit`,
+ * or nothing when the act names no commit or the workspace's repository `repo` does not hold it.
+ * Each commit is looked up in the repository once.
+ */
+function ranAgainstOf(root: string, repo: Repository | undefined) {
+  const held = new Map<string, boolean>();
+  return (event: RecordedEvent) => {
+    const hash = event.attribution.git_hash;
+    if (hash === null || repo === undefined) return {};
+    if (!held.has(hash)) held.set(hash, holdsCommit(repo, hash));
+    return held.get(hash)
+      ? { [RAN_AGAINST.out]: { href: `${root}/${COMMIT_SLUG}/${hash}`, type: COMMIT_TYPE } }
+      : {};
+  };
+}
+
+/** The fields of a change that name a record: a node's `id`, and an edge's `from` and `to`. */
+const ENDS = ["id", "from", "to"] as const;
+
+// Links to the records `change` names, each under the name of the field that names it, so a page
+// shows them without building an address from a handle.
+function endLinks(origin: string, scope: TenantScope, change: object) {
+  const named = change as Ends;
+  return Object.fromEntries(
+    ENDS.flatMap((field) => {
+      const handle = named[field];
+      return typeof handle === "string"
+        ? [[field, { href: `${origin}${nodePath(scope.prefix, handle)}`, type: typeOf(handle) }]]
+        : [];
+    }),
+  );
+}
+
 // `/{handle}/events`: what happened to one record, change by change. The changes that name it are
 // rolled up out of the acts that made them, so these are changes and not acts. Not a resource of
-// its own, so it has no `self`; each event says which act it belongs to. `dir` is the event as seen
-// from the record: `in` when an edge ends at it, `out` when one starts at it, and `subject` when
-// the change is to the record itself.
-async function events(req: Request, scope: TenantScope, handle: string): Promise<Response> {
+// its own, so it has no `self`; each event links the act it belongs to, the records it names, and
+// the commit the act ran against. `dir` is the event as seen from the record: `in` when an edge
+// ends at it, `out` when one starts at it, and `subject` when the change is to the record itself.
+async function events(
+  req: Request,
+  scope: TenantScope,
+  handle: string,
+  repo: Repository | undefined,
+): Promise<Response> {
   const origin = publicOrigin(req).origin;
   const root = `${origin}${scope.prefix}`;
   const self = `${root}/${handle}/${EVENTS_SEGMENT}`;
-  const p = await page(req, scope, handle);
+  const p = await page(req, scope, { naming: handle });
+  const ranAgainst = ranAgainstOf(root, repo);
   const extras = extrasOf(req, HANDLED);
   const carry = <T>(value: T): T =>
     extras.length === 0 ? value : (withExtras(value, extras) as T);
@@ -316,7 +360,11 @@ async function events(req: Request, scope: TenantScope, handle: string): Promise
           subject: event.subject,
           dir,
           ...change,
-          _links: carry({ parent: { href: act, type: ACT_TYPE } }),
+          _links: carry({
+            parent: { href: act, type: ACT_TYPE },
+            ...endLinks(origin, scope, change),
+            ...ranAgainst(event),
+          }),
         },
       ];
     }),
@@ -335,6 +383,48 @@ async function events(req: Request, scope: TenantScope, handle: string): Promise
     _links: { ...paging, ...carry(groups) },
     _embedded: { events: embedded },
   });
+}
+
+/**
+ * `/commit/{id}/events`: what the acts that ran against commit `hash` did, change by change, a page
+ * of acts at a time. Every change of those acts is here, since each was made against the commit;
+ * none has a `dir`, since no change names the commit. `base` is the workspace's address.
+ */
+export async function commitEvents(
+  req: Request,
+  scope: TenantScope,
+  base: string,
+  hash: string,
+  repo: Repository,
+): Promise<Response> {
+  const origin = publicOrigin(req).origin;
+  const root = `${origin}${scope.prefix}`;
+  const commit = `${base}/${COMMIT_SLUG}/${hash}`;
+  const self = `${commit}/${EVENTS_SEGMENT}`;
+  const p = await page(req, scope, { ranAgainst: hash });
+  const ranAgainst = ranAgainstOf(root, repo);
+  const extras = extrasOf(req, HANDLED);
+  const carry = <T>(value: T): T =>
+    extras.length === 0 ? value : (withExtras(value, extras) as T);
+  const embedded = p.acts.flatMap((event) =>
+    event.changes.map((change, i) => ({
+      seq: event.seq,
+      index: i + 1,
+      operation: event.operation,
+      subject: event.subject,
+      ...change,
+      _links: carry({
+        parent: { href: `${root}/${ACT_SLUG}/${event.seq}`, type: ACT_TYPE },
+        ...endLinks(origin, scope, change),
+        ...ranAgainst(event),
+      }),
+    })),
+  );
+  const paging = carry([...pageLinks(root, self, p), { rel: "about", href: commit }]).reduce(
+    (links, { rel, href }) => Object.assign(links, { [rel]: { href } }),
+    {} as Record<string, { href: string }>,
+  );
+  return json({ about: hash, _links: paging, _embedded: { events: embedded } });
 }
 
 function json(body: unknown): Response {
@@ -365,5 +455,5 @@ export async function eventsHandler(
   if (seq !== undefined) return act(req, scope, Number(seq), repo);
   const handle = decodeURIComponent(EVENTS.exec(rest)?.[1] ?? "");
   if (!HANDLE.test(handle)) return problem(404, "Not Found", `${handle} is not a handle`);
-  return events(req, scope, handle);
+  return events(req, scope, handle, repo);
 }

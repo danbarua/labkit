@@ -4,7 +4,7 @@
  * repository (`docs/architecture.md`, "Files and history").
  */
 
-import { CaretRightIcon, FileTextIcon, FolderIcon, FolderOpenIcon } from "@phosphor-icons/react";
+import { CaretRightIcon, FolderIcon, FolderOpenIcon } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   type CollectionItem,
@@ -15,6 +15,8 @@ import {
   hrefOf,
   keyOf,
 } from "./hal";
+import { ActiveBox } from "./active-box";
+import { fileLook } from "./file-icons";
 import { docOf, requestPath, useDocument, usePages } from "./hal-store";
 import { type LaneRow, lanesOf, widthOf } from "./lanes";
 
@@ -55,7 +57,8 @@ function Tail({
 
 /**
  * The workspace's files as a tree, from the directory `rootKey`. A directory's entries are
- * fetched when it is first opened. Clicking a file opens it.
+ * fetched when it is first opened. Clicking a file opens it, and the box around the open file
+ * slides to it.
  */
 export function FileTree({
   rootKey,
@@ -67,6 +70,7 @@ export function FileTree({
   onOpen: (key: string) => void;
 }) {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+  const list = useRef<HTMLDivElement>(null);
   const toggle = (key: string) =>
     setOpened((was) => {
       const now = new Set(was);
@@ -74,7 +78,8 @@ export function FileTree({
       return now;
     });
   return (
-    <div className="file-tree">
+    <div className="file-tree" ref={list}>
+      <ActiveBox list={list} activeKey={openKey} />
       <Directory dirKey={rootKey} depth={0} {...{ opened, toggle, openKey, onOpen }} />
     </div>
   );
@@ -114,7 +119,7 @@ function Directory({
                 onClick={() => toggle(item.key)}
               >
                 <CaretRightIcon className={open ? "caret open" : "caret"} aria-hidden="true" />
-                <Icon className="tree-icon" aria-hidden="true" />
+                <Icon className="tree-icon" data-kind="folder" aria-hidden="true" />
                 <span className="tree-name">{name}</span>
               </button>
               {open ? (
@@ -127,6 +132,9 @@ function Directory({
             </Fragment>
           );
         }
+        const look = fileLook(
+          typeof item.data.media_type === "string" ? item.data.media_type : undefined,
+        );
         return (
           <button
             key={item.key}
@@ -137,7 +145,7 @@ function Directory({
             onClick={() => onOpen(item.key)}
           >
             <span className="caret-space" />
-            <FileTextIcon className="tree-icon" aria-hidden="true" />
+            <look.icon className="tree-icon" data-kind={look.kind} aria-hidden="true" />
             <span className="tree-name">{name}</span>
           </button>
         );
@@ -199,7 +207,8 @@ function LaneCell({ row, width }: { row: LaneRow; width: number }) {
  * The workspace's history across every branch, newest first, from the timeline the history at
  * `historyKey` links to: each commit with the lanes `git log --graph` draws, and the names of
  * the branches that point to it. A branch picker, opening on HEAD's branch, scrolls to the
- * picked branch's tip, loading pages until it is listed. Clicking a commit opens it.
+ * picked branch's tip, loading pages until it is listed. Clicking a commit opens it, and the box
+ * that marks the open commit slides to it.
  */
 export function History({
   historyKey,
@@ -255,6 +264,7 @@ export function History({
   const width = widthOf(rows);
   return (
     <div className="history" ref={list}>
+      <ActiveBox list={list} activeKey={openKey} />
       {branches.length === 0 ? null : (
         <label className="branch-pick">
           <span>Branch</span>

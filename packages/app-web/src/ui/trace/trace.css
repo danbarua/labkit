@@ -37,6 +37,20 @@
   --c-act: #8592b0;
   --c-file: #c4b5fd;
   --c-commit: #fb923c;
+  /* File Explorer's icons: its folders, and its files by kind (file-icons.tsx). */
+  --f-folder: #e5b567;
+  --f-markdown: #7dd3fc;
+  --f-json: #fbbf24;
+  --f-config: #c084fc;
+  --f-python: #2dd4bf;
+  --f-javascript: #facc15;
+  --f-typescript: #60a5fa;
+  --f-table: #4ade80;
+  --f-html: #f97316;
+  --f-image: #f472b6;
+  --f-pdf: #f87171;
+  --f-text: var(--text-dim);
+  --f-other: var(--text-faint);
 
   display: flex;
   flex-direction: column;
@@ -343,9 +357,38 @@
   flex-direction: column;
   min-height: 0;
 }
-/* Open sections share the height the folded ones leave, equally, whatever their content. */
+/* Open sections share the height the folded ones leave, in proportion to their shares, whatever
+   their content. */
 .trace .explorer.open {
   flex: 1 1 0;
+}
+/* The border between two open sections, which a drag moves. It lies over the border and takes no
+   height of its own, and shows the accent while it is hovered, dragged or focused. */
+.trace .splitter {
+  flex: none;
+  position: relative;
+  z-index: 3;
+  height: 7px;
+  margin: -4px 0 -3px;
+  cursor: row-resize;
+  touch-action: none;
+}
+.trace .splitter::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  height: 3px;
+  transition: background-color 120ms ease;
+}
+.trace .splitter:hover::after,
+.trace .splitter.dragging::after,
+.trace .splitter:focus-visible::after {
+  background: var(--accent);
+}
+.trace .splitter:focus-visible {
+  outline: none;
 }
 .trace .explorer-body {
   flex: 1 1 auto;
@@ -482,9 +525,62 @@
   border-color: var(--accent);
   background: var(--accent-dim);
 }
+/* In File Explorer the box marks the open file, as it does in the Items pane. */
+.trace .file-tree {
+  position: relative;
+}
+.trace .file-tree .tree-row {
+  position: relative;
+}
+.trace .file-tree .tree-row.active {
+  background: none;
+  border-color: transparent;
+}
+.trace .file-tree .active-box.fill:not(.filled) ~ .tree-row.active {
+  background: var(--panel-2);
+}
 .trace .tree-icon {
   flex: none;
   color: var(--text-dim);
+}
+.trace .tree-icon[data-kind="folder"] {
+  color: var(--f-folder);
+}
+.trace .tree-icon[data-kind="markdown"] {
+  color: var(--f-markdown);
+}
+.trace .tree-icon[data-kind="json"] {
+  color: var(--f-json);
+}
+.trace .tree-icon[data-kind="config"] {
+  color: var(--f-config);
+}
+.trace .tree-icon[data-kind="python"] {
+  color: var(--f-python);
+}
+.trace .tree-icon[data-kind="javascript"] {
+  color: var(--f-javascript);
+}
+.trace .tree-icon[data-kind="typescript"] {
+  color: var(--f-typescript);
+}
+.trace .tree-icon[data-kind="table"] {
+  color: var(--f-table);
+}
+.trace .tree-icon[data-kind="html"] {
+  color: var(--f-html);
+}
+.trace .tree-icon[data-kind="image"] {
+  color: var(--f-image);
+}
+.trace .tree-icon[data-kind="pdf"] {
+  color: var(--f-pdf);
+}
+.trace .tree-icon[data-kind="text"] {
+  color: var(--f-text);
+}
+.trace .tree-icon[data-kind="other"] {
+  color: var(--f-other);
 }
 .trace .caret-space {
   flex: none;
@@ -533,6 +629,26 @@
 }
 .trace .commit-row.timeline-row.tip {
   border-color: var(--accent);
+}
+/* In Source Explorer the box marks the open commit, as it does in File Explorer. Rows touch, so
+   the box has square corners like them. An open tip keeps the tip's outline. */
+.trace .history {
+  position: relative;
+}
+.trace .history .commit-row {
+  position: relative;
+}
+.trace .history .commit-row.active {
+  background: none;
+}
+.trace .history .commit-row.active:not(.tip) {
+  border-color: transparent;
+}
+.trace .history .active-box.fill:not(.filled) ~ .commit-row.active {
+  background: var(--panel-2);
+}
+.trace .history .active-box {
+  border-radius: 0;
 }
 .trace .lanes {
   flex: none;
@@ -818,6 +934,43 @@
 .trace .header-top .pill {
   align-self: center;
 }
+/* The view tabs and Reload sit at the right of the header's line, quietly: no border, and no
+   background but the chosen tab's and the one under the pointer. */
+.trace .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  margin-left: auto;
+}
+.trace .view-tabs {
+  display: flex;
+  gap: 2px;
+}
+.trace .view-tab,
+.trace .view-action {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.trace .view-tab:hover,
+.trace .view-action:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+.trace .view-tab.on {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.trace .view-action {
+  padding: 0 8px;
+}
 
 .trace .skeleton .bar {
   display: block;
@@ -833,11 +986,6 @@
   }
 }
 
-.trace .toolbar {
-  display: flex;
-  gap: 8px;
-  margin-top: 14px;
-}
 .trace .tbtn {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -898,7 +1046,9 @@
 .trace .toggle-btn:hover {
   color: var(--text);
 }
+/* A caret never shrinks, so a row whose name is cut keeps its icon in line with the rows around it. */
 .trace .caret {
+  flex: none;
   color: var(--text-faint);
   transition: transform 120ms ease;
 }
@@ -1134,12 +1284,26 @@
 }
 .trace .ev-kind {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 3px 8px;
 }
 .trace .ev-what b {
   color: var(--text);
   font-weight: 600;
+}
+.trace .ev-label {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+/* The open record, in an event that names it: filled with its colour rather than linked. */
+.trace .mention.current {
+  background: color-mix(in srgb, var(--mention) 22%, transparent);
+}
+/* A commit the acts ran against: its chip, then its acts. */
+.trace .ev.ran-against {
+  align-items: center;
 }
 .trace .events-more {
   margin: 8px 0;

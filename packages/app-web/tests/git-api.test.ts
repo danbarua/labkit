@@ -102,6 +102,17 @@ describe("a workspace's files", () => {
     });
   });
 
+  test("a listed file names its media type only when its extension does", async () => {
+    const { body } = await get("/workspace/alpha/file");
+    expect(body._embedded.file.map((e: any) => [e.name, e.media_type])).toEqual([
+      ["notes", undefined],
+      ["src", undefined],
+      ["big.txt", "text/plain"],
+      ["readme-link", undefined],
+      ["README.md", "text/markdown"],
+    ]);
+  });
+
   test("a directory pages its entries and links up to the directory it is in", async () => {
     const { body } = await get("/workspace/alpha/file/notes?limit=1");
     expect(body.path).toBe("notes");
@@ -434,6 +445,39 @@ describe("acts and the commits they ran against", () => {
     });
     const acts = await get(`/workspace/alpha/commit/${git.commits[1]}/acts`);
     expect(acts.body._embedded.acts.map((a: any) => a.id)).toEqual(["3"]);
+  });
+
+  test("a commit an act ran against links its events: every change those acts made", async () => {
+    const [first, , third] = git.commits;
+    const { body } = await get(`/workspace/alpha/commit/${first}`);
+    expect(body._links.events.href).toBe(`${commitHref(first!)}/events`);
+    const events = await get(`/workspace/alpha/commit/${first}/events`);
+    expect(events.status).toBe(200);
+    expect(events.body._links.about.href).toBe(commitHref(first!));
+    const all = events.body._embedded.events;
+    expect(all.length).toBeGreaterThan(0);
+    expect(all.map((e: any) => [e.seq, e.index])).toEqual(
+      all.map((_: any, i: number) => [1, i + 1]),
+    );
+    expect(all[0]).toMatchObject({
+      seq: 1,
+      operation: "pose",
+      subject: "Q_1",
+      _links: { parent: { href: `${ORIGIN}/workspace/alpha/act/1`, type: "Act" } },
+    });
+    expect(all[0]._links.id).toEqual({ href: `${ORIGIN}/workspace/alpha/Q_1`, type: "Question" });
+    expect(all[0]._links["ran_against:commit"].href).toBe(commitHref(first!));
+    // No change names the commit, so none is in, out of, or about it.
+    expect(all.some((e: any) => "dir" in e)).toBe(false);
+    // A record's events link the commit each act ran against, when the repository holds it.
+    const q1 = (await get("/workspace/alpha/Q_1/events")).body._embedded.events;
+    expect(q1.map((e: any) => [e.seq, e._links["ran_against:commit"]])).toEqual([
+      [1, { href: commitHref(first!), type: "Commit" }],
+      [2, undefined],
+    ]);
+    // No act ran against the third commit, so it has no events to link.
+    const none = await get(`/workspace/alpha/commit/${third}`);
+    expect(none.body._links.events).toBeUndefined();
   });
 });
 

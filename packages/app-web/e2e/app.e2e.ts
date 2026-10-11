@@ -241,6 +241,67 @@ test.describe("the sidebar", () => {
     await expect(tree.locator(".tree-row.active")).toHaveText("a.ts");
   });
 
+  test("File Explorer draws each file's icon by its media type, and folders as folders", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    const kind = (name: string) =>
+      tree.getByRole("button", { name, exact: true }).locator(".tree-icon");
+    await expect(kind("src")).toHaveAttribute("data-kind", "folder");
+    await expect(kind("README.md")).toHaveAttribute("data-kind", "markdown");
+    await expect(kind("pixel.png")).toHaveAttribute("data-kind", "image");
+    await expect(kind("big.txt")).toHaveAttribute("data-kind", "text");
+    // The API's table names no media type for a name with no extension.
+    await expect(kind("readme-link")).toHaveAttribute("data-kind", "other");
+    await tree.getByRole("button", { name: "src" }).click();
+    await expect(kind("a.ts")).toHaveAttribute("data-kind", "typescript");
+  });
+
+  test("in File Explorer, a box marks the open file, slides to the next one opened, and moves with it when a folder above opens", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    const box = tree.locator(".active-box.outline");
+    const file = (name: string) => tree.getByRole("button", { name, exact: true });
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    await file("README.md").click();
+    await expect(header(page)).toHaveText("README.md");
+    await expect.poll(async () => (await top(box)) - (await top(file("README.md")))).toBe(0);
+    await file("big.txt").click();
+    await expect(header(page)).toHaveText("big.txt");
+    await expect(tree.locator(".active-box.fill")).toHaveClass(/filled/);
+    await expect.poll(async () => (await top(box)) - (await top(file("big.txt")))).toBe(0);
+    await file("notes").click();
+    await expect(file("plan.md")).toBeVisible();
+    await expect.poll(async () => (await top(box)) - (await top(file("big.txt")))).toBe(0);
+  });
+
+  test("in Source Explorer, a box marks the open commit and slides to the next one opened", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "Source Explorer").click();
+    const history = page.locator(".history");
+    const box = history.locator(".active-box.outline");
+    const commit = (subject: string) => history.locator(".commit-row", { hasText: subject });
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    await commit("Add a picture and a guide").click();
+    await expect(commit("Add a picture and a guide")).toHaveClass(/active/);
+    await expect
+      .poll(async () => (await top(box)) - (await top(commit("Add a picture and a guide"))))
+      .toBe(0);
+    await commit("Side work").click();
+    await expect(commit("Side work")).toHaveClass(/active/);
+    await expect(history.locator(".active-box.fill")).toHaveClass(/filled/);
+    await expect.poll(async () => (await top(box)) - (await top(commit("Side work")))).toBe(0);
+  });
+
   test("Source Explorer lists every branch's commits, newest first; a commit opens with its changed files and diff", async ({
     page,
   }) => {
@@ -298,6 +359,95 @@ test.describe("the sidebar", () => {
     expect(box.height).toBeGreaterThanOrEqual(100);
     expect(box.bottom).toBeLessThanOrEqual(bottom + 1);
     await expect(item(page, "Q_1")).toBeInViewport();
+  });
+
+  test("dragging the border between two open sections moves height from one to the other, and a reload keeps it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    await explorer(page, "Source Explorer").click();
+    const section = (name: string) => sidebar(page).getByRole("region", { name });
+    const height = async (name: string) =>
+      Math.round((await section(name).boundingBox())?.height ?? -1);
+    const heights = async () => ({
+      files: await height("File Explorer"),
+      history: await height("Source Explorer"),
+      records: await height("Record Explorer"),
+    });
+    const border = page.getByRole("separator", {
+      name: "Resize File Explorer and Source Explorer",
+    });
+    const before = await heights();
+    const at = await border.boundingBox();
+    if (at === null) throw new Error("the border has no box");
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2 + 60, { steps: 5 });
+    await page.mouse.up();
+    const dragged = await heights();
+    expect(Math.abs(dragged.files - (before.files + 60))).toBeLessThanOrEqual(2);
+    expect(Math.abs(dragged.history - (before.history - 60))).toBeLessThanOrEqual(2);
+    expect(dragged.records).toBe(before.records);
+
+    await border.focus();
+    await page.keyboard.press("ArrowUp");
+    const pressed = await heights();
+    expect(Math.abs(pressed.files - (dragged.files - 16))).toBeLessThanOrEqual(2);
+
+    await page.reload();
+    // File Explorer takes its share once the workspace's index arrives, after it is first drawn.
+    await expect
+      .poll(async () => Math.abs((await heights()).files - pressed.files))
+      .toBeLessThanOrEqual(2);
+  });
+
+  test("a double-click or Home on a border returns the two sections it divides to their initial proportion, and no other border moves", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    await explorer(page, "Source Explorer").click();
+    const section = (name: string) => sidebar(page).getByRole("region", { name });
+    const height = async (name: string) =>
+      Math.round((await section(name).boundingBox())?.height ?? -1);
+    const heights = async () => ({
+      files: await height("File Explorer"),
+      history: await height("Source Explorer"),
+      records: await height("Record Explorer"),
+    });
+    const upper = page.getByRole("separator", { name: "Resize File Explorer and Source Explorer" });
+    const lower = page.getByRole("separator", {
+      name: "Resize Source Explorer and Record Explorer",
+    });
+    const drag = async (border: typeof upper, by: number) => {
+      const at = await border.boundingBox();
+      if (at === null) throw new Error("the border has no box");
+      await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2 + by, { steps: 5 });
+      await page.mouse.up();
+    };
+    await drag(upper, 60);
+    await drag(lower, 40);
+    const dragged = await heights();
+    expect(dragged.files - dragged.history).toBeGreaterThan(60);
+
+    await upper.dblclick();
+    const reset = await heights();
+    expect(Math.abs(reset.files - reset.history)).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(reset.files + reset.history - (dragged.files + dragged.history)),
+    ).toBeLessThanOrEqual(2);
+    expect(reset.records).toBe(dragged.records);
+
+    await lower.focus();
+    await page.keyboard.press("Home");
+    const home = await heights();
+    expect(Math.abs(home.records - 2 * home.history)).toBeLessThanOrEqual(3);
+    expect(home.files).toBe(reset.files);
   });
 
   test("Source Explorer draws the branches' lanes and opens on HEAD's branch; picking another outlines its tip", async ({
@@ -510,6 +660,65 @@ test.describe("an open resource", () => {
     await expect(page.locator(".response-card .lk-code-text")).toContainText("alpha question");
   });
 
+  test("Overview, Debug and Reload sit on the header's line, at its right", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    const middle = async (locator: import("@playwright/test").Locator) => {
+      const b = await locator.boundingBox();
+      return b === null ? -1 : b.y + b.height / 2;
+    };
+    const handle = await middle(header(page));
+    for (const control of [
+      page.getByRole("tab", { name: "Overview" }),
+      page.getByRole("tab", { name: "Debug" }),
+      page.getByRole("button", { name: "Reload from the API" }),
+    ])
+      expect(Math.abs((await middle(control)) - handle)).toBeLessThanOrEqual(6);
+    const right = async (locator: import("@playwright/test").Locator) => {
+      const b = await locator.boundingBox();
+      return b === null ? -1 : b.x + b.width;
+    };
+    expect(
+      Math.abs(
+        (await right(page.getByRole("button", { name: "Reload from the API" }))) -
+          (await right(page.locator(".header-top"))),
+      ),
+    ).toBeLessThanOrEqual(1);
+  });
+
+  test("an event draws the records its change names as chips: the open one marked, the others opening theirs", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1?tab=debug");
+    const created = page.locator(".ev", { hasText: "#1.1" });
+    await expect(created.locator(".mention.current")).toHaveText("Q_1");
+    // Act 2 drew an edge from NOTE_1 to Q_1: its ends either side of its label, on one line.
+    const edge = page.locator(".ev", { hasText: "#2.2" });
+    await expect(edge.locator(".ev-kind")).toHaveText(/EdgeCreated\s*NOTE_1\s*\S+\s*Q_1/);
+    await expect(edge.locator(".mention.current")).toHaveText("Q_1");
+    await edge.getByRole("button", { name: "NOTE_1" }).click();
+    await expect(page).toHaveURL(/\/NOTE_1/);
+    // The graph does not hold NOTE_1: the browser reports its 404.
+    await expect(page.locator(".fetch-error")).toContainText("404");
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+  });
+
+  test("under a record's events, the commits their acts ran against, each opening its commit", async ({
+    page,
+  }) => {
+    // Act 1, which posed Q_1, ran against the repository's first commit.
+    await page.goto("/app/workspace/alpha/Q_1?tab=debug");
+    const commits = page.locator(".panel", { hasText: "Commits the acts ran against" });
+    const row = commits.locator(".ev.ran-against");
+    await expect(row).toHaveCount(1);
+    await expect(row.getByRole("button", { name: "#1" })).toBeVisible();
+    await row.locator(".mention").click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
+  });
+
   test("an unknown tab in the address opens the overview", async ({ page }) => {
     await page.goto("/app/workspace/alpha/Q_1?tab=nonsense");
     await expect(header(page)).toHaveText("Q_1");
@@ -543,7 +752,7 @@ test.describe("the Items pane's open row", () => {
     await expect(fill(page)).toHaveClass(/filled/);
     const top = async (locator: import("@playwright/test").Locator) =>
       Math.round((await locator.boundingBox())?.y ?? -1);
-    expect(await top(box(page))).toBe(await top(item(page, "Q_1")));
+    await expect.poll(async () => (await top(box(page))) - (await top(item(page, "Q_1")))).toBe(0);
 
     await item(page, "Q_2").click();
     await expect(header(page)).toHaveText("Q_2");
@@ -856,12 +1065,42 @@ test.describe("playback", () => {
     await expect(header(page)).toHaveText("LOE_1");
   });
 
-  test("from a resource no act records, says so", async ({ page }) => {
+  test("from a record no act changed, says so", async ({ page }) => {
     await page.goto("/app/workspace/alpha/EU_1");
     await expect(header(page)).toHaveText("EU_1");
     await play(page).click();
-    await expect(page.locator(".playback-status")).toHaveText("No act records EU_1.");
+    await expect(page.locator(".playback-status")).toHaveText("No act changed EU_1.");
     await expect(play(page)).toBeVisible();
+  });
+
+  test("from a commit an act ran against, plays the later acts; from one no act ran against, or a file, Play is disabled", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await page.getByRole("button", { name: "Source Explorer", exact: true }).click();
+    const commit = (subject: string) => page.locator(".history .commit-row", { hasText: subject });
+    // Act 1 ran against the first commit; acts 2 and 3 come after it.
+    await commit("Start the project").click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await play(page).click();
+    await expect(page).toHaveURL(/\/NOTE_1/, { timeout: 10_000 });
+    await expect(header(page)).toHaveText("LOE_1", { timeout: 10_000 });
+    await expect(page.locator(".playback-status")).toHaveText("No later act.", {
+      timeout: 10_000,
+    });
+    // The browser reports the 404 for NOTE_1, which the graph does not hold, as a console error.
+    expect(errors.every((e) => e.includes("404"))).toBe(true);
+    errors.length = 0;
+
+    await commit("Change a, plan the work").click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
+    await expect(play(page)).toBeDisabled();
+    await page.getByRole("button", { name: "File Explorer", exact: true }).click();
+    await page.locator(".file-tree").getByRole("button", { name: "README.md" }).click();
+    await expect(header(page)).toHaveText("README.md");
+    await expect(play(page)).toBeDisabled();
   });
 });
 

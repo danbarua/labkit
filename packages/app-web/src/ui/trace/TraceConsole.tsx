@@ -31,6 +31,7 @@ import {
   PlayIcon,
   SealCheckIcon,
   SidebarSimpleIcon,
+  WrenchIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
 import markUrl from "@labkit/design/mark.svg";
@@ -43,13 +44,12 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
-import { useSavedFlag } from "../saved-flag";
+import { useSavedFlag, useSavedNumber } from "../saved-flag";
 import { useSavedTheme } from "../saved-theme";
 import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
@@ -59,6 +59,7 @@ import {
   drawnAs,
   edgeLabelOf,
   FILE_TYPE,
+  commitsRanAgainst,
   type HalDocument,
   type Held,
   type HeldIndex,
@@ -82,6 +83,7 @@ import {
   useStoreVersion,
 } from "./hal-store";
 import { FileTree, History } from "./explorers";
+import { ActiveBox } from "./active-box";
 import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
@@ -351,7 +353,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
                   held={held}
                   selected={path}
                   playback={playback.playback}
-                  canPlay={held.get(path)?.own === true || (openIsCollection && listsActs(path))}
+                  canPlay={playsFrom(held, path) || (openIsCollection && listsActs(path))}
                   onToggle={() => setGraphOpen((o) => !o)}
                   onOpen={open}
                   onReset={explored.reset}
@@ -439,6 +441,15 @@ function indexOfList(key: string): string | undefined {
 }
 
 /** Whether collection `key` is the acts collection: the type its own index lists it under is Act. */
+/**
+ * Whether playback can start from resource `key`: an act, or a resource that links its events, once
+ * its own response has arrived. A file, or a commit no act ran against, links none.
+ */
+function playsFrom(held: HeldIndex, key: string): boolean {
+  const res = held.get(key);
+  return res?.own === true && (res.type === "Act" || res.eventsHref !== undefined);
+}
+
 function listsActs(key: string): boolean {
   const upper = indexOfList(key);
   return upper !== undefined && rowIn(upper, key)?.data.type === "Act";
@@ -526,6 +537,12 @@ function Lists({
   const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.trace.records", true);
   const [filesOpen, setFilesOpen] = useSavedFlag("labkit.trace.files", false);
   const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.trace.history", false);
+  const [filesGrow, setFilesGrow] = useSavedNumber("labkit.trace.files.grow", FILES_SHARE);
+  const [historyGrow, setHistoryGrow] = useSavedNumber("labkit.trace.history.grow", HISTORY_SHARE);
+  const [recordsGrow, setRecordsGrow] = useSavedNumber("labkit.trace.records.grow", RECORDS_SHARE);
+  const filesSection = useRef<HTMLElement>(null);
+  const historySection = useRef<HTMLElement>(null);
+  const recordsSection = useRef<HTMLElement>(null);
   // The open workspace's index says whether it serves files and history, and where.
   const indexKey = workspace?.replace(/\/$/, "");
   const indexEntry = useDocument(indexKey === undefined ? undefined : requestPath(indexKey));
@@ -547,37 +564,83 @@ function Lists({
           : key === undefined
             ? `${slug} serves no ${what}.`
             : undefined;
+  const filesUnavailable = unavailable(filesKey, "files");
+  const historyUnavailable = unavailable(historyKey, "history");
+  // The open sections, in order. A border that can be dragged sits after each but the last.
+  const shares: Share[] = [
+    filesOpen && filesUnavailable === undefined
+      ? {
+          name: "File Explorer",
+          initial: FILES_SHARE,
+          grow: filesGrow,
+          setGrow: setFilesGrow,
+          element: filesSection,
+        }
+      : undefined,
+    historyOpen && historyUnavailable === undefined
+      ? {
+          name: "Source Explorer",
+          initial: HISTORY_SHARE,
+          grow: historyGrow,
+          setGrow: setHistoryGrow,
+          element: historySection,
+        }
+      : undefined,
+    recordsOpen
+      ? {
+          name: "Record Explorer",
+          initial: RECORDS_SHARE,
+          grow: recordsGrow,
+          setGrow: setRecordsGrow,
+          element: recordsSection,
+        }
+      : undefined,
+  ].filter((share) => share !== undefined);
+  const splitterAfter = (element: RefObject<HTMLElement | null>) => {
+    const at = shares.findIndex((share) => share.element === element);
+    const above = shares[at];
+    const below = shares[at + 1];
+    return above === undefined || below === undefined ? null : (
+      <Splitter above={above} below={below} />
+    );
+  };
   return (
     <aside className={className}>
       <Explorer
         title="File Explorer"
         icon={<FolderIcon aria-hidden="true" />}
-        unavailable={unavailable(filesKey, "files")}
+        unavailable={filesUnavailable}
         open={filesOpen}
         onToggle={() => setFilesOpen(!filesOpen)}
+        grow={filesGrow}
+        sectionRef={filesSection}
         scrolls
       >
         {filesKey === undefined ? null : (
           <FileTree rootKey={filesKey} openKey={openKey} onOpen={onOpen} />
         )}
       </Explorer>
+      {splitterAfter(filesSection)}
       <Explorer
         title="Source Explorer"
         icon={<GitCommitIcon aria-hidden="true" />}
-        unavailable={unavailable(historyKey, "history")}
+        unavailable={historyUnavailable}
         open={historyOpen}
         onToggle={() => setHistoryOpen(!historyOpen)}
+        grow={historyGrow}
+        sectionRef={historySection}
         scrolls
       >
         {historyKey === undefined ? null : (
           <History historyKey={historyKey} openKey={openKey} onOpen={onOpen} />
         )}
       </Explorer>
+      {splitterAfter(historySection)}
       <Explorer
         title="Record Explorer"
         icon={<DatabaseIcon aria-hidden="true" />}
-        // It holds two panes, Collections and Items, so it takes twice the share of the height.
-        share={2}
+        grow={recordsGrow}
+        sectionRef={recordsSection}
         open={recordsOpen}
         onToggle={() => setRecordsOpen(!recordsOpen)}
       >
@@ -650,7 +713,8 @@ function Explorer({
   unavailable,
   onToggle,
   scrolls = false,
-  share = 1,
+  grow,
+  sectionRef,
   children,
 }: {
   title: string;
@@ -661,15 +725,17 @@ function Explorer({
   /** Whether the section's body scrolls as a whole, rather than a list inside it. */
   scrolls?: boolean;
   /** How many shares of the height the open sections divide this one takes. */
-  share?: number;
+  grow: number;
+  sectionRef: RefObject<HTMLElement | null>;
   children?: ReactNode;
 }) {
   const shown = open && unavailable === undefined;
   const why = useId();
   return (
     <section
+      ref={sectionRef}
       className={shown ? "explorer open" : "explorer"}
-      style={shown ? { flexGrow: share } : undefined}
+      style={shown ? { flexGrow: grow } : undefined}
       aria-label={title}
     >
       <button
@@ -693,6 +759,100 @@ function Explorer({
         <div className={scrolls ? "explorer-body scrolls" : "explorer-body"}>{children}</div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Each section's share of the height the open sections divide, until a border is moved. Record
+ * Explorer holds two panes, Collections and Items, so it starts with twice the share of the others.
+ */
+const FILES_SHARE = 1;
+const HISTORY_SHARE = 1;
+const RECORDS_SHARE = 2;
+
+/** An open sidebar section, as the border below or above it sees it. */
+interface Share {
+  name: string;
+  /** The section's share before any border is moved. */
+  initial: number;
+  grow: number;
+  setGrow: (next: number) => void;
+  element: RefObject<HTMLElement | null>;
+}
+
+/** The fewest pixels a drag leaves an open section: its header and a row or two. */
+const MIN_SECTION = 72;
+/** How far one press of an arrow key moves a border, in pixels. */
+const SPLITTER_STEP = 16;
+
+/**
+ * The border between two open sidebar sections, which a drag or the Up and Down keys move. The two
+ * sections divide their height in the new proportion, and keep it on the next visit; each keeps at
+ * least MIN_SECTION pixels. A folded section between them moves with the border. A double-click or
+ * the Home key returns the two sections to their initial proportion of the height they share, so
+ * no other border moves.
+ */
+function Splitter({ above, below }: { above: Share; below: Share }) {
+  const drag = useRef<{ y: number; a: number; b: number } | undefined>(undefined);
+  const [dragging, setDragging] = useState(false);
+  const sizes = () => ({
+    a: above.element.current?.getBoundingClientRect().height ?? 0,
+    b: below.element.current?.getBoundingClientRect().height ?? 0,
+  });
+  // Gives `above` `delta` more pixels of the two sections' height, and `below` that many fewer.
+  const move = (from: { a: number; b: number }, delta: number) => {
+    const total = from.a + from.b;
+    if (total < 2 * MIN_SECTION) return;
+    const a = Math.min(Math.max(from.a + delta, MIN_SECTION), total - MIN_SECTION);
+    const grow = above.grow + below.grow;
+    above.setGrow((grow * a) / total);
+    below.setGrow((grow * (total - a)) / total);
+  };
+  const reset = () => {
+    const grow = above.grow + below.grow;
+    const initial = above.initial + below.initial;
+    above.setGrow((grow * above.initial) / initial);
+    below.setGrow((grow * below.initial) / initial);
+  };
+  const stop = () => {
+    drag.current = undefined;
+    setDragging(false);
+  };
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: an <hr> takes no focus or drag; this is the ARIA window splitter pattern.
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label={`Resize ${above.name} and ${below.name}`}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round((100 * above.grow) / (above.grow + below.grow))}
+      tabIndex={0}
+      className={dragging ? "splitter dragging" : "splitter"}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { y: e.clientY, ...sizes() };
+        setDragging(true);
+      }}
+      onPointerMove={(e) => {
+        const start = drag.current;
+        if (start !== undefined) move(start, e.clientY - start.y);
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onDoubleClick={reset}
+      onKeyDown={(e) => {
+        if (e.key === "Home") {
+          e.preventDefault();
+          reset();
+          return;
+        }
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        move(sizes(), e.key === "ArrowUp" ? -SPLITTER_STEP : SPLITTER_STEP);
+      }}
+    />
   );
 }
 
@@ -789,79 +949,6 @@ function Pane({
           Load more
         </button>
       ) : null}
-    </>
-  );
-}
-
-/** How long the open row's box takes to slide from one row to another, in milliseconds. */
-const SLIDE_MS = 220;
-
-/**
- * The box around a sidebar list's current row: the open resource in the Items pane, or the listed
- * collection in the Collections pane. When the current row changes, the box loses its fill, slides
- * to the new row, and fills again on arrival. When that row is out of the list's view, the list
- * scrolls to show it at the top, a page at a time rather than a row at a time.
- */
-function ActiveBox({
-  list,
-  activeKey,
-  rows,
-}: {
-  list: RefObject<HTMLDivElement | null>;
-  activeKey: string;
-  /** Changes whenever the rows drawn change, so the box is measured again. */
-  rows: string;
-}) {
-  const [box, setBox] = useState<{ top: number; height: number; slide: boolean }>();
-  const [filled, setFilled] = useState(true);
-  const lastTop = useRef<number | undefined>(undefined);
-  // The row the list has yet to scroll to: set when another row opens, cleared once it is shown,
-  // so rows added below by Load more do not pull the list back to the open row.
-  const scrollTo = useRef<string | undefined>(activeKey);
-  const shownKey = useRef<string | undefined>(undefined);
-  if (shownKey.current !== activeKey) {
-    shownKey.current = activeKey;
-    scrollTo.current = activeKey;
-  }
-  useLayoutEffect(() => {
-    const row = list.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(activeKey)}"]`);
-    if (!row) {
-      lastTop.current = undefined;
-      setBox(undefined);
-      return;
-    }
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const top = row.offsetTop;
-    const slide = lastTop.current !== undefined && lastTop.current !== top && !reduced;
-    lastTop.current = top;
-    setBox({ top, height: row.offsetHeight, slide });
-    if (slide) setFilled(false);
-    if (scrollTo.current !== activeKey) return;
-    scrollTo.current = undefined;
-    const scroller = row.closest<HTMLElement>(".sidebar-section");
-    if (!scroller) return;
-    const view = scroller.getBoundingClientRect();
-    const at = row.getBoundingClientRect();
-    if (at.top >= view.top && at.bottom <= view.bottom) return;
-    scroller.scrollTo({
-      top: scroller.scrollTop + (at.top - view.top) - 4,
-      behavior: reduced ? "auto" : "smooth",
-    });
-  }, [list, activeKey, rows]);
-  useEffect(() => {
-    if (filled) return;
-    const timer = setTimeout(() => setFilled(true), SLIDE_MS);
-    return () => clearTimeout(timer);
-  }, [filled]);
-  if (box === undefined) return null;
-  // Two layers: the fill under the rows, so it does not tint their text, and the outline over
-  // them, so the hover background of the row it slides to does not hide it.
-  const style = { transform: `translateY(${box.top}px)`, height: box.height };
-  const state = [box.slide ? "" : "placed", filled ? "filled" : ""].join(" ");
-  return (
-    <>
-      <div className={`active-box fill ${state}`} style={style} aria-hidden="true" />
-      <div className={`active-box outline ${state}`} style={style} aria-hidden="true" />
     </>
   );
 }
@@ -1023,31 +1110,42 @@ function Detail({
               </span>
             );
           })}
-        </div>
-        <div className="toolbar" role="tablist">
-          {(["overview", "debug"] as const).map((t) => (
+          {/* Overview and Debug are views of the resource, so they are tabs; Reload is an action. */}
+          <div className="header-actions">
+            <div className="view-tabs" role="tablist" aria-label="View">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "overview"}
+                className={tab === "overview" ? "view-tab on" : "view-tab"}
+                onClick={() => onTab("overview")}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "debug"}
+                aria-label="Debug"
+                title="Debug: the API's response, and the events that changed this"
+                className={tab === "debug" ? "view-tab on" : "view-tab"}
+                onClick={() => onTab("debug")}
+              >
+                <WrenchIcon aria-hidden="true" />
+              </button>
+            </div>
             <button
-              key={t}
               type="button"
-              role="tab"
-              aria-selected={tab === t}
-              className={tab === t ? "tbtn on" : "tbtn"}
-              onClick={() => onTab(t)}
+              className="view-action"
+              title="Reload from the API"
+              aria-label="Reload from the API"
+              onClick={() =>
+                store.reload((p) => p === resourcePath(path) || p.startsWith(`${path}/events`))
+              }
             >
-              {t === "overview" ? "Overview" : "Debug"}
+              <ArrowClockwiseIcon aria-hidden="true" />
             </button>
-          ))}
-          <button
-            type="button"
-            className="tbtn"
-            title="Reload from the API"
-            aria-label="Reload from the API"
-            onClick={() =>
-              store.reload((p) => p === resourcePath(path) || p.startsWith(`${path}/events`))
-            }
-          >
-            <ArrowClockwiseIcon aria-hidden="true" />
-          </button>
+          </div>
         </div>
       </div>
       {tab === "debug" && res !== undefined ? (
@@ -1195,7 +1293,9 @@ function Debug({
       >
         {doc === undefined ? <Spinner>loading…</Spinner> : <JsonView value={doc} preview={40} />}
       </ContentCard>
-      {res.eventsHref === undefined ? null : <Events href={res.eventsHref} onOpen={onOpen} />}
+      {res.eventsHref === undefined ? null : (
+        <Events href={res.eventsHref} current={res.key} onOpen={onOpen} />
+      )}
     </>
   );
 }
@@ -1209,36 +1309,91 @@ const readEvents = (doc: HalDocument) => {
   };
 };
 
-/** A record's events, from its `events` link: one row per change, oldest first, a page at a time. */
-function Events({ href, onOpen }: { href: string; onOpen: (key: string) => void }) {
+/**
+ * A record's or a commit's events, from its `events` link: one row per change, oldest first, a page
+ * of acts at a time. Under them, the commits the acts ran against, each with its acts.
+ */
+function Events({
+  href,
+  current,
+  onOpen,
+}: {
+  href: string;
+  /** The open resource, whose chip in each event is marked rather than linked. */
+  current: string;
+  onOpen: (key: string) => void;
+}) {
   const path = requestPath(href);
   const events = usePages(path, readEvents);
+  const commits = commitsRanAgainst(events.items, current);
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <a href={path} target="_blank" rel="noopener" title="Open in a new tab">
-          {path}
-        </a>
-        <span>events{events.items.length > 0 ? ` · ${events.items.length}` : ""}</span>
+    <>
+      <div className="panel">
+        <div className="panel-head">
+          <a href={path} target="_blank" rel="noopener" title="Open in a new tab">
+            {path}
+          </a>
+          <span>events{events.items.length > 0 ? ` · ${events.items.length}` : ""}</span>
+        </div>
+        <div className="panel-body">
+          {events.items.map((e) => (
+            <EventRow
+              key={`${String(e.seq)}.${String(e.index)}`}
+              event={e}
+              current={current}
+              onOpen={onOpen}
+            />
+          ))}
+          {events.error !== undefined ? (
+            <div className="empty-panel">Fetch failed: {events.error}</div>
+          ) : events.loading ? (
+            <Spinner>loading events…</Spinner>
+          ) : events.items.length === 0 ? (
+            <div className="empty-panel">No event names this record.</div>
+          ) : null}
+          {!events.loading && events.next !== undefined ? (
+            <button type="button" className="tbtn primary events-more" onClick={events.more}>
+              Load more acts
+            </button>
+          ) : null}
+        </div>
       </div>
-      <div className="panel-body">
-        {events.items.map((e) => (
-          <EventRow key={`${String(e.seq)}.${String(e.index)}`} event={e} onOpen={onOpen} />
-        ))}
-        {events.error !== undefined ? (
-          <div className="empty-panel">Fetch failed: {events.error}</div>
-        ) : events.loading ? (
-          <Spinner>loading events…</Spinner>
-        ) : events.items.length === 0 ? (
-          <div className="empty-panel">No event names this record.</div>
-        ) : null}
-        {!events.loading && events.next !== undefined ? (
-          <button type="button" className="tbtn primary events-more" onClick={events.more}>
-            Load more acts
-          </button>
-        ) : null}
-      </div>
-    </div>
+      {commits.length === 0 ? null : (
+        <div className="panel">
+          <div className="panel-head">
+            Commits the acts ran against<span>{commits.length}</span>
+          </div>
+          <div className="panel-body">
+            {commits.map(({ commit, acts }) => (
+              <div key={commit} className="ev ran-against">
+                <button
+                  type="button"
+                  className="mention"
+                  style={{ "--mention": typeColour(COMMIT_TYPE) } as CSSProperties}
+                  title={COMMIT_TYPE}
+                  onClick={() => onOpen(commit)}
+                >
+                  {nameOf(commit, COMMIT_TYPE)}
+                </button>
+                <span>
+                  {acts.map((act) => (
+                    <button
+                      key={act.key}
+                      type="button"
+                      className="ref mono"
+                      title="Open the act"
+                      onClick={() => onOpen(act.key)}
+                    >
+                      #{act.seq}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1345,7 +1500,9 @@ function GraphCard({
             title={
               playing
                 ? "Stop stepping through the acts"
-                : "Step through the later acts, one at a time"
+                : canPlay
+                  ? "Step through the later acts, one at a time"
+                  : "No act changed this or ran against it, so there are no acts to step through from here"
             }
             disabled={!playing && !canPlay}
             onClick={playing ? onPause : onPlay}
