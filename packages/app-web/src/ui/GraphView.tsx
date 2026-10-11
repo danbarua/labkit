@@ -329,6 +329,11 @@ const SPREAD_KEEP = 0.87;
 const SWAY = Math.PI / 6;
 const SWAY_STEP = (2 * Math.PI) / (16 * 60);
 /**
+ * The most the camera turns in one frame: 0.75°, 45° a second at 60 frames a second. A large turn,
+ * such as one that brings a cluster from edge-on into view, sweeps over seconds rather than snaps.
+ */
+const TURN_MAX = (0.75 * Math.PI) / 180;
+/**
  * The nearest and farthest the camera frames from. A small graph spaces its few nodes far apart
  * along the time axis, and fitting them all would draw every node a pixel or two across.
  */
@@ -462,7 +467,8 @@ export function frameCamera(sim: Sim, width: number, height: number): void {
   if (!sim.pointerOn && !sim.reducedMotion)
     sim.swayPhase = (sim.swayPhase + SWAY_STEP) % (2 * Math.PI);
   const goal = sim.aim + SWAY * Math.sin(sim.swayPhase);
-  camera.yaw += turnBetween(camera.yaw, goal) * FRAME_EASE;
+  const step = turnBetween(camera.yaw, goal) * FRAME_EASE;
+  camera.yaw += Math.max(-TURN_MAX, Math.min(TURN_MAX, step));
   const fit = distanceToFit(points, camera, FIT * Math.min(width, height));
   if (fit !== undefined) {
     const target = Math.min(FRAME_DISTANCE.max, Math.max(FRAME_DISTANCE.min, fit));

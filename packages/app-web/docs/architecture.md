@@ -65,6 +65,7 @@ it:
   those that put the rest of the graph behind them and nearly as far toward the bottom-right
   corner, behind the hover card, as the best one does. Of those, it takes the turn nearest its
   current one, so opening another node turns the camera no further than it must.
+  The camera turns at most 45° a second, so a large turn sweeps over seconds rather than snaps.
 - The camera zooms so the node's neighbours fill 30% of the canvas's shorter side.
 - The camera swings 30° either side of that turn, about the vertical through the node, once every
   16 seconds, so depth shows by parallax. It holds still while the pointer is on the canvas and

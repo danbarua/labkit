@@ -202,6 +202,17 @@ describe("the camera's framing", () => {
       expect(sim.aim).toBe(aim);
     });
 
+    test("turns at most 45° a second toward its framing", () => {
+      const sim = settled();
+      sim.reducedMotion = true;
+      const aim = sim.aim!;
+      sim.camera.yaw = aim + Math.PI / 2;
+      frameCamera(sim, 800, 400);
+      expect(degrees(Math.abs(sim.camera.yaw - aim - Math.PI / 2))).toBeCloseTo(0.75);
+      for (let i = 1; i < 60; i++) frameCamera(sim, 800, 400);
+      expect(degrees(aim + Math.PI / 2 - sim.camera.yaw)).toBeCloseTo(45);
+    });
+
     test("holds still while the pointer is on the canvas", () => {
       const sim = settled();
       swing(sim, 200);
