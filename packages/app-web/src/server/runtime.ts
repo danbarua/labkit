@@ -3,6 +3,7 @@ import { APP_ROLE } from "@labkit/core-db/schema";
 import { TENANT_SETTING } from "@labkit/core-db/scoped";
 import { worktreeName } from "@labkit/app-cli/worktree";
 import { type Connections, pgConnections } from "./connections";
+import { openRepositories, type Repositories, repositoriesFile } from "./repositories";
 
 // Goes into query text, so it is checked once here rather than trusted downstream.
 const GRAPH_NAME = /^[a-z0-9_]+$/;
@@ -14,6 +15,8 @@ const GRAPH_NAME = /^[a-z0-9_]+$/;
 export interface Runtime {
   connections: Connections;
   worktree: string;
+  /** The git repository each workspace serves its files and history from, by workspace slug. */
+  repositories: Repositories;
 }
 
 export interface Workspace {
@@ -33,14 +36,21 @@ export interface TenantScope {
   query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-export function createRuntime(connections: Connections): Runtime {
-  return { connections, worktree: worktreeName() ?? basename(process.cwd()) };
+export function createRuntime(
+  connections: Connections,
+  repositories: Repositories = new Map(),
+): Runtime {
+  return { connections, worktree: worktreeName() ?? basename(process.cwd()), repositories };
 }
 
-/** A runtime on the Postgres server `LABKIT_DB_URL` names. */
-export function openRuntime(): Runtime {
+/**
+ * A runtime on the Postgres server `LABKIT_DB_URL` names, with the repositories the workspaces
+ * mapping file names (`repositoriesFile`), read once, here.
+ */
+export async function openRuntime(): Promise<Runtime> {
   process.env.LABKIT_DB_URL ??= "postgresql://postgres:agens@127.0.0.1:5433/labkit";
-  return createRuntime(pgConnections(process.env.LABKIT_DB_URL));
+  const repositories = await openRepositories(repositoriesFile());
+  return createRuntime(pgConnections(process.env.LABKIT_DB_URL), repositories);
 }
 
 /**
