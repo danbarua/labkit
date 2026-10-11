@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import Markdown from "react-markdown";
+import Markdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remend from "remend";
 import { highlight } from "./code";
@@ -17,13 +17,30 @@ const NO_TYPES: Readonly<Record<string, string>> = {};
  * are closed before it is drawn, so the rest of the message does not take their shape for a
  * moment; a link whose address is unfinished is its text. Code blocks are highlighted once the
  * text has settled.
+ *
+ * `resolveUrl` rewrites each image's `src` and each link's `href`, as a file's own relative links
+ * resolve against where the file is. An address with a scheme react-markdown does not allow, such
+ * as `javascript:`, is dropped before `resolveUrl` sees it, and so is one `resolveUrl` returns.
  */
-export function MarkdownText({ text, streaming = false }: { text: string; streaming?: boolean }) {
+export function MarkdownText({
+  text,
+  streaming = false,
+  resolveUrl,
+}: {
+  text: string;
+  streaming?: boolean;
+  resolveUrl?: (url: string, kind: "src" | "href") => string;
+}) {
   const records = useContext(RecordsContext);
   return (
     <div className="lk-md">
       <Markdown
         remarkPlugins={[remarkGfm, [remarkRecords, records?.types ?? NO_TYPES]]}
+        urlTransform={(url, key) => {
+          const safe = defaultUrlTransform(url);
+          if (safe === "" || resolveUrl === undefined) return safe;
+          return defaultUrlTransform(resolveUrl(safe, key === "src" ? "src" : "href"));
+        }}
         components={{
           // A link with no address is its text. That includes one still arriving: `remend` gives it
           // an address of its own, which react-markdown blanks as one it does not know.

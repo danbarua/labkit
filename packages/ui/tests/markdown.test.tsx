@@ -41,3 +41,49 @@ describe("code blocks in markdown", () => {
     expect(draw("```labkit\nnow\n```")).toContain('<code class="language-labkit">now\n</code>');
   });
 });
+
+describe("addresses in markdown", () => {
+  const resolved = (text: string) => {
+    const seen: [string, string][] = [];
+    const html = renderToStaticMarkup(
+      <MarkdownText
+        text={text}
+        resolveUrl={(url, kind) => {
+          seen.push([url, kind]);
+          return `/resolved/${kind}/${url}`;
+        }}
+      />,
+    );
+    return { html, seen };
+  };
+
+  test("an image's src goes through the resolver as a src", () => {
+    const { html, seen } = resolved("![a pixel](../pixel.png)");
+    expect(seen).toEqual([["../pixel.png", "src"]]);
+    expect(html).toContain('src="/resolved/src/../pixel.png"');
+  });
+
+  test("a link's href goes through the resolver as an href", () => {
+    const { html, seen } = resolved("[the plan](notes/plan.md)");
+    expect(seen).toEqual([["notes/plan.md", "href"]]);
+    expect(html).toContain('href="/resolved/href/notes/plan.md"');
+  });
+
+  test("a javascript: link is dropped before the resolver sees it", () => {
+    const { html, seen } = resolved("[run](javascript:alert(1))");
+    expect(seen).toEqual([]);
+    expect(html).toContain("<span>run</span>");
+  });
+
+  test("an address the resolver returns with a scheme that is not allowed is dropped", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownText text="[the plan](plan.md)" resolveUrl={() => "javascript:alert(1)"} />,
+    );
+    expect(html).toContain("<span>the plan</span>");
+  });
+
+  test("without a resolver, addresses are drawn as written", () => {
+    expect(draw("![a pixel](../pixel.png) [the plan](plan.md)")).toContain('src="../pixel.png"');
+    expect(draw("[the plan](plan.md)")).toContain('href="plan.md"');
+  });
+});

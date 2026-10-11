@@ -222,3 +222,62 @@
 .hljs-section {
   font-weight: 600;
 }
+
+/* Markdown: an agent's message, or a markdown file. */
+.lk-md > :first-child {
+  margin-top: 0;
+}
+.lk-md > :last-child {
+  margin-bottom: 0;
+}
+.lk-md p,
+.lk-md ul,
+.lk-md ol,
+.lk-md pre,
+.lk-md blockquote,
+.lk-md table {
+  margin: 0 0 10px;
+}
+.lk-md ul,
+.lk-md ol {
+  padding-left: 22px;
+}
+.lk-md a {
+  color: var(--lk-accent-text);
+}
+.lk-md code {
+  font-family: var(--lk-font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--lk-surface-2);
+}
+.lk-md pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--lk-line);
+  border-radius: var(--lk-radius);
+  background: var(--lk-surface);
+}
+.lk-md pre code {
+  padding: 0;
+  background: none;
+}
+.lk-md blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--lk-line);
+  color: var(--lk-muted);
+}
+.lk-md table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.lk-md th,
+.lk-md td {
+  padding: 4px 10px;
+  border: 1px solid var(--lk-line);
+}
+.lk-md img {
+  max-width: 100%;
+}
