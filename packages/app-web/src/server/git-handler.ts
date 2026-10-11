@@ -88,7 +88,7 @@ function summaryOf(base: string, commit: Commit) {
     type: COMMIT_TYPE,
     name: commit.summary() ?? "",
     author: commit.author().name,
-    at: commit.time().toISOString(),
+    committed_at: commit.time().toISOString(),
     _links: { self: { href: `${base}/${COMMIT_SLUG}/${commit.id()}`, type: COMMIT_TYPE } },
   };
 }

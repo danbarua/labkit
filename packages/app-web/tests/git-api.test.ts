@@ -177,7 +177,7 @@ describe("a workspace's history", () => {
     ]);
     expect(page.body._embedded.commit[0]).toMatchObject({
       author: "Ada Tester",
-      at: "2026-09-21T14:15:20.000Z",
+      committed_at: "2026-09-21T14:15:20.000Z",
       _links: { self: { href: commitHref(third!), type: "Commit" } },
     });
     expect(page.body._links.next.href).toBe(`${ORIGIN}/workspace/alpha/commit?limit=2&offset=2`);
