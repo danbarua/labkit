@@ -9,6 +9,9 @@ bin/
 
 *.bun-build
 .labkit
+# Which git repository each workspace serves its files and history from: folders on this
+# machine (docs/environment.md, LABKIT_WORKSPACES_FILE).
+workspaces.local.json
 # The exo-ledger belief store, when a session has exo-memory wired up. Same
 # reason as `.labkit` above: it is an embedded PGlite database, machine-local,
 # and rewritten by whichever session is holding it. The beliefs are the point;

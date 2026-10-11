@@ -186,7 +186,7 @@ test.describe("the sidebar", () => {
     await expect(item(page, "Q_1")).toBeVisible();
   });
 
-  test("File and Source Explorers are disabled, and say why: no workspace is open, or it serves none", async ({
+  test("File and Source Explorers are disabled, and say why: no workspace is open, or the open one serves none", async ({
     page,
   }) => {
     await page.goto("/app/");
@@ -199,14 +199,109 @@ test.describe("the sidebar", () => {
     await expect(explorer(page, "Source Explorer")).toHaveAccessibleDescription(
       "Open a workspace to browse its history.",
     );
-    await page.goto("/app/workspace/alpha/Q_1");
+    // The test stack maps a repository to alpha and none to beta.
+    await page.goto("/app/workspace/beta/Q_1");
     await expect(header(page)).toHaveText("Q_1");
     await expect(explorer(page, "File Explorer")).toHaveAccessibleDescription(
-      "alpha serves no files.",
+      "beta serves no files.",
     );
     await expect(explorer(page, "Source Explorer")).toHaveAccessibleDescription(
-      "alpha serves no history.",
+      "beta serves no history.",
     );
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(explorer(page, "File Explorer")).toBeEnabled();
+    await expect(explorer(page, "Source Explorer")).toBeEnabled();
+  });
+
+  test("File Explorer shows the files as a tree; a directory opens in place, and a file opens on the page", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    await expect(tree.locator(".tree-row .tree-name")).toHaveText([
+      "notes",
+      "src",
+      "big.txt",
+      "readme-link",
+      "README.md",
+    ]);
+    await tree.getByRole("button", { name: "src" }).click();
+    await expect(tree.getByRole("button", { name: "src" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await tree.getByRole("button", { name: "a.ts" }).click();
+    await expect(header(page)).toHaveText("a.ts");
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/file\/src\/a\.ts/);
+    await expect(page.locator("pre.code")).toHaveText("1export const a = 2;");
+    await expect(tree.locator(".tree-row.active")).toHaveText("a.ts");
+  });
+
+  test("Source Explorer lists the history, newest first; a commit opens with its changed files and diff", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "Source Explorer").click();
+    const history = page.locator(".history .commit-row .subject");
+    await expect(history).toHaveText([
+      "Drop the blob, add a big file",
+      "Change a, plan the work",
+      "Start the project",
+    ]);
+    await history.nth(1).click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await expect(header(page)).toHaveText(/^[0-9a-f]{7}$/);
+    const changes = page.locator(".change-row");
+    await expect(changes).toHaveText([
+      "Addednotes/latin1.txt",
+      "Addednotes/plan.md",
+      "Addedreadme-link",
+      "Modifiedsrc/a.ts",
+    ]);
+    await expect(page.locator("pre.diff .d-del")).toContainText(["-export const a = 1;"]);
+    await expect(page.locator("pre.diff .d-add")).toContainText(["+export const a = 2;"]);
+    // A changed file opens as it was at that commit.
+    await changes.filter({ hasText: "src/a.ts" }).click();
+    await expect(header(page)).toHaveText("a.ts");
+    await expect(page).toHaveURL(/\/commit\/[0-9a-f]{40}\/file\/src\/a\.ts/);
+    await expect(page.locator("pre.code")).toHaveText("1export const a = 2;");
+  });
+
+  test("File and Source Explorers are enabled once Record Explorer lists a workspace, before any record is open", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await expect(row(page, "Question")).toBeVisible();
+    await expect(explorer(page, "File Explorer")).toBeEnabled();
+    await expect(explorer(page, "Source Explorer")).toBeEnabled();
+  });
+
+  test("with all three sections open, Record Explorer keeps its Items pane inside the sidebar", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
+    await explorer(page, "File Explorer").click();
+    await explorer(page, "Source Explorer").click();
+    await expect(page.locator(".file-tree .tree-row").first()).toBeVisible();
+    const bottom = await sidebar(page).evaluate((el) => el.getBoundingClientRect().bottom);
+    const items = page.locator(".explorer-body .sidebar-section.grow");
+    const box = await items.evaluate((el) => el.getBoundingClientRect());
+    expect(box.height).toBeGreaterThanOrEqual(100);
+    expect(box.bottom).toBeLessThanOrEqual(bottom + 1);
+    await expect(item(page, "Q_1")).toBeInViewport();
+  });
+
+  test("Record Explorer lists the workspace's records and acts, and leaves files and history to their own sections", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await expect(row(page, "Question")).toBeVisible();
+    await expect(row(page, "Act")).toBeVisible();
+    await expect(row(page, "File")).toHaveCount(0);
+    await expect(row(page, "Commit")).toHaveCount(0);
   });
 
   test("in a narrow window, the toggle opens the sidebar over the page, and opening a resource closes it", async ({
@@ -697,6 +792,20 @@ test.describe("when something is not there", () => {
   test("an unknown workspace says so", async ({ page, errors }) => {
     await page.goto("/app/workspace/nowhere");
     await expect(page.locator(".fetch-error")).toContainText("404");
+    errors.length = 0;
+  });
+
+  test("in an unknown workspace, File and Source Explorers say its collections did not load", async ({
+    page,
+    errors,
+  }) => {
+    await page.goto("/app/workspace/nowhere/Q_1");
+    await expect(page.locator(".fetch-error")).toContainText("404");
+    for (const name of ["File Explorer", "Source Explorer"]) {
+      const head = page.getByRole("button", { name, exact: true });
+      await expect(head).toBeDisabled();
+      await expect(head).toHaveAccessibleDescription(/^nowhere's collections did not load: .*404/);
+    }
     errors.length = 0;
   });
 

@@ -38,6 +38,23 @@ HAL root (`Accept: application/hal+json` on `/`, or `/api` through Vite):
 
 The Trace Console starts at `/collections/workspace`.
 
+### Files and history
+
+A workspace serves its committed files and its git history when `workspaces.local.json` maps it to
+a repository (`docs/environment.md`, `LABKIT_WORKSPACES_FILE`). The API reads them from the
+repository with es-git on each request; they are not in the graph. Its index then lists two more
+collections, `file` (type `File`) and `commit` (type `Commit`).
+
+| Path | Serves |
+| --- | --- |
+| `/workspace/{slug}/commit` | The commits from HEAD, newest first, paged by `limit` and `offset`. |
+| `/workspace/{slug}/commit/{id}` | One commit: message, author, time, parents, changed files, and its diff from its first parent, cut at 100,000 characters (`diff_truncated`). |
+| `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). |
+| `/workspace/{slug}/commit/{id}/file/{path}` | The same, at that commit. |
+
+Only committed content is served. A path is looked up in the commit's tree, never on disk. A
+binary file and text that is not UTF-8 are served without content.
+
 ## Trace Console
 
 The browser app's page for the graph, at `/app/<API path>`: `/app/workspace/overlap_bench/Q_1` opens
@@ -56,9 +73,21 @@ The button at the left of the top bar shows or hides the sidebar:
 - In a window 860 px wide or narrower, the sidebar is a drawer over the page, closed until the
   button opens it. Opening a resource closes it.
 
-The browser also keeps whether Record Explorer is folded. File Explorer and Source Explorer are
-disabled, with the reason under each header: no workspace is open, or the open workspace serves no
-files or history. No workspace serves them yet.
+The browser also keeps whether each section is folded. The sections list:
+
+| Section | Lists | Opening an item shows |
+| --- | --- | --- |
+| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. | The file's properties and its text, numbered by line. |
+| Source Explorer | The workspace's commits, newest first. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
+| Record Explorer | The workspace's collections of records and acts, and the items of the one picked. The `file` and `commit` collections are left out. | The record. |
+
+Open sections divide the sidebar's height; Record Explorer, which holds two panes, takes twice the
+share, and its Collections pane scrolls when it is short. The workspace the sections serve is the
+open resource's, or else the one Record Explorer lists. File Explorer and Source Explorer are
+enabled when that workspace's index lists a collection of type `File` or `Commit` ("Files and
+history" above). Otherwise each is disabled, with the reason
+under its header: no workspace is open, the open workspace's index did not load (with the error),
+or the open workspace serves no files or history.
 
 Every resource is requested at `depth=2`, so its neighbours arrive with their properties. The page
 keeps each response as it arrived and draws from them; a resource's own response is the only one

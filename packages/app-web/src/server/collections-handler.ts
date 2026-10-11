@@ -1,5 +1,15 @@
 import { NODE_LABELS, type NodeLabel } from "@labkit/core-db/domain";
-import { ACT_SLUG, ACT_TYPE, collectionPath, LABEL_BY_SLUG, slugFor } from "./collection-paths";
+import {
+  ACT_SLUG,
+  ACT_TYPE,
+  COMMIT_SLUG,
+  COMMIT_TYPE,
+  collectionPath,
+  FILE_SLUG,
+  FILE_TYPE,
+  LABEL_BY_SLUG,
+  slugFor,
+} from "./collection-paths";
 import {
   isRaisedException,
   MAX_DEPTH,
@@ -204,17 +214,25 @@ async function workspaceListing(
   });
 }
 
-// The collection called `name` in one workspace, or its index when it is empty.
+// The collection called `name` in one workspace, or its index when it is empty. The index lists
+// the workspace's files and history only when a repository is mapped to it.
 function serve(
   req: Request,
   scope: TenantScope,
   root: string,
   name: string,
+  hasRepository: boolean,
 ): Promise<Response> | Response {
   if (name === "") {
     const entries = [
       ...NODE_LABELS.map((label) => ({ slug: slugFor(label), type: label as string })),
       { slug: ACT_SLUG, type: ACT_TYPE },
+      ...(hasRepository
+        ? [
+            { slug: FILE_SLUG, type: FILE_TYPE },
+            { slug: COMMIT_SLUG, type: COMMIT_TYPE },
+          ]
+        : []),
     ];
     return index(req, root, entries);
   }
@@ -247,7 +265,8 @@ export async function workspaceCollectionsHandler(
   req: Request,
   scope: TenantScope,
   rest: string,
+  hasRepository: boolean,
 ): Promise<Response> {
   const name = rest.replace(/^\//, "").replace(/\/$/, "");
-  return serve(req, scope, `${publicOrigin(req).origin}${scope.prefix}`, name);
+  return serve(req, scope, `${publicOrigin(req).origin}${scope.prefix}`, name, hasRepository);
 }

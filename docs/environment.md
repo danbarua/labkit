@@ -40,6 +40,12 @@ full `LABKIT_DB_URL` instead.
 | `LABKIT_PORT_POOLER` | PgBouncer. | `6432` |
 | `LABKIT_PORT_ALPHA`, `LABKIT_PORT_BETA` | Two-tenant web fixtures. | `8901`, `8902` |
 
+## Web API
+
+| variable | effect | default |
+| --- | --- | --- |
+| `LABKIT_WORKSPACES_FILE` | A JSON object mapping workspace slugs to git repositories, `{ "<slug>": "<folder>" }`; each folder is absolute or starts with `~/`. A mapped workspace serves its committed files and history. Read once, when the API starts. A missing file maps no workspace; an entry whose folder is not a repository is skipped with a warning. The file is machine-local and ignored by git. | `packages/app-web/workspaces.local.json` |
+
 ## MCP
 
 | variable | effect | default |

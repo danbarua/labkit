@@ -1,11 +1,10 @@
 #!/usr/bin/env bun
 /**
- * The stack the browser tests run against.
- *
- * The API in this process on an in-memory PGlite database with two workspaces, the Vite dev
- * server, and `vite preview` of a fresh production build. Preview starts last, so its being
- * reachable means everything is, and that is the URL Playwright waits on. Nothing outside this
- * machine is needed.
+ * The stack the browser tests run against: the API in this process on an in-memory PGlite
+ * database with two workspaces, a git repository mapped to the first
+ * (`tests/support/git-fixture.ts`) and none to the second, the Vite dev server, and `vite preview`
+ * of a fresh production build. Preview starts last, so its being reachable means everything is,
+ * and that is the URL Playwright waits on. Nothing outside this machine is needed.
  */
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -14,6 +13,7 @@ import path from "node:path";
 import { createRuntime } from "../src/server/runtime";
 import { serve } from "../src/server/serve";
 import { createFixture } from "../tests/support/fixture";
+import { createGitFixture } from "../tests/support/git-fixture";
 
 const port = (name: string, fallback: number) => String(Number(process.env[name] ?? fallback));
 const ports = {
@@ -23,7 +23,11 @@ const ports = {
 };
 
 const fixture = await createFixture("pglite");
-const api = serve(createRuntime(fixture.connections), Number(ports.api));
+const git = await createGitFixture();
+const api = serve(
+  createRuntime(fixture.connections, new Map([["alpha", git.repo]])),
+  Number(ports.api),
+);
 // The bundle goes in a directory of its own, so a test run leaves nothing in the package.
 const built = await mkdtemp(path.join(tmpdir(), "labkit-e2e-"));
 const env = { ...process.env, LABKIT_PORT_WEB: ports.api };
@@ -40,6 +44,7 @@ async function stop(code: number): Promise<never> {
     await Promise.all(children.map((child) => child.exited));
     await api.stop(true);
     await fixture.close();
+    await git.close();
     await rm(built, { recursive: true, force: true });
   }
   process.exit(code);
