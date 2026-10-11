@@ -37,6 +37,20 @@
   --c-act: #8592b0;
   --c-file: #c4b5fd;
   --c-commit: #fb923c;
+  /* File Explorer's icons: its folders, and its files by kind (file-icons.tsx). */
+  --f-folder: #e5b567;
+  --f-markdown: #7dd3fc;
+  --f-json: #fbbf24;
+  --f-config: #c084fc;
+  --f-python: #2dd4bf;
+  --f-javascript: #facc15;
+  --f-typescript: #60a5fa;
+  --f-table: #4ade80;
+  --f-html: #f97316;
+  --f-image: #f472b6;
+  --f-pdf: #f87171;
+  --f-text: var(--text-dim);
+  --f-other: var(--text-faint);
 
   display: flex;
   flex-direction: column;
@@ -485,6 +499,45 @@
 .trace .tree-icon {
   flex: none;
   color: var(--text-dim);
+}
+.trace .tree-icon[data-kind="folder"] {
+  color: var(--f-folder);
+}
+.trace .tree-icon[data-kind="markdown"] {
+  color: var(--f-markdown);
+}
+.trace .tree-icon[data-kind="json"] {
+  color: var(--f-json);
+}
+.trace .tree-icon[data-kind="config"] {
+  color: var(--f-config);
+}
+.trace .tree-icon[data-kind="python"] {
+  color: var(--f-python);
+}
+.trace .tree-icon[data-kind="javascript"] {
+  color: var(--f-javascript);
+}
+.trace .tree-icon[data-kind="typescript"] {
+  color: var(--f-typescript);
+}
+.trace .tree-icon[data-kind="table"] {
+  color: var(--f-table);
+}
+.trace .tree-icon[data-kind="html"] {
+  color: var(--f-html);
+}
+.trace .tree-icon[data-kind="image"] {
+  color: var(--f-image);
+}
+.trace .tree-icon[data-kind="pdf"] {
+  color: var(--f-pdf);
+}
+.trace .tree-icon[data-kind="text"] {
+  color: var(--f-text);
+}
+.trace .tree-icon[data-kind="other"] {
+  color: var(--f-other);
 }
 .trace .caret-space {
   flex: none;

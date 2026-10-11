@@ -4,7 +4,7 @@
  * repository (`docs/architecture.md`, "Files and history").
  */
 
-import { CaretRightIcon, FileTextIcon, FolderIcon, FolderOpenIcon } from "@phosphor-icons/react";
+import { CaretRightIcon, FolderIcon, FolderOpenIcon } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   type CollectionItem,
@@ -15,6 +15,7 @@ import {
   hrefOf,
   keyOf,
 } from "./hal";
+import { fileLook } from "./file-icons";
 import { docOf, requestPath, useDocument, usePages } from "./hal-store";
 import { type LaneRow, lanesOf, widthOf } from "./lanes";
 
@@ -114,7 +115,7 @@ function Directory({
                 onClick={() => toggle(item.key)}
               >
                 <CaretRightIcon className={open ? "caret open" : "caret"} aria-hidden="true" />
-                <Icon className="tree-icon" aria-hidden="true" />
+                <Icon className="tree-icon" data-kind="folder" aria-hidden="true" />
                 <span className="tree-name">{name}</span>
               </button>
               {open ? (
@@ -127,6 +128,9 @@ function Directory({
             </Fragment>
           );
         }
+        const look = fileLook(
+          typeof item.data.media_type === "string" ? item.data.media_type : undefined,
+        );
         return (
           <button
             key={item.key}
@@ -137,7 +141,7 @@ function Directory({
             onClick={() => onOpen(item.key)}
           >
             <span className="caret-space" />
-            <FileTextIcon className="tree-icon" aria-hidden="true" />
+            <look.icon className="tree-icon" data-kind={look.kind} aria-hidden="true" />
             <span className="tree-name">{name}</span>
           </button>
         );
