@@ -136,6 +136,25 @@
 .lk-frame .items-filter::placeholder {
   color: var(--text-faint);
 }
+/* The button that shows or hides a list's filter: a search icon with no border, like the rail's. */
+.lk-frame .filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-faint);
+  font-size: 14px;
+}
+.lk-frame .filter-btn:hover,
+.lk-frame .filter-btn.on {
+  background: var(--panel-2);
+  color: var(--text);
+}
 
 /* The rail: a narrow column of icons at the left edge that stays when the sidebar is hidden. Its
    first button shows or hides the sidebar; the others fold or open one section each. */

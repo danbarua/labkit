@@ -36,7 +36,7 @@ HAL root (`Accept: application/hal+json` on `/`, or `/api` through Vite):
 { id: "labkit", _links: { self: { href: "/" }, start: { href: "/questions/1", name: "Q_1" }, questions: { href: "/questions" }, ... } }
 ```
 
-The Trace Console starts at `/collections/workspace`.
+The web app starts at a list of the workspaces, read from `/workspace`. Everything after that is inside one workspace, so the app reads nothing from `/collections`.
 
 ### Files and history
 
@@ -131,7 +131,7 @@ Text that is not UTF-8, or a binary file of a text type, gets the note.
 
 | Column | Shows |
 |--------|-------|
-| Left | The sidebar, in three sections that fold: File Explorer, Source Explorer, and Record Explorer, which lists two collections: the one picked (`?list=`) and the collection it is listed in. Collections takes at most 40% of Record Explorer and scrolls beyond that; Items has the rest and a filter box that narrows the listed items. |
+| Left | The sidebar, in three sections that fold: File Explorer, Source Explorer, and Record Explorer. In a workspace, Record Explorer lists the workspace's collections and, below, the one picked (`?list=`), or the open collection and the collection it is listed in. Before a workspace is picked it is disabled and says so. Collections takes at most 40% of Record Explorer and scrolls beyond that; Items has the rest. |
 | Centre | The graph, a card that folds: the resources opened in the workspace since its last reset and what they relate to, on a 3D canvas (`GraphView`). Clicking a node opens its resource. Below it, the open resource. Tabs: Overview (properties, then a card for each related resource, outbound then inbound), Debug, drawn as a wrench (the response; the events of the record, or of the acts that ran against the commit, each a line with chips for the records it names; and the commits those acts ran against). `?tab=` names the tab. The tabs and Reload sit at the right of the line with the resource's name. |
 | Right | In development, in a workspace: the agent's chat. At full width it slides open and shut beside a rail that stays; the rail's button expands or minimises it. In a window 860 px wide or narrower it is a drawer over the page from the right, opened by a button in the top bar. Its sessions open in the workspace's folder, which the dev server reads from the workspaces mapping file (`/agent-workspace/<slug>`). A workspace's session connects the first time the chat is shown in that workspace, and stays connected while the chat is hidden; a workspace the chat was never shown in has no session. Each workspace keeps its session for the life of the page: leaving it and coming back reopens that session. `?session=` names the session of the workspace in scope, so a reload reopens it. A workspace the file does not map has no chat, and the button is disabled with the reason. `/new` starts a session in place, and `/sessions` lists the sessions the agent keeps for the workspace's folder (ACP `session/list` by `cwd`), newest first, in a palette; picking one reopens it. `@` offers the workspace's files at HEAD (`/paths`); each file a message mentions is sent with it as a `resource_link` to the file in the workspace's folder (`file://<folder>/<path>`), which the agent reads itself. The border at the chat's left edge moves by drag, by Left and Right (16 px), and by Home and End (to 320 px, and to 60% of the window); a double-click returns it to 400 px, and the browser keeps the width. |
 
@@ -154,9 +154,11 @@ The browser also keeps whether each section is folded. The sections list:
 
 | Section | Lists | Opening an item shows |
 | --- | --- | --- |
-| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. Each file's icon and colour come from its listed `media_type` (`file-icons.tsx`); a file listed without one has the plain file icon. The box that marks the open file slides to the next file opened. | The file, shown as its media type. |
-| Source Explorer | Every branch's commits, newest first, with each branch's line drawn beside them as `git log --graph` draws it, and branch names on the commits they point to. A branch picker opens on HEAD's branch and scrolls to the picked branch's tip. The box that marks the open commit slides to the next commit opened. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
+| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. Each file's icon and colour come from its listed `media_type` (`file-icons.tsx`); a file listed without one has the plain file icon. The box that marks the open file slides to the next file opened. A file opened from anywhere else, such as the graph or a link, opens the folders above it. Its filter lists the files whose paths hold every word typed, from `/paths`, so files in folders not yet opened are found. | The file, shown as its media type. |
+| Source Explorer | Every branch's commits, newest first, with each branch's line drawn beside them as `git log --graph` draws it, and branch names on the commits they point to. A branch picker opens on HEAD's branch and scrolls to the picked branch's tip. The box that marks the open commit slides to the next commit opened. Its filter narrows the commits loaded so far, by id, message, author or branch, and says how many it searched. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
 | Record Explorer | The workspace's collections of records and acts, and the items of the one picked. The `file` and `commit` collections are left out. | The record. |
+
+Items, File Explorer and Source Explorer each have a filter, hidden until the search button at the right of the list's header shows it. Hiding a filter, by its button or by Escape in its box, empties it, so a hidden filter never narrows a list.
 
 Open sections divide the sidebar's height in proportion to their shares. Record Explorer, which
 holds two panes, starts with twice the share of the others, and its Collections pane scrolls when

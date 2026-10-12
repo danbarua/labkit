@@ -15,8 +15,10 @@ import {
   hrefOf,
   keyOf,
 } from "./hal";
+import { filterItems } from "@labkit/ui";
 import { ActiveBox } from "./active-box";
 import { fileLook } from "./file-icons";
+import { usePathsOf } from "./file-paths";
 import { docOf, requestPath, useDocument, usePages } from "./hal-store";
 import { type LaneRow, lanesOf, widthOf } from "./lanes";
 
@@ -55,22 +57,38 @@ function Tail({
   );
 }
 
+/** The keys of the directories above `key` in the tree at `rootKey`, top first; none outside it. */
+export function foldersAbove(rootKey: string, key: string): string[] {
+  if (!key.startsWith(`${rootKey}/`)) return [];
+  const segments = key.slice(rootKey.length + 1).split("/");
+  return segments.slice(0, -1).map((_, i) => `${rootKey}/${segments.slice(0, i + 1).join("/")}`);
+}
+
 /**
  * The workspace's files as a tree, from the directory `rootKey`. A directory's entries are
  * fetched when it is first opened. Clicking a file opens it, and the box around the open file
- * slides to it.
+ * slides to it. When a file in the tree opens from anywhere else, such as the graph or a link, the
+ * directories above it open, so its row and the box show; closing one afterwards keeps it closed.
  */
 export function FileTree({
   rootKey,
   openKey,
   onOpen,
+  term = "",
 }: {
   rootKey: string;
   openKey: string;
   onOpen: (key: string) => void;
+  /** While not blank, the tree is replaced by the files whose paths hold every word of it. */
+  term?: string;
 }) {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
   const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const above = foldersAbove(rootKey, openKey);
+    if (above.length === 0) return;
+    setOpened((was) => (above.every((key) => was.has(key)) ? was : new Set([...was, ...above])));
+  }, [rootKey, openKey]);
   const toggle = (key: string) =>
     setOpened((was) => {
       const now = new Set(was);
@@ -79,9 +97,79 @@ export function FileTree({
     });
   return (
     <div className="file-tree" ref={list}>
-      <ActiveBox list={list} activeKey={openKey} />
-      <Directory dirKey={rootKey} depth={0} {...{ opened, toggle, openKey, onOpen }} />
+      <ActiveBox list={list} activeKey={openKey} rows={term} />
+      {term.trim() === "" ? (
+        <Directory dirKey={rootKey} depth={0} {...{ opened, toggle, openKey, onOpen }} />
+      ) : (
+        <FileMatches {...{ rootKey, term, openKey, onOpen }} />
+      )}
     </div>
+  );
+}
+
+/** The most matches File Explorer's filter draws; it says how many more there are. */
+const MAX_MATCHES = 200;
+/** A match's icon: the list of paths names no media type, and the page maps no extension to one. */
+const PLAIN = fileLook(undefined);
+
+/**
+ * The files at HEAD whose paths hold every word of `term`, from the files API's list of every path
+ * (`paths`), so a file in a folder not yet opened is found too. Each is a row with its folder and
+ * name, which opens it.
+ */
+function FileMatches({
+  rootKey,
+  term,
+  openKey,
+  onOpen,
+}: {
+  rootKey: string;
+  term: string;
+  openKey: string;
+  onOpen: (key: string) => void;
+}) {
+  const listed = usePathsOf(rootKey, "file explorer filter");
+  const matches = useMemo(
+    () =>
+      listed === undefined
+        ? []
+        : filterItems(
+            listed.paths.map((path) => ({ id: path, label: path })),
+            term,
+          ),
+    [listed, term],
+  );
+  if (listed === undefined) return <div className="faint tree-note">Loading the files…</div>;
+  const shown = matches.slice(0, MAX_MATCHES);
+  return (
+    <>
+      <div className="faint tree-note">
+        {matches.length === 0
+          ? `No file's path holds "${term.trim()}".`
+          : `${matches.length} of ${listed.total} files${matches.length > shown.length ? `; the first ${shown.length} shown` : ""}`}
+      </div>
+      {shown.map(({ label: path }) => {
+        const key = listed.keyOf(path);
+        if (key === undefined) return null;
+        const slash = path.lastIndexOf("/");
+        return (
+          <button
+            key={path}
+            type="button"
+            data-key={key}
+            className={key === openKey ? "tree-row active" : "tree-row"}
+            title={path}
+            onClick={() => onOpen(key)}
+          >
+            <PLAIN.icon className="tree-icon" data-kind={PLAIN.kind} aria-hidden="true" />
+            <span className="tree-name">
+              {slash < 0 ? null : <span className="faint">{path.slice(0, slash + 1)}</span>}
+              {path.slice(slash + 1)}
+            </span>
+          </button>
+        );
+      })}
+    </>
   );
 }
 
@@ -214,10 +302,16 @@ export function History({
   historyKey,
   openKey,
   onOpen,
+  term = "",
 }: {
   historyKey: string;
   openKey: string;
   onOpen: (key: string) => void;
+  /**
+   * While not blank, only the loaded commits whose id, message, author or branch names hold every
+   * word of it are drawn, without their lanes, under a line that says how many were searched.
+   */
+  term?: string;
 }) {
   // Any page of the history names the timeline and the branches.
   const history = docOf(useDocument(requestPath(`${historyKey}?limit=1`)));
@@ -262,6 +356,27 @@ export function History({
     [timeline.items],
   );
   const width = widthOf(rows);
+  const filtering = term.trim() !== "";
+  const matching = useMemo(
+    () =>
+      filtering
+        ? new Set(
+            filterItems(
+              timeline.items.map((item) => ({
+                id: item.key,
+                label: String(item.data.name ?? ""),
+                detail: String(item.data.author ?? ""),
+                keywords: [
+                  String(item.id ?? ""),
+                  ...(Array.isArray(item.data.branches) ? item.data.branches.map(String) : []),
+                ].join(" "),
+              })),
+              term,
+            ).map((item) => item.id),
+          )
+        : undefined,
+    [filtering, timeline.items, term],
+  );
   return (
     <div className="history" ref={list}>
       <ActiveBox list={list} activeKey={openKey} />
@@ -277,8 +392,14 @@ export function History({
           </select>
         </label>
       )}
+      {matching === undefined ? null : (
+        <div className="faint tree-note">
+          {`${matching.size} of the ${timeline.items.length} commits loaded match${timeline.next === undefined ? "" : "; load more to search further"}`}
+        </div>
+      )}
       {timeline.items.map((item, i) => {
-        const row = rows[i];
+        if (matching !== undefined && !matching.has(item.key)) return null;
+        const row = matching === undefined ? rows[i] : undefined;
         const id = String(item.id ?? "");
         const names = Array.isArray(item.data.branches) ? item.data.branches.map(String) : [];
         const classes = ["commit-row", "timeline-row"];

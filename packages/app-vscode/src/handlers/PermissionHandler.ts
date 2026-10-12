@@ -6,7 +6,7 @@ import type {
 } from "@agentclientprotocol/sdk";
 import * as vscode from "vscode";
 
-import { diagnosticError } from "@labkit/core-agent/logging";
+import { diagnosticError } from "../utils/redact";
 import { logDiagnostic } from "../utils/Logger";
 
 type Option = RequestPermissionRequest["options"][number];

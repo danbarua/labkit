@@ -402,6 +402,19 @@ describe("collections", () => {
     expect(items[1]._links).toEqual({ self: { href: `${PUBLIC}/workspace/beta` } });
   });
 
+  test("/workspace lists the same workspaces, with no index above it", async () => {
+    for (const path of ["/workspace", "/workspace/"]) {
+      const r = await get(path);
+      expect(r.status).toBe(200);
+      expect(r.type).toBe("application/hal+json");
+      expect(r.body._links.self.href).toBe(`${PUBLIC}/workspace?limit=25&offset=0`);
+      expect(r.body._links.index).toBeUndefined();
+      const items = r.body._embedded.workspace;
+      expect(items.map((i: any) => i.slug)).toEqual(["alpha", "beta"]);
+      expect(items[0]._links).toEqual({ self: { href: `${PUBLIC}/workspace/alpha` } });
+    }
+  });
+
   test("collection links stay in the workspace", async () => {
     const r = await get("/workspace/beta/question");
     for (const href of hrefs(r.body))

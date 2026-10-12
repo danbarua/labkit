@@ -9,7 +9,7 @@ import type {
 } from "@agentclientprotocol/sdk";
 import * as vscode from "vscode";
 
-import { diagnosticError } from "@labkit/core-agent/logging";
+import { diagnosticError } from "../utils/redact";
 import { logDiagnostic } from "../utils/Logger";
 
 /** The editor owns text and saving. Direct disk writes would bypass dirty buffers. */

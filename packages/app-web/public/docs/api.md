@@ -6,15 +6,16 @@ Machine-readable description: [/docs/openapi.json](/docs/openapi.json). Discover
 
 ## Workspaces
 
-Everything below is scoped to a workspace, one research project's graph. There is no default workspace: `/collections/workspace` lists them and every other path names one, as `/workspace/{slug}`:
+Everything below is scoped to a workspace, one research project's graph. There is no default workspace: `/workspace` lists them and every other path names one, as `/workspace/{slug}`:
 
 ```
+GET /workspace                       every workspace
 GET /workspace/{slug}                a workspace's collections, one per node type
 GET /workspace/{slug}/{type}         one collection
 GET /workspace/{slug}/{id}           one entity
 ```
 
-- A workspace is a collection. `/collections/workspace` lists them, and each item's address is the workspace itself. It is offered at the API root only, since workspaces are not nested.
+- A workspace is a collection. `/workspace` lists them, and each item's address is the workspace itself. `/collections/workspace` lists the same workspaces from the API root.
 - A slug that does not exist is a 404. A workspace never falls back to another one's data.
 - Links in a response keep you in the workspace you arrived by. `/workspace/{slug}/{id}` links to `/workspace/{slug}/…`.
 - Inside a workspace a collection and an entity share a path level. A collection name is lower case and a handle is not, so a name is never both.

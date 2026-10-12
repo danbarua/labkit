@@ -13,7 +13,8 @@ const apiPort = Number(process.env.LABKIT_PORT_WEB ?? "8899");
 
 // The paths the API server answers. Vite serves the browser app, and everything here goes to the
 // API process instead, so a change to the routes in `src/server/handler.ts` is a change here.
-const API_PATHS = /^\/(graph|collections|workspace|docs|sitemap\.xml|\.well-known|healthz)(\/|$)/;
+const API_PATHS =
+  /^\/(graph|collections|workspace|docs|sitemap\.xml|\.well-known|healthz)(\/|\?|$)/;
 
 const api = { target: `http://127.0.0.1:${apiPort}` };
 const agent = agentBackend(process.env);
