@@ -1195,6 +1195,10 @@
     width 220ms ease,
     visibility 0s;
 }
+/* While its border is dragged, the chat follows the pointer at once. */
+.trace .chat-sidebar.resizing {
+  transition: none;
+}
 .trace .chat-sidebar > * {
   min-width: var(--chat-width, 400px);
 }

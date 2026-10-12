@@ -1452,4 +1452,39 @@ test.describe("the agent's chat in the Trace Console", () => {
     await expect(chat.locator(".agent-status")).toContainText("ready");
     await expect(page).toHaveURL(/[?&]session=fake-\d+/);
   });
+
+  test("dragging the chat's border widens it, a reload keeps the width, and its keys and double-click move it", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/app/workspace/alpha/Q_1");
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    const width = async () => Math.round((await chat.boundingBox())?.width ?? -1);
+    await expect.poll(width).toBe(400);
+    const border = page.getByRole("separator", { name: "Resize the agent" });
+    const at = await border.boundingBox();
+    if (at === null) throw new Error("the border has no box");
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(at.x + at.width / 2 - 100, at.y + at.height / 2, { steps: 5 });
+    await page.mouse.up();
+    await expect.poll(width).toBe(500);
+
+    await page.reload();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect.poll(width).toBe(500);
+
+    await border.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(width).toBe(484);
+    await page.keyboard.press("Home");
+    await expect.poll(width).toBe(320);
+    await page.keyboard.press("End");
+    await expect.poll(width).toBe(768);
+    await border.dblclick();
+    await expect.poll(width).toBe(400);
+  });
 });

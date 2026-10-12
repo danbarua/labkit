@@ -207,6 +207,21 @@
 .lk-frame .splitter:focus-visible {
   outline: none;
 }
+/* A border between two columns, such as the agent's chat and the page: it takes no width of its own. */
+.lk-frame .splitter.vertical {
+  width: 7px;
+  height: auto;
+  margin: 0 -3px 0 -4px;
+  cursor: col-resize;
+}
+.lk-frame .splitter.vertical::after {
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  right: auto;
+  width: 3px;
+  height: auto;
+}
 
 /* ---------- pages other than the Trace Console: gallery, sessions, replays, errors ---------- */
 .lk-frame .crumb {

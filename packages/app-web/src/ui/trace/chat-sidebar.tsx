@@ -1,11 +1,91 @@
 import { ChatCircleDotsIcon } from "@phosphor-icons/react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { type CSSProperties, lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useSavedNumber } from "../saved-flag";
 
 // The agent exists only in the dev server, so the chat is dev-only: in a production build
 // `import.meta.env.DEV` is false, the import is dropped, and there is no chat to show.
 const AgentChat = import.meta.env.DEV
   ? lazy(() => import("../agent/AgentChat").then((m) => ({ default: m.AgentChat })))
   : undefined;
+
+/** The chat's width until its border is moved, and the least it can be, in pixels. */
+const CHAT_WIDTH = 400;
+const MIN_CHAT = 320;
+/** The most of the window's width the chat can take. */
+const MOST_OF_WINDOW = 0.6;
+/** How far one press of Left or Right moves the chat's border, in pixels. */
+const BORDER_STEP = 16;
+
+/** The widest the chat can be in this window, and never less than its least. */
+const widest = () => Math.max(MIN_CHAT, Math.floor(window.innerWidth * MOST_OF_WINDOW));
+
+/**
+ * The border at the chat's left edge, which a drag or the window splitter pattern's keys move:
+ * Left and Right by BORDER_STEP, Home to the chat's least width, End to its widest. A double-click
+ * returns the chat to CHAT_WIDTH. The browser keeps the width for the next visit.
+ */
+function ChatBorder({
+  width,
+  setWidth,
+  onDragging,
+}: {
+  width: number;
+  setWidth: (next: number) => void;
+  onDragging: (dragging: boolean) => void;
+}) {
+  const drag = useRef<{ x: number; width: number } | undefined>(undefined);
+  const [dragging, setDragging] = useState(false);
+  const place = (next: number) =>
+    setWidth(Math.round(Math.min(Math.max(next, MIN_CHAT), widest())));
+  const stop = () => {
+    drag.current = undefined;
+    setDragging(false);
+    onDragging(false);
+  };
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: an <hr> takes no focus or drag; this is the ARIA window splitter pattern.
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the agent"
+      aria-valuemin={MIN_CHAT}
+      aria-valuemax={widest()}
+      aria-valuenow={width}
+      tabIndex={0}
+      className={dragging ? "splitter vertical dragging" : "splitter vertical"}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        drag.current = { x: e.clientX, width };
+        setDragging(true);
+        onDragging(true);
+      }}
+      onPointerMove={(e) => {
+        const start = drag.current;
+        // The chat is at the right, so dragging the border left widens it.
+        if (start !== undefined) place(start.width + start.x - e.clientX);
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onDoubleClick={() => place(CHAT_WIDTH)}
+      onKeyDown={(e) => {
+        const next =
+          e.key === "ArrowLeft"
+            ? width + BORDER_STEP
+            : e.key === "ArrowRight"
+              ? width - BORDER_STEP
+              : e.key === "Home"
+                ? MIN_CHAT
+                : e.key === "End"
+                  ? widest()
+                  : undefined;
+        if (next === undefined) return;
+        e.preventDefault();
+        place(next);
+      }}
+    />
+  );
+}
 
 /** Whether this build has the agent's chat at all. */
 export const HAS_CHAT = AgentChat !== undefined;
@@ -70,6 +150,8 @@ export function ChatSidebar({
   onStarted: (sessionId: string) => void;
 }) {
   const folder = useWorkspaceFolder(workspace);
+  const [width, setWidth] = useSavedNumber("labkit.trace.chat.width", CHAT_WIDTH);
+  const [resizing, setResizing] = useState(false);
   if (AgentChat === undefined) return null;
   const unavailable =
     folder.kind === "unmapped"
@@ -80,7 +162,14 @@ export function ChatSidebar({
   const shown = expanded && folder.kind === "mapped";
   return (
     <>
-      <aside className={shown ? "chat-sidebar" : "chat-sidebar collapsed"} aria-label="Agent">
+      {shown ? <ChatBorder width={width} setWidth={setWidth} onDragging={setResizing} /> : null}
+      <aside
+        className={["chat-sidebar", shown ? "" : "collapsed", resizing ? "resizing" : ""]
+          .filter(Boolean)
+          .join(" ")}
+        style={{ "--chat-width": `${width}px` } as CSSProperties}
+        aria-label="Agent"
+      >
         {connected && folder.kind === "mapped" ? (
           <Suspense fallback={null}>
             <AgentChat
