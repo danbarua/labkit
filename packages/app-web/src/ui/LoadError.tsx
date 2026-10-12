@@ -1,5 +1,5 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { Bar } from "./Bar";
+import { Frame } from "./chrome/Frame";
 
 /**
  * A page whose data could not be loaded: the header, what went wrong, and ways on from here, so a
@@ -8,8 +8,7 @@ import { Bar } from "./Bar";
 export function LoadError({ error }: { error: unknown }) {
   const router = useRouter();
   return (
-    <>
-      <Bar />
+    <Frame>
       <div className="page">
         <p className="load-error">{error instanceof Error ? error.message : String(error)}</p>
         <p>
@@ -21,6 +20,6 @@ export function LoadError({ error }: { error: unknown }) {
           </Link>
         </p>
       </div>
-    </>
+    </Frame>
   );
 }

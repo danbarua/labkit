@@ -1,11 +1,10 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
-import { Bar } from "../ui/Bar";
+import { Frame } from "../ui/chrome/Frame";
 
 export const Route = createRootRoute({
   component: Outlet,
   notFoundComponent: () => (
-    <>
-      <Bar />
+    <Frame>
       <div className="page">
         <h2>Not found</h2>
         <p>
@@ -14,6 +13,6 @@ export const Route = createRootRoute({
           </Link>
         </p>
       </div>
-    </>
+    </Frame>
   ),
 });
