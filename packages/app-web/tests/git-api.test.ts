@@ -82,6 +82,32 @@ describe("a workspace's index", () => {
 const fileHref = (path: string) => `${ORIGIN}/workspace/alpha/file/${path}`;
 
 describe("a workspace's files", () => {
+  test("the top directory at HEAD links every file's path, a list of the tree's files alone", async () => {
+    const top = await get("/workspace/alpha/file");
+    expect(top.body._links.paths.href).toBe(`${ORIGIN}/workspace/alpha/paths`);
+    const { status, body } = await get("/workspace/alpha/paths");
+    expect(status).toBe(200);
+    expect(body._links.index.href).toBe(`${ORIGIN}/workspace/alpha/file`);
+    expect(body.paths).toContain("README.md");
+    expect(body.paths).toContain("src/a.ts");
+    // Directories are not listed, only the files in them.
+    expect(body.paths).not.toContain("src");
+    expect(body.paths).not.toContain("notes");
+    const byName = new Intl.Collator("en", { sensitivity: "base", numeric: true });
+    expect(body.paths).toEqual([...body.paths].sort(byName.compare));
+    expect(body).toMatchObject({
+      total: body.paths.length,
+      count: body.paths.length,
+      truncated: false,
+    });
+  });
+
+  test("a directory below the top, or the tree at a commit, links no list of paths", async () => {
+    expect((await get("/workspace/alpha/file/src")).body._links.paths).toBeUndefined();
+    const at = await get(`/workspace/alpha/commit/${git.commits[0]}/file`);
+    expect(at.body._links.paths).toBeUndefined();
+  });
+
   test("the top directory at HEAD lists its directories, then its files, by name, case aside", async () => {
     const { status, body } = await get("/workspace/alpha/file");
     expect(status).toBe(200);

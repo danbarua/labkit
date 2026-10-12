@@ -3,7 +3,7 @@ import type {
   PromptCapabilities,
   RequestPermissionOutcome,
 } from "@agentclientprotocol/sdk";
-import { connectSession, type SessionClient } from "@labkit/acp-client";
+import { connectSession, type PromptLink, type SessionClient } from "@labkit/acp-client";
 import type { AttachLimits, ResolveLink } from "@labkit/ui";
 import { initialState, reduce } from "@labkit/view-model";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -157,7 +157,7 @@ export function useAgentSession({
   }, []);
 
   const send = useCallback(
-    (text: string, files: readonly File[]) => {
+    (text: string, files: readonly File[], links: readonly PromptLink[] = []) => {
       if (text.trim() === `/${NEW.name}`) {
         setLeft(sessionId);
         setStarted(undefined);
@@ -171,7 +171,7 @@ export function useAgentSession({
         });
         return;
       }
-      void client.current.prompt(text, files);
+      void client.current.prompt(text, files, links);
     },
     [sessionId],
   );

@@ -1574,4 +1574,35 @@ test.describe("the agent's chat in the Trace Console", () => {
     await expect(page).toHaveURL(new RegExp(`[?&]session=${first}(&|$)`));
     await expect(chat.locator(".agent-status")).toContainText("ready");
   });
+
+  test("@ offers the workspace's files; a mentioned file is sent as a link to it in the agent's folder", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    const prompts: string[] = [];
+    page.on("request", (req) => {
+      const body = req.postData();
+      if (req.url().endsWith("/acp") && body?.includes('"session/prompt"')) prompts.push(body);
+    });
+    await page.goto("/app/workspace/alpha/Q_1");
+    const folder = await page.evaluate(async () => {
+      const res = await fetch("/agent-workspace/alpha");
+      return ((await res.json()) as { cwd: string }).cwd;
+    });
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    const message = chat.getByRole("textbox", { name: "Message" });
+    await message.fill("look at @README.m");
+    await expect(chat.getByRole("option", { name: /README\.md/ })).toBeVisible();
+    await message.press("Enter");
+    await expect(message).toHaveValue(/^look at @README\.md\s*$/);
+    await message.press("Enter");
+    await expect.poll(() => prompts.length).toBe(1);
+    const prompt = JSON.parse(prompts[0] ?? "{}").params.prompt;
+    expect(prompt).toEqual([
+      { type: "text", text: "look at @README.md" },
+      { type: "resource_link", uri: `file://${folder}/README.md`, name: "README.md" },
+    ]);
+  });
 });

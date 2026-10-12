@@ -15,7 +15,7 @@ import * as Client from "effective-acp/client";
 import * as Http from "effective-acp/http";
 import * as Protocol from "effective-acp/protocol";
 import * as V1 from "effective-acp/schema/v1";
-import { type PromptFile, promptBlocks } from "./prompt-blocks";
+import { type PromptFile, type PromptLink, promptBlocks } from "./prompt-blocks";
 
 export interface ConnectOptions {
   /** The agent's ACP endpoint. */
@@ -35,10 +35,11 @@ export interface SessionClient {
   /** What the agent takes in a prompt besides text, as its `initialize` answer advertises it. */
   readonly promptCapabilities: acp.PromptCapabilities;
   /**
-   * Sends a prompt: `text`, and `files` as `promptBlocks` turns them into blocks. Resolves when the
-   * turn has ended; what happened arrives through `onEvent`, as does a file the agent does not take.
+   * Sends a prompt: `text`, `links` and `files` as `promptBlocks` turns them into blocks. Resolves
+   * when the turn has ended; what happened arrives through `onEvent`, as does a file the agent does
+   * not take.
    */
-  prompt(text: string, files?: readonly PromptFile[]): Promise<void>;
+  prompt(text: string, files?: readonly PromptFile[], links?: readonly PromptLink[]): Promise<void>;
   /**
    * Asks the agent to stop the turn (`session/cancel`), then answers every permission request still
    * open as `cancelled`, as ACP requires of a client that cancels a turn. The prompt then resolves
@@ -313,10 +314,10 @@ export async function connectSession(options: ConnectOptions): Promise<SessionCl
   return {
     sessionId: id,
     promptCapabilities,
-    async prompt(text, files = []) {
+    async prompt(text, files = [], links = []) {
       let content: acp.ContentBlock[];
       try {
-        content = await promptBlocks(text, files, promptCapabilities);
+        content = await promptBlocks(text, files, promptCapabilities, links);
       } catch (err) {
         onEvent({ type: "failed", message: describeError(err) });
         return;

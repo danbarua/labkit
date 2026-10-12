@@ -1,4 +1,10 @@
-export { attachmentUri, FileNotTaken, type PromptFile, promptBlocks } from "./prompt-blocks";
+export {
+  attachmentUri,
+  FileNotTaken,
+  type PromptFile,
+  type PromptLink,
+  promptBlocks,
+} from "./prompt-blocks";
 export {
   type ConnectOptions,
   connectSession,

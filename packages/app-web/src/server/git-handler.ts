@@ -59,12 +59,16 @@ const RAW = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/raw\/(.+)$/;
 // The commits that changed a file, from HEAD, `/history/{path}`, or from a commit,
 // `/commit/{id}/history/{path}`.
 const HISTORY = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/history\/(.+)$/;
+// Every file's path in the tree at HEAD, `/paths`.
+const PATHS = /^\/paths\/?$/;
+/** The most paths `/paths` lists; it says how many there are in all. */
+export const MAX_PATHS = 5000;
 // The tree at HEAD, `/file/{path}`, or at a commit, `/commit/{id}/file/{path}`.
 const IN_TREE = /^(?:\/commit\/([0-9a-f]{40}|[0-9a-f]{64}))?\/file(?:\/(.*))?$/;
 
 /** Whether `rest`, the path after `/workspace/{slug}`, names the workspace's files or history. */
 export function isGitPath(rest: string): boolean {
-  return /^\/(commit|file|history|raw|branch|timeline)(\/|$)/.test(rest);
+  return /^\/(commit|file|history|raw|branch|timeline|paths)(\/|$)/.test(rest);
 }
 
 /**
@@ -601,7 +605,14 @@ function typeOf(entry: TreeEntry): string {
  * BY_NAME order. `at` is the tree's address, `/file` or `/commit/{id}/file`; `up` is the parent
  * directory's, or the workspace's for the top.
  */
-function directory(req: Request, tree: Tree, at: string, path: string, up: string): Response {
+function directory(
+  req: Request,
+  tree: Tree,
+  at: string,
+  path: string,
+  up: string,
+  more: Record<string, { href: string }> = {},
+): Response {
   const url = new URL(req.url);
   const limit = pageParam(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = pageParam(url.searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
@@ -617,6 +628,7 @@ function directory(req: Request, tree: Tree, at: string, path: string, up: strin
     _links: {
       self: { href: `${self}?limit=${limit}&offset=${offset}` },
       ...Object.fromEntries(links.map((l) => [l.rel, { href: l.href }])),
+      ...more,
     },
     path,
     offset,
@@ -759,7 +771,16 @@ function inTree(
   const at =
     id === undefined ? `${base}/${FILE_SLUG}` : `${base}/${COMMIT_SLUG}/${id}/${FILE_SLUG}`;
   const path = decodedPath(encoded);
-  if (path === "") return directory(req, tree, at, "", base);
+  // The top of the tree at HEAD links every file's path, which the chat's mentions are made from.
+  if (path === "")
+    return directory(
+      req,
+      tree,
+      at,
+      "",
+      base,
+      id === undefined ? { paths: { href: `${base}/paths` } } : {},
+    );
   const entry = tree.getPath(path);
   if (entry === null) return problem(404, "Not Found", `${path} is not in ${slug} at ${commitId}`);
   const type = typeOf(entry);
@@ -840,6 +861,42 @@ function rawFile(
 }
 
 /**
+ * Every file's path in the tree at HEAD, in BY_NAME order of the whole path: what can be mentioned
+ * in a message to the agent. Directories and submodules are not listed. At most MAX_PATHS are
+ * listed; `total` counts them all, and `truncated` says when some are left out.
+ */
+function filePaths(req: Request, repo: Repository, base: string, slug: string): Response {
+  let tree: Tree;
+  try {
+    tree = repo.getCommit(repo.revparseSingle("HEAD")).tree();
+  } catch (err) {
+    if (isNotFound(err)) return problem(404, "Not Found", `${slug}'s repository has no commits`);
+    throw err;
+  }
+  const paths: string[] = [];
+  const walk = (at: Tree, prefix: string) => {
+    for (const entry of at.iter()) {
+      const kind = entry.type();
+      if (kind === "Tree") walk(repo.getTree(entry.id()), `${prefix}${entry.name()}/`);
+      else if (kind === "Blob") paths.push(`${prefix}${entry.name()}`);
+    }
+  };
+  walk(tree, "");
+  paths.sort((a, b) => BY_NAME.compare(a, b));
+  const listed = paths.slice(0, MAX_PATHS);
+  return halJson(req, {
+    _links: {
+      self: { href: `${base}/paths` },
+      index: { href: `${base}/${FILE_SLUG}` },
+    },
+    total: paths.length,
+    count: listed.length,
+    truncated: listed.length < paths.length,
+    paths: listed,
+  });
+}
+
+/**
  * The workspace's files, git history and branches, read from `repo`, the repository mapped to it,
  * at the paths `isGitPath` names, where `rest` is the path after `/workspace/{slug}`. Without a
  * repository, every such path is not found.
@@ -876,6 +933,7 @@ export async function gitHandler(
   const fileHistoryOf = HISTORY.exec(rest);
   if (fileHistoryOf !== null)
     return fileHistory(req, repo, base, scope.slug, fileHistoryOf[1], fileHistoryOf[2] ?? "");
+  if (PATHS.test(rest)) return filePaths(req, repo, base, scope.slug);
   const tree = IN_TREE.exec(rest);
   if (tree !== null) return inTree(req, repo, base, scope.slug, tree[1], tree[2] ?? "");
   return problem(404, "Not Found", `${rest} names no commit or file in ${scope.slug}`);
