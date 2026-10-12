@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { rotatingFileSink } from "./rotating-file-sink.ts";
-import { redactDiagnostics } from "@labkit/core-agent/logging";
+import { redactDiagnostics } from "./redact";
 
 /** One bounded log set per extension storage directory, across restarts. */
 export function fileDiagnostics(

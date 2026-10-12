@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import { diagnosticError, redactDiagnostics } from "@labkit/core-agent/logging";
+import { diagnosticError, redactDiagnostics } from "./redact";
 import { fileDiagnostics } from "./file-diagnostics";
 
 let output: vscode.OutputChannel | undefined;

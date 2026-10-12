@@ -316,7 +316,6 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "catalog:",
-    "@labkit/core-agent": "workspace:*",
     "@labkit/ui": "workspace:*",
     "@labkit/view-model": "workspace:*",
     "react": "catalog:",

@@ -23,7 +23,6 @@
 "area:agent":
   - changed-files:
       - any-glob-to-any-file:
-          - packages/core-agent/**
           - packages/app-vscode/**
           - packages/acp-fake/**
           - packages/acp-scenarios/**

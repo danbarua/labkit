@@ -17,7 +17,7 @@ import type {
 } from "@agentclientprotocol/sdk";
 import * as vscode from "vscode";
 
-import { diagnosticError } from "@labkit/core-agent/logging";
+import { diagnosticError } from "../utils/redact";
 import { logDiagnostic, registerEnvironmentSecrets } from "../utils/Logger";
 
 export type TerminalDisplay = TerminalOutputResponse & {

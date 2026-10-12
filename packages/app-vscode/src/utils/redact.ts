@@ -1,22 +1,7 @@
-import { getLogger, type LogLevel } from "@logtape/logtape";
-
-// Configuration and sink lifetime belong to the environment, never to a session.
-export {
-  configure,
-  reset,
-  getConsoleSink,
-  getStreamSink,
-  getJsonLinesFormatter,
-  fromAsyncSink,
-  type LogLevel,
-  type LogRecord,
-  type Sink,
-} from "@logtape/logtape";
-
-export type DiagnosticFields = Readonly<Record<string, unknown>>;
-
-/** A caught error, redacted and flattened by {@link diagnosticError}: identity, stack, cause, code. */
-export type DiagnosticError = Readonly<Record<string, unknown>>;
+/**
+ * Redaction for the extension's diagnostics: credential fields and recognizable credential text are
+ * replaced, and every other detail is kept, so a log line still says what failed.
+ */
 
 const secretField =
   /^(?:api[-_]?key|x[-_]api[-_]key|authorization|proxy[-_]authorization|password|client[-_]?secret|access[-_]?token|refresh[-_]?token|id[-_]?token|cookie|set-cookie)$/i;
@@ -78,37 +63,4 @@ export function diagnosticError(
   return detail !== null && typeof detail === "object" && !Array.isArray(detail)
     ? (detail as Record<string, unknown>)
     : { message: detail };
-}
-
-/** Best-effort diagnostics cannot change actor execution or durable decisions. */
-export function diagnostic(
-  category: string,
-  level: LogLevel,
-  event: string,
-  fields: DiagnosticFields = {},
-): void {
-  try {
-    const properties = redactDiagnostics({ ...fields, event }) as Record<string, unknown>;
-    const detail = Object.entries(properties)
-      .filter(([key, value]) => key !== "event" && value !== undefined)
-      .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-      .join(" ");
-    getLogger(["labkit", category]).emit({
-      level,
-      timestamp: Date.now(),
-      rawMessage: event,
-      message: [detail ? `${event} ${detail}` : event],
-      properties,
-    });
-  } catch {
-    // A failing synchronous sink must not become an operation failure.
-    // Async sinks must use LogTape's fromAsyncSink (which handles rejections).
-  }
-}
-
-/** Immutable explicit context; safe for concurrent sessions and browser runtimes. */
-export function diagnosticContext(category: string, context: DiagnosticFields) {
-  const bound = { ...context };
-  return (level: LogLevel, event: string, fields: DiagnosticFields = {}): void =>
-    diagnostic(category, level, event, { ...bound, ...fields });
 }
