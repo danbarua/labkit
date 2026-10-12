@@ -183,6 +183,17 @@ describe("a workspace's files", () => {
     expect(body._links.index.href).toBe(`${commitHref(first)}/file/src`);
   });
 
+  test("a file at a commit links the same path at HEAD when HEAD holds it, and only then", async () => {
+    const first = git.commits[0]!;
+    const kept = await get(`/workspace/alpha/commit/${first}/file/src/a.ts`);
+    expect(kept.body._links.head).toEqual({ href: fileHref("src/a.ts"), type: "File" });
+    // The blob was dropped in a later commit, so HEAD holds no such file.
+    const dropped = await get(`/workspace/alpha/commit/${first}/file/data/blob.bin`);
+    expect(dropped.body._links.head).toBeUndefined();
+    // A file read at HEAD is already there.
+    expect((await get("/workspace/alpha/file/src/a.ts")).body._links.head).toBeUndefined();
+  });
+
   test("a binary file has its size and no text", async () => {
     const { body } = await get(`/workspace/alpha/commit/${git.commits[0]}/file/data/blob.bin`);
     expect(body).toMatchObject({ binary: true, size: 6 });

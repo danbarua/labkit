@@ -61,6 +61,7 @@ import {
   type HalDocument,
   type Held,
   type HeldIndex,
+  hrefOf,
   humanRel,
   itemView,
   keyOf,
@@ -186,6 +187,10 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   const openEntry = useDocument(path === "" ? undefined : resourcePath(path));
   const openDoc = docOf(openEntry);
   const openIsCollection = openDoc !== undefined && typeof openDoc.type !== "string";
+  // File Explorer shows HEAD: a file open at a commit is followed to the same path at HEAD, which
+  // the file links as `head` when HEAD holds it.
+  const headHref = openDoc === undefined ? undefined : hrefOf(openDoc, "head");
+  const fileKey = headHref === undefined ? path : keyOf(headHref);
 
   // Opening what is already open adds no history entry. Opening a resource of another type than
   // the listed collection's lists the collection that one is listed in instead, which closes the
@@ -286,6 +291,7 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
             listKey={listKey}
             root={listKey !== undefined && listKey === workspaceIndex}
             openKey={path}
+            fileKey={fileKey}
             held={held}
             expanded={narrow ? drawer === "items" : sidebarShown}
             onToggle={() =>
@@ -424,6 +430,7 @@ function Lists({
   listKey,
   root,
   openKey,
+  fileKey,
   held,
   expanded,
   onToggle,
@@ -434,6 +441,8 @@ function Lists({
   className: string;
   /** The open workspace's directory, `/workspace/<slug>/`, or undefined when none is open. */
   workspace: string | undefined;
+  /** The key File Explorer marks: the open file, or for a file open at a commit, the same path at HEAD. */
+  fileKey: string;
   /** The collection Record Explorer lists; undefined when no workspace is in scope. */
   listKey: string | undefined;
   root: boolean;
@@ -654,7 +663,7 @@ function Lists({
           {filesKey === undefined ? null : (
             <FileTree
               rootKey={filesKey}
-              openKey={openKey}
+              openKey={fileKey}
               onOpen={onOpen}
               term={filesFilter.term}
             />
