@@ -3,7 +3,9 @@
  * resizable border. A page's root carries `.lk-root` for the palette and `.lk-frame` for these
  * rules; the Trace Console adds `.trace` for its own.
  */
-.lk-frame {
+/* Two classes, so these win over `.lk-root`'s own rules in `@labkit/ui/ui.css`, which the agent's
+   chat loads into the same page. */
+.lk-root.lk-frame {
   --ink: var(--lk-bg);
   --panel: var(--lk-panel);
   --panel-2: var(--lk-panel-2);
@@ -108,20 +110,6 @@
   flex: 1 1 auto;
 }
 
-.lk-frame .dev-links {
-  display: flex;
-  gap: 10px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.lk-frame .dev-links a {
-  color: var(--text-dim);
-  text-decoration: none;
-}
-.lk-frame .dev-links a:hover {
-  color: var(--accent);
-}
-
 .lk-frame .theme-btn {
   display: inline-flex;
   align-items: center;
@@ -160,6 +148,11 @@
   padding: 8px 0;
   border-right: 1px solid var(--line);
   background: var(--panel);
+}
+/* The rail at the right of the page, beside the agent's chat. */
+.lk-frame .rail.right {
+  border-right: 0;
+  border-left: 1px solid var(--line);
 }
 .lk-frame .rail-btn {
   display: flex;

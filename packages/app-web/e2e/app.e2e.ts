@@ -1330,3 +1330,54 @@ test.describe("the agent", () => {
     expect(await page.evaluate(() => (window as unknown as { kept?: boolean }).kept)).toBe(true);
   });
 });
+
+test.describe("the agent's chat in the Trace Console", () => {
+  const rail = (page: import("@playwright/test").Page) =>
+    page.getByRole("navigation", { name: "Agent sidebar" });
+  const chatToggle = (page: import("@playwright/test").Page) =>
+    page.getByRole("button", { name: "Show or hide the agent" });
+
+  test("the chat's rail is at the right in a workspace, and absent outside one or in a build", async ({
+    page,
+  }, info) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    if (info.project.name !== "dev") {
+      await expect(rail(page)).toHaveCount(0);
+      return;
+    }
+    await expect(rail(page)).toBeVisible();
+    const box = await rail(page).boundingBox();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBe(page.viewportSize()?.width);
+    await page.goto("/app/");
+    await expect(page.getByText("Pick a type on the left")).toBeVisible();
+    await expect(rail(page)).toHaveCount(0);
+  });
+
+  test("expanding the chat connects a session and names it in the address; minimising keeps it", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.goto("/app/workspace/alpha/Q_1");
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect(chat.getByRole("textbox", { name: "Message" })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]session=fake-\d+/);
+    const named = new URL(page.url()).searchParams.get("session");
+
+    await chatToggle(page).click();
+    await expect(chat).toBeHidden();
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    expect(new URL(page.url()).searchParams.get("session")).toBe(named);
+
+    // Opening a record keeps the session in the address, and a reload reopens it.
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    expect(new URL(page.url()).searchParams.get("session")).toBe(named);
+    await page.reload();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    expect(new URL(page.url()).searchParams.get("session")).toBe(named);
+  });
+});

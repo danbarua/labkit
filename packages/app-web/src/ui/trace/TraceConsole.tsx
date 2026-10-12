@@ -32,7 +32,7 @@ import {
   WrenchIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   type CSSProperties,
   type ReactNode,
@@ -82,6 +82,7 @@ import {
 } from "./hal-store";
 import { FileTree, History } from "./explorers";
 import { ActiveBox } from "./active-box";
+import { ChatSidebar, HAS_CHAT } from "./chat-sidebar";
 import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
@@ -152,9 +153,11 @@ export interface TraceConsoleProps {
   /** The API path of the collection the left column lists, when one was picked. */
   list: string | undefined;
   tab: Tab;
+  /** The agent's session the chat reopens, when the address names one. */
+  session: string | undefined;
 }
 
-export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
+export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   const navigate = useNavigate();
   const [theme] = useSavedTheme();
   const [drawer, setDrawer] = useState<"items" | undefined>();
@@ -162,6 +165,19 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   // window it is a drawer over the page, closed until opened.
   const [sidebarShown, setSidebarShown] = useSavedFlag("labkit.trace.sidebar", true);
   const narrow = useMediaQuery(NARROW);
+  // The agent's chat at the right: expanded or minimised, as this browser last left it. Its session
+  // connects the first time it is expanded on this page.
+  const [chatShown, setChatShown] = useSavedFlag("labkit.trace.chat", false);
+  const [chatConnected, setChatConnected] = useState(chatShown);
+  const toggleChat = () => {
+    setChatShown(!chatShown);
+    setChatConnected(true);
+  };
+  const onChatStarted = useCallback(
+    (started: string) =>
+      void navigate({ to: ".", search: (s) => ({ ...s, session: started }), replace: true }),
+    [navigate],
+  );
   const [graphOpen, setGraphOpen] = useState(true);
   const explored = useExplored(path);
   const workspace = workspaceOf(path);
@@ -209,16 +225,19 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const home = () => {
     setDrawer(undefined);
     store.load(requestPath(ENTRY), true);
-    void navigate({ to: "/$", params: { _splat: "" }, search: {} });
+    // The chat's session is kept: it belongs to the agent's directory, not to a workspace.
+    void navigate({ to: "/$", params: { _splat: "" }, search: { session } });
   };
 
   const listKey = openIsCollection ? path : (list ?? ENTRY);
+  // The workspace of the open resource, or else of the collection Record Explorer lists.
+  const scope = workspace ?? workspaceOf(`${listKey}/`);
   const prose = proseFor(held, path, open);
 
   return (
     <IconContext.Provider value={ICONS}>
       <div className="lk-root lk-frame trace" data-theme={theme === "system" ? undefined : theme}>
-        <TopBar onHome={home} end={import.meta.env.DEV ? <DevLinks /> : null} />
+        <TopBar onHome={home} />
 
         <div className="body">
           <button
@@ -234,8 +253,7 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
               drawer === "items" ? "open" : "",
               sidebarShown ? "" : "collapsed",
             ].join(" ")}
-            // The workspace of the open resource, or else of the collection Record Explorer lists.
-            workspace={workspace ?? workspaceOf(`${listKey}/`)}
+            workspace={scope}
             listKey={listKey}
             root={listKey === ENTRY}
             openKey={path}
@@ -281,21 +299,18 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
               />
             </div>
           </main>
+          {HAS_CHAT && scope !== undefined ? (
+            <ChatSidebar
+              expanded={chatShown}
+              onToggle={toggleChat}
+              connected={chatConnected}
+              sessionId={session}
+              onStarted={onChatStarted}
+            />
+          ) : null}
         </div>
       </div>
     </IconContext.Provider>
-  );
-}
-
-/** Pages that exist only in development; a host with no address bar reaches them from here. */
-function DevLinks() {
-  return (
-    <nav className="dev-links" aria-label="Development pages">
-      {/* A full page load: the agent page keeps the session it has open, and this starts one. */}
-      <Link to="/agent/{-$sessionId}" params={{ sessionId: undefined }} reloadDocument>
-        agent
-      </Link>
-    </nav>
   );
 }
 

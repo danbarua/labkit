@@ -40,6 +40,7 @@
   height: 100vh;
 }
 @media (prefers-reduced-motion: reduce) {
+  .trace .chat-sidebar,
   .trace .spinner,
   .trace .skeleton .bar,
   .trace .active-box,
@@ -1178,6 +1179,34 @@
   border: 0;
 }
 
+/* ---------- the agent's chat, at the right ---------- */
+/* It slides shut to nothing and then leaves the tab order, as the left sidebar does. Its contents
+   keep their width, so they are cut off at its edge rather than squeezed. */
+.trace .chat-sidebar {
+  flex: 0 0 auto;
+  width: var(--chat-width, 400px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  transition:
+    width 220ms ease,
+    visibility 0s;
+}
+.trace .chat-sidebar > * {
+  min-width: var(--chat-width, 400px);
+}
+.trace .chat-sidebar.collapsed {
+  width: 0;
+  border-left-width: 0;
+  visibility: hidden;
+  transition:
+    width 220ms ease,
+    visibility 0s 220ms;
+}
+
 /* ---------- full width: the sidebar is shown or hidden ---------- */
 @media (min-width: 861px) {
   /* The sidebar slides shut to nothing and then leaves the tab order. Its contents keep their width,
@@ -1208,9 +1237,6 @@
 
 /* ---------- narrow windows: the side column becomes a drawer ---------- */
 @media (max-width: 860px) {
-  .trace .dev-links {
-    display: none;
-  }
   .trace .scrim.open {
     display: block;
   }

@@ -6,6 +6,8 @@ interface Search {
   list?: string | undefined;
   /** The centre column's tab, when it is not the overview. */
   tab?: Exclude<Tab, "overview"> | undefined;
+  /** The agent's session the chat reopens. */
+  session?: string | undefined;
 }
 
 // Every path the other routes leave is an API path, opened in the Trace Console: `/app/workspace/w/Q_1`
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/$")({
     return {
       list: typeof search.list === "string" ? search.list : undefined,
       tab: search.tab === "debug" ? search.tab : undefined,
+      session: typeof search.session === "string" ? search.session : undefined,
     };
   },
   component: Page,
@@ -28,6 +31,13 @@ export const Route = createFileRoute("/$")({
 
 function Page() {
   const { _splat } = Route.useParams();
-  const { list, tab } = Route.useSearch();
-  return <TraceConsole path={_splat ? `/${_splat}` : ""} list={list} tab={tab ?? "overview"} />;
+  const { list, tab, session } = Route.useSearch();
+  return (
+    <TraceConsole
+      path={_splat ? `/${_splat}` : ""}
+      list={list}
+      tab={tab ?? "overview"}
+      session={session}
+    />
+  );
 }
