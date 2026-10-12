@@ -1,24 +1,9 @@
 /*
  * The Trace Console. Every rule is under `.trace`, the page's root, which also carries `.lk-root`
- * for the Labkit palette; the names below alias it.
+ * for the Labkit palette and `.lk-frame` for the chrome in `../chrome/chrome.css`, whose short
+ * names for the palette these rules use.
  */
 .trace {
-  --ink: var(--lk-bg);
-  --panel: var(--lk-panel);
-  --panel-2: var(--lk-panel-2);
-  --line: var(--lk-line);
-  --text: var(--lk-text);
-  --text-dim: var(--lk-muted);
-  --text-faint: var(--lk-faint);
-  --accent: var(--lk-accent);
-  --accent-dim: var(--lk-accent-dim);
-  --danger: var(--lk-danger);
-  --primary: var(--lk-primary);
-  --primary-foreground: var(--lk-primary-text);
-  --font-sans: var(--lk-font-sans);
-  --font-mono: var(--lk-font-mono);
-  --font-wordmark: var(--lk-font-wordmark);
-
   --c-question: #a78bfa;
   --c-lineofenquiry: #7c9bf5;
   --c-decision: #f0a13a;
@@ -52,39 +37,7 @@
   --f-text: var(--text-dim);
   --f-other: var(--text-faint);
 
-  display: flex;
-  flex-direction: column;
   height: 100vh;
-  background: var(--ink);
-  color: var(--text);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.trace * {
-  box-sizing: border-box;
-}
-.trace button,
-.trace input {
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-}
-.trace button {
-  cursor: pointer;
-}
-.trace a {
-  color: inherit;
-}
-.trace ::selection {
-  background: var(--accent-dim);
-}
-.trace :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 3px;
 }
 @media (prefers-reduced-motion: reduce) {
   .trace .spinner,
@@ -95,16 +48,6 @@
     animation: none;
     transition: none;
   }
-}
-
-.trace .mono {
-  font-family: var(--font-mono);
-}
-.trace .dim {
-  color: var(--text-dim);
-}
-.trace .faint {
-  color: var(--text-faint);
 }
 
 /* ---------- badges ---------- */
@@ -204,89 +147,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* ---------- topbar ---------- */
-.trace .topbar {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 16px;
-  height: 52px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
-}
-/* The brand is the link to the workspaces. */
-.trace .brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--text);
-  font-size: inherit;
-  white-space: nowrap;
-}
-.trace .brand:hover {
-  background: var(--panel-2);
-}
-.trace .brand-mark {
-  width: 21px;
-  height: 23.6px;
-  flex: 0 0 auto;
-}
-.trace .brand-name {
-  font-family: var(--font-wordmark, inherit);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.trace .topbar-gap {
-  flex: 1 1 auto;
-}
-
-.trace .dev-links {
-  display: flex;
-  gap: 10px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.trace .dev-links a {
-  color: var(--text-dim);
-  text-decoration: none;
-}
-.trace .dev-links a:hover {
-  color: var(--accent);
-}
-
-.trace .theme-btn {
-  display: inline-flex;
-  align-items: center;
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  padding: 6px 8px;
-  color: var(--text-dim);
-}
-.trace .theme-btn:hover {
-  background: var(--panel-2);
-  color: var(--text);
-}
-.trace .items-filter {
-  width: 100%;
-  margin-bottom: 6px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 4px 8px;
-  color: var(--text);
-  font-size: 12.5px;
-}
-.trace .items-filter::placeholder {
-  color: var(--text-faint);
-}
-
 /* ---------- body layout ---------- */
 .trace .body {
   flex: 1 1 auto;
@@ -294,43 +154,6 @@
   min-height: 0;
 }
 
-/* The rail: a narrow column of icons at the left edge that stays when the sidebar is hidden. Its
-   first button shows or hides the sidebar; the others fold or open one section each. */
-.trace .rail {
-  flex: 0 0 44px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0;
-  border-right: 1px solid var(--line);
-  background: var(--panel);
-}
-.trace .rail-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--text-dim);
-  font-size: 18px;
-}
-.trace .rail-btn:hover:not(:disabled) {
-  background: var(--panel-2);
-  color: var(--text);
-}
-.trace .rail-btn.on {
-  background: var(--accent-dim);
-  color: var(--text);
-}
-.trace .rail-btn:disabled {
-  color: var(--text-faint);
-  cursor: default;
-}
 .trace .sidebar {
   flex: 0 0 288px;
   width: 288px;
@@ -365,34 +188,6 @@
 }
 .trace .explorer-top {
   flex: none;
-}
-/* The border between two open sections, which a drag moves. It lies over the border and takes no
-   height of its own, and shows the accent while it is hovered, dragged or focused. */
-.trace .splitter {
-  flex: none;
-  position: relative;
-  z-index: 3;
-  height: 7px;
-  margin: -4px 0 -3px;
-  cursor: row-resize;
-  touch-action: none;
-}
-.trace .splitter::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 2px;
-  height: 3px;
-  transition: background-color 120ms ease;
-}
-.trace .splitter:hover::after,
-.trace .splitter.dragging::after,
-.trace .splitter:focus-visible::after {
-  background: var(--accent);
-}
-.trace .splitter:focus-visible {
-  outline: none;
 }
 .trace .explorer-body {
   flex: 1 1 auto;

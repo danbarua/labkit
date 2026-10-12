@@ -12,7 +12,7 @@ import { initialState, reduce } from "@labkit/view-model";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
-import { Bar } from "./Bar";
+import { Frame } from "./chrome/Frame";
 import { useSavedTheme } from "./saved-theme";
 
 type Status = "connecting" | "ready" | "failed";
@@ -177,8 +177,7 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
     void navigate({ to: "/agent/{-$sessionId}", params: { sessionId: started }, replace: true });
   }, [started, navigate]);
   return (
-    <>
-      <Bar />
+    <Frame>
       <div style={{ padding: "8px 16px", color: "var(--text-dim)", fontSize: 12 }}>
         {real ? (
           `Agent (${status})`
@@ -220,6 +219,6 @@ export default function AgentSession({ sessionId }: { sessionId?: string }) {
           resolveLink={resolveLink}
         />
       </div>
-    </>
+    </Frame>
   );
 }

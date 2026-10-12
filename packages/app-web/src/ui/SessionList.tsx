@@ -3,7 +3,7 @@ import { listSessions } from "@labkit/acp-client";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
-import { Bar } from "./Bar";
+import { Frame } from "./chrome/Frame";
 
 type Listed =
   | { kind: "loading" }
@@ -52,10 +52,7 @@ export default function SessionList() {
   }, []);
 
   return (
-    <>
-      <Bar>
-        <code className="crumb">sessions</code>
-      </Bar>
+    <Frame bar={<code className="crumb">sessions</code>}>
       <div className="page">
         {listed.kind === "loading" ? null : listed.kind === "not_listed" ? (
           <p>This agent does not list its sessions.</p>
@@ -98,6 +95,6 @@ export default function SessionList() {
           </table>
         )}
       </div>
-    </>
+    </Frame>
   );
 }

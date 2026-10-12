@@ -1,12 +1,12 @@
 import { FIXTURES } from "@labkit/acp-scenarios";
-import { Conversation, ThemeToggle } from "@labkit/ui";
+import { Conversation } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import type { TranscriptState } from "@labkit/view-model";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Bar } from "./Bar";
+import { Frame } from "./chrome/Frame";
 import { BuildingBlocks } from "./BuildingBlocks";
 import { useSavedTheme } from "./saved-theme";
 import { type TranscriptEntry, transcriptList, transcriptState } from "./transcripts-api";
@@ -22,7 +22,7 @@ import { type TranscriptEntry, transcriptList, transcriptState } from "./transcr
 export default function Gallery() {
   const [entries, setEntries] = useState<readonly TranscriptEntry[]>(FIXTURES);
   const [states, setStates] = useState<Record<string, TranscriptState>>({});
-  const [theme, setTheme] = useSavedTheme();
+  const [theme] = useSavedTheme();
   const [recorded, setRecorded] = useState<ReadonlySet<string>>(new Set());
   // Why a card, or the list of recorded transcripts, could not be loaded, by id ("" for the list).
   const [failures, setFailures] = useState<Readonly<Record<string, string>>>({});
@@ -56,12 +56,7 @@ export default function Gallery() {
   }, []);
 
   return (
-    <>
-      <Bar>
-        <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-          <ThemeToggle theme={theme} onChange={setTheme} className="theme-toggle" />
-        </span>
-      </Bar>
+    <Frame>
       <div
         style={{
           flex: 1,
@@ -109,6 +104,6 @@ export default function Gallery() {
           );
         })}
       </div>
-    </>
+    </Frame>
   );
 }

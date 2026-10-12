@@ -86,6 +86,31 @@ test.describe("getting around", () => {
     await expect(bar).not.toContainText("live");
   });
 
+  test("the top bar links to no gallery or sessions page", async ({ page }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    const bar = page.locator(".topbar");
+    await expect(bar.getByRole("button", { name: "LabKit" })).toBeVisible();
+    await expect(bar.getByRole("link", { name: "gallery" })).toHaveCount(0);
+    await expect(bar.getByRole("link", { name: "sessions" })).toHaveCount(0);
+  });
+
+  test("the sessions page has the same top bar as the Trace Console, with the theme button at its right", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the sessions page exists only in development");
+    await page.goto("/app/gallery/sessions");
+    const bar = page.locator(".topbar");
+    await expect(bar.getByRole("link", { name: "LabKit" })).toBeVisible();
+    const theme = bar.getByRole("button", { name: /^Theme:/ });
+    await expect(theme).toBeVisible();
+    const barBox = await bar.boundingBox();
+    const themeBox = await theme.boundingBox();
+    expect(
+      (barBox?.x ?? 0) + (barBox?.width ?? 0) - ((themeBox?.x ?? 0) + (themeBox?.width ?? 0)),
+    ).toBeLessThan(24);
+    expect(await bar.evaluate((e) => getComputedStyle(e).height)).toBe("52px");
+  });
+
   test("the Items filter narrows the listed items", async ({ page }) => {
     await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
     await expect(item(page, "Q_2")).toBeVisible();

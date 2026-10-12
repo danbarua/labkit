@@ -1,9 +1,9 @@
-import { Conversation, ThemeToggle } from "@labkit/ui";
+import { Conversation } from "@labkit/ui";
 import { RECORD_TYPES } from "./record-types";
 import "@labkit/ui/ui.css";
 import type { TranscriptState } from "@labkit/view-model";
 import { type ReactNode, useMemo, useState } from "react";
-import { Bar } from "./Bar";
+import { Frame } from "./chrome/Frame";
 import { type Recording, usePlayback } from "./playback";
 import { useSavedTheme } from "./saved-theme";
 
@@ -24,15 +24,9 @@ export function Page({
   children: ReactNode;
 }) {
   return (
-    <>
-      <Bar>
-        <code className="crumb">{crumb}</code>
-        <span style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
-          {controls}
-        </span>
-      </Bar>
+    <Frame bar={<code className="crumb">{crumb}</code>} end={controls}>
       {children}
-    </>
+    </Frame>
   );
 }
 
@@ -44,7 +38,7 @@ export function Replay({ crumb, recording }: { crumb: string; recording: Recordi
   // `?from=N` opens the session as it stood after N events, ready to play on from there.
   const from = Number(new URLSearchParams(window.location.search).get("from") ?? Number.NaN);
   const playback = usePlayback(recording, Number.isFinite(from) ? from : undefined);
-  const [theme, setTheme] = useSavedTheme();
+  const [theme] = useSavedTheme();
   const [picked, setPicked] = useState<ReadonlyMap<string, string | boolean>>(new Map());
   const state: TranscriptState = useMemo(
     () => ({
@@ -82,7 +76,6 @@ export function Replay({ crumb, recording }: { crumb: string; recording: Recordi
         {playback.applied} / {playback.total}
         {recording.at === undefined ? " · no times recorded" : ""}
       </span>
-      <ThemeToggle theme={theme} onChange={setTheme} className="theme-toggle" />
     </>
   );
 

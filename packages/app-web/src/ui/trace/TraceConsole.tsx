@@ -5,7 +5,7 @@
  * pasted link opens it again.
  */
 
-import { ContentCard, ICONS, JsonView, ThemeToggle } from "@labkit/ui";
+import { ContentCard, ICONS, JsonView } from "@labkit/ui";
 import "@labkit/ui/content.css";
 import {
   ArrowClockwiseIcon,
@@ -32,8 +32,6 @@ import {
   WrenchIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import markUrl from "@labkit/design/mark.svg";
-import "@labkit/design/tokens.css";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   type CSSProperties,
@@ -48,6 +46,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { TopBar } from "../chrome/Frame";
 import { useSavedFlag, useSavedNumber } from "../saved-flag";
 import { useSavedTheme } from "../saved-theme";
 import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
@@ -157,7 +156,7 @@ export interface TraceConsoleProps {
 
 export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
   const navigate = useNavigate();
-  const [theme, setTheme] = useSavedTheme();
+  const [theme] = useSavedTheme();
   const [drawer, setDrawer] = useState<"items" | undefined>();
   // At full width the sidebar is shown or hidden, as this browser last left it; in a narrow
   // window it is a drawer over the page, closed until opened.
@@ -218,16 +217,8 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
 
   return (
     <IconContext.Provider value={ICONS}>
-      <div className="lk-root trace" data-theme={theme === "system" ? undefined : theme}>
-        <header className="topbar">
-          <button type="button" className="brand" title="Back to the workspaces" onClick={home}>
-            <img className="brand-mark" src={markUrl} alt="" />
-            <span className="brand-name">LabKit</span>
-          </button>
-          <span className="topbar-gap" />
-          {import.meta.env.DEV ? <DevLinks /> : null}
-          <ThemeToggle theme={theme} onChange={setTheme} className="theme-btn" />
-        </header>
+      <div className="lk-root lk-frame trace" data-theme={theme === "system" ? undefined : theme}>
+        <TopBar onHome={home} end={import.meta.env.DEV ? <DevLinks /> : null} />
 
         <div className="body">
           <button
@@ -300,8 +291,6 @@ export function TraceConsole({ path, list, tab }: TraceConsoleProps) {
 function DevLinks() {
   return (
     <nav className="dev-links" aria-label="Development pages">
-      <Link to="/gallery">gallery</Link>
-      <Link to="/gallery/sessions">sessions</Link>
       {/* A full page load: the agent page keeps the session it has open, and this starts one. */}
       <Link to="/agent/{-$sessionId}" params={{ sessionId: undefined }} reloadDocument>
         agent

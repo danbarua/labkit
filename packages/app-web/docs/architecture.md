@@ -89,6 +89,15 @@ link beside it has the rest:
 | A file | `commit:changes` | the commits that changed it | `history` |
 | An act | `ran_against:commit` | its `git_hash`, when the workspace's repository holds it | — |
 
+## Pages and their chrome
+
+Every page of the app, the Trace Console and the development pages (the gallery, the sessions list,
+session replays and the agent), shares one frame: `src/ui/chrome/Frame.tsx` and `chrome.css`. The
+frame gives a page the palette, the top bar and the resizable border. The theme is one setting
+(`useSavedTheme`) that every component reads, so the button in the top bar and the content agree.
+The development pages have no link in the Trace Console, except `agent`, and are reached by their
+addresses.
+
 ## Trace Console
 
 The browser app's page for the graph, at `/app/<API path>`: `/app/workspace/overlap_bench/Q_1` opens
