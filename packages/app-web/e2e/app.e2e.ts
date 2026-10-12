@@ -137,12 +137,21 @@ test.describe("getting around", () => {
     expect(await bar.evaluate((e) => getComputedStyle(e).height)).toBe("52px");
   });
 
-  test("the Items filter narrows the listed items", async ({ page }) => {
+  test("the Items filter is hidden behind a search button; it narrows the items, and Escape hides and empties it", async ({
+    page,
+  }) => {
     await page.goto(`/app/workspace/alpha/Q_1?${list("/workspace/alpha/question")}`);
     await expect(item(page, "Q_2")).toBeVisible();
-    await page.getByRole("textbox", { name: "Filter the items" }).fill("Q_2");
+    const box = page.getByRole("textbox", { name: "Filter the items" });
+    await expect(box).toHaveCount(0);
+    await page.getByRole("button", { name: "Filter the items" }).click();
+    await expect(box).toBeFocused();
+    await box.fill("Q_2");
     await expect(item(page, "Q_2")).toBeVisible();
     await expect(item(page, "Q_1")).toHaveCount(0);
+    await box.press("Escape");
+    await expect(box).toHaveCount(0);
+    await expect(item(page, "Q_1")).toBeVisible();
   });
 
   test("in a short window, Collections takes at most 40% of Record Explorer and Items keeps the rest", async ({
@@ -415,6 +424,36 @@ test.describe("the sidebar", () => {
     await expect
       .poll(async () => (await top(tree.locator(".active-box.outline"))) - (await top(row)))
       .toBe(0);
+  });
+
+  test("File Explorer's filter finds a file in a folder not yet opened, and opens it", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    await page.getByRole("button", { name: "Filter the files" }).click();
+    await page.getByRole("textbox", { name: "Filter the files" }).fill("plan");
+    await expect(tree.locator(".tree-note")).toContainText(/^1 of \d+ files$/);
+    await tree.getByRole("button", { name: "notes/plan.md" }).click();
+    await expect(header(page)).toHaveText("plan.md");
+    await expect(tree.getByRole("button", { name: "notes/plan.md" })).toHaveClass(/active/);
+  });
+
+  test("Source Explorer's filter narrows the loaded commits and says how many it searched", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "Source Explorer").click();
+    const history = page.locator(".history");
+    await expect(history.locator(".commit-row")).not.toHaveCount(0);
+    const loaded = await history.locator(".commit-row").count();
+    await page.getByRole("button", { name: "Filter the commits" }).click();
+    await page.getByRole("textbox", { name: "Filter the commits" }).fill("side work");
+    await expect(history.locator(".commit-row .subject")).toHaveText(["Side work"]);
+    await expect(history.locator(".tree-note")).toContainText(
+      `1 of the ${loaded} commits loaded match`,
+    );
   });
 
   test("in Source Explorer, a box marks the open commit and slides to the next one opened", async ({

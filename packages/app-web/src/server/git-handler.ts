@@ -862,7 +862,8 @@ function rawFile(
 
 /**
  * Every file's path in the tree at HEAD, in BY_NAME order of the whole path: what can be mentioned
- * in a message to the agent. Directories and submodules are not listed. At most MAX_PATHS are
+ * in a message to the agent, and what File Explorer's filter searches. The templated `file` link
+ * names each path's file. Directories and submodules are not listed. At most MAX_PATHS are
  * listed; `total` counts them all, and `truncated` says when some are left out.
  */
 function filePaths(req: Request, repo: Repository, base: string, slug: string): Response {
@@ -888,6 +889,9 @@ function filePaths(req: Request, repo: Repository, base: string, slug: string): 
     _links: {
       self: { href: `${base}/paths` },
       index: { href: `${base}/${FILE_SLUG}` },
+      // Each listed path's file, by RFC 6570 reserved expansion: the path's slashes are kept and
+      // each segment is percent-encoded.
+      file: { href: `${base}/${FILE_SLUG}/{+path}`, templated: true },
     },
     total: paths.length,
     count: listed.length,

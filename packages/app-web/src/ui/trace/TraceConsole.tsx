@@ -83,6 +83,7 @@ import {
 import { FileTree, History } from "./explorers";
 import { ActiveBox } from "./active-box";
 import { ChatButton, ChatSidebar, useChat } from "./chat-sidebar";
+import { FilterBox, FilterButton, useFilter } from "./filter";
 import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
@@ -423,8 +424,11 @@ function Lists({
   onOpen: (key: string) => void;
   onList: (key: string) => void;
 }) {
-  // Narrows the Items pane to the items whose text holds it.
-  const [term, setTerm] = useState("");
+  // Each list's filter, hidden until its search button shows it.
+  const itemsFilter = useFilter();
+  const term = itemsFilter.term;
+  const filesFilter = useFilter();
+  const commitsFilter = useFilter();
   const listEntry = useDocument(requestPath(listKey));
   // Until the picked collection's first page arrives, the collection it was picked from stays the
   // upper one, so the upper pane does not show the picked collection and then swap back.
@@ -606,9 +610,25 @@ function Lists({
           grow={filesGrow}
           sectionRef={filesSection}
           scrolls
+          actions={
+            <FilterButton what="files" shown={filesFilter.shown} onToggle={filesFilter.toggle} />
+          }
         >
+          {filesFilter.shown ? (
+            <FilterBox
+              what="files"
+              term={filesFilter.term}
+              setTerm={filesFilter.setTerm}
+              onHide={filesFilter.hide}
+            />
+          ) : null}
           {filesKey === undefined ? null : (
-            <FileTree rootKey={filesKey} openKey={openKey} onOpen={onOpen} />
+            <FileTree
+              rootKey={filesKey}
+              openKey={openKey}
+              onOpen={onOpen}
+              term={filesFilter.term}
+            />
           )}
         </Explorer>
         {splitterAfter(filesSection)}
@@ -621,9 +641,29 @@ function Lists({
           grow={historyGrow}
           sectionRef={historySection}
           scrolls
+          actions={
+            <FilterButton
+              what="commits"
+              shown={commitsFilter.shown}
+              onToggle={commitsFilter.toggle}
+            />
+          }
         >
+          {commitsFilter.shown ? (
+            <FilterBox
+              what="commits"
+              term={commitsFilter.term}
+              setTerm={commitsFilter.setTerm}
+              onHide={commitsFilter.hide}
+            />
+          ) : null}
           {historyKey === undefined ? null : (
-            <History historyKey={historyKey} openKey={openKey} onOpen={onOpen} />
+            <History
+              historyKey={historyKey}
+              openKey={openKey}
+              onOpen={onOpen}
+              term={commitsFilter.term}
+            />
           )}
         </Explorer>
         {splitterAfter(historySection)}
@@ -659,21 +699,27 @@ function Lists({
           <div className="sidebar-section grow">
             <div className="section-label">
               Items
-              <span className="count">
-                {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
+              <span className="label-end">
+                <span className="count">
+                  {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
+                </span>
+                {lowerKey === undefined ? null : (
+                  <FilterButton
+                    what="items"
+                    shown={itemsFilter.shown}
+                    onToggle={itemsFilter.toggle}
+                  />
+                )}
               </span>
             </div>
-            {lowerKey === undefined ? null : (
-              <input
-                type="text"
-                className="items-filter"
-                placeholder="Filter items…"
-                autoComplete="off"
-                aria-label="Filter the items"
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
+            {itemsFilter.shown && lowerKey !== undefined ? (
+              <FilterBox
+                what="items"
+                term={itemsFilter.term}
+                setTerm={itemsFilter.setTerm}
+                onHide={itemsFilter.hide}
               />
-            )}
+            ) : null}
             <div className="faint mono pane-path">{lowerKey ?? ""}</div>
             <div className="res-list" ref={lowerList}>
               {lowerKey === undefined ? (
@@ -718,6 +764,7 @@ function Explorer({
   scrolls = false,
   grow,
   sectionRef,
+  actions,
   children,
 }: {
   title: string;
@@ -730,6 +777,8 @@ function Explorer({
   /** How many shares of the height the open sections divide this one takes. */
   grow: number;
   sectionRef: RefObject<HTMLElement | null>;
+  /** Controls at the right of the header while the section is open, such as its filter's button. */
+  actions?: ReactNode;
   children?: ReactNode;
 }) {
   const shown = open && unavailable === undefined;
@@ -776,18 +825,23 @@ function Explorer({
       aria-label={title}
     >
       <div ref={top} className="explorer-top">
-        <button
-          type="button"
-          className="explorer-head"
-          aria-expanded={shown}
-          disabled={unavailable !== undefined}
-          aria-describedby={unavailable === undefined ? undefined : why}
-          onClick={onToggle}
-        >
-          <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
-          {icon}
-          <span className="explorer-title">{title}</span>
-        </button>
+        <div className="explorer-headrow">
+          <button
+            type="button"
+            className="explorer-head"
+            aria-expanded={shown}
+            disabled={unavailable !== undefined}
+            aria-describedby={unavailable === undefined ? undefined : why}
+            onClick={onToggle}
+          >
+            <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
+            {icon}
+            <span className="explorer-title">{title}</span>
+          </button>
+          {shown && actions !== undefined ? (
+            <span className="explorer-actions">{actions}</span>
+          ) : null}
+        </div>
         {unavailable === undefined ? null : (
           <div id={why} className="explorer-note">
             {unavailable}

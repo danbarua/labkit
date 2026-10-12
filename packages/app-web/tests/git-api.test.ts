@@ -88,6 +88,10 @@ describe("a workspace's files", () => {
     const { status, body } = await get("/workspace/alpha/paths");
     expect(status).toBe(200);
     expect(body._links.index.href).toBe(`${ORIGIN}/workspace/alpha/file`);
+    expect(body._links.file).toEqual({
+      href: `${ORIGIN}/workspace/alpha/file/{+path}`,
+      templated: true,
+    });
     expect(body.paths).toContain("README.md");
     expect(body.paths).toContain("src/a.ts");
     // Directories are not listed, only the files in them.
