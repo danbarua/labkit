@@ -9,6 +9,15 @@
 
 import type * as acp from "@agentclientprotocol/sdk";
 
+/**
+ * A file the prompt names by its address rather than sends: a `resource_link`, which the agent
+ * reads itself. ACP requires every agent to take one, so no capability is asked for.
+ */
+export interface PromptLink {
+  readonly uri: string;
+  readonly name: string;
+}
+
 /** What a prompt needs of a file: a browser's `File` has all of it. */
 export type PromptFile = Pick<File, "name" | "type" | "arrayBuffer">;
 
@@ -71,16 +80,21 @@ async function blockFor(
 }
 
 /**
- * The blocks for `text` and `files`, in that order. A prompt of files alone has no text block.
- * Rejects with `FileNotTaken` for a file the agent takes in no form, so no file is left out.
+ * The blocks for `text`, `links` and `files`, in that order. A prompt of links or files alone has
+ * no text block. Rejects with `FileNotTaken` for a file the agent takes in no form, so no file is
+ * left out.
  */
 export async function promptBlocks(
   text: string,
   files: readonly PromptFile[],
   takes: acp.PromptCapabilities,
+  links: readonly PromptLink[] = [],
 ): Promise<acp.ContentBlock[]> {
   const attached = await Promise.all(files.map((file) => blockFor(file, takes)));
+  const linked = links.map(
+    ({ uri, name }): acp.ContentBlock => ({ type: "resource_link", uri, name }),
+  );
   const said: acp.ContentBlock[] =
-    text === "" && attached.length > 0 ? [] : [{ type: "text", text }];
-  return [...said, ...attached];
+    text === "" && attached.length + linked.length > 0 ? [] : [{ type: "text", text }];
+  return [...said, ...linked, ...attached];
 }

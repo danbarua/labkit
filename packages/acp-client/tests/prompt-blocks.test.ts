@@ -77,3 +77,27 @@ describe("a prompt's files", () => {
     expect(decodeURIComponent(uri.split("/").at(-1) ?? "")).toBe("Δ loss.csv");
   });
 });
+
+describe("files a prompt names by address", () => {
+  test("each is a resource_link, after the text and before attached files, whatever the agent takes", async () => {
+    const blocks = await promptBlocks(
+      "look at @src/a.ts",
+      [new File(["a"], "a.txt", { type: "text/plain" })],
+      BOTH,
+      [{ uri: "file:///work/src/a.ts", name: "src/a.ts" }],
+    );
+    expect(blocks.map((b) => b.type)).toEqual(["text", "resource_link", "resource"]);
+    expect(blocks[1]).toEqual({
+      type: "resource_link",
+      uri: "file:///work/src/a.ts",
+      name: "src/a.ts",
+    });
+    const plain = await promptBlocks("x", [], {}, [{ uri: "file:///w/b", name: "b" }]);
+    expect(plain.map((b) => b.type)).toEqual(["text", "resource_link"]);
+  });
+
+  test("a prompt of links alone has no text block", async () => {
+    const blocks = await promptBlocks("", [], {}, [{ uri: "file:///w/b", name: "b" }]);
+    expect(blocks).toEqual([{ type: "resource_link", uri: "file:///w/b", name: "b" }]);
+  });
+});
