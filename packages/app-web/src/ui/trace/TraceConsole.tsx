@@ -82,7 +82,7 @@ import {
 } from "./hal-store";
 import { FileTree, History } from "./explorers";
 import { ActiveBox } from "./active-box";
-import { ChatSidebar, HAS_CHAT } from "./chat-sidebar";
+import { ChatButton, ChatSidebar, useChat } from "./chat-sidebar";
 import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
@@ -160,22 +160,17 @@ export interface TraceConsoleProps {
 export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   const navigate = useNavigate();
   const [theme] = useSavedTheme();
-  const [drawer, setDrawer] = useState<"items" | undefined>();
+  // In a narrow window, the drawer open over the page: the sidebar's, or the agent's chat.
+  const [drawer, setDrawer] = useState<"items" | "chat" | undefined>();
   // At full width the sidebar is shown or hidden, as this browser last left it; in a narrow
   // window it is a drawer over the page, closed until opened.
   const [sidebarShown, setSidebarShown] = useSavedFlag("labkit.trace.sidebar", true);
   const narrow = useMediaQuery(NARROW);
-  // The agent's chat at the right: expanded or minimised, as this browser last left it. Its session
-  // connects the first time it is expanded on this page.
+  // At full width the agent's chat is expanded or minimised, as this browser last left it.
   const [chatShown, setChatShown] = useSavedFlag("labkit.trace.chat", false);
-  const [chatConnected, setChatConnected] = useState(chatShown);
-  const toggleChat = () => {
-    setChatShown(!chatShown);
-    setChatConnected(true);
-  };
-  const onChatStarted = useCallback(
-    (started: string) =>
-      void navigate({ to: ".", search: (s) => ({ ...s, session: started }), replace: true }),
+  const setSession = useCallback(
+    (next: string | undefined) =>
+      void navigate({ to: ".", search: (s) => ({ ...s, session: next }), replace: true }),
     [navigate],
   );
   const [graphOpen, setGraphOpen] = useState(true);
@@ -231,25 +226,25 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   const listKey = openIsCollection ? path : (list ?? ENTRY);
   // The workspace of the open resource, or else of the collection Record Explorer lists.
   const scope = workspace ?? workspaceOf(`${listKey}/`);
-  // A session is its workspace's own, opened in the workspace's folder. When the workspace in scope
-  // changes, the session the address names is not reopened in the new one, and leaves the address.
-  const sessionScope = useRef(scope);
-  const leftSession = useRef<string | undefined>(undefined);
-  if (sessionScope.current !== scope) {
-    sessionScope.current = scope;
-    leftSession.current = session;
-  }
-  const chatSession = session === leftSession.current ? undefined : session;
-  useEffect(() => {
-    if (session !== undefined && session === leftSession.current)
-      void navigate({ to: ".", search: (s) => ({ ...s, session: undefined }), replace: true });
-  }, [scope, session, navigate]);
+  const chat = useChat({
+    slug: scope?.split("/")[2],
+    expanded: narrow ? drawer === "chat" : chatShown,
+    session,
+    setSession,
+  });
+  const toggleChat = () =>
+    narrow ? setDrawer((d) => (d === "chat" ? undefined : "chat")) : setChatShown(!chatShown);
   const prose = proseFor(held, path, open);
 
   return (
     <IconContext.Provider value={ICONS}>
       <div className="lk-root lk-frame trace" data-theme={theme === "system" ? undefined : theme}>
-        <TopBar onHome={home} />
+        <TopBar
+          onHome={home}
+          end={
+            narrow && chat !== undefined ? <ChatButton chat={chat} onToggle={toggleChat} /> : null
+          }
+        />
 
         <div className="body">
           <button
@@ -311,16 +306,9 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
               />
             </div>
           </main>
-          {HAS_CHAT && scope !== undefined ? (
-            <ChatSidebar
-              workspace={scope.split("/")[2] ?? ""}
-              expanded={chatShown}
-              onToggle={toggleChat}
-              connected={chatConnected}
-              sessionId={chatSession}
-              onStarted={onChatStarted}
-            />
-          ) : null}
+          {chat === undefined ? null : (
+            <ChatSidebar chat={chat} narrow={narrow} onToggle={toggleChat} />
+          )}
         </div>
       </div>
     </IconContext.Provider>

@@ -1,5 +1,13 @@
 import { ChatCircleDotsIcon } from "@phosphor-icons/react";
-import { type CSSProperties, lazy, Suspense, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useSavedNumber } from "../saved-flag";
 
 // The agent exists only in the dev server, so the chat is dev-only: in a production build
@@ -90,18 +98,20 @@ function ChatBorder({
 /** Whether this build has the agent's chat at all. */
 export const HAS_CHAT = AgentChat !== undefined;
 
-type Folder =
+export type Folder =
   | { kind: "loading" }
   | { kind: "mapped"; cwd: string }
   | { kind: "unmapped"; reason: string };
 
 /**
  * The folder the workspace `slug` is, from the dev server (`/agent-workspace/<slug>`, which reads
- * the workspaces mapping file). The agent's sessions for the workspace open in it.
+ * the workspaces mapping file). The agent's sessions for the workspace open in it. No workspace in
+ * scope has no folder to find.
  */
-function useWorkspaceFolder(slug: string): Folder {
+function useWorkspaceFolder(slug: string | undefined): Folder {
   const [folder, setFolder] = useState<Folder>({ kind: "loading" });
   useEffect(() => {
+    if (slug === undefined) return;
     const controller = new AbortController();
     setFolder({ kind: "loading" });
     fetch(`/agent-workspace/${encodeURIComponent(slug)}`, { signal: controller.signal })
@@ -126,76 +136,157 @@ function useWorkspaceFolder(slug: string): Folder {
   return folder;
 }
 
-/**
- * The agent's chat at the right of the page, and the rail beside it that stays when the chat is
- * minimised. The chat's sessions open in the workspace's folder; a workspace the mapping file does
- * not map has no chat, and the rail's button says why. The session connects the first time the chat
- * is shown and stays connected while it is minimised; only its view is not drawn.
- */
-export function ChatSidebar({
-  workspace,
-  expanded,
-  onToggle,
-  connected,
-  sessionId,
-  onStarted,
-}: {
+/** The agent's chat in the workspace in scope, as the page drives it. */
+export interface Chat {
   /** The slug of the workspace in scope. */
-  workspace: string;
-  expanded: boolean;
-  onToggle: () => void;
-  /** Whether the chat has been shown on this page, which is when the session connects. */
+  slug: string;
+  folder: Folder;
+  /** Whether the chat is shown: expanded at full width, or its drawer open in a narrow window. */
+  shown: boolean;
+  /** Whether the chat's session is connected: it has been shown in this workspace on this page. */
   connected: boolean;
+  /** The session to reopen in this workspace. */
   sessionId: string | undefined;
   onStarted: (sessionId: string) => void;
+  /** Why the chat cannot be shown, when it cannot. */
+  unavailable: string | undefined;
+}
+
+/**
+ * The agent's chat for the workspace `slug`, kept for the life of the page.
+ * - The session connects the first time the chat is shown in a workspace, and stays connected
+ *   while the chat is hidden. A workspace the chat was never shown in has no session.
+ * - Each workspace keeps its session: leaving one and coming back reopens the session it had.
+ * - `session` is the address's `?session=`, which names the session of the workspace in scope;
+ *   `setSession` writes it. On leaving a workspace, the address names the next one's session.
+ */
+export function useChat({
+  slug,
+  expanded,
+  session,
+  setSession,
+}: {
+  slug: string | undefined;
+  expanded: boolean;
+  session: string | undefined;
+  setSession: (sessionId: string | undefined) => void;
+}): Chat | undefined {
+  // A build without the chat asks for no folder.
+  const folder = useWorkspaceFolder(AgentChat === undefined ? undefined : slug);
+  // The session each workspace had on this page, and the workspace the address's session is.
+  // Until the address is written again, the session it names is the workspace's just left.
+  const sessions = useRef(new Map<string, string>());
+  const addressed = useRef(slug);
+  const left = useRef<string | undefined>(undefined);
+  if (addressed.current !== slug) {
+    if (addressed.current !== undefined && session !== undefined)
+      sessions.current.set(addressed.current, session);
+    addressed.current = slug;
+    left.current = session;
+  }
+  const named = session === left.current ? undefined : session;
+  if (slug !== undefined && named !== undefined) sessions.current.set(slug, named);
+  const sessionId = slug === undefined ? undefined : sessions.current.get(slug);
+  useEffect(() => {
+    if (session !== sessionId) setSession(sessionId);
+  }, [session, sessionId, setSession]);
+
+  const [shownIn, setShownIn] = useState<ReadonlySet<string>>(new Set());
+  const shown = expanded && folder.kind === "mapped";
+  useEffect(() => {
+    if (shown && slug !== undefined && !shownIn.has(slug)) setShownIn(new Set([...shownIn, slug]));
+  }, [shown, slug, shownIn]);
+
+  const onStarted = useCallback(
+    (started: string) => {
+      if (addressed.current !== undefined) sessions.current.set(addressed.current, started);
+      setSession(started);
+    },
+    [setSession],
+  );
+  if (AgentChat === undefined || slug === undefined) return undefined;
+  return {
+    slug,
+    folder,
+    shown,
+    connected: shown || shownIn.has(slug),
+    sessionId,
+    onStarted,
+    unavailable:
+      folder.kind === "unmapped"
+        ? folder.reason
+        : folder.kind === "loading"
+          ? `Finding ${slug}'s folder…`
+          : undefined,
+  };
+}
+
+/** The button that shows or hides the agent's chat: in the rail, or in a narrow window, the top bar. */
+export function ChatButton({ chat, onToggle }: { chat: Chat; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className={chat.shown ? "rail-btn on" : "rail-btn"}
+      aria-label="Show or hide the agent"
+      aria-expanded={chat.shown}
+      title={chat.unavailable ?? "Show or hide the agent"}
+      disabled={chat.unavailable !== undefined}
+      onClick={onToggle}
+    >
+      <ChatCircleDotsIcon aria-hidden="true" />
+    </button>
+  );
+}
+
+/**
+ * The agent's chat at the right of the page. At full width the rail beside it stays when it is
+ * minimised; in a narrow window it is a drawer over the page, and its button is in the top bar.
+ * The chat's sessions open in the workspace's folder; a workspace the mapping file does not map has
+ * no chat, and the button says why.
+ */
+export function ChatSidebar({
+  chat,
+  narrow,
+  onToggle,
+}: {
+  chat: Chat;
+  narrow: boolean;
+  onToggle: () => void;
 }) {
-  const folder = useWorkspaceFolder(workspace);
   const [width, setWidth] = useSavedNumber("labkit.trace.chat.width", CHAT_WIDTH);
   const [resizing, setResizing] = useState(false);
   if (AgentChat === undefined) return null;
-  const unavailable =
-    folder.kind === "unmapped"
-      ? folder.reason
-      : folder.kind === "loading"
-        ? `Finding ${workspace}'s folder…`
-        : undefined;
-  const shown = expanded && folder.kind === "mapped";
+  const { folder, shown } = chat;
   return (
     <>
-      {shown ? <ChatBorder width={width} setWidth={setWidth} onDragging={setResizing} /> : null}
+      {shown && !narrow ? (
+        <ChatBorder width={width} setWidth={setWidth} onDragging={setResizing} />
+      ) : null}
       <aside
-        className={["chat-sidebar", shown ? "" : "collapsed", resizing ? "resizing" : ""]
+        className={["chat-sidebar", shown ? "open" : "collapsed", resizing ? "resizing" : ""]
           .filter(Boolean)
           .join(" ")}
         style={{ "--chat-width": `${width}px` } as CSSProperties}
         aria-label="Agent"
       >
-        {connected && folder.kind === "mapped" ? (
+        {chat.connected && folder.kind === "mapped" ? (
           <Suspense fallback={null}>
             <AgentChat
               // A workspace's sessions are its own: another folder is another chat.
               key={folder.cwd}
               cwd={folder.cwd}
-              sessionId={sessionId}
-              onStarted={onStarted}
+              sessionId={chat.sessionId}
+              onStarted={chat.onStarted}
               shown={shown}
             />
           </Suspense>
         ) : null}
       </aside>
-      <nav className="rail right" aria-label="Agent sidebar">
-        <button
-          type="button"
-          className={shown ? "rail-btn on" : "rail-btn"}
-          aria-label="Show or hide the agent"
-          aria-expanded={shown}
-          title={unavailable ?? "Show or hide the agent"}
-          disabled={unavailable !== undefined}
-          onClick={onToggle}
-        >
-          <ChatCircleDotsIcon aria-hidden="true" />
-        </button>
-      </nav>
+      {narrow ? null : (
+        <nav className="rail right" aria-label="Agent sidebar">
+          <ChatButton chat={chat} onToggle={onToggle} />
+        </nav>
+      )}
     </>
   );
 }

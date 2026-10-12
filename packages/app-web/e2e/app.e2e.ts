@@ -1487,4 +1487,60 @@ test.describe("the agent's chat in the Trace Console", () => {
     await border.dblclick();
     await expect.poll(width).toBe(400);
   });
+
+  test("no session opens until the chat is shown; leaving the workspace and coming back reopens its session", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    const sent: string[] = [];
+    page.on("request", (req) => {
+      const method = /"method":"(session\/(?:new|load))"/.exec(req.postData() ?? "")?.[1];
+      if (req.url().endsWith("/acp") && method !== undefined) sent.push(method);
+    });
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(chatToggle(page)).toBeEnabled();
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    expect(sent).toEqual([]);
+
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect(page).toHaveURL(/[?&]session=fake-\d+/);
+    const named = new URL(page.url()).searchParams.get("session");
+    expect(sent).toEqual(["session/new"]);
+
+    await chatToggle(page).click();
+    await page.getByRole("button", { name: "LabKit" }).click();
+    await expect(page).toHaveURL(/\/app\/$/);
+    expect(new URL(page.url()).searchParams.get("session")).toBeNull();
+    await row(page, "alpha").click();
+    await expect(chatToggle(page)).toBeEnabled();
+    await expect(page).toHaveURL(new RegExp(`[?&]session=${named}`));
+    await expect.poll(() => sent).toEqual(["session/new", "session/load"]);
+  });
+
+  test("in a narrow window the chat's button is in the top bar, and the chat is a drawer over the page", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.setViewportSize({ width: 600, height: 800 });
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    await expect(rail(page)).toHaveCount(0);
+    const button = page.locator(".topbar").getByRole("button", { name: "Show or hide the agent" });
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await expect(button).toBeEnabled();
+    await expect(chat).not.toBeInViewport();
+    await button.click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect(chat).toBeInViewport();
+    await expect(button).toHaveAttribute("aria-expanded", "true");
+    // The drawer covers the right of the page; the scrim shows at its left.
+    await page
+      .getByRole("button", { name: "Close the column" })
+      .click({ force: true, position: { x: 100, y: 400 } });
+    await expect(chat).not.toBeInViewport();
+    await expect(button).toHaveAttribute("aria-expanded", "false");
+  });
 });

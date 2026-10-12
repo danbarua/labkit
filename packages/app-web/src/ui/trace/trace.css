@@ -1258,6 +1258,33 @@
   .trace .sidebar.open {
     transform: translateX(0);
   }
+  /* The agent's chat is a drawer from the right, over the page, at most as wide as the window. Its
+     button is in the top bar, and there is no rail or border to drag. */
+  .trace .chat-sidebar,
+  .trace .chat-sidebar.collapsed {
+    position: fixed;
+    z-index: 20;
+    top: 52px;
+    right: 0;
+    bottom: 0;
+    width: min(100vw, var(--chat-width, 400px));
+    border-left-width: 1px;
+    transform: translateX(100%);
+    transition:
+      transform 0.18s ease,
+      visibility 0s 0.18s;
+    box-shadow: -2px 0 16px rgba(0, 0, 0, 0.35);
+  }
+  .trace .chat-sidebar.collapsed {
+    visibility: hidden;
+  }
+  .trace .chat-sidebar.open {
+    transform: translateX(0);
+    transition: transform 0.18s ease;
+  }
+  .trace .chat-sidebar > * {
+    min-width: 0;
+  }
   .trace .detail {
     padding: 20px 16px 60px;
   }
