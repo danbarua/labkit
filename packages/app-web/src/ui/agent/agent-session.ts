@@ -16,13 +16,14 @@ export const HOST_COMMANDS = [NEW];
 export type Status = "connecting" | "ready" | "failed";
 
 /**
- * Why the composer takes no input before the session is open: there is no session to send to, and
- * the files, commands and settings it offers come from what the agent answers.
+ * Why the composer takes no input while the session is opening: there is no session to send to,
+ * and the files, commands and settings it offers come from what the agent answers. Once opening has
+ * failed the composer takes input again, so `/new` can start another session.
  */
-export const UNAVAILABLE: Record<Exclude<Status, "ready">, string> = {
-  connecting: "Connecting to the agent…",
-  failed: "Not connected to the agent",
-};
+export const CONNECTING = "Connecting to the agent…";
+
+/** What a failure to reach the agent's session adds: the way on from it. */
+const TRY_NEW = `Send /${NEW.name} to start a new session.`;
 
 type ViewAction = Parameters<typeof reduce>[1] | { type: "reset" };
 
@@ -112,7 +113,8 @@ export function useAgentSession({
         },
         (err: unknown) => {
           if (cancelled) return;
-          dispatch({ type: "failed", message: err instanceof Error ? err.message : String(err) });
+          const reason = err instanceof Error ? err.message : String(err);
+          dispatch({ type: "failed", message: `${reason} ${TRY_NEW}` });
           setStatus("failed");
         },
       );
@@ -162,7 +164,7 @@ export function useAgentSession({
       if (client.current === null) {
         dispatch({
           type: "failed",
-          message: "The message was not sent: the agent is not connected.",
+          message: `The message was not sent: the agent is not connected. ${TRY_NEW}`,
         });
         return;
       }

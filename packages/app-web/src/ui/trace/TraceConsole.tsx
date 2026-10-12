@@ -225,13 +225,25 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   const home = () => {
     setDrawer(undefined);
     store.load(requestPath(ENTRY), true);
-    // The chat's session is kept: it belongs to the agent's directory, not to a workspace.
-    void navigate({ to: "/$", params: { _splat: "" }, search: { session } });
+    void navigate({ to: "/$", params: { _splat: "" }, search: {} });
   };
 
   const listKey = openIsCollection ? path : (list ?? ENTRY);
   // The workspace of the open resource, or else of the collection Record Explorer lists.
   const scope = workspace ?? workspaceOf(`${listKey}/`);
+  // A session is its workspace's own, opened in the workspace's folder. When the workspace in scope
+  // changes, the session the address names is not reopened in the new one, and leaves the address.
+  const sessionScope = useRef(scope);
+  const leftSession = useRef<string | undefined>(undefined);
+  if (sessionScope.current !== scope) {
+    sessionScope.current = scope;
+    leftSession.current = session;
+  }
+  const chatSession = session === leftSession.current ? undefined : session;
+  useEffect(() => {
+    if (session !== undefined && session === leftSession.current)
+      void navigate({ to: ".", search: (s) => ({ ...s, session: undefined }), replace: true });
+  }, [scope, session, navigate]);
   const prose = proseFor(held, path, open);
 
   return (
@@ -301,10 +313,11 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
           </main>
           {HAS_CHAT && scope !== undefined ? (
             <ChatSidebar
+              workspace={scope.split("/")[2] ?? ""}
               expanded={chatShown}
               onToggle={toggleChat}
               connected={chatConnected}
-              sessionId={session}
+              sessionId={chatSession}
               onStarted={onChatStarted}
             />
           ) : null}

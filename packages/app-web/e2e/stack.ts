@@ -45,7 +45,11 @@ const api = serve(
 );
 // The bundle goes in a directory of its own, so a test run leaves nothing in the package.
 const built = await mkdtemp(path.join(tmpdir(), "labkit-e2e-"));
-const env = { ...process.env, LABKIT_PORT_WEB: ports.api };
+// The dev server maps workspaces to folders from this file, for the agent's sessions: `alpha` to
+// the git fixture's folder, as the API maps it to the fixture's repository, and `beta` to none.
+const workspacesFile = path.join(built, "..", `${path.basename(built)}-workspaces.json`);
+await Bun.write(workspacesFile, JSON.stringify({ alpha: git.folder }));
+const env = { ...process.env, LABKIT_PORT_WEB: ports.api, LABKIT_WORKSPACES_FILE: workspacesFile };
 const vite = "node_modules/vite/bin/vite.js";
 const inherit = { env, stdout: "inherit", stderr: "inherit" } as const;
 
@@ -61,6 +65,7 @@ async function stop(code: number): Promise<never> {
     await fixture.close();
     await git.close();
     await rm(built, { recursive: true, force: true });
+    await rm(workspacesFile, { force: true });
   }
   process.exit(code);
 }
