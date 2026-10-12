@@ -1305,3 +1305,28 @@ test.describe("the API keeps its own paths", () => {
     }
   });
 });
+
+test.describe("the agent", () => {
+  test("its page starts a session and takes its address; /new starts another in place", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.goto("/app/agent");
+    await expect(page.locator(".agent-status")).toContainText("ready");
+    await expect(page).toHaveURL(/\/agent\/[^/]+$/);
+    const first = page.url();
+    await page.evaluate(() => {
+      (window as unknown as { kept: boolean }).kept = true;
+    });
+    const message = page.getByRole("textbox", { name: "Message" });
+    await message.fill("/new");
+    // The first Enter picks the command from the list the slash opens; the second sends it.
+    await message.press("Enter");
+    await expect(message).toHaveValue(/^\/new\s*$/);
+    await message.press("Enter");
+    await expect(page).not.toHaveURL(first);
+    await expect(page).toHaveURL(/\/agent\/[^/]+$/);
+    await expect(page.locator(".agent-status")).toContainText("ready");
+    expect(await page.evaluate(() => (window as unknown as { kept?: boolean }).kept)).toBe(true);
+  });
+});
