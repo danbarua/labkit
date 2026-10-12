@@ -12,6 +12,18 @@ const test = base.extend<{ errors: string[] }>({
   errors: [
     async ({ page }, use) => {
       const errors: string[] = [];
+      // Closing an agent connection ends its event stream and then sends DELETE; the ACP server
+      // forgets a connection whose stream has ended, so the DELETE can be answered 404, which the
+      // browser logs. The connection is closed either way. Each such answer excuses one log line.
+      let closed404 = 0;
+      page.on("response", (res) => {
+        if (
+          res.request().method() === "DELETE" &&
+          res.status() === 404 &&
+          res.url().endsWith("/acp")
+        )
+          closed404++;
+      });
       page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`));
       page.on("console", (msg) => {
         const { url } = msg.location();
@@ -21,7 +33,11 @@ const test = base.extend<{ errors: string[] }>({
         }
       });
       await use(errors);
-      expect(errors, "errors in the browser").toEqual([]);
+      const left = errors.filter(
+        (e) =>
+          !(closed404 > 0 && e.includes("404 (Not Found)") && e.endsWith("/acp") && closed404--),
+      );
+      expect(left, "errors in the browser").toEqual([]);
     },
     { auto: true },
   ],
@@ -92,6 +108,16 @@ test.describe("getting around", () => {
     await expect(bar.getByRole("button", { name: "LabKit" })).toBeVisible();
     await expect(bar.getByRole("link", { name: "gallery" })).toHaveCount(0);
     await expect(bar.getByRole("link", { name: "sessions" })).toHaveCount(0);
+  });
+
+  test("the gallery draws every tile without an error, the failed turns' included", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the gallery exists only in development");
+    await page.goto("/app/gallery");
+    await expect(page.locator("section[aria-label]").first()).toBeVisible();
+    // A failed turn's tile drew again on every render until its indicator kept an equal activity.
+    await page.waitForTimeout(1500);
   });
 
   test("the sessions page has the same top bar as the Trace Console, with the theme button at its right", async ({
@@ -1303,5 +1329,162 @@ test.describe("the API keeps its own paths", () => {
     if (test.info().project.name === "dev") {
       expect(response.headers()["content-type"]).toContain("application/problem+json");
     }
+  });
+});
+
+test.describe("the agent", () => {
+  test("its page starts a session and takes its address; /new starts another in place", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.goto("/app/agent");
+    await expect(page.locator(".agent-status")).toContainText("ready");
+    await expect(page).toHaveURL(/\/agent\/[^/]+$/);
+    const first = page.url();
+    await page.evaluate(() => {
+      (window as unknown as { kept: boolean }).kept = true;
+    });
+    const message = page.getByRole("textbox", { name: "Message" });
+    await message.fill("/new");
+    // The first Enter picks the command from the list the slash opens; the second sends it.
+    await message.press("Enter");
+    await expect(message).toHaveValue(/^\/new\s*$/);
+    await message.press("Enter");
+    await expect(page).not.toHaveURL(first);
+    await expect(page).toHaveURL(/\/agent\/[^/]+$/);
+    await expect(page.locator(".agent-status")).toContainText("ready");
+    expect(await page.evaluate(() => (window as unknown as { kept?: boolean }).kept)).toBe(true);
+  });
+});
+
+test.describe("the agent's chat in the Trace Console", () => {
+  const rail = (page: import("@playwright/test").Page) =>
+    page.getByRole("navigation", { name: "Agent sidebar" });
+  const chatToggle = (page: import("@playwright/test").Page) =>
+    page.getByRole("button", { name: "Show or hide the agent" });
+
+  test("the chat's rail is at the right in a workspace, and absent outside one or in a build", async ({
+    page,
+  }, info) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await expect(header(page)).toHaveText("Q_1");
+    if (info.project.name !== "dev") {
+      await expect(rail(page)).toHaveCount(0);
+      return;
+    }
+    await expect(rail(page)).toBeVisible();
+    const box = await rail(page).boundingBox();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBe(page.viewportSize()?.width);
+    await page.goto("/app/");
+    await expect(page.getByText("Pick a type on the left")).toBeVisible();
+    await expect(rail(page)).toHaveCount(0);
+  });
+
+  test("expanding the chat connects a session in the workspace's folder and names it in the address; minimising keeps it", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    const opened: string[] = [];
+    page.on("request", (req) => {
+      const body = req.postData();
+      if (req.url().endsWith("/acp") && body?.includes('"session/new"')) opened.push(body);
+    });
+    await page.goto("/app/workspace/alpha/Q_1");
+    const folder = await page.evaluate(async () => {
+      const res = await fetch("/agent-workspace/alpha");
+      return ((await res.json()) as { cwd: string }).cwd;
+    });
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect(chat.getByRole("textbox", { name: "Message" })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]session=fake-\d+/);
+    const named = new URL(page.url()).searchParams.get("session");
+    // The session opened in the folder the workspaces mapping file gives alpha.
+    expect(opened).toHaveLength(1);
+    expect(JSON.parse(opened[0] ?? "{}").params.cwd).toBe(folder);
+
+    await chatToggle(page).click();
+    await expect(chat).toBeHidden();
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    expect(new URL(page.url()).searchParams.get("session")).toBe(named);
+
+    // Opening a record keeps the session in the address, and a reload reopens it.
+    await page.locator(".card-head", { hasText: "LOE_1" }).click();
+    await expect(header(page)).toHaveText("LOE_1");
+    expect(new URL(page.url()).searchParams.get("session")).toBe(named);
+    await page.reload();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    expect(new URL(page.url()).searchParams.get("session")).toBe(named);
+  });
+
+  test("in a workspace the mapping file does not map, the chat's button is disabled and says why; going home drops the session", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.goto("/app/workspace/alpha/Q_1");
+    await chatToggle(page).click();
+    await expect(page).toHaveURL(/[?&]session=fake-\d+/);
+    await page.getByRole("button", { name: "LabKit" }).click();
+    await expect(page).toHaveURL(/\/app\/$/);
+    await row(page, "beta").click();
+    await expect(chatToggle(page)).toBeDisabled();
+    await expect(chatToggle(page)).toHaveAttribute("title", /maps no folder to the workspace beta/);
+    expect(new URL(page.url()).searchParams.get("session")).toBeNull();
+  });
+
+  test("a session the address names that the agent cannot reopen says so, and /new starts another", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.goto("/app/workspace/alpha/Q_1?session=no-such-session");
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("failed");
+    await expect(chat).toContainText("Send /new to start a new session.");
+    const message = chat.getByRole("textbox", { name: "Message" });
+    await expect(message).toBeEnabled();
+    await message.fill("/new");
+    await message.press("Enter");
+    await expect(message).toHaveValue(/^\/new\s*$/);
+    await message.press("Enter");
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect(page).toHaveURL(/[?&]session=fake-\d+/);
+  });
+
+  test("dragging the chat's border widens it, a reload keeps the width, and its keys and double-click move it", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/app/workspace/alpha/Q_1");
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    const width = async () => Math.round((await chat.boundingBox())?.width ?? -1);
+    await expect.poll(width).toBe(400);
+    const border = page.getByRole("separator", { name: "Resize the agent" });
+    const at = await border.boundingBox();
+    if (at === null) throw new Error("the border has no box");
+    await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(at.x + at.width / 2 - 100, at.y + at.height / 2, { steps: 5 });
+    await page.mouse.up();
+    await expect.poll(width).toBe(500);
+
+    await page.reload();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect.poll(width).toBe(500);
+
+    await border.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(width).toBe(484);
+    await page.keyboard.press("Home");
+    await expect.poll(width).toBe(320);
+    await page.keyboard.press("End");
+    await expect.poll(width).toBe(768);
+    await border.dblclick();
+    await expect.poll(width).toBe(400);
   });
 });

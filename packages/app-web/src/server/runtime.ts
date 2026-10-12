@@ -3,7 +3,8 @@ import { APP_ROLE } from "@labkit/core-db/schema";
 import { TENANT_SETTING } from "@labkit/core-db/scoped";
 import { worktreeName } from "@labkit/app-cli/worktree";
 import { type Connections, pgConnections } from "./connections";
-import { openRepositories, type Repositories, repositoriesFile } from "./repositories";
+import { openRepositories, type Repositories } from "./repositories";
+import { readWorkspaceDirectories, workspacesFile } from "./workspace-directories";
 
 // Goes into query text, so it is checked once here rather than trusted downstream.
 const GRAPH_NAME = /^[a-z0-9_]+$/;
@@ -45,11 +46,11 @@ export function createRuntime(
 
 /**
  * A runtime on the Postgres server `LABKIT_DB_URL` names, with the repositories the workspaces
- * mapping file names (`repositoriesFile`), read once, here.
+ * mapping file names (`workspacesFile`), read once, here.
  */
 export async function openRuntime(): Promise<Runtime> {
   process.env.LABKIT_DB_URL ??= "postgresql://postgres:agens@127.0.0.1:5433/labkit";
-  const repositories = await openRepositories(repositoriesFile());
+  const repositories = await openRepositories(await readWorkspaceDirectories(workspacesFile()));
   return createRuntime(pgConnections(process.env.LABKIT_DB_URL), repositories);
 }
 

@@ -48,6 +48,18 @@ export function currentActivity(state: TranscriptState): Activity | undefined {
   return last?.kind === "thought" ? { kind: "thinking" } : { kind: "waiting" };
 }
 
+/**
+ * Whether two activities say the same thing. `currentActivity` makes a new object on each call, so
+ * a component that keeps an activity in state compares with this, not by reference: a new but equal
+ * object kept in state would draw again, derive another new object, and never settle.
+ */
+export const sameActivity = (a: Activity | undefined, b: Activity | undefined): boolean =>
+  a === b ||
+  (a !== undefined &&
+    b !== undefined &&
+    a.kind === b.kind &&
+    (a.kind !== "tool" || (b.kind === "tool" && a.label === b.label)));
+
 /** How long the stream may stay quiet before the indicator says it is waiting again. */
 export const PAUSE_MS = 1500;
 

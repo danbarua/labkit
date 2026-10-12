@@ -6,6 +6,7 @@ import { labkitDev } from "./src/infra/dev-plugin";
 import { APP_BASE } from "./src/app-base";
 import { agentBackend } from "./src/infra/agent-backend";
 import { transcripts } from "./src/infra/transcripts-plugin";
+import { workspaceFolders } from "./src/infra/workspace-folder-plugin";
 
 const explorerPort = Number(process.env.LABKIT_PORT_EXPLORER ?? "8850");
 const apiPort = Number(process.env.LABKIT_PORT_WEB ?? "8899");
@@ -27,6 +28,7 @@ export default defineConfig(({ command, isPreview }) => ({
     react(),
     labkitDev(),
     transcripts(),
+    workspaceFolders(),
     ...agent.plugins,
   ],
   resolve: {

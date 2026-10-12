@@ -44,7 +44,7 @@ full `LABKIT_DB_URL` instead.
 
 | variable | effect | default |
 | --- | --- | --- |
-| `LABKIT_WORKSPACES_FILE` | A JSON object mapping workspace slugs to git repositories, `{ "<slug>": "<folder>" }`; each folder is absolute or starts with `~/`. A mapped workspace serves its committed files and history. Read once, when the API starts. A missing file maps no workspace; an entry whose folder is not a repository is skipped with a warning. The file is machine-local and ignored by git. | `packages/app-web/workspaces.local.json` |
+| `LABKIT_WORKSPACES_FILE` | A JSON object mapping workspace slugs to folders, `{ "<slug>": "<folder>" }`; each folder is absolute or starts with `~/`. The API reads it once, when it starts: a mapped workspace whose folder is a git repository serves its committed files and history. The dev server reads it on each request to `/agent-workspace/<slug>`: the agent's chat opens its sessions in the mapped folder, and a workspace with no folder has no chat. A missing file maps no workspace; an entry that is not an absolute folder, or (for the API) not a repository, is skipped with a warning. The file is machine-local and ignored by git. | `packages/app-web/workspaces.local.json` |
 
 ## MCP
 

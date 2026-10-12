@@ -9,7 +9,7 @@ import {
   PencilSimpleIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { type Activity, activityLabel, activityMood } from "./activity";
+import { type Activity, activityLabel, activityMood, sameActivity } from "./activity";
 import { MessageAttachments } from "./attachments";
 import { MarkdownText } from "./markdown";
 import { Loader, type LoaderMood } from "./loader";
@@ -249,7 +249,8 @@ export function useLingering(activity: Activity | undefined): {
   const [last, setLast] = useState(activity);
   useEffect(() => {
     if (activity !== undefined) {
-      setLast(activity);
+      // An equal activity keeps the one held, so the state does not change and nothing draws again.
+      setLast((held) => (sameActivity(held, activity) ? held : activity));
       return;
     }
     const timer = setTimeout(() => setLast(undefined), DONE_MS);

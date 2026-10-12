@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { activityMood, afterPause, currentActivity } from "../activity";
+import { activityMood, afterPause, currentActivity, sameActivity } from "../activity";
 import { Conversation } from "../conversation";
 
 const started: ViewEvent = { type: "prompt_started", content: [{ type: "text", text: "Go" }] };
@@ -153,5 +153,31 @@ describe("the thinking block", () => {
       '<div class="lk-message assistant" data-last="true" data-streaming="true">',
     );
     expect(speaking).not.toContain('class="lk-working"');
+  });
+});
+
+describe("two activities compared", () => {
+  test("a new object that says the same is the same activity", () => {
+    expect(sameActivity({ kind: "failed" }, { kind: "failed" })).toBe(true);
+    expect(sameActivity({ kind: "tool", label: "ls" }, { kind: "tool", label: "ls" })).toBe(true);
+    expect(sameActivity(undefined, undefined)).toBe(true);
+  });
+
+  test("another kind, another tool label, or one missing is a different activity", () => {
+    expect(sameActivity({ kind: "failed" }, { kind: "waiting" })).toBe(false);
+    expect(sameActivity({ kind: "tool", label: "ls" }, { kind: "tool", label: "cat" })).toBe(false);
+    expect(sameActivity({ kind: "waiting" }, undefined)).toBe(false);
+  });
+
+  test("a failed turn's activity is a new object on each call, and the same activity", () => {
+    const failed = currentActivity(
+      state(started, { type: "failed", message: "The request failed" } as ViewEvent),
+    );
+    const again = currentActivity(
+      state(started, { type: "failed", message: "The request failed" } as ViewEvent),
+    );
+    expect(failed).toEqual({ kind: "failed" });
+    expect(failed).not.toBe(again);
+    expect(sameActivity(failed, again)).toBe(true);
   });
 });
