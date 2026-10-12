@@ -1543,4 +1543,35 @@ test.describe("the agent's chat in the Trace Console", () => {
     await expect(chat).not.toBeInViewport();
     await expect(button).toHaveAttribute("aria-expanded", "false");
   });
+
+  test("/sessions lists the workspace's sessions, and picking one reopens it", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "dev", "the agent exists only in development");
+    await page.goto("/app/workspace/alpha/Q_1");
+    const chat = page.getByRole("complementary", { name: "Agent" });
+    await chatToggle(page).click();
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+    await expect(page).toHaveURL(/[?&]session=fake-\d+/);
+    const first = new URL(page.url()).searchParams.get("session") ?? "";
+    const message = chat.getByRole("textbox", { name: "Message" });
+    const command = async (name: string) => {
+      await message.fill(`/${name}`);
+      // The first Enter picks the command from the list the slash opens; the second sends it.
+      await message.press("Enter");
+      await expect(message).toHaveValue(new RegExp(`^/${name}\\s*$`));
+      await message.press("Enter");
+    };
+    await command("new");
+    await expect(page).not.toHaveURL(new RegExp(`[?&]session=${first}(&|$)`));
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+
+    await command("sessions");
+    const sessions = page.getByRole("dialog", { name: "Sessions" });
+    await expect(sessions).toBeVisible();
+    await sessions.getByRole("option", { name: new RegExp(first) }).click();
+    await expect(sessions).toBeHidden();
+    await expect(page).toHaveURL(new RegExp(`[?&]session=${first}(&|$)`));
+    await expect(chat.locator(".agent-status")).toContainText("ready");
+  });
 });

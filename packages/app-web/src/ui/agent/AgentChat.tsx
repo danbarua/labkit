@@ -4,7 +4,9 @@ import "@labkit/ui/ui.css";
 import { AGENT_CWD, AGENT_URL } from "../agent-endpoint";
 import { RECORD_TYPES } from "../record-types";
 import { useSavedTheme } from "../saved-theme";
-import { CONNECTING, HOST_COMMANDS, resolveLink, useAgentSession } from "./agent-session";
+import { useState } from "react";
+import { CONNECTING, NEW, resolveLink, SESSIONS, useAgentSession } from "./agent-session";
+import { SessionPicker } from "./SessionPicker";
 
 /**
  * A live session with the agent the dev server mounts at `/acp`: the fake agent by default, or a
@@ -16,6 +18,7 @@ export function AgentChat({
   cwd,
   sessionId,
   onStarted,
+  onPick,
   shown = true,
   themeButton = false,
 }: {
@@ -25,15 +28,18 @@ export function AgentChat({
   sessionId: string | undefined;
   /** Called with the id of each session this starts, so the page can put it in its address. */
   onStarted: (sessionId: string) => void;
+  /** Opens another session in this folder: `/sessions` lists them. Without it there is no `/sessions`. */
+  onPick?: (sessionId: string) => void;
   shown?: boolean;
   /** Whether the conversation draws its own theme button, for a page with no top bar. */
   themeButton?: boolean;
 }) {
   // The dev stack names a folder for the real agent and none for the fake one.
   const real = AGENT_CWD !== undefined;
-  const { state, status, attach, send, cancel, answer, answerQuestion, setConfig } =
+  const { state, status, started, attach, send, cancel, answer, answerQuestion, setConfig } =
     useAgentSession({ url: AGENT_URL, cwd, sessionId, onStarted });
   const [theme, setTheme] = useSavedTheme();
+  const [picking, setPicking] = useState(false);
   if (!shown) return null;
   return (
     <div className="agent-chat">
@@ -55,10 +61,13 @@ export function AgentChat({
           records={{ types: RECORD_TYPES }}
           theme={theme}
           {...(themeButton ? { onThemeChange: setTheme } : {})}
-          hostCommands={HOST_COMMANDS}
+          hostCommands={onPick === undefined ? [NEW] : [NEW, SESSIONS]}
           {...(attach === undefined ? {} : { attach })}
           composerUnavailable={status === "connecting" ? CONNECTING : undefined}
-          onSend={send}
+          onSend={(text, files) => {
+            if (onPick !== undefined && text.trim() === `/${SESSIONS.name}`) setPicking(true);
+            else send(text, files);
+          }}
           onCancel={cancel}
           onAnswer={answer}
           onAnswerQuestion={answerQuestion}
@@ -66,6 +75,16 @@ export function AgentChat({
           resolveLink={resolveLink}
         />
       </div>
+      {onPick === undefined ? null : (
+        <SessionPicker
+          url={AGENT_URL}
+          cwd={cwd}
+          current={sessionId ?? started}
+          open={picking}
+          onClose={() => setPicking(false)}
+          onPick={onPick}
+        />
+      )}
     </div>
   );
 }

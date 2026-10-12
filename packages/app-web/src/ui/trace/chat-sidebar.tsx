@@ -148,6 +148,8 @@ export interface Chat {
   /** The session to reopen in this workspace. */
   sessionId: string | undefined;
   onStarted: (sessionId: string) => void;
+  /** Opens another of this workspace's sessions, from `/sessions`. */
+  onPick: (sessionId: string) => void;
   /** Why the chat cannot be shown, when it cannot. */
   unavailable: string | undefined;
 }
@@ -212,6 +214,7 @@ export function useChat({
     connected: shown || shownIn.has(slug),
     sessionId,
     onStarted,
+    onPick: onStarted,
     unavailable:
       folder.kind === "unmapped"
         ? folder.reason
@@ -277,6 +280,7 @@ export function ChatSidebar({
               cwd={folder.cwd}
               sessionId={chat.sessionId}
               onStarted={chat.onStarted}
+              onPick={chat.onPick}
               shown={shown}
             />
           </Suspense>

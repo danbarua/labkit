@@ -10,8 +10,11 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 /** The command the chat carries out itself rather than sending: start a new session in place. */
 export const NEW = { name: "new", description: "Start a new session" } as const;
-/** Commands the chat carries out itself. */
-export const HOST_COMMANDS = [NEW];
+/** The command that lists the sessions in the chat's folder, to open another. */
+export const SESSIONS = {
+  name: "sessions",
+  description: "Open another session in this folder",
+} as const;
 
 export type Status = "connecting" | "ready" | "failed";
 
