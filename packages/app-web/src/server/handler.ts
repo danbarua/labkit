@@ -3,6 +3,7 @@ import {
   isCollectionSlug,
   rootCollectionsHandler,
   workspaceCollectionsHandler,
+  workspacesHandler,
 } from "./collections-handler";
 import { docsHandler } from "./docs-handler";
 import { eventsHandler, isEventsPath } from "./events-handler";
@@ -63,9 +64,10 @@ export async function handle(req: Request, runtime: Runtime): Promise<Response> 
   return withCors(req, await route(req, runtime));
 }
 
-// `/workspace/{slug}` is a workspace's collections, `/workspace/{slug}/{type}` one collection and
-// `/workspace/{slug}/{handle}` one node. There is no default workspace: `/collections/workspace`
-// lists them and every other path names one.
+// `/workspace` lists the workspaces, `/workspace/{slug}` is a workspace's collections,
+// `/workspace/{slug}/{type}` one collection and `/workspace/{slug}/{handle}` one node. There is no
+// default workspace: `/workspace` (and `/collections/workspace`) list them and every other path
+// names one.
 const WORKSPACE_PATH = /^\/workspace\/([^/]+)(\/.*)?$/;
 
 async function inWorkspace(
@@ -83,6 +85,11 @@ async function route(req: Request, runtime: Runtime): Promise<Response> {
 
   const original = new URL(req.url).pathname;
   const path = original;
+
+  if (original === "/workspace" || original === "/workspace/") {
+    console.debug("request: workspaces", original);
+    return workspacesHandler(req, runtime);
+  }
 
   const workspace = WORKSPACE_PATH.exec(original);
   if (workspace) {

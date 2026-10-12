@@ -51,23 +51,34 @@ const item = (page: import("@playwright/test").Page, handle: string) =>
     has: page.locator(".rid", { hasText: new RegExp(`^${handle}$`) }),
   });
 const list = (path: string) => `list=${encodeURIComponent(path)}`;
+// A workspace on the landing view, by its name.
+const workspaceCard = (page: import("@playwright/test").Page, name: string) =>
+  page.locator(".workspace-card", {
+    has: page.locator(".workspace-name", { hasText: new RegExp(`^${name}$`) }),
+  });
 // The canvas's nodes are also a visually hidden list of buttons, for the keyboard, which is how
 // these tests pick a node: a canvas has no element to click.
 const node = (page: import("@playwright/test").Page, name: string | RegExp) =>
   page.getByRole("list", { name: "Nodes in the graph" }).getByRole("button", { name });
 
 test.describe("getting around", () => {
-  test("a browser at the root lands on the app, with the workspaces", async ({ page }) => {
+  test("a browser at the root lands on the app, which lists the workspaces and nothing above them", async ({
+    page,
+  }) => {
+    const asked: string[] = [];
+    page.on("request", (req) => asked.push(new URL(req.url()).pathname));
     await page.goto("/");
     await expect(page).toHaveURL(/\/app\/$/);
-    await expect(row(page, "alpha")).toBeVisible();
-    await expect(row(page, "beta")).toBeVisible();
+    await expect(workspaceCard(page, "alpha")).toBeVisible();
+    await expect(workspaceCard(page, "beta")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Record Explorer", exact: true })).toBeDisabled();
+    expect(asked.filter((path) => path.startsWith("/collections"))).toEqual([]);
   });
 
   test("workspace, then collection, then resource, by clicking", async ({ page }) => {
     await page.goto("/app/");
-    await row(page, "alpha").click();
-    await expect(page).toHaveURL(new RegExp(list("/workspace/alpha")));
+    await workspaceCard(page, "alpha").click();
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha$/);
 
     await row(page, "Question").click();
     await expect(page).toHaveURL(new RegExp(list("/workspace/alpha/question")));
@@ -84,7 +95,20 @@ test.describe("getting around", () => {
     await page.goto("/app/workspace/alpha/Q_1");
     await page.getByRole("button", { name: "LabKit" }).click();
     await expect(page).toHaveURL(/\/app\/$/);
-    await expect(page.getByText("Pick a type on the left")).toBeVisible();
+    await expect(workspaceCard(page, "alpha")).toBeVisible();
+  });
+
+  test("an address that names its workspace only in ?list= names it in its path instead", async ({
+    page,
+  }) => {
+    await page.goto(`/app/?${list("/workspace/alpha/question")}`);
+    await expect(page).toHaveURL(
+      new RegExp(`/app/workspace/alpha\\?${list("/workspace/alpha/question")}$`),
+    );
+    await expect(item(page, "Q_1")).toBeVisible();
+    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha$/);
+    await expect(row(page, "Question")).toBeVisible();
   });
 
   test("the top bar has the LabKit name and no sidebar, history or filter controls", async ({
@@ -183,7 +207,7 @@ test.describe("getting around", () => {
   }) => {
     await page.goto("/app/workspace/alpha/question");
     await expect(item(page, "Q_1")).toBeVisible();
-    await expect(page.getByText("Pick a type on the left")).toBeVisible();
+    await expect(page.getByText("Pick a collection in Record Explorer")).toBeVisible();
     await item(page, "Q_1").click();
     await expect(header(page)).toHaveText("Q_1");
     await expect(page).toHaveURL(new RegExp(`/Q_1\\?${list("/workspace/alpha/question")}$`));
@@ -193,7 +217,7 @@ test.describe("getting around", () => {
   test("a collection picked from the upper pane loads below it, and the upper pane stays", async ({
     page,
   }) => {
-    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await page.goto("/app/workspace/alpha");
     await expect(row(page, "Question")).toBeVisible();
     let release: () => void = () => {};
     const held = new Promise<void>((resolve) => {
@@ -215,14 +239,14 @@ test.describe("getting around", () => {
   test("opening a resource of another type than the listed one closes the Items pane", async ({
     page,
   }) => {
-    await page.goto(`/app/?${list("/workspace/alpha/question")}`);
+    await page.goto(`/app/workspace/alpha?${list("/workspace/alpha/question")}`);
     await item(page, "Q_1").click();
     await expect(header(page)).toHaveText("Q_1");
     await expect(item(page, "Q_2")).toBeVisible();
 
     await page.locator(".card-head", { hasText: "LOE_1" }).click();
     await expect(header(page)).toHaveText("LOE_1");
-    await expect(page).toHaveURL(new RegExp(`${list("/workspace/alpha")}$`));
+    await expect(page).toHaveURL(/\/app\/workspace\/alpha\/LOE_1$/);
     await expect(page.getByText("Pick a collection above to list its items.")).toBeVisible();
     await expect(row(page, "Question")).toBeVisible();
   });
@@ -238,7 +262,7 @@ test.describe("getting around", () => {
   });
 
   test("a collection's next page is added on request", async ({ page }) => {
-    await page.goto(`/app/?${list("/workspace/alpha/question?limit=1")}`);
+    await page.goto(`/app/workspace/alpha?${list("/workspace/alpha/question?limit=1")}`);
     await expect(item(page, "Q_1")).toBeVisible();
     await expect(item(page, "Q_2")).toHaveCount(0);
     await page.getByRole("button", { name: "Load more" }).click();
@@ -315,7 +339,7 @@ test.describe("the sidebar", () => {
     page,
   }) => {
     await page.goto("/app/");
-    await expect(row(page, "alpha")).toBeVisible();
+    await expect(workspaceCard(page, "alpha")).toBeVisible();
     await expect(explorer(page, "File Explorer")).toBeDisabled();
     await expect(explorer(page, "File Explorer")).toHaveAccessibleDescription(
       "Open a workspace to browse its files.",
@@ -516,7 +540,7 @@ test.describe("the sidebar", () => {
   test("File and Source Explorers are enabled once Record Explorer lists a workspace, before any record is open", async ({
     page,
   }) => {
-    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await page.goto("/app/workspace/alpha");
     await expect(row(page, "Question")).toBeVisible();
     await expect(explorer(page, "File Explorer")).toBeEnabled();
     await expect(explorer(page, "Source Explorer")).toBeEnabled();
@@ -763,7 +787,7 @@ test.describe("the sidebar", () => {
   test("Record Explorer lists the workspace's records and acts, and leaves files and history to their own sections", async ({
     page,
   }) => {
-    await page.goto(`/app/?${list("/workspace/alpha")}`);
+    await page.goto("/app/workspace/alpha");
     await expect(row(page, "Question")).toBeVisible();
     await expect(row(page, "Act")).toBeVisible();
     await expect(row(page, "File")).toHaveCount(0);
@@ -972,7 +996,7 @@ test.describe("the Items pane's open row", () => {
   test("in the Collections pane, a box marks the listed collection and slides to the next", async ({
     page,
   }) => {
-    await page.goto(`/app/?${list("/workspace/alpha/question")}`);
+    await page.goto(`/app/workspace/alpha?${list("/workspace/alpha/question")}`);
     const outline = page.locator(".type-list .active-box.outline");
     const top = async (locator: import("@playwright/test").Locator) =>
       Math.round((await locator.boundingBox())?.y ?? -1);
@@ -1332,7 +1356,7 @@ test.describe("workspaces are separate", () => {
   });
 
   test("links inside a workspace stay inside it", async ({ page }) => {
-    await page.goto(`/app/?${list("/workspace/beta/question")}`);
+    await page.goto(`/app/workspace/beta?${list("/workspace/beta/question")}`);
     await item(page, "Q_1").click();
     await expect(page).toHaveURL(/\/app\/workspace\/beta\/Q_1\?/);
     await expect(page.locator(".detail").getByText("beta question")).toBeVisible();
@@ -1435,7 +1459,7 @@ test.describe("the agent's chat in the Trace Console", () => {
     const box = await rail(page).boundingBox();
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBe(page.viewportSize()?.width);
     await page.goto("/app/");
-    await expect(page.getByText("Pick a type on the left")).toBeVisible();
+    await expect(workspaceCard(page, "alpha")).toBeVisible();
     await expect(rail(page)).toHaveCount(0);
   });
 
@@ -1487,7 +1511,7 @@ test.describe("the agent's chat in the Trace Console", () => {
     await expect(page).toHaveURL(/[?&]session=fake-\d+/);
     await page.getByRole("button", { name: "LabKit" }).click();
     await expect(page).toHaveURL(/\/app\/$/);
-    await row(page, "beta").click();
+    await workspaceCard(page, "beta").click();
     await expect(chatToggle(page)).toBeDisabled();
     await expect(chatToggle(page)).toHaveAttribute("title", /maps no folder to the workspace beta/);
     expect(new URL(page.url()).searchParams.get("session")).toBeNull();
@@ -1573,7 +1597,7 @@ test.describe("the agent's chat in the Trace Console", () => {
     await page.getByRole("button", { name: "LabKit" }).click();
     await expect(page).toHaveURL(/\/app\/$/);
     expect(new URL(page.url()).searchParams.get("session")).toBeNull();
-    await row(page, "alpha").click();
+    await workspaceCard(page, "alpha").click();
     await expect(chatToggle(page)).toBeEnabled();
     await expect(page).toHaveURL(new RegExp(`[?&]session=${named}`));
     await expect.poll(() => sent).toEqual(["session/new", "session/load"]);

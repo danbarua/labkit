@@ -1320,3 +1320,44 @@
     flex: none;
   }
 }
+
+/* ---------- the landing view: the workspaces ---------- */
+.trace .workspace-picker {
+  max-width: 640px;
+}
+.trace .workspace-picker h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.trace .workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.trace .workspace-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: left;
+}
+.trace .workspace-card:hover {
+  border-color: var(--accent);
+}
+.trace .workspace-card .workspace-icon {
+  grid-row: span 2;
+  font-size: 22px;
+  color: var(--text-dim);
+}
+.trace .workspace-card .workspace-name {
+  font-weight: 600;
+}
+.trace .workspace-card .mono {
+  font-size: 11.5px;
+}

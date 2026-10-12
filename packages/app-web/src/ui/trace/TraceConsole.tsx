@@ -84,6 +84,7 @@ import { FileTree, History } from "./explorers";
 import { ActiveBox } from "./active-box";
 import { ChatButton, ChatSidebar, useChat } from "./chat-sidebar";
 import { FilterBox, FilterButton, useFilter } from "./filter";
+import { WorkspacePicker } from "./workspace-picker";
 import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
@@ -91,7 +92,8 @@ import { Badge, EventRow, PropRows, type Prose } from "./values";
 import "./trace.css";
 
 /** Where the left column starts: the list of workspaces. */
-const ENTRY = "/collections/workspace";
+/** The API's list of workspaces: the page's landing view lists it, and nothing else. */
+const WORKSPACES = "/workspace";
 
 export type Tab = "overview" | "debug";
 
@@ -176,7 +178,8 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   );
   const [graphOpen, setGraphOpen] = useState(true);
   const explored = useExplored(path);
-  const workspace = workspaceOf(path);
+  // A workspace's own index, `/workspace/<slug>`, is inside that workspace too.
+  const workspace = workspaceOf(`${path}/`);
   useStoreVersion();
   const held = store.index();
 
@@ -187,7 +190,13 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   // Opening what is already open adds no history entry. Opening a resource of another type than
   // the listed collection's lists the collection that one is listed in instead, which closes the
   // Items pane: the reader is following relations, not reading down the list.
-  const shownList = openIsCollection ? path : list;
+  // The workspace in scope: the open resource's, or else that of the collection picked.
+  const scope = workspace ?? (list === undefined ? undefined : workspaceOf(`${list}/`));
+  const workspaceIndex = scope?.replace(/\/$/, "");
+  // Record Explorer lists the open collection, or else the one picked, or else the workspace's
+  // collections. The workspace's own index, open in the centre, lists what is picked under it.
+  const listKey = openIsCollection && path !== workspaceIndex ? path : (list ?? workspaceIndex);
+  const shownList = listKey;
   const open = (key: string) => {
     setDrawer(undefined);
     if (key === path) return;
@@ -202,7 +211,8 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
     void navigate({
       to: "/$",
       params: { _splat: key.replace(/^\//, "") },
-      search: (s) => ({ ...s, list: nextList }),
+      // The workspace's own collections are what Record Explorer lists when nothing is picked.
+      search: (s) => ({ ...s, list: nextList === workspaceIndex ? undefined : nextList }),
     });
   };
   const playback = usePlayback(path, workspace, open);
@@ -210,7 +220,11 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
   // as records are written, and its rows stay on screen until the new page arrives.
   const pickList = (key: string) => {
     store.load(requestPath(key), true);
-    void navigate({ to: ".", search: (s) => ({ ...s, list: key }), replace: true });
+    void navigate({
+      to: ".",
+      search: (s) => ({ ...s, list: key === workspaceIndex ? undefined : key }),
+      replace: true,
+    });
   };
   const pickTab = (next: Tab) =>
     void navigate({
@@ -220,13 +234,20 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
     });
   const home = () => {
     setDrawer(undefined);
-    store.load(requestPath(ENTRY), true);
+    store.load(requestPath(WORKSPACES), true);
     void navigate({ to: "/$", params: { _splat: "" }, search: {} });
   };
 
-  const listKey = openIsCollection ? path : (list ?? ENTRY);
-  // The workspace of the open resource, or else of the collection Record Explorer lists.
-  const scope = workspace ?? workspaceOf(`${listKey}/`);
+  // An address that names its workspace only in `?list=` names it in its path instead.
+  useEffect(() => {
+    if (path !== "" || workspaceIndex === undefined) return;
+    void navigate({
+      to: "/$",
+      params: { _splat: workspaceIndex.replace(/^\//, "") },
+      search: (s) => ({ ...s, list: s.list === workspaceIndex ? undefined : s.list }),
+      replace: true,
+    });
+  }, [path, workspaceIndex, navigate]);
   const chat = useChat({
     slug: scope?.split("/")[2],
     expanded: narrow ? drawer === "chat" : chatShown,
@@ -263,7 +284,7 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
             ].join(" ")}
             workspace={scope}
             listKey={listKey}
-            root={listKey === ENTRY}
+            root={listKey !== undefined && listKey === workspaceIndex}
             openKey={path}
             held={held}
             expanded={narrow ? drawer === "items" : sidebarShown}
@@ -295,6 +316,7 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
                   onPause={playback.pause}
                 />
               )}
+              {path === "" ? <WorkspacePicker onOpen={open} /> : null}
               <Detail
                 path={path}
                 entry={openEntry}
@@ -412,7 +434,8 @@ function Lists({
   className: string;
   /** The open workspace's directory, `/workspace/<slug>/`, or undefined when none is open. */
   workspace: string | undefined;
-  listKey: string;
+  /** The collection Record Explorer lists; undefined when no workspace is in scope. */
+  listKey: string | undefined;
   root: boolean;
   openKey: string;
   held: HeldIndex;
@@ -429,27 +452,31 @@ function Lists({
   const term = itemsFilter.term;
   const filesFilter = useFilter();
   const commitsFilter = useFilter();
-  const listEntry = useDocument(requestPath(listKey));
+  const listEntry = useDocument(listKey === undefined ? undefined : requestPath(listKey));
   // Until the picked collection's first page arrives, the collection it was picked from stays the
   // upper one, so the upper pane does not show the picked collection and then swap back.
   const shown = useRef<string | undefined>(undefined);
-  const upperKey = root
-    ? listKey
-    : docOf(listEntry) !== undefined
-      ? (indexOfList(listKey) ?? listKey)
-      : shown.current !== undefined && rowIn(shown.current, listKey) !== undefined
-        ? shown.current
-        : listKey;
+  const upperKey =
+    listKey === undefined || root
+      ? listKey
+      : docOf(listEntry) !== undefined
+        ? (indexOfList(listKey) ?? listKey)
+        : shown.current !== undefined && rowIn(shown.current, listKey) !== undefined
+          ? shown.current
+          : listKey;
   useEffect(() => {
     shown.current = upperKey;
   });
   const lowerKey = upperKey === listKey ? undefined : listKey;
   // The row for the lower collection, which `list` may name with a query (`?limit=`), is lit.
   const lowerRow = lowerKey === undefined ? undefined : keyOf(lowerKey);
-  const upper = usePages(requestPath(upperKey), readCollection(upperKey));
+  const upper = usePages(
+    upperKey === undefined ? undefined : requestPath(upperKey),
+    readCollection(upperKey ?? ""),
+  );
   const lower = usePages(
     lowerKey === undefined ? undefined : requestPath(lowerKey),
-    readCollection(listKey),
+    readCollection(listKey ?? ""),
   );
   // The Items pane follows the open resource: while it is of the type the pane lists and not among
   // the rows loaded, the next page is loaded, as long as the last one names a next page.
@@ -499,6 +526,8 @@ function Lists({
             ? `${slug} serves no ${what}.`
             : undefined;
   const filesUnavailable = unavailable(filesKey, "files");
+  const recordsUnavailable =
+    listKey === undefined ? "Pick a workspace to browse its records." : undefined;
   const historyUnavailable = unavailable(historyKey, "history");
   // The open sections, in order. A border that can be dragged sits after each but the last.
   const shares: Share[] = [
@@ -520,7 +549,7 @@ function Lists({
           element: historySection,
         }
       : undefined,
-    recordsOpen
+    recordsOpen && recordsUnavailable === undefined
       ? {
           name: "Record Explorer",
           initial: RECORDS_SHARE,
@@ -597,7 +626,7 @@ function Lists({
           <DatabaseIcon aria-hidden="true" />,
           recordsOpen,
           setRecordsOpen,
-          undefined,
+          recordsUnavailable,
         )}
       </nav>
       <aside className={className}>
@@ -670,6 +699,7 @@ function Lists({
         <Explorer
           title="Record Explorer"
           icon={<DatabaseIcon aria-hidden="true" />}
+          unavailable={recordsUnavailable}
           grow={recordsGrow}
           sectionRef={recordsSection}
           open={recordsOpen}
@@ -687,7 +717,7 @@ function Lists({
               )}
               <Pane
                 pages={upper}
-                empty={`Loading ${ENTRY}…`}
+                empty={`Loading ${upperKey ?? ""}…`}
                 {...{ held, openKey, onOpen, onList }}
                 term=""
                 lowerKey={lowerRow}
@@ -1147,10 +1177,11 @@ function Detail({
   onTab: (tab: Tab) => void;
   onOpen: (key: string) => void;
 }) {
-  if (path === "" || isCollection)
+  if (path === "") return null;
+  if (isCollection)
     return (
       <div className="empty-panel first">
-        Pick a type on the left, then an item, to open it here.
+        Pick a collection in Record Explorer, then an item, to open it here.
       </div>
     );
   if (entry?.status === "failed")

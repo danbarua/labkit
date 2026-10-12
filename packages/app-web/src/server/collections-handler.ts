@@ -186,7 +186,9 @@ async function listing(
 async function workspaceListing(
   req: Request,
   workspaces: Workspace[],
-  root: string,
+  self: string,
+  /** The index above the listing; the listing at `/workspace` has none. */
+  up: string | undefined,
 ): Promise<Response> {
   const url = new URL(req.url);
   const origin = publicOrigin(req).origin;
@@ -195,11 +197,11 @@ async function workspaceListing(
   const rows = workspaces.slice(offset, offset + limit + 1);
   const page = rows.slice(0, limit);
 
-  const self = `${root}/${WORKSPACE_SLUG}`;
+  const paging = pagingLinks(up ?? self, self, limit, offset, rows.length > limit);
   return halJson(req, {
     _links: {
       self: { href: `${self}?limit=${limit}&offset=${offset}` },
-      ...linksOf(pagingLinks(root, self, limit, offset, rows.length > limit)),
+      ...linksOf(up === undefined ? paging.filter((l) => l.rel !== "index") : paging),
     },
     offset,
     limit,
@@ -252,12 +254,22 @@ export async function rootCollectionsHandler(
   const name = path.replace(/^\/collections\/?/, "").replace(/\/$/, "");
   const root = `${publicOrigin(req).origin}/collections`;
   if (name === "") return index(req, root, [{ slug: WORKSPACE_SLUG, type: "Workspace" }]);
-  if (name === WORKSPACE_SLUG) return workspaceListing(req, await listWorkspaces(runtime), root);
+  if (name === WORKSPACE_SLUG)
+    return workspaceListing(req, await listWorkspaces(runtime), `${root}/${WORKSPACE_SLUG}`, root);
   return problem(
     404,
     "Not Found",
     `${path} names no workspace. Address a collection inside one: /workspace/{slug}/${name}`,
   );
+}
+
+/**
+ * `/workspace`: every workspace, each addressed by its own index, `/workspace/{slug}`. The same
+ * workspaces as `/collections/workspace`, at the address its items sit under, with no index above.
+ */
+export async function workspacesHandler(req: Request, runtime: Runtime): Promise<Response> {
+  const self = `${publicOrigin(req).origin}/workspace`;
+  return workspaceListing(req, await listWorkspaces(runtime), self, undefined);
 }
 
 // `/workspace/{slug}` and `/workspace/{slug}/{type}`. `rest` is what follows the slug.
