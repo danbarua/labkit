@@ -154,7 +154,7 @@ The browser also keeps whether each section is folded. The sections list:
 
 | Section | Lists | Opening an item shows |
 | --- | --- | --- |
-| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. Each file's icon and colour come from its listed `media_type` (`file-icons.tsx`); a file listed without one has the plain file icon. The box that marks the open file slides to the next file opened. | The file, shown as its media type. |
+| File Explorer | The workspace's files at HEAD, as a tree. A directory's entries are fetched when it is first opened. Each file's icon and colour come from its listed `media_type` (`file-icons.tsx`); a file listed without one has the plain file icon. The box that marks the open file slides to the next file opened. A file opened from anywhere else, such as the graph or a link, opens the folders above it. | The file, shown as its media type. |
 | Source Explorer | Every branch's commits, newest first, with each branch's line drawn beside them as `git log --graph` draws it, and branch names on the commits they point to. A branch picker opens on HEAD's branch and scrolls to the picked branch's tip. The box that marks the open commit slides to the next commit opened. | The commit's properties, message, parents, changed files and diff. A changed file opens as it was at that commit. |
 | Record Explorer | The workspace's collections of records and acts, and the items of the one picked. The `file` and `commit` collections are left out. | The record. |
 

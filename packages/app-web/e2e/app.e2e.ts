@@ -397,6 +397,26 @@ test.describe("the sidebar", () => {
     await expect.poll(async () => (await top(box)) - (await top(file("big.txt")))).toBe(0);
   });
 
+  test("a file opened from a link opens the folders above it in File Explorer, and its row is marked", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    const tree = page.locator(".file-tree");
+    await expect(tree.getByRole("button", { name: "README.md", exact: true })).toBeVisible();
+    await expect(tree.getByRole("button", { name: "plan.md", exact: true })).toHaveCount(0);
+    await page.goto("/app/workspace/alpha/file/notes/plan.md");
+    await expect(header(page)).toHaveText("plan.md");
+    const row = tree.getByRole("button", { name: "plan.md", exact: true });
+    await expect(row).toBeVisible();
+    await expect(row).toHaveClass(/active/);
+    const top = async (locator: import("@playwright/test").Locator) =>
+      Math.round((await locator.boundingBox())?.y ?? -1);
+    await expect
+      .poll(async () => (await top(tree.locator(".active-box.outline"))) - (await top(row)))
+      .toBe(0);
+  });
+
   test("in Source Explorer, a box marks the open commit and slides to the next one opened", async ({
     page,
   }) => {

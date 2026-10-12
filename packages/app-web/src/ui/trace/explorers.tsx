@@ -55,10 +55,18 @@ function Tail({
   );
 }
 
+/** The keys of the directories above `key` in the tree at `rootKey`, top first; none outside it. */
+export function foldersAbove(rootKey: string, key: string): string[] {
+  if (!key.startsWith(`${rootKey}/`)) return [];
+  const segments = key.slice(rootKey.length + 1).split("/");
+  return segments.slice(0, -1).map((_, i) => `${rootKey}/${segments.slice(0, i + 1).join("/")}`);
+}
+
 /**
  * The workspace's files as a tree, from the directory `rootKey`. A directory's entries are
  * fetched when it is first opened. Clicking a file opens it, and the box around the open file
- * slides to it.
+ * slides to it. When a file in the tree opens from anywhere else, such as the graph or a link, the
+ * directories above it open, so its row and the box show; closing one afterwards keeps it closed.
  */
 export function FileTree({
   rootKey,
@@ -71,6 +79,11 @@ export function FileTree({
 }) {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
   const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const above = foldersAbove(rootKey, openKey);
+    if (above.length === 0) return;
+    setOpened((was) => (above.every((key) => was.has(key)) ? was : new Set([...was, ...above])));
+  }, [rootKey, openKey]);
   const toggle = (key: string) =>
     setOpened((was) => {
       const now = new Set(was);
