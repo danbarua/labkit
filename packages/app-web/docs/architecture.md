@@ -56,6 +56,7 @@ collections, `file` (type `File`) and `commit` (type `Commit`).
 | `/workspace/{slug}/commit/{id}/diff/{path}` | One changed file's diff: its status and unified diff, cut at 20,000 characters (`patch_truncated`). |
 | `/workspace/{slug}/file/{path}` | The tree at HEAD: a directory as a collection of its entries, a file as a resource with its text, cut at 100,000 characters (`content_truncated`). A listed file carries `media_type` only when the extension table names its extension; the file's own resource always carries it. |
 | `/workspace/{slug}/commit/{id}/file/{path}` | The same, at that commit. |
+| `/workspace/{slug}/paths` | Every file's path in the tree at HEAD, in name order, as a `paths` array: what the chat offers to mention. Directories and submodules are not listed. At most 5,000 paths; `total` counts them all and `truncated` says when some are left out. The top directory at HEAD links it as `paths`. |
 | `/workspace/{slug}/raw/{path}` | A file's committed bytes at HEAD, as its media type. A file over 20 MiB gets a 413 that names its size. |
 | `/workspace/{slug}/commit/{id}/raw/{path}` | The same, at that commit. |
 | `/workspace/{slug}/commit/{id}/changes` | The files the commit changed, with their status, paged. |
