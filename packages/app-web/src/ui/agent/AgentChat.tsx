@@ -1,11 +1,12 @@
 import { SCENARIOS } from "@labkit/acp-scenarios";
-import { Conversation } from "@labkit/ui";
+import { Conversation, type PickItem } from "@labkit/ui";
 import "@labkit/ui/ui.css";
 import { AGENT_CWD, AGENT_URL } from "../agent-endpoint";
 import { RECORD_TYPES } from "../record-types";
 import { useSavedTheme } from "../saved-theme";
 import { useState } from "react";
 import { CONNECTING, NEW, resolveLink, SESSIONS, useAgentSession } from "./agent-session";
+import { mentionedLinks } from "./mentions";
 import { SessionPicker } from "./SessionPicker";
 
 /**
@@ -19,6 +20,7 @@ export function AgentChat({
   sessionId,
   onStarted,
   onPick,
+  mentions,
   shown = true,
   themeButton = false,
 }: {
@@ -30,6 +32,8 @@ export function AgentChat({
   onStarted: (sessionId: string) => void;
   /** Opens another session in this folder: `/sessions` lists them. Without it there is no `/sessions`. */
   onPick?: (sessionId: string) => void;
+  /** The files a message can mention with `@`; each one mentioned is sent with it as a link. */
+  mentions?: readonly PickItem[];
   shown?: boolean;
   /** Whether the conversation draws its own theme button, for a page with no top bar. */
   themeButton?: boolean;
@@ -62,11 +66,12 @@ export function AgentChat({
           theme={theme}
           {...(themeButton ? { onThemeChange: setTheme } : {})}
           hostCommands={onPick === undefined ? [NEW] : [NEW, SESSIONS]}
+          {...(mentions === undefined ? {} : { mentions })}
           {...(attach === undefined ? {} : { attach })}
           composerUnavailable={status === "connecting" ? CONNECTING : undefined}
           onSend={(text, files) => {
             if (onPick !== undefined && text.trim() === `/${SESSIONS.name}`) setPicking(true);
-            else send(text, files);
+            else send(text, files, mentions === undefined ? [] : mentionedLinks(text, mentions));
           }}
           onCancel={cancel}
           onAnswer={answer}

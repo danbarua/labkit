@@ -5,9 +5,13 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
+import { mentionItems } from "../agent/mentions";
+import { collectionOf, FILE_TYPE, hrefOf, keyOf } from "./hal";
+import { docOf, requestPath, useDocument } from "./hal-store";
 import { useSavedNumber } from "../saved-flag";
 
 // The agent exists only in the dev server, so the chat is dev-only: in a production build
@@ -242,6 +246,42 @@ export function ChatButton({ chat, onToggle }: { chat: Chat; onToggle: () => voi
 }
 
 /**
+ * Every file's path at HEAD in the workspace `slug`, from the files API: the workspace's index
+ * names its file collection, whose top links `paths`. Nothing is asked for until `wanted`. A list
+ * the API cut short is used as it is, with a warning naming how many files it left out.
+ */
+function useFilePaths(slug: string, wanted: boolean): readonly string[] | undefined {
+  const indexKey = `/workspace/${slug}`;
+  const index = docOf(useDocument(wanted ? requestPath(indexKey) : undefined));
+  const filesKey =
+    index === undefined
+      ? undefined
+      : collectionOf(indexKey, index).items.find((item) => item.data.type === FILE_TYPE)?.key;
+  const files = docOf(
+    useDocument(filesKey === undefined ? undefined : requestPath(`${filesKey}?limit=1`)),
+  );
+  const pathsHref = files === undefined ? undefined : hrefOf(files, "paths");
+  const listed = docOf(
+    useDocument(pathsHref === undefined ? undefined : requestPath(keyOf(pathsHref))),
+  );
+  const paths = listed?.paths;
+  const list = useMemo(
+    () =>
+      Array.isArray(paths) ? paths.filter((p): p is string => typeof p === "string") : undefined,
+    [paths],
+  );
+  useEffect(() => {
+    if (listed?.truncated === true)
+      console.warn("chat mentions: the files API listed only some of the workspace's files", {
+        slug,
+        listed: list?.length,
+        total: listed.total,
+      });
+  }, [listed, list, slug]);
+  return list;
+}
+
+/**
  * The agent's chat at the right of the page. At full width the rail beside it stays when it is
  * minimised; in a narrow window it is a drawer over the page, and its button is in the top bar.
  * The chat's sessions open in the workspace's folder; a workspace the mapping file does not map has
@@ -258,8 +298,14 @@ export function ChatSidebar({
 }) {
   const [width, setWidth] = useSavedNumber("labkit.trace.chat.width", CHAT_WIDTH);
   const [resizing, setResizing] = useState(false);
-  if (AgentChat === undefined) return null;
   const { folder, shown } = chat;
+  const paths = useFilePaths(chat.slug, chat.connected);
+  const cwd = folder.kind === "mapped" ? folder.cwd : undefined;
+  const mentions = useMemo(
+    () => (cwd === undefined || paths === undefined ? undefined : mentionItems(cwd, paths)),
+    [cwd, paths],
+  );
+  if (AgentChat === undefined) return null;
   return (
     <>
       {shown && !narrow ? (
@@ -281,6 +327,7 @@ export function ChatSidebar({
               sessionId={chat.sessionId}
               onStarted={chat.onStarted}
               onPick={chat.onPick}
+              {...(mentions === undefined ? {} : { mentions })}
               shown={shown}
             />
           </Suspense>
