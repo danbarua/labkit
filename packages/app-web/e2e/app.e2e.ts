@@ -480,6 +480,27 @@ test.describe("the sidebar", () => {
     );
   });
 
+  test("a file opened from a commit's changes opens its folders in File Explorer and marks the same path at HEAD", async ({
+    page,
+  }) => {
+    await page.goto("/app/workspace/alpha/Q_1");
+    await explorer(page, "File Explorer").click();
+    await explorer(page, "Source Explorer").click();
+    const tree = page.locator(".file-tree");
+    await expect(tree.getByRole("button", { name: "README.md", exact: true })).toBeVisible();
+    await page.locator(".history .commit-row", { hasText: "Change a, plan the work" }).click();
+    await expect(page.locator(".header-type")).toHaveText("Commit");
+    await page
+      .locator(".kv:has(.change-status)")
+      .getByRole("button", { name: "notes/plan.md" })
+      .click();
+    await expect(header(page)).toHaveText("plan.md");
+    await expect(page).toHaveURL(/\/commit\/[0-9a-f]+\/file\/notes\/plan\.md/);
+    const row = tree.getByRole("button", { name: "plan.md", exact: true });
+    await expect(row).toBeVisible();
+    await expect(row).toHaveClass(/active/);
+  });
+
   test("in Source Explorer, a box marks the open commit and slides to the next one opened", async ({
     page,
   }) => {

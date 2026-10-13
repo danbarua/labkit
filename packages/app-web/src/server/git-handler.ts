@@ -692,6 +692,9 @@ function file(
     atCommit
       ? `${base}/${COMMIT_SLUG}/${commit}/${route}/${pathHref(path)}`
       : `${base}/${route}/${pathHref(path)}`;
+  // A file read at a commit links the same path in the tree at HEAD, when it is there, so File
+  // Explorer, which shows HEAD, can follow it.
+  const atHead = atCommit && pathAtHead(repo, path);
   const blob = entry.toObject(repo).peelToBlob();
   const size = Number(blob.size());
   const binary = blob.isBinary();
@@ -700,6 +703,9 @@ function file(
     self: { href: self, type: FILE_TYPE },
     index: { href: parent },
     commit: { href: `${base}/${COMMIT_SLUG}/${commit}`, type: COMMIT_TYPE },
+    ...(atHead
+      ? { head: { href: `${base}/${FILE_SLUG}/${pathHref(path)}`, type: FILE_TYPE } }
+      : {}),
     history: { href: sibling("history") },
     raw: { href: sibling("raw"), type: mediaType },
     [REL.changedBy]: changedBy.map((c) => ({ ...c._links.self, dir: "in" })),
@@ -858,6 +864,19 @@ function rawFile(
         "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
     },
   });
+}
+
+/** Whether the tree at HEAD holds a file at `path`. A repository with no commits holds none. */
+function pathAtHead(repo: Repository, path: string): boolean {
+  let tree: Tree;
+  try {
+    tree = repo.getCommit(repo.revparseSingle("HEAD")).tree();
+  } catch (err) {
+    if (isNotFound(err)) return false;
+    throw err;
+  }
+  const entry = tree.getPath(path);
+  return entry !== null && typeOf(entry) === FILE_TYPE;
 }
 
 /**
