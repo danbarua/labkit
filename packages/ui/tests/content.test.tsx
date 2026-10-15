@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ContentCard } from "../content/card";
 import { CodeView, JsonView } from "../content/code";
 import { DiffView } from "../content/diff";
-import { rowsOfPatch } from "../format";
+import { rowsOfPatch } from "../content/diff-rows";
 
 describe("JSON as code", () => {
   test("keys, strings and numbers are coloured, and the text stays text", () => {

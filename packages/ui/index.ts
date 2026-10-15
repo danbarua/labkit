@@ -6,7 +6,7 @@ export { useLingering, WorkingIndicator } from "./conversation/blocks";
 export { ContentCard } from "./content/card";
 export { CodeView, JsonView, languageOf } from "./content/code";
 export { DiffView, TextDiff } from "./content/diff";
-export { diffLines, filesOfPatch, rowsOfPatch } from "./format";
+export { diffLines, filesOfPatch, rowsOfPatch } from "./content/diff-rows";
 export type { ResolveLink } from "./content/links";
 export { Loader, type LoaderMood } from "./base/loader";
 export { type StepFigures, StepStats } from "./conversation/step-stats";

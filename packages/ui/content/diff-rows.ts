@@ -1,5 +1,3 @@
-import type { Cost, ToolCallStatus } from "@agentclientprotocol/sdk";
-
 export type DiffLine = { readonly kind: "same" | "add" | "remove"; readonly text: string };
 
 /** Beyond this many line pairs a diff is drawn as a plain removal and addition. */
@@ -102,24 +100,6 @@ export function diffLines(before: string, after: string): DiffLine[] {
   for (; i < a.length; i++) out.push({ kind: "remove", text: a[i] as string });
   for (; j < b.length; j++) out.push({ kind: "add", text: b[j] as string });
   return out;
-}
-
-export const STATUS_LABEL: Record<ToolCallStatus, string> = {
-  pending: "Pending",
-  in_progress: "Running",
-  completed: "Done",
-  failed: "Failed",
-};
-
-export function formatCost(cost: Cost): string {
-  const symbol = cost.currency === "USD" ? "$" : `${cost.currency} `;
-  return `${symbol}${cost.amount.toFixed(2)}`;
-}
-
-/** How full a context window is, as a whole percentage held between 0 and 100. */
-export function fillPercent(used: number, size: number): number {
-  if (size <= 0) return 0;
-  return Math.min(100, Math.max(0, Math.round((used / size) * 100)));
 }
 
 /** A patch's header lines before its first hunk, which name the file rather than change it. */

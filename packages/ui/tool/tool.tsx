@@ -17,7 +17,6 @@ import {
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { STATUS_LABEL } from "../format";
 import { CodeView } from "../content/code";
 import { TextDiff } from "../content/diff";
 import { toolTally } from "../conversation/grouping";
@@ -297,6 +296,13 @@ const wasRefused = (call: ToolCall, decision: { tone: string } | undefined): boo
   (typeof call.rawOutput === "object" &&
     call.rawOutput !== null &&
     (call.rawOutput as { refused?: unknown }).refused === true);
+
+const STATUS_LABEL: Record<ToolCallStatus, string> = {
+  pending: "Pending",
+  in_progress: "Running",
+  completed: "Done",
+  failed: "Failed",
+};
 
 const STATUS_ICON: Record<string, Icon> = {
   cancelled: MinusCircleIcon,

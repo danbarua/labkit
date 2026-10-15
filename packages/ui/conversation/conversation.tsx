@@ -29,7 +29,7 @@ import {
   WorkingIndicator,
 } from "./blocks";
 import { Composer } from "../composer/composer";
-import { fillPercent, formatCost } from "../format";
+import { fillPercent, formatCost } from "../base/format";
 import type { PickItem } from "../overlay/list";
 import { ToastProvider } from "../overlay/toast";
 import { PermissionBatch, PermissionPrompt } from "../requests/permission";
