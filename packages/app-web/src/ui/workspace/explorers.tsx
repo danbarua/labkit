@@ -15,7 +15,7 @@ import {
   hrefOf,
   keyOf,
 } from "./hal";
-import { filterItems } from "@labkit/ui";
+import { classNames, filterItems } from "@labkit/ui";
 import { ActiveBox } from "./active-box";
 import { fileLook } from "./file-icons";
 import { usePathsOf } from "./file-paths";
@@ -402,16 +402,18 @@ export function History({
         const row = matching === undefined ? rows[i] : undefined;
         const id = String(item.id ?? "");
         const names = Array.isArray(item.data.branches) ? item.data.branches.map(String) : [];
-        const classes = ["commit-row", "timeline-row"];
-        if (item.key === openKey) classes.push("active");
-        if (id === tip) classes.push("tip");
         return (
           <button
             key={item.key}
             type="button"
             data-key={item.key}
             data-id={id}
-            className={classes.join(" ")}
+            className={classNames(
+              "commit-row",
+              "timeline-row",
+              item.key === openKey && "active",
+              id === tip && "tip",
+            )}
             title={String(item.data.name ?? "")}
             onClick={() => onOpen(item.key)}
           >

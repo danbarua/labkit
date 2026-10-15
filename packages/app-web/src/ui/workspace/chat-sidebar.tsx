@@ -1,4 +1,4 @@
-import { IconButton } from "@labkit/ui";
+import { classNames, IconButton } from "@labkit/ui";
 import { ChatCircleDotsIcon } from "@phosphor-icons/react";
 import {
   type CSSProperties,
@@ -274,9 +274,7 @@ export function ChatSidebar({
         <ChatBorder width={width} setWidth={setWidth} onDragging={setResizing} />
       ) : null}
       <aside
-        className={["chat-sidebar", shown ? "open" : "collapsed", resizing ? "resizing" : ""]
-          .filter(Boolean)
-          .join(" ")}
+        className={classNames("chat-sidebar", shown ? "open" : "collapsed", resizing && "resizing")}
         style={{ "--chat-width": `${width}px` } as CSSProperties}
         aria-label="Agent"
       >

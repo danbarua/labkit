@@ -1,5 +1,6 @@
 import { XIcon } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import { classNames } from "../base/class-names";
 import { IconButton } from "../base/icon-button";
 import { useFocusTrap } from "./focus-trap";
 
@@ -49,9 +50,7 @@ export function Modal({
     // biome-ignore lint/a11y/useKeyWithClickEvents: the backdrop click's keyboard twin is Escape, handled by onCancel
     <dialog
       ref={ref}
-      className={["lk-modal", className, place ? "lk-modal-placed" : undefined]
-        .filter(Boolean)
-        .join(" ")}
+      className={classNames("lk-modal", className, place && "lk-modal-placed")}
       {...(place === undefined
         ? {}
         : {

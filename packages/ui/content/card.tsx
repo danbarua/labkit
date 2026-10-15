@@ -1,5 +1,6 @@
 import { CaretRightIcon } from "@phosphor-icons/react";
 import { type ReactNode, useState } from "react";
+import { classNames } from "../base/class-names";
 
 /**
  * A card whose content may be any length, such as a file or a diff: a header that folds it, with
@@ -41,7 +42,7 @@ export function ContentCard({
   const shown = open ?? kept;
   const toggle = onToggle ?? (() => setKept(!kept));
   return (
-    <section className={["lk-card", shown ? "open" : "", className ?? ""].join(" ").trim()}>
+    <section className={classNames("lk-card", shown && "open", className)}>
       <div className="lk-card-head">
         <button
           type="button"

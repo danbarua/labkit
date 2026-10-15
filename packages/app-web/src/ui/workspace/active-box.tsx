@@ -1,4 +1,4 @@
-import { prefersReducedMotion } from "@labkit/ui";
+import { classNames, prefersReducedMotion } from "@labkit/ui";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** How long the open row's box takes to slide from one row to another, in milliseconds. */
@@ -77,11 +77,15 @@ export function ActiveBox({
   // Two layers: the fill under the rows, so it does not tint their text, and the outline over
   // them, so the hover background of the row it slides to does not hide it.
   const style = { transform: `translateY(${box.top}px)`, height: box.height };
-  const state = [box.slide ? "" : "placed", filled ? "filled" : ""].join(" ");
+  const state = [!box.slide && "placed", filled && "filled"] as const;
   return (
     <>
-      <div className={`active-box fill ${state}`} style={style} aria-hidden="true" />
-      <div className={`active-box outline ${state}`} style={style} aria-hidden="true" />
+      <div className={classNames("active-box fill", ...state)} style={style} aria-hidden="true" />
+      <div
+        className={classNames("active-box outline", ...state)}
+        style={style}
+        aria-hidden="true"
+      />
     </>
   );
 }

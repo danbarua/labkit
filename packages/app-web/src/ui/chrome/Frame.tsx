@@ -1,4 +1,4 @@
-import { ThemeToggle } from "@labkit/ui";
+import { classNames, ThemeToggle } from "@labkit/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import markUrl from "@labkit/design/mark.svg";
@@ -54,7 +54,7 @@ export function TopBar({
 export function Frame({
   bar,
   end,
-  className = "",
+  className,
   children,
 }: {
   /** The page's controls in the top bar, after the name. */
@@ -67,7 +67,7 @@ export function Frame({
   const [theme] = useSavedTheme();
   return (
     <div
-      className={`lk-root lk-frame ${className}`.trim()}
+      className={classNames("lk-root lk-frame", className)}
       data-theme={theme === "system" ? undefined : theme}
     >
       <TopBar end={end}>{bar}</TopBar>

@@ -6,6 +6,7 @@
  */
 
 import {
+  classNames,
   ContentCard,
   ICONS,
   IconButton,
@@ -281,11 +282,11 @@ export function WorkspacePage({ path, list, tab, session }: WorkspacePageProps) 
             onClick={() => setDrawer(undefined)}
           />
           <Lists
-            className={[
+            className={classNames(
               "sidebar",
-              drawer === "items" ? "open" : "",
-              sidebarShown ? "" : "collapsed",
-            ].join(" ")}
+              drawer === "items" && "open",
+              !sidebarShown && "collapsed",
+            )}
             workspace={scope}
             listKey={listKey}
             root={listKey !== undefined && listKey === workspaceIndex}
@@ -852,9 +853,7 @@ function Explorer({
   return (
     <section
       ref={sectionRef}
-      className={["explorer", shown ? "open" : "", closing ? "closing" : "", moving ? "moving" : ""]
-        .filter(Boolean)
-        .join(" ")}
+      className={classNames("explorer", shown && "open", closing && "closing", moving && "moving")}
       style={{
         flexGrow: shown ? grow : 0,
         minHeight: closing ? topHeight.current : undefined,
@@ -1104,12 +1103,11 @@ function ResourceRow({
   title?: string;
   onOpen: (key: string) => void;
 }) {
-  const cls = ["res-item", unresolved ? "unresolved" : "", active ? "active" : ""].filter(Boolean);
   return (
     <button
       data-key={itemKey}
       type="button"
-      className={cls.join(" ")}
+      className={classNames("res-item", unresolved && "unresolved", active && "active")}
       title={title}
       onClick={() => onOpen(itemKey)}
     >
