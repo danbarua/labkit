@@ -8,7 +8,6 @@
 import {
   classNames,
   ContentCard,
-  ICONS,
   IconButton,
   JsonView,
   prefersReducedMotion,
@@ -32,7 +31,6 @@ import {
   FolderIcon,
   GitCommitIcon,
   type Icon,
-  IconContext,
   PauseIcon,
   PlayIcon,
   SealCheckIcon,
@@ -53,9 +51,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { TopBar } from "../chrome/Frame";
+import { Frame } from "../chrome/Frame";
 import { useSavedFlag, useSavedNumber } from "../saved-flag";
-import { useSavedTheme } from "../saved-theme";
 import { GraphView, type GraphEdgeSeed, type GraphNodeSeed, type Overlay } from "../GraphView";
 import {
   COMMIT_TYPE,
@@ -160,7 +157,6 @@ export interface WorkspacePageProps {
 
 export function WorkspacePage({ path, list, tab, session }: WorkspacePageProps) {
   const navigate = useNavigate();
-  const [theme] = useSavedTheme();
   // In a narrow window, the drawer open over the page: the sidebar's, or the agent's chat.
   const [drawer, setDrawer] = useState<"items" | "chat" | undefined>();
   // At full width the sidebar is shown or hidden, as this browser last left it; in a narrow
@@ -261,86 +257,78 @@ export function WorkspacePage({ path, list, tab, session }: WorkspacePageProps) 
   const prose = proseFor(held, path, open);
 
   return (
-    <IconContext.Provider value={ICONS}>
-      <div
-        className="lk-root lk-frame workspace-page"
-        data-theme={theme === "system" ? undefined : theme}
-      >
-        <TopBar
-          onHome={home}
-          end={
-            narrow && chat !== undefined ? <ChatButton chat={chat} onToggle={toggleChat} /> : null
-          }
+    <Frame
+      className="workspace-page"
+      onHome={home}
+      end={narrow && chat !== undefined ? <ChatButton chat={chat} onToggle={toggleChat} /> : null}
+    >
+      <div className="body">
+        <button
+          type="button"
+          className={drawer === undefined ? "scrim" : "scrim open"}
+          aria-label="Close the column"
+          tabIndex={-1}
+          onClick={() => setDrawer(undefined)}
         />
-
-        <div className="body">
-          <button
-            type="button"
-            className={drawer === undefined ? "scrim" : "scrim open"}
-            aria-label="Close the column"
-            tabIndex={-1}
-            onClick={() => setDrawer(undefined)}
-          />
-          <Lists
-            className={classNames(
-              "sidebar",
-              drawer === "items" && "open",
-              !sidebarShown && "collapsed",
-            )}
-            workspace={scope}
-            listKey={listKey}
-            root={listKey !== undefined && listKey === workspaceIndex}
-            openKey={path}
-            fileKey={fileKey}
-            held={held}
-            expanded={narrow ? drawer === "items" : sidebarShown}
-            onToggle={() =>
-              narrow
-                ? setDrawer((d) => (d === "items" ? undefined : "items"))
-                : setSidebarShown(!sidebarShown)
-            }
-            onShow={() => (narrow ? setDrawer("items") : setSidebarShown(true))}
-            onOpen={open}
-            onList={pickList}
-          />
-          <main className="main">
-            <div className="detail">
-              {workspace === undefined ? null : (
-                <GraphCard
-                  open={graphOpen}
-                  workspace={workspace}
-                  explored={explored.keys}
-                  generation={explored.generation}
-                  held={held}
-                  selected={path}
-                  playback={playback.playback}
-                  canPlay={playsFrom(held, path) || (openIsCollection && listsActs(path))}
-                  onToggle={() => setGraphOpen((o) => !o)}
-                  onOpen={open}
-                  onReset={explored.reset}
-                  onPlay={playback.play}
-                  onPause={playback.pause}
-                />
-              )}
-              {path === "" ? <WorkspacePicker onOpen={open} /> : null}
-              <Detail
-                path={path}
-                entry={openEntry}
-                isCollection={openIsCollection}
-                held={held}
-                tab={tab}
-                prose={prose}
-                onTab={pickTab}
-                onOpen={open}
-              />
-            </div>
-          </main>
-          {chat === undefined ? null : (
-            <ChatSidebar chat={chat} narrow={narrow} onToggle={toggleChat} />
+        <Lists
+          className={classNames(
+            "sidebar",
+            drawer === "items" && "open",
+            !sidebarShown && "collapsed",
           )}
-        </div>
+          workspace={scope}
+          listKey={listKey}
+          root={listKey !== undefined && listKey === workspaceIndex}
+          openKey={path}
+          fileKey={fileKey}
+          held={held}
+          expanded={narrow ? drawer === "items" : sidebarShown}
+          onToggle={() =>
+            narrow
+              ? setDrawer((d) => (d === "items" ? undefined : "items"))
+              : setSidebarShown(!sidebarShown)
+          }
+          onShow={() => (narrow ? setDrawer("items") : setSidebarShown(true))}
+          onOpen={open}
+          onList={pickList}
+        />
+        <main className="main">
+          <div className="detail">
+            {workspace === undefined ? null : (
+              <GraphCard
+                open={graphOpen}
+                workspace={workspace}
+                explored={explored.keys}
+                generation={explored.generation}
+                held={held}
+                selected={path}
+                playback={playback.playback}
+                canPlay={playsFrom(held, path) || (openIsCollection && listsActs(path))}
+                onToggle={() => setGraphOpen((o) => !o)}
+                onOpen={open}
+                onReset={explored.reset}
+                onPlay={playback.play}
+                onPause={playback.pause}
+              />
+            )}
+            {path === "" ? <WorkspacePicker onOpen={open} /> : null}
+            <Detail
+              path={path}
+              entry={openEntry}
+              isCollection={openIsCollection}
+              held={held}
+              tab={tab}
+              prose={prose}
+              onTab={pickTab}
+              onOpen={open}
+            />
+          </div>
+        </main>
+        {chat === undefined ? null : (
+          <ChatSidebar chat={chat} narrow={narrow} onToggle={toggleChat} />
+        )}
       </div>
-    </IconContext.Provider>
+    </Frame>
   );
 }
 
