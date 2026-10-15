@@ -13,7 +13,7 @@ import { type Activity, activityLabel, activityMood, sameActivity } from "./acti
 import { MessageAttachments } from "../composer/attachments";
 import { MarkdownText } from "../content/markdown";
 import { Loader, type LoaderMood } from "../base/loader";
-import { ContentView } from "../tool/tool";
+import { ContentView } from "../content/content-block";
 
 type Kind<K extends Block["kind"]> = Extract<Block, { kind: K }>;
 

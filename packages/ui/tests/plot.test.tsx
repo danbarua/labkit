@@ -26,7 +26,7 @@ describe("a chart in a tool's result", () => {
   });
 
   test("a resource of another type is still drawn as its text", async () => {
-    const { ContentView } = await import("../tool/tool");
+    const { ContentView } = await import("../content/content-block");
     const html = renderToStaticMarkup(
       <ContentView
         block={{ type: "resource", resource: { uri: "x", mimeType: "text/plain", text: "hello" } }}

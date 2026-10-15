@@ -2,7 +2,7 @@ import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { FileIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { formatBytes } from "../base/format";
-import { useLink } from "../content/links";
+import { useLink, useMediaSource } from "../content/links";
 
 /** What a composer accepts as attachments. Without these a composer takes no files. */
 export interface AttachLimits {
@@ -179,8 +179,7 @@ function FileChip({ name, size, href }: { name: string; size?: number; href?: st
 }
 
 function SentImage({ block }: { block: Sent<"image"> }) {
-  const linked = useLink(block.data === "" ? block.uri : undefined);
-  const src = block.data === "" ? linked : `data:${block.mimeType};base64,${block.data}`;
+  const src = useMediaSource(block);
   const name = nameIn(block.uri) ?? block.mimeType;
   if (src === undefined) return <FileChip name={name} />;
   return <img className="lk-message-image" src={src} alt={name} title={name} />;

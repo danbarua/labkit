@@ -35,3 +35,16 @@ export function useLink(uri: string | null | undefined): string | undefined {
     ? undefined
     : resolved;
 }
+
+/**
+ * Where an image or audio block loads from: its bytes when it carries them, else its link once the
+ * host resolves it (`useLink`). `undefined` while the link is unresolved.
+ */
+export function useMediaSource(block: {
+  readonly data: string;
+  readonly mimeType: string;
+  readonly uri?: string | null | undefined;
+}): string | undefined {
+  const linked = useLink(block.data === "" ? block.uri : undefined);
+  return block.data === "" ? linked : `data:${block.mimeType};base64,${block.data}`;
+}
