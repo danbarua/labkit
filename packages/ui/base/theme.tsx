@@ -1,4 +1,5 @@
 import { DesktopIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
+import { IconButton } from "./icon-button";
 
 /** The colours these components are drawn in: the system's light or dark setting, or one chosen. */
 export type Theme = "system" | "light" | "dark";
@@ -20,17 +21,14 @@ export function ThemeToggle({
   onChange: (theme: Theme) => void;
   className?: string;
 }) {
-  const Icon = ICON[theme];
   const label = `Theme: ${NAME[theme]}. Switch to ${NAME[NEXT[theme]]}`;
   return (
-    <button
-      type="button"
+    <IconButton
       className={className}
-      aria-label={label}
-      title={label}
+      label={label}
+      icon={ICON[theme]}
+      size={16}
       onClick={() => onChange(NEXT[theme])}
-    >
-      <Icon size={16} aria-hidden="true" />
-    </button>
+    />
   );
 }

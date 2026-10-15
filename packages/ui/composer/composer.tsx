@@ -1,5 +1,6 @@
 import type { AvailableCommand, SessionConfigOption } from "@agentclientprotocol/sdk";
 import { ArrowUpIcon, AtIcon, PaperclipIcon, StopIcon } from "@phosphor-icons/react";
+import { IconButton } from "../base/icon-button";
 import { type AttachLimits, AttachmentChips, useAttachments } from "./attachments";
 import { Loader, type LoaderMood } from "../base/loader";
 import {
@@ -403,16 +404,12 @@ export function Composer({
         <div className="lk-composer-bar">
           {attach === undefined ? null : (
             <>
-              <button
-                type="button"
-                className="lk-icon-btn"
-                aria-label="Attach files"
-                title="Attach files"
+              <IconButton
+                label="Attach files"
+                icon={PaperclipIcon}
                 disabled={!available}
                 onClick={() => picker.current?.click()}
-              >
-                <PaperclipIcon aria-hidden="true" />
-              </button>
+              />
               <input
                 ref={picker}
                 type="file"
@@ -440,17 +437,13 @@ export function Composer({
             </button>
           )}
           {mentions === undefined ? null : (
-            <button
-              type="button"
-              className="lk-icon-btn"
+            <IconButton
+              label="Mention"
+              icon={AtIcon}
               aria-haspopup="dialog"
-              aria-label="Mention"
-              title="Mention"
               disabled={!available}
               onClick={() => setOverlay("mentions")}
-            >
-              <AtIcon aria-hidden="true" />
-            </button>
+            />
           )}
           <SessionControls
             options={configOptions}

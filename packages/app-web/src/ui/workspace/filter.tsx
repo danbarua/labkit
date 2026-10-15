@@ -1,3 +1,4 @@
+import { IconButton } from "@labkit/ui";
 import { MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
@@ -33,16 +34,14 @@ export function FilterButton({
   onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className={shown ? "filter-btn on" : "filter-btn"}
-      aria-label={`Filter the ${what}`}
+    <IconButton
+      className="filter-btn"
+      on={shown}
+      label={`Filter the ${what}`}
+      icon={MagnifyingGlassIcon}
       aria-expanded={shown}
-      title={`Filter the ${what}`}
       onClick={onToggle}
-    >
-      <MagnifyingGlassIcon aria-hidden="true" />
-    </button>
+    />
   );
 }
 

@@ -2,6 +2,7 @@ import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { FileIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { formatBytes } from "../base/format";
+import { IconButton } from "../base/icon-button";
 import { useLink, useMediaSource } from "../content/links";
 
 /** What a composer accepts as attachments. Without these a composer takes no files. */
@@ -114,15 +115,12 @@ export function AttachmentChips({
               <Preview file={file} />
               <span className="lk-attachment-name">{file.name}</span>
               <span className="lk-attachment-size">{formatBytes(file.size)}</span>
-              <button
-                type="button"
-                className="lk-icon-btn"
-                aria-label={`Remove ${file.name}`}
+              <IconButton
+                label={`Remove ${file.name}`}
                 title="Remove"
+                icon={XIcon}
                 onClick={() => onRemove(i)}
-              >
-                <XIcon aria-hidden="true" />
-              </button>
+              />
             </li>
           ))}
         </ul>

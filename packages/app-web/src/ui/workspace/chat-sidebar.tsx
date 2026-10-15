@@ -1,3 +1,4 @@
+import { IconButton } from "@labkit/ui";
 import { ChatCircleDotsIcon } from "@phosphor-icons/react";
 import {
   type CSSProperties,
@@ -230,17 +231,15 @@ export function useChat({
 /** The button that shows or hides the agent's chat: in the rail, or in a narrow window, the top bar. */
 export function ChatButton({ chat, onToggle }: { chat: Chat; onToggle: () => void }) {
   return (
-    <button
-      type="button"
-      className={chat.shown ? "rail-btn on" : "rail-btn"}
-      aria-label="Show or hide the agent"
+    <IconButton
+      className="rail-btn"
+      on={chat.shown}
+      label="Show or hide the agent"
+      icon={ChatCircleDotsIcon}
       aria-expanded={chat.shown}
-      title={chat.unavailable ?? "Show or hide the agent"}
-      disabled={chat.unavailable !== undefined}
+      unavailable={chat.unavailable}
       onClick={onToggle}
-    >
-      <ChatCircleDotsIcon aria-hidden="true" />
-    </button>
+    />
   );
 }
 

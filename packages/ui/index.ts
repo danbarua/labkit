@@ -9,6 +9,7 @@ export { DiffView, TextDiff } from "./content/diff";
 export { diffLines, filesOfPatch, rowsOfPatch } from "./content/diff-rows";
 export type { ResolveLink } from "./content/links";
 export { isRecord } from "./content/value";
+export { IconButton } from "./base/icon-button";
 export { Loader, type LoaderMood } from "./base/loader";
 export { type StepFigures, StepStats } from "./conversation/step-stats";
 export { ElicitationForm, problemsWith } from "./requests/elicitation";

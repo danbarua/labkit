@@ -5,7 +5,7 @@
  * pasted link opens it again.
  */
 
-import { ContentCard, ICONS, JsonView } from "@labkit/ui";
+import { ContentCard, ICONS, IconButton, JsonView } from "@labkit/ui";
 import "@labkit/ui/content.css";
 import {
   ArrowClockwiseIcon,
@@ -592,59 +592,49 @@ function Lists({
   // and shows the sidebar.
   const railButton = (
     title: string,
-    icon: ReactNode,
+    icon: Icon,
     open: boolean,
     setOpen: (next: boolean) => void,
     unavailable: string | undefined,
   ) => {
     const showing = expanded && open && unavailable === undefined;
     return (
-      <button
-        type="button"
-        className={showing ? "rail-btn on" : "rail-btn"}
-        aria-label={`Open ${title}`}
+      <IconButton
+        className="rail-btn"
+        on={showing}
+        label={`Open ${title}`}
+        title={title}
+        icon={icon}
         aria-pressed={showing}
-        title={unavailable ?? title}
-        disabled={unavailable !== undefined}
+        unavailable={unavailable}
         onClick={() => {
           setOpen(!showing);
           if (!showing) onShow();
         }}
-      >
-        {icon}
-      </button>
+      />
     );
   };
   return (
     <>
       <nav className="rail" aria-label="Sidebar sections">
-        <button
-          type="button"
+        <IconButton
           className="rail-btn"
-          aria-label="Show or hide the sidebar"
+          label="Show or hide the sidebar"
+          icon={SidebarSimpleIcon}
           aria-expanded={expanded}
-          title="Show or hide the sidebar"
           onClick={onToggle}
-        >
-          <SidebarSimpleIcon aria-hidden="true" />
-        </button>
-        {railButton(
-          "File Explorer",
-          <FolderIcon aria-hidden="true" />,
-          filesOpen,
-          setFilesOpen,
-          filesUnavailable,
-        )}
+        />
+        {railButton("File Explorer", FolderIcon, filesOpen, setFilesOpen, filesUnavailable)}
         {railButton(
           "Source Explorer",
-          <GitCommitIcon aria-hidden="true" />,
+          GitCommitIcon,
           historyOpen,
           setHistoryOpen,
           historyUnavailable,
         )}
         {railButton(
           "Record Explorer",
-          <DatabaseIcon aria-hidden="true" />,
+          DatabaseIcon,
           recordsOpen,
           setRecordsOpen,
           recordsUnavailable,

@@ -7,6 +7,7 @@ import {
   type Icon,
   ShieldIcon,
 } from "@phosphor-icons/react";
+import { IconButton } from "../base/icon-button";
 import type { PickItem } from "../overlay/list";
 
 type Select = Extract<SessionConfigOption, { type: "select" }>;
@@ -157,16 +158,12 @@ export function SessionControls({
         );
       })}
       {rest.length === 0 || readOnly ? null : (
-        <button
-          type="button"
-          className="lk-icon-btn"
+        <IconButton
+          label="Session settings"
+          icon={GearSixIcon}
           aria-haspopup="dialog"
-          aria-label="Session settings"
-          title="Session settings"
           onClick={() => onOpen("settings")}
-        >
-          <GearSixIcon aria-hidden="true" />
-        </button>
+        />
       )}
     </>
   );

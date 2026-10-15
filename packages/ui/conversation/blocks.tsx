@@ -12,6 +12,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Activity, activityLabel, activityMood, sameActivity } from "./activity";
 import { MessageAttachments } from "../composer/attachments";
 import { MarkdownText } from "../content/markdown";
+import { IconButton } from "../base/icon-button";
 import { Loader, type LoaderMood } from "../base/loader";
 import { ContentView } from "../content/content-block";
 
@@ -72,30 +73,22 @@ function MessageToolbar({
   };
   return (
     <div className="lk-message-toolbar">
-      <button
-        type="button"
-        className="lk-icon-btn"
-        aria-label={copied ? "Copied" : "Copy"}
-        title={copied ? "Copied" : "Copy"}
+      <IconButton
+        label={copied ? "Copied" : "Copy"}
+        icon={copied ? CheckIcon : CopyIcon}
         onClick={copy}
-      >
-        {copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
-      </button>
+      />
       {onAction === undefined
         ? null
         : actions.map((action) => {
             const { label, Glyph } = ACTIONS[action];
             return (
-              <button
+              <IconButton
                 key={action}
-                type="button"
-                className="lk-icon-btn"
-                aria-label={label}
-                title={label}
+                label={label}
+                icon={Glyph}
                 onClick={() => onAction(action, block)}
-              >
-                <Glyph aria-hidden="true" />
-              </button>
+              />
             );
           })}
     </div>

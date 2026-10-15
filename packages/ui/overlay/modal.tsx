@@ -1,5 +1,6 @@
 import { XIcon } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import { IconButton } from "../base/icon-button";
 import { useFocusTrap } from "./focus-trap";
 
 /**
@@ -81,9 +82,7 @@ export function Modal({
           ) : (
             <header className="lk-modal-head">
               <h2 id={titleId}>{title}</h2>
-              <button type="button" className="lk-icon-btn" aria-label="Close" onClick={onClose}>
-                <XIcon aria-hidden="true" />
-              </button>
+              <IconButton label="Close" icon={XIcon} onClick={onClose} />
             </header>
           )}
           {children}
