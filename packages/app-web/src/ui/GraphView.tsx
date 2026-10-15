@@ -55,7 +55,18 @@ type Camera = { yaw: number; pitch: number; distance: number };
 /** A point in the graph's space: the plane of the force layout, and depth by order first seen. */
 type Point3 = { x: number; y: number; z: number };
 
-type Drag = { x: number; y: number; yaw: number; pitch: number };
+/** A position in the window, in CSS pixels. */
+type Point2 = { x: number; y: number };
+
+/**
+ * What the pointers pressed on the canvas do to the camera, measured from where they were when a
+ * pointer was last pressed or released. One pointer orbits: it turns the camera from `yaw` and
+ * `pitch` as it moves from `from`. Two pinch: the camera's distance scales with how much nearer or
+ * further apart they are than `gap`, from `distance`.
+ */
+type Gesture =
+  | { kind: "orbit"; from: Point2; yaw: number; pitch: number }
+  | { kind: "pinch"; gap: number; distance: number };
 
 type Sim = {
   nodes: Map<string, SimNode>;
@@ -72,7 +83,7 @@ type Sim = {
   pivot: Point3 | null;
   /** Scales every force, and falls each tick; below HEAT_MIN the layout is not computed. */
   heat: number;
-  /** Whether the camera frames the open node by itself: set when a node opens, cleared by a drag or a scroll. */
+  /** Whether the camera frames the open node by itself: set when a node opens, cleared by a drag, a pinch or a scroll. */
   follow: boolean;
   /** The yaw the framing chose, which the sway swings about; null until it chooses after following starts. */
   aim: number | null;
@@ -82,7 +93,14 @@ type Sim = {
   pointerOn: boolean;
   /** Whether the reader's system asks for reduced motion. The camera does not sway when it does. */
   reducedMotion: boolean;
-  drag: Drag | null;
+  /** The pointers pressed on the canvas and not yet released, by pointer id, where each is now. */
+  pointers: Map<number, Point2>;
+  /** What the pressed pointers do to the camera; null while none is pressed. */
+  gesture: Gesture | null;
+  /**
+   * Whether the pointers pressed since the canvas last had none have moved the camera or pinched.
+   * The click that ends such a press opens no node.
+   */
   dragged: boolean;
 };
 
@@ -1071,9 +1089,104 @@ export function createSim(): Sim {
     swayPhase: 0,
     pointerOn: false,
     reducedMotion: false,
-    drag: null,
+    pointers: new Map(),
+    gesture: null,
     dragged: false,
   };
+}
+
+/** How far the camera can be from the pivot, as a scroll or a pinch zooms it. */
+const ZOOM = { min: 120, max: 2200 };
+/**
+ * How far, in pixels, a pressed pointer must move, or a pinch's two pointers must close or part,
+ * before the gesture takes the camera from the framing.
+ */
+const DRAG_SLOP = 4;
+/** How far the camera turns, in radians, for each pixel an orbiting pointer moves. */
+const ORBIT_RATE = 0.006;
+
+/** Stops the camera framing the open node, as a drag, a pinch or a scroll takes it. */
+function takeCamera(sim: Sim): void {
+  sim.follow = false;
+  sim.aim = null;
+}
+
+function zoomTo(sim: Sim, distance: number): void {
+  sim.camera.distance = Math.max(ZOOM.min, Math.min(ZOOM.max, distance));
+}
+
+/**
+ * The gesture the pressed pointers make from where they are now: none, an orbit by the one
+ * pointer, or a pinch by the first two pressed. A third pointer moves nothing.
+ */
+function gestureOf(sim: Sim): Gesture | null {
+  const [first, second] = sim.pointers.values();
+  if (first === undefined) return null;
+  if (second === undefined)
+    return { kind: "orbit", from: first, yaw: sim.camera.yaw, pitch: sim.camera.pitch };
+  return { kind: "pinch", gap: gapBetween(first, second), distance: sim.camera.distance };
+}
+
+/** The distance between two pointers, at least 1 pixel, so a pinch never divides by 0. */
+function gapBetween(a: Point2, b: Point2): number {
+  return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+}
+
+/**
+ * Records a pointer pressed on the canvas at `at`. The gesture starts again from the pointers'
+ * positions, so the camera does not jump when a second pointer joins or one is lifted. A second
+ * pointer makes the press a pinch, whose click opens no node.
+ */
+export function pressPointer(sim: Sim, id: number, at: Point2): void {
+  const stale = sim.pointers.get(id);
+  if (stale !== undefined) {
+    console.warn(
+      `graph view: pointer ${id}, pressed at (${stale.x}, ${stale.y}), is pressed again at (${at.x}, ${at.y}) with no release between; the earlier press is dropped`,
+    );
+    sim.pointers.delete(id);
+  }
+  if (sim.pointers.size === 0) sim.dragged = false;
+  sim.pointers.set(id, at);
+  if (sim.pointers.size > 1) sim.dragged = true;
+  sim.gesture = gestureOf(sim);
+}
+
+/** Records a pointer lifted or cancelled. One pressed elsewhere changes nothing. */
+export function releasePointer(sim: Sim, id: number): void {
+  if (!sim.pointers.delete(id)) return;
+  sim.gesture = gestureOf(sim);
+}
+
+/**
+ * Moves a pressed pointer to `at`, and turns or zooms the camera. Returns false for a pointer not
+ * pressed on the canvas, such as a mouse passing over it.
+ */
+export function movePointer(sim: Sim, id: number, at: Point2): boolean {
+  const gesture = sim.gesture;
+  if (gesture === null || !sim.pointers.has(id)) return false;
+  sim.pointers.set(id, at);
+  switch (gesture.kind) {
+    case "orbit": {
+      const dx = at.x - gesture.from.x;
+      const dy = at.y - gesture.from.y;
+      if (Math.hypot(dx, dy) > DRAG_SLOP) {
+        sim.dragged = true;
+        takeCamera(sim);
+      }
+      sim.camera.yaw = gesture.yaw + dx * ORBIT_RATE;
+      sim.camera.pitch = gesture.pitch - dy * ORBIT_RATE;
+      return true;
+    }
+    case "pinch": {
+      const [first, second] = sim.pointers.values();
+      if (first === undefined || second === undefined) return true;
+      const gap = gapBetween(first, second);
+      if (Math.abs(gap - gesture.gap) > DRAG_SLOP) takeCamera(sim);
+      // Pointers moving apart bring the camera nearer.
+      zoomTo(sim, (gesture.distance * gesture.gap) / gap);
+      return true;
+    }
+  }
 }
 
 function resizeCanvas(
@@ -1111,6 +1224,8 @@ export function GraphView({
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const simRef = useRef<Sim>(createSim());
   const reducedMotion = useMediaQuery(REDUCED_MOTION);
+  // A device whose main pointer cannot hover, such as a phone or a tablet, zooms by pinching.
+  const touch = useMediaQuery("(hover: none)");
   const sizeRef = useRef({ width: 0, height: 0 });
   const navigateRef = useRef(onNavigate);
   navigateRef.current = onNavigate;
@@ -1144,27 +1259,15 @@ export function GraphView({
     const wrap = canvas.parentElement;
     if (wrap) ro.observe(wrap);
 
+    const at = (event: PointerEvent): Point2 => ({ x: event.clientX, y: event.clientY });
     const onPointerDown = (event: PointerEvent) => {
-      const s = simRef.current;
-      s.dragged = false;
-      s.drag = { x: event.clientX, y: event.clientY, yaw: s.camera.yaw, pitch: s.camera.pitch };
+      pressPointer(simRef.current, event.pointerId, at(event));
       canvas.classList.add("dragging");
     };
     const onPointerMove = (event: PointerEvent) => {
       const s = simRef.current;
+      if (movePointer(s, event.pointerId, at(event))) return;
       const rect = canvas.getBoundingClientRect();
-      if (s.drag) {
-        const dx = event.clientX - s.drag.x;
-        const dy = event.clientY - s.drag.y;
-        if (Math.hypot(dx, dy) > 4) {
-          s.dragged = true;
-          s.follow = false;
-          s.aim = null;
-        }
-        s.camera.yaw = s.drag.yaw + dx * 0.006;
-        s.camera.pitch = s.drag.pitch - dy * 0.006;
-        return;
-      }
       const mx = event.clientX - rect.left;
       const my = event.clientY - rect.top;
       const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
@@ -1174,10 +1277,12 @@ export function GraphView({
       setHoverId(s.hoverId);
       setPointerOn(inside);
     };
-    const onPointerUp = () => {
+    // The browser fires pointercancel instead of pointerup when it stops reporting a pointer, for
+    // example when the operating system uses a touch for its own gesture. Either releases it.
+    const onPointerUp = (event: PointerEvent) => {
       const s = simRef.current;
-      s.drag = null;
-      canvas.classList.remove("dragging");
+      releasePointer(s, event.pointerId);
+      if (s.pointers.size === 0) canvas.classList.remove("dragging");
     };
     const onClick = (event: MouseEvent) => {
       const s = simRef.current;
@@ -1189,10 +1294,9 @@ export function GraphView({
     };
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      simRef.current.follow = false;
-      simRef.current.aim = null;
-      const cam = simRef.current.camera;
-      cam.distance = Math.max(120, Math.min(2200, cam.distance + event.deltaY * 0.6));
+      const s = simRef.current;
+      takeCamera(s);
+      zoomTo(s, s.camera.distance + event.deltaY * 0.6);
     };
     const onLeave = () => {
       simRef.current.hoverId = null;
@@ -1204,6 +1308,7 @@ export function GraphView({
     canvas.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("click", onClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("pointerleave", onLeave);
@@ -1213,6 +1318,7 @@ export function GraphView({
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("click", onClick);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("pointerleave", onLeave);
@@ -1238,7 +1344,7 @@ export function GraphView({
   return (
     <div id="stage-wrap">
       <canvas id="stage" ref={canvasRef} className="orbit" />
-      <div className="hint">drag to orbit · scroll to zoom</div>
+      <div className="hint">drag to orbit · {touch ? "pinch" : "scroll"} to zoom</div>
       <div id="popover" className={carded === null ? "popover hidden" : "popover"}>
         {carded === null ? null : summary(carded)}
       </div>

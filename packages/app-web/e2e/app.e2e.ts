@@ -1080,6 +1080,57 @@ test.describe("the graph", () => {
     await expect.poll(anchorFilled).toBe(true);
   });
 
+  test.describe("on a touch screen", () => {
+    test.use({ hasTouch: true });
+
+    test("two fingers moving apart zoom in on the open resource's node", async ({ page }) => {
+      await page.goto("/app/workspace/alpha/LOE_1");
+      await expect(header(page)).toHaveText("LOE_1");
+      await expect(page.locator(".hint")).toHaveText("drag to orbit · pinch to zoom");
+      // Whether every pixel of a square `side` pixels across, centred where the open resource's
+      // node is drawn, is opaque. While the camera frames the node, the node is at most 30 pixels
+      // across; with the camera as near as a pinch can bring it, about 75.
+      const anchorFilled = (side: number) =>
+        page.locator("#stage").evaluate((el, side) => {
+          const c = el as HTMLCanvasElement;
+          const half = Math.floor(side / 2);
+          const data = c
+            .getContext("2d")
+            ?.getImageData(
+              Math.floor(c.width * 0.35) - half,
+              Math.floor(c.height * 0.45) - half,
+              side,
+              side,
+            ).data;
+          if (!data) return false;
+          for (let i = 3; i < data.length; i += 4) if ((data[i] ?? 0) < 250) return false;
+          return true;
+        }, side);
+      await expect.poll(() => anchorFilled(5)).toBe(true);
+      expect(await anchorFilled(41)).toBe(false);
+
+      // Touch input as the browser receives it from a screen, not events made up in the page.
+      const stage = await page.locator("#stage").boundingBox();
+      if (stage === null) throw new Error("the canvas has no box");
+      const cdp = await page.context().newCDPSession(page);
+      const x = stage.x + stage.width / 2;
+      const y = stage.y + stage.height / 2;
+      const fingers = (apart: number) => [
+        { x: x - apart / 2, y, id: 0 },
+        { x: x + apart / 2, y, id: 1 },
+      ];
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: fingers(40) });
+      for (const apart of [100, 200, 300, 400]) {
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: fingers(apart),
+        });
+      }
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await expect.poll(() => anchorFilled(41)).toBe(true);
+    });
+  });
+
   test("the colour toggle switches, and there is no 2D view or standing overlay", async ({
     page,
   }) => {
