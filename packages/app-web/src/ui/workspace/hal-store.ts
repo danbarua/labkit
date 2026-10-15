@@ -4,7 +4,14 @@
  */
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { type HalDocument, type HeldIndex, indexOf, keyOf } from "./hal";
+import {
+  type CollectionItem,
+  collectionOf,
+  type HalDocument,
+  type HeldIndex,
+  indexOf,
+  keyOf,
+} from "./hal";
 
 /** A request's state. A document fetched again stays readable, as `previous`, until the new one arrives. */
 export type Entry =
@@ -220,4 +227,14 @@ export function usePages<T>(
     if (next !== undefined) setAsked({ first, after: [...after, requestPath(next)] });
   };
   return { items, next, loading, error, more };
+}
+
+/**
+ * The pages of the collection at `href`, from its first page on, as collection items. `href` may
+ * carry a query, such as `?limit=200`, which the request keeps. `undefined` requests nothing.
+ */
+export function useCollectionPages(href: string | undefined): Pages<CollectionItem> {
+  return usePages(href === undefined ? undefined : requestPath(href), (doc) =>
+    collectionOf(keyOf(href ?? ""), doc),
+  );
 }

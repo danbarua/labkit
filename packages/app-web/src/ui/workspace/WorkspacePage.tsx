@@ -82,6 +82,7 @@ import {
   resourcePath,
   store,
   useDocument,
+  useCollectionPages,
   usePages,
   useStoreVersion,
 } from "./hal-store";
@@ -400,13 +401,6 @@ function rowIn(upper: string, key: string): CollectionItem | undefined {
   return doc && collectionOf(upper, doc).items.find((item) => item.key === keyOf(key));
 }
 
-const readCollection =
-  (key: string) =>
-  (doc: HalDocument): { items: CollectionItem[]; next: string | undefined } => {
-    const c = collectionOf(key, doc);
-    return { items: c.items, next: c.next };
-  };
-
 /**
  * Two collections. The one picked is the lower one when it names the collection it is listed in
  * (its `index` link), and that one is the upper; otherwise it is the upper one alone. The list of
@@ -467,14 +461,8 @@ function Lists({
   const lowerKey = upperKey === listKey ? undefined : listKey;
   // The row for the lower collection, which `list` may name with a query (`?limit=`), is lit.
   const lowerRow = lowerKey === undefined ? undefined : keyOf(lowerKey);
-  const upper = usePages(
-    upperKey === undefined ? undefined : requestPath(upperKey),
-    readCollection(upperKey ?? ""),
-  );
-  const lower = usePages(
-    lowerKey === undefined ? undefined : requestPath(lowerKey),
-    readCollection(listKey ?? ""),
-  );
+  const upper = useCollectionPages(upperKey);
+  const lower = useCollectionPages(lowerKey);
   // The Items pane follows the open resource: while it is of the type the pane lists and not among
   // the rows loaded, the next page is loaded, as long as the last one names a next page.
   const openType = held.get(openKey)?.type;

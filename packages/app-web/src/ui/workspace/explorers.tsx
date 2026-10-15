@@ -6,31 +6,16 @@
 
 import { CaretRightIcon, FolderIcon, FolderOpenIcon } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import {
-  type CollectionItem,
-  collectionOf,
-  DIRECTORY_TYPE,
-  fmtDate,
-  type HalDocument,
-  hrefOf,
-  keyOf,
-} from "./hal";
+import { DIRECTORY_TYPE, fmtDate, hrefOf } from "./hal";
 import { classNames, filterItems } from "@labkit/ui";
 import { ActiveBox } from "./active-box";
 import { fileLook } from "./file-icons";
 import { usePathsOf } from "./file-paths";
-import { docOf, requestPath, useDocument, usePages } from "./hal-store";
+import { docOf, requestPath, useCollectionPages, useDocument } from "./hal-store";
 import { type LaneRow, lanesOf, widthOf } from "./lanes";
 
 /** How many entries of a directory, or commits of the history, one request asks for. */
 const PAGE = 200;
-
-const read =
-  (key: string) =>
-  (doc: HalDocument): { items: CollectionItem[]; next: string | undefined } => {
-    const c = collectionOf(key, doc);
-    return { items: c.items, next: c.next };
-  };
 
 /** A note, a spinner line, or a button for the next page, under a list. */
 function Tail({
@@ -188,7 +173,7 @@ function Directory({
   openKey: string;
   onOpen: (key: string) => void;
 }) {
-  const pages = usePages(requestPath(`${dirKey}?limit=${PAGE}`), read(dirKey));
+  const pages = useCollectionPages(`${dirKey}?limit=${PAGE}`);
   const indent = { paddingLeft: `${6 + depth * 14}px` };
   return (
     <>
@@ -317,13 +302,11 @@ export function History({
   const history = docOf(useDocument(requestPath(`${historyKey}?limit=1`)));
   const timelineHref = history === undefined ? undefined : hrefOf(history, "timeline");
   const branchesHref = history === undefined ? undefined : hrefOf(history, "branches");
-  const timeline = usePages(
-    timelineHref === undefined ? undefined : requestPath(`${timelineHref}?limit=${PAGE}`),
-    read(timelineHref === undefined ? "" : keyOf(timelineHref)),
+  const timeline = useCollectionPages(
+    timelineHref === undefined ? undefined : `${timelineHref}?limit=${PAGE}`,
   );
-  const branchPages = usePages(
-    branchesHref === undefined ? undefined : requestPath(`${branchesHref}?limit=${PAGE}`),
-    read(branchesHref === undefined ? "" : keyOf(branchesHref)),
+  const branchPages = useCollectionPages(
+    branchesHref === undefined ? undefined : `${branchesHref}?limit=${PAGE}`,
   );
   const branches = branchPages.items.map((item) => ({
     name: String(item.data.name ?? item.id ?? ""),

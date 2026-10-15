@@ -6,8 +6,8 @@
 import { CodeView, ContentCard, DiffView, MarkdownText, rowsOfPatch } from "@labkit/ui";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import { APP_BASE } from "../../app-base";
-import { collectionOf, type HalDocument, keyOf } from "./hal";
-import { requestPath, usePages } from "./hal-store";
+import { type HalDocument, hrefOf, keyOf, linksOf } from "./hal";
+import { requestPath, useCollectionPages } from "./hal-store";
 
 /** The properties a file or a commit shows in its own card rather than as a property row. */
 export const SHOWN_APART: Readonly<Record<string, readonly string[]>> = {
@@ -123,9 +123,9 @@ export function FileView({
   const size = `${Number(attrs.size ?? 0).toLocaleString("en")} bytes`;
   const content = typeof attrs.content === "string" ? attrs.content : undefined;
   const note = noteOf(attrs, content);
-  const self = hrefsOf(doc, "self")[0] ?? "";
+  const self = hrefOf(doc, "self") ?? "";
   // The raw route reads no query, so the view's parameters, which every link carries, are left off.
-  const raw = keyOf(hrefsOf(doc, "raw")[0] ?? "");
+  const raw = keyOf(hrefOf(doc, "raw") ?? "");
   const mediaType = typeof attrs.media_type === "string" ? attrs.media_type : "";
   const lines = content === undefined ? 0 : content.replace(/\n$/, "").split("\n").length;
   const lineCount = `${lines} ${lines === 1 ? "line" : "lines"}`;
@@ -228,21 +228,12 @@ export function FileView({
   }
 }
 
-/** The href of `doc`'s link `rel`, or each of them, when it has several. */
-function hrefsOf(doc: HalDocument, rel: string): string[] {
-  return [doc._links?.[rel] ?? []].flat().map((link) => link.href);
-}
-
 /**
  * The files a commit changed, with their status, from its `changes` collection: the first page,
  * then each next page asked for.
  */
 function ChangedFiles({ href, onOpen }: { href: string; onOpen: (key: string) => void }) {
-  const key = keyOf(href);
-  const pages = usePages(requestPath(href), (doc) => {
-    const c = collectionOf(key, doc);
-    return { items: c.items, next: c.next };
-  });
+  const pages = useCollectionPages(href);
   return (
     <>
       {pages.items.map((item) => (
@@ -293,9 +284,9 @@ export function CommitView({
 }) {
   const message = typeof attrs.message === "string" ? attrs.message : "";
   const body = message.split("\n").slice(1).join("\n").trim();
-  const parents = hrefsOf(doc, "parent:commit");
-  const changes = hrefsOf(doc, "changes")[0];
-  const diff = hrefsOf(doc, "diff")[0];
+  const parents = linksOf(doc, "parent:commit").map((link) => link.href);
+  const changes = hrefOf(doc, "changes");
+  const diff = hrefOf(doc, "diff");
   return (
     <>
       {body === "" ? null : (
@@ -333,11 +324,7 @@ export function CommitView({
  * then each next page asked for. Only this page asks for a commit's diff.
  */
 function Diffs({ href }: { href: string }) {
-  const key = keyOf(href);
-  const pages = usePages(requestPath(href), (doc) => {
-    const c = collectionOf(key, doc);
-    return { items: c.items, next: c.next };
-  });
+  const pages = useCollectionPages(href);
   return (
     <>
       {pages.items.map((item) => {
