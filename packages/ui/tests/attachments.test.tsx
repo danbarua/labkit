@@ -55,14 +55,14 @@ describe("which files are taken", () => {
   });
 });
 
-describe("the composer's paperclip", () => {
-  test("is there only when the composer takes files", () => {
+describe("the composer's file chooser", () => {
+  test("is there only when the composer takes files, and takes the types it accepts", () => {
     const without = renderToStaticMarkup(<Composer running={false} onSend={() => {}} />);
-    expect(without).not.toContain("Attach files");
+    expect(without).not.toContain('type="file"');
     const withFiles = renderToStaticMarkup(
       <Composer running={false} onSend={() => {}} attach={{ accept: ["image/*"], maxFiles: 3 }} />,
     );
-    expect(withFiles).toContain('aria-label="Attach files"');
+    expect(withFiles).toContain('type="file"');
     expect(withFiles).toContain('accept="image/*"');
   });
 });

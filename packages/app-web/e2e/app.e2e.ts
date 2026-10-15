@@ -143,6 +143,78 @@ test.describe("getting around", () => {
     await page.waitForTimeout(1500);
   });
 
+  test.describe("the composer's menu", () => {
+    // The gallery's first composer: it takes files, commands and mentions, and has settings. At
+    // 1280 pixels its box is about 570 wide; at 390, about 310.
+    const open = async (page: import("@playwright/test").Page, width: number) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/app/gallery");
+      const tile = page.locator('section[aria-label="Composer"]');
+      return { tile, button: tile.getByRole("button", { name: "Composer menu" }) };
+    };
+
+    test("opens upward from its button, the arrows move through it, and Escape closes it onto the button", async ({
+      page,
+    }, info) => {
+      test.skip(info.project.name !== "dev", "the gallery exists only in development");
+      const { tile, button } = await open(page, 1280);
+      await button.click();
+      const menu = tile.getByRole("menu");
+      await expect(menu.getByRole("menuitem", { name: "Attach files" })).toBeFocused();
+      const menuBox = await menu.boundingBox();
+      const buttonBox = await button.boundingBox();
+      expect((menuBox?.y ?? 0) + (menuBox?.height ?? 0)).toBeLessThanOrEqual(buttonBox?.y ?? 0);
+      await page.keyboard.press("ArrowUp");
+      await expect(menu.getByRole("menuitem", { name: "Session settings" })).toBeFocused();
+      await page.keyboard.press("ArrowDown");
+      await expect(menu.getByRole("menuitem", { name: "Attach files" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+      await expect(button).toBeFocused();
+    });
+
+    test("a row that opens a picker hands focus back to the menu button when the picker closes", async ({
+      page,
+    }, info) => {
+      test.skip(info.project.name !== "dev", "the gallery exists only in development");
+      const { tile, button } = await open(page, 1280);
+      await button.focus();
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("ArrowDown");
+      await expect(tile.getByRole("menuitem", { name: "Commands" })).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(tile.getByRole("dialog", { name: "Commands" })).toBeVisible();
+      await expect(tile.getByRole("menu")).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await expect(tile.getByRole("dialog", { name: "Commands" })).toHaveCount(0);
+      await expect(button).toBeFocused();
+    });
+
+    test("in a wide composer the settings are chips beside the button; in a narrow one they are rows in the menu", async ({
+      page,
+    }, info) => {
+      test.skip(info.project.name !== "dev", "the gallery exists only in development");
+      const wide = await open(page, 1280);
+      await expect(wide.tile.getByRole("button", { name: "Model: Claude Opus 5.5" })).toBeVisible();
+      await wide.button.click();
+      await expect(wide.tile.getByRole("menuitem", { name: /^Model/ })).toHaveCount(0);
+
+      const narrow = await open(page, 390);
+      await expect(narrow.tile.getByRole("button", { name: "Model: Claude Opus 5.5" })).toHaveCount(
+        0,
+      );
+      await expect(narrow.tile.getByRole("textbox", { name: "Message" })).toHaveAttribute(
+        "placeholder",
+        "Message the agent",
+      );
+      await narrow.button.click();
+      const model = narrow.tile.getByRole("menuitem", { name: "Model: Claude Opus 5.5" });
+      await expect(model).toBeVisible();
+      await model.click();
+      await expect(narrow.tile.getByRole("dialog", { name: "Model" })).toBeVisible();
+    });
+  });
+
   test("the sessions page has the same top bar as the workspace page, with the theme button at its right", async ({
     page,
   }, info) => {
