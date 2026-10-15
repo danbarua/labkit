@@ -2,10 +2,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { admit, formatBytes, MessageAttachments } from "../attachments";
-import { UserMessage } from "../blocks";
-import { Composer } from "../composer";
-import { LinksContext } from "../links";
+import { admit, formatBytes, MessageAttachments } from "../composer/attachments";
+import { UserMessage } from "../conversation/blocks";
+import { Composer } from "../composer/composer";
+import { LinksContext } from "../content/links";
 
 const file = (name: string, type: string, size: number) => ({ name, type, size });
 

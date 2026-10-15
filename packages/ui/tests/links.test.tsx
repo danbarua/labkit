@@ -3,8 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LinksContext, type ResolveLink } from "../links";
-import { ContentView } from "../tool";
+import { LinksContext, type ResolveLink } from "../content/links";
+import { ContentView } from "../tool/tool";
 
 const draw = (block: ContentBlock, resolve?: ResolveLink) =>
   renderToStaticMarkup(

@@ -15,7 +15,7 @@ import {
 import { IconContext } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { afterPause, currentActivity, PAUSE_MS } from "./activity";
-import type { AttachLimits } from "./attachments";
+import type { AttachLimits } from "../composer/attachments";
 import {
   AssistantMessage,
   Compaction,
@@ -28,20 +28,20 @@ import {
   useLingering,
   WorkingIndicator,
 } from "./blocks";
-import { Composer } from "./composer";
-import { fillPercent, formatCost } from "./format";
-import type { PickItem } from "./overlay/list";
-import { ToastProvider } from "./overlay/toast";
-import { PermissionBatch, PermissionPrompt } from "./permission";
-import { type RecordsConfig, RecordsContext } from "./records-context";
-import { SessionControls } from "./session-controls";
-import { type Theme, ThemeToggle } from "./theme";
-import { ICONS } from "./surface";
-import { ElicitationForm, ElicitationReceipt } from "./elicitation";
+import { Composer } from "../composer/composer";
+import { fillPercent, formatCost } from "../format";
+import type { PickItem } from "../overlay/list";
+import { ToastProvider } from "../overlay/toast";
+import { PermissionBatch, PermissionPrompt } from "../requests/permission";
+import { type RecordsConfig, RecordsContext } from "../content/records-context";
+import { SessionControls } from "../composer/session-controls";
+import { type Theme, ThemeToggle } from "../base/theme";
+import { ICONS } from "../base/surface";
+import { ElicitationForm, ElicitationReceipt } from "../requests/elicitation";
 import { type Drawn, drawnBlocks } from "./grouping";
 import { TranscriptItem, useLeaving } from "./leaving";
-import { LinksContext, type ResolveLink } from "./links";
-import { ToolRun } from "./tool";
+import { LinksContext, type ResolveLink } from "../content/links";
+import { ToolRun } from "../tool/tool";
 
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Idle",

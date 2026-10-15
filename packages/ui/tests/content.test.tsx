@@ -5,9 +5,9 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ContentCard } from "../card";
-import { CodeView, JsonView } from "../code";
-import { DiffView } from "../diff";
+import { ContentCard } from "../content/card";
+import { CodeView, JsonView } from "../content/code";
+import { DiffView } from "../content/diff";
 import { rowsOfPatch } from "../format";
 
 describe("JSON as code", () => {

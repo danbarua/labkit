@@ -1,6 +1,6 @@
 import { phase, type TranscriptState } from "@labkit/view-model";
-import type { LoaderMood } from "./loader";
-import { inputPreview } from "./value";
+import type { LoaderMood } from "../base/loader";
+import { inputPreview } from "../content/value";
 
 /** What the agent is doing now, for the indicator under the transcript. */
 export type Activity =

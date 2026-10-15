@@ -9,9 +9,9 @@ import { FIXTURES } from "@labkit/acp-scenarios";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SessionConfigOption } from "@agentclientprotocol/sdk";
-import { commandsMatching } from "../composer";
+import { commandsMatching } from "../composer/composer";
 import type { PickItem } from "../overlay/list";
-import { pickedSetting, settingItems } from "../session-controls";
+import { pickedSetting, settingItems } from "../composer/session-controls";
 import { Conversation, type RecordsConfig } from "../index";
 
 async function draw(id: string, handlers = false): Promise<string> {

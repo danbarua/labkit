@@ -17,12 +17,12 @@ import {
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { STATUS_LABEL } from "./format";
-import { CodeView } from "./code";
-import { TextDiff } from "./diff";
-import { toolTally } from "./grouping";
-import { useLink } from "./links";
-import { isVegaLite, VegaLitePlot } from "./plot";
+import { STATUS_LABEL } from "../format";
+import { CodeView } from "../content/code";
+import { TextDiff } from "../content/diff";
+import { toolTally } from "../conversation/grouping";
+import { useLink } from "../content/links";
+import { isVegaLite, VegaLitePlot } from "../content/plot";
 import { toolView } from "./tool-views";
 import {
   ArgumentsLine,
@@ -31,7 +31,7 @@ import {
   inputPreview,
   sameValue,
   ValueView,
-} from "./value";
+} from "../content/value";
 
 const dataUri = (mimeType: string, data: string): string => `data:${mimeType};base64,${data}`;
 

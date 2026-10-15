@@ -1,7 +1,7 @@
 import type { AvailableCommand, SessionConfigOption } from "@agentclientprotocol/sdk";
 import { ArrowUpIcon, AtIcon, PaperclipIcon, StopIcon } from "@phosphor-icons/react";
 import { type AttachLimits, AttachmentChips, useAttachments } from "./attachments";
-import { Loader, type LoaderMood } from "./loader";
+import { Loader, type LoaderMood } from "../base/loader";
 import {
   type KeyboardEvent,
   useEffect,
@@ -18,9 +18,9 @@ import {
   optionId,
   type PickItem,
   useListNavigation,
-} from "./overlay/list";
-import type { Place } from "./overlay/modal";
-import { CommandPalette } from "./overlay/palette";
+} from "../overlay/list";
+import type { Place } from "../overlay/modal";
+import { CommandPalette } from "../overlay/palette";
 import { arrange, pickedSetting, SessionControls, settingItems } from "./session-controls";
 
 /** The commands whose name starts what has been typed after a leading slash, before any argument. */

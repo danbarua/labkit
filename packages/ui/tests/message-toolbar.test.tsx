@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Conversation } from "../conversation";
+import { Conversation } from "../conversation/conversation";
 
 const events: ViewEvent[] = [
   { type: "prompt_started", content: [{ type: "text", text: "Go" }] },

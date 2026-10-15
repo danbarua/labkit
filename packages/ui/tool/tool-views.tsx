@@ -1,7 +1,7 @@
 import type { ToolCall } from "@agentclientprotocol/sdk";
 import { FileIcon, FolderIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { decode } from "./value";
+import { decode } from "../content/value";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

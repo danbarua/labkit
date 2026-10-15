@@ -1,7 +1,7 @@
 import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { FileIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
-import { useLink } from "./links";
+import { useLink } from "../content/links";
 
 /** What a composer accepts as attachments. Without these a composer takes no files. */
 export interface AttachLimits {

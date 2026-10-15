@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { type DiffLine, type DiffRow, diffLines, foldUnchanged } from "./format";
+import { type DiffLine, type DiffRow, diffLines, foldUnchanged } from "../format";
 
 /**
  * A diff of one file: its lines, marked added or removed, with each long unchanged stretch folded

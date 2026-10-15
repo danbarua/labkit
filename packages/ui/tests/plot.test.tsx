@@ -4,8 +4,8 @@ import { describe, expect, test } from "bun:test";
 import { FIXTURES } from "@labkit/acp-scenarios";
 import { stateOfFixture } from "@labkit/view-model/fixtures";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Conversation } from "../conversation";
-import { isVegaLite } from "../plot";
+import { Conversation } from "../conversation/conversation";
+import { isVegaLite } from "../content/plot";
 
 describe("a chart in a tool's result", () => {
   test("the media types Vega-Lite specs travel under", () => {
@@ -26,7 +26,7 @@ describe("a chart in a tool's result", () => {
   });
 
   test("a resource of another type is still drawn as its text", async () => {
-    const { ContentView } = await import("../tool");
+    const { ContentView } = await import("../tool/tool");
     const html = renderToStaticMarkup(
       <ContentView
         block={{ type: "resource", resource: { uri: "x", mimeType: "text/plain", text: "hello" } }}

@@ -10,10 +10,10 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Activity, activityLabel, activityMood, sameActivity } from "./activity";
-import { MessageAttachments } from "./attachments";
-import { MarkdownText } from "./markdown";
-import { Loader, type LoaderMood } from "./loader";
-import { ContentView } from "./tool";
+import { MessageAttachments } from "../composer/attachments";
+import { MarkdownText } from "../content/markdown";
+import { Loader, type LoaderMood } from "../base/loader";
+import { ContentView } from "../tool/tool";
 
 type Kind<K extends Block["kind"]> = Extract<Block, { kind: K }>;
 

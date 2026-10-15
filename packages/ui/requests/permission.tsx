@@ -1,7 +1,7 @@
 import type { PermissionOption, RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
-import { MarkdownText } from "./markdown";
-import { ValueView } from "./value";
+import { MarkdownText } from "../content/markdown";
+import { ValueView } from "../content/value";
 
 const buttonClass = (kind: PermissionOption["kind"]): string => {
   if (kind === "allow_once") return "lk-btn primary";

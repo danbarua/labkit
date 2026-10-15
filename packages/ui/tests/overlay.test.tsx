@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AvailableCommand } from "@agentclientprotocol/sdk";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Composer, mentionAt } from "../composer";
+import { Composer, mentionAt } from "../composer/composer";
 import { filterItems, inDrawnOrder, type PickItem, stepIndex } from "../overlay/list";
 import { Modal } from "../overlay/modal";
 import { PalettePanel } from "../overlay/palette";

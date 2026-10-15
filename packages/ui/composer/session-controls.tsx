@@ -7,7 +7,7 @@ import {
   type Icon,
   ShieldIcon,
 } from "@phosphor-icons/react";
-import type { PickItem } from "./overlay/list";
+import type { PickItem } from "../overlay/list";
 
 type Select = Extract<SessionConfigOption, { type: "select" }>;
 type Choice = {

@@ -2,7 +2,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { compactCount, StepStats, shortDuration, tokensPerSecond } from "../step-stats";
+import {
+  compactCount,
+  StepStats,
+  shortDuration,
+  tokensPerSecond,
+} from "../conversation/step-stats";
 
 describe("a step's figures", () => {
   test("counts read as people say them", () => {
