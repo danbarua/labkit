@@ -38,7 +38,7 @@ import {
   WrenchIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   type ReactNode,
   type RefObject,
