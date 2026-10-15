@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveInRepository, viewerOf } from "../src/ui/trace/git-views";
+import { resolveInRepository, viewerOf } from "../src/ui/workspace/git-views";
 
 describe("how a file is shown", () => {
   test("is chosen by its media type", () => {

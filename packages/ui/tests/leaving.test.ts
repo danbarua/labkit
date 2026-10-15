@@ -1,7 +1,7 @@
 /** Which items are drawn while one leaves, and where. */
 
 import { describe, expect, test } from "bun:test";
-import { type Shown, withLeaving } from "../leaving";
+import { type Shown, withLeaving } from "../conversation/leaving";
 
 const items = (...keys: string[]) => keys.map((key) => ({ key }));
 const drawn = (shown: readonly Shown<{ key: string }>[]) =>

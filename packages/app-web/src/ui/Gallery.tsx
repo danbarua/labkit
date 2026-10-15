@@ -10,6 +10,7 @@ import { Frame } from "./chrome/Frame";
 import { BuildingBlocks } from "./BuildingBlocks";
 import { useSavedTheme } from "./saved-theme";
 import { type TranscriptEntry, transcriptList, transcriptState } from "./transcripts-api";
+import { messageOf } from "../message-of";
 
 /**
  * Every state in the shared corpus drawn at once: the scripted scenarios in `@labkit/acp-scenarios`
@@ -32,7 +33,7 @@ export default function Gallery() {
     // A request this page gave up on, leaving or remounting, is not a failure to show.
     const failed = (id: string) => (error: unknown) => {
       if (controller.signal.aborted) return;
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = messageOf(error);
       setFailures((prev) => ({ ...prev, [id]: reason }));
     };
     for (const fixture of FIXTURES) {

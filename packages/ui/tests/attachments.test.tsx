@@ -2,10 +2,11 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { admit, formatBytes, MessageAttachments } from "../attachments";
-import { UserMessage } from "../blocks";
-import { Composer } from "../composer";
-import { LinksContext } from "../links";
+import { formatBytes } from "../base/format";
+import { admit, MessageAttachments } from "../composer/attachments";
+import { UserMessage } from "../conversation/blocks";
+import { Composer } from "../composer/composer";
+import { LinksContext } from "../content/links";
 
 const file = (name: string, type: string, size: number) => ({ name, type, size });
 
@@ -48,6 +49,8 @@ describe("which files are taken", () => {
   test("sizes read in the unit a person uses", () => {
     expect(formatBytes(900)).toBe("900 B");
     expect(formatBytes(2048)).toBe("2 KB");
+    expect(formatBytes(1536)).toBe("1.5 KB");
+    expect(formatBytes(15 * 1024 + 300)).toBe("15 KB");
     expect(formatBytes(1536 * 1024)).toBe("1.5 MB");
   });
 });

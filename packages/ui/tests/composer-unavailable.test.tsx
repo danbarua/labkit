@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Composer } from "../composer";
+import { Composer } from "../composer/composer";
 
 const COMMANDS = [{ name: "compact", description: "Compact the conversation" }];
 

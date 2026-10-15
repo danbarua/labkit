@@ -3,8 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Conversation } from "../conversation";
-import { drawnBlocks, toolTally } from "../grouping";
+import { Conversation } from "../conversation/conversation";
+import { drawnBlocks, toolTally } from "../conversation/grouping";
 
 const call = (id: string, name: string, status = "completed"): ViewEvent => ({
   type: "update",

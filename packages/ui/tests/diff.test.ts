@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { type DiffLine, diffLines, filesOfPatch, foldUnchanged, rowsOfPatch } from "../format";
+import {
+  type DiffLine,
+  diffLines,
+  filesOfPatch,
+  foldUnchanged,
+  rowsOfPatch,
+} from "../content/diff-rows";
 
 describe("diffLines", () => {
   test("marks what stayed, what went and what was added", () => {

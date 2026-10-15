@@ -1,7 +1,7 @@
 @import "@labkit/design/tokens.css";
 
 /*
- * Content of unknown length, shared by the chat and the Trace Console: a file as code, a diff, and
+ * Content of unknown length, shared by the chat and the workspace page: a file as code, a diff, and
  * the card either sits in. Inside an element with the `lk-root` class, which carries the tokens.
  */
 .lk-caption {

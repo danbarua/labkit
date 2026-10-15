@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import type { RequestPermissionOutcome } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PermissionBatch, PermissionPrompt } from "../permission";
+import { PermissionBatch, PermissionPrompt } from "../requests/permission";
 
 const entry = (id: string, kinds: string[]): PermissionEntry => ({
   requestId: id,

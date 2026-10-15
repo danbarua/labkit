@@ -5,10 +5,10 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ContentCard } from "../card";
-import { CodeView, JsonView } from "../code";
-import { DiffView } from "../diff";
-import { rowsOfPatch } from "../format";
+import { ContentCard } from "../content/card";
+import { CodeView, JsonView } from "../content/code";
+import { DiffView } from "../content/diff";
+import { rowsOfPatch } from "../content/diff-rows";
 
 describe("JSON as code", () => {
   test("keys, strings and numbers are coloured, and the text stays text", () => {

@@ -6,8 +6,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ToolCall } from "@agentclientprotocol/sdk";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ToolCard } from "../tool";
-import { decode, inlineArguments, sameValue } from "../value";
+import { ToolCard } from "../tool/tool";
+import { decode, inlineArguments, sameValue } from "../content/value";
 
 /** A settled call whose result arrives as one serialised text block and again as raw output. */
 function settled(name: string, rawInput: unknown, result: unknown): ToolCall {

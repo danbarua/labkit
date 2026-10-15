@@ -10,7 +10,7 @@ import {
   patternProblems,
   problemsWith,
   rfc3339,
-} from "../elicitation";
+} from "../requests/elicitation";
 
 const SCHEMA: ElicitationSchema = {
   type: "object",

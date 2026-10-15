@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { IconButton } from "../base/icon-button";
 
 export type ToastTone = "info" | "success" | "error";
 
@@ -84,9 +85,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           {toast.action.label}
         </button>
       )}
-      <button type="button" className="lk-icon-btn" aria-label="Dismiss" onClick={onDismiss}>
-        <XIcon aria-hidden="true" />
-      </button>
+      <IconButton label="Dismiss" icon={XIcon} onClick={onDismiss} />
     </li>
   );
 }

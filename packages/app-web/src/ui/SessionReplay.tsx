@@ -1,45 +1,27 @@
 import { sessionHistory } from "@labkit/acp-client";
-import { useEffect, useState } from "react";
-import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
+import { useLoaded } from "./loaded";
 import type { Recording } from "./playback";
+import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
 import { Page, Replay } from "./Replay";
-
-type Loaded = { kind: "loading" } | { kind: "failed"; message: string } | Recording;
 
 /**
  * A session the agent keeps, replayed from the start: what reopening it shows, an event at a
  * time, at a steady pace (the agent keeps no arrival times). Nothing is sent to it.
  */
 export default function SessionReplay({ sessionId }: { sessionId: string }) {
-  const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoaded({ kind: "loading" });
-    // Deferred a tick, as the agent page does: React's development double-invoke cancels the
-    // first run before it connects, so one connection opens, not two racing for one stream.
-    const timer = setTimeout(() => {
+  const loaded = useLoaded(
+    () =>
       sessionHistory({
         url: AGENT_URL,
         sessionId,
         ...(AGENT_CWD === undefined ? {} : { cwd: AGENT_CWD }),
-      }).then(
-        (events) => {
-          if (!cancelled) setLoaded({ events });
-        },
-        (err: unknown) => {
-          if (cancelled) return;
-          setLoaded({ kind: "failed", message: err instanceof Error ? err.message : String(err) });
-        },
-      );
-    }, 0);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [sessionId]);
-
-  if (!("kind" in loaded)) return <Replay key={sessionId} crumb={sessionId} recording={loaded} />;
+      }).then((events): Recording => ({ events })),
+    sessionId,
+    // Reopening a session opens an ACP connection: see `useLoaded` for why it waits a tick.
+    { deferred: true },
+  );
+  if (loaded.kind === "loaded")
+    return <Replay key={sessionId} crumb={sessionId} recording={loaded.value} />;
   return (
     <Page crumb={sessionId} controls={null}>
       <div className="page">

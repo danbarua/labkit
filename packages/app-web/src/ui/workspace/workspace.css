@@ -1,0 +1,1364 @@
+/*
+ * The workspace page. Every rule is under `.workspace-page`, the page's root, which also carries
+ * `.lk-root` for the LabKit palette and `.lk-frame` for the chrome in `../chrome/chrome.css`, whose
+ * short names for the palette these rules use.
+ */
+.workspace-page {
+  --c-question: #a78bfa;
+  --c-lineofenquiry: #7c9bf5;
+  --c-decision: #f0a13a;
+  --c-evidence: #38bdf8;
+  --c-evidenceunit: #2dd4bf;
+  --c-computation: #4ade80;
+  --c-artefact: #94a3b8;
+  --c-claim: #fb7185;
+  --c-criterion: #d946ef;
+  --c-criterionevaluation: #f472b6;
+  --c-gate: #ef4444;
+  --c-task: #34d399;
+  --c-review: #eab308;
+  --c-note: #fda4af;
+  --c-workspace: #a3e635;
+  --c-act: #8592b0;
+  --c-file: #c4b5fd;
+  --c-commit: #fb923c;
+  /* File Explorer's icons: its folders, and its files by kind (file-icons.tsx). */
+  --f-folder: #e5b567;
+  --f-markdown: #7dd3fc;
+  --f-json: #fbbf24;
+  --f-config: #c084fc;
+  --f-python: #2dd4bf;
+  --f-javascript: #facc15;
+  --f-typescript: #60a5fa;
+  --f-table: #4ade80;
+  --f-html: #f97316;
+  --f-image: #f472b6;
+  --f-pdf: #f87171;
+  --f-text: var(--text-dim);
+  --f-other: var(--text-faint);
+
+  height: 100vh;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-page .chat-sidebar,
+  .workspace-page .spinner,
+  .workspace-page .skeleton .bar,
+  .workspace-page .active-box,
+  .workspace-page .explorer,
+  .workspace-page .sidebar {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---------- badges ---------- */
+.workspace-page .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 5px;
+  line-height: 1.3;
+  color: #0a0f1c;
+  flex: 0 0 auto;
+}
+/* A type drawn as an icon: the icon at the size of the letters it stands in for. */
+.workspace-page .badge.icon svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+.workspace-page .header-top .badge {
+  font-size: 12px;
+  padding: 3px 7px;
+}
+.workspace-page .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  border-radius: 20px;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+.workspace-page .pill.outcome-pass {
+  color: #22c55e;
+  border-color: #22c55e55;
+}
+.workspace-page .pill.outcome-fail {
+  color: #ef4444;
+  border-color: #ef444455;
+}
+.workspace-page .pill.kind-confirmatory {
+  color: #38bdf8;
+  border-color: #38bdf855;
+}
+.workspace-page .pill.kind-exploratory {
+  color: #f0a13a;
+  border-color: #f0a13a55;
+}
+
+.workspace-page .mention {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid var(--mention, var(--line));
+  background: none;
+  color: var(--text);
+}
+.workspace-page button.mention:hover {
+  background: var(--panel-2);
+}
+.workspace-page .mention.unknown {
+  color: var(--text-dim);
+  border-style: dashed;
+}
+.workspace-page .math {
+  font-family: var(--font-mono);
+  font-style: italic;
+  color: var(--c-lineofenquiry);
+}
+.workspace-page .card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.workspace-page .card-head:hover {
+  background: var(--panel-2);
+}
+.workspace-page .card-head .cid {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.workspace-page .card-head .clabel {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* ---------- body layout ---------- */
+.workspace-page .body {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.workspace-page .sidebar {
+  flex: 0 0 288px;
+  width: 288px;
+  min-width: 288px;
+  overflow-x: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* The sidebar's sections fold under their headers. Record Explorer's Items pane scrolls; File
+   Explorer and Source Explorer scroll as a whole. */
+.workspace-page .explorer {
+  /* A folded section has no share, and its minimum height, which is its header's, keeps it
+     visible. An open one has a share, set inline, of the height the others leave. Both have a
+     basis of 0, so the share animates. */
+  flex: 0 1 0;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+.workspace-page .explorer.moving {
+  transition: flex-grow 220ms ease;
+}
+/* An open section may be shorter than its content, which is cut off. A section that is folding
+   keeps its header's height, set inline. */
+.workspace-page .explorer.open,
+.workspace-page .explorer.closing {
+  min-height: 0;
+  overflow: hidden;
+}
+.workspace-page .explorer-top {
+  flex: none;
+}
+.workspace-page .explorer-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+}
+/* A section's header: the button that folds it, then its controls at the right while it is open. */
+.workspace-page .explorer-headrow {
+  display: flex;
+  align-items: center;
+}
+.workspace-page .explorer-headrow .explorer-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.workspace-page .explorer-actions {
+  flex: none;
+  display: inline-flex;
+  padding-right: 10px;
+}
+.workspace-page .explorer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+}
+.workspace-page .explorer-head:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+.workspace-page .explorer-head:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+.workspace-page .explorer-title {
+  white-space: nowrap;
+}
+/* Why a disabled section is unavailable: a line under the header, in line with its title. */
+.workspace-page .explorer-note {
+  margin-top: -6px;
+  padding: 0 14px 8px 58px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+/* The shared content cards (`@labkit/ui`): a file's text, a commit's message, changed files and
+   diffs, the graph and the Debug response, spaced like the page's other panels. */
+.workspace-page .lk-card {
+  margin-bottom: 18px;
+}
+.workspace-page .card-note {
+  margin: -8px 0 18px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.workspace-page .lk-card .card-note {
+  margin: 0 0 8px;
+}
+/* A file shown as a picture, never wider than its card, on a checkerboard that shows where it
+   is transparent. */
+.workspace-page .file-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: repeating-conic-gradient(var(--line) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+}
+.workspace-page .file-markdown {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.workspace-page .message {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.workspace-page .ref {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.workspace-page .ref + .ref {
+  margin-left: 10px;
+}
+.workspace-page .ref:hover {
+  text-decoration: underline;
+}
+.workspace-page .change-status.s-added {
+  color: #22c55e;
+}
+.workspace-page .change-status.s-deleted {
+  color: #ef4444;
+}
+.workspace-page .response-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.workspace-page .lk-card-actions a {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+/* File Explorer and Source Explorer scroll as a whole. */
+.workspace-page .explorer-body.scrolls {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding: 6px 8px 8px;
+}
+.workspace-page .tree-row,
+.workspace-page .commit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+}
+.workspace-page .tree-row:hover,
+.workspace-page .commit-row:hover {
+  background: var(--panel-2);
+}
+.workspace-page .tree-row.active,
+.workspace-page .commit-row.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.workspace-page .tree-icon {
+  flex: none;
+  color: var(--text-dim);
+}
+.workspace-page .tree-icon[data-kind="folder"] {
+  color: var(--f-folder);
+}
+.workspace-page .tree-icon[data-kind="markdown"] {
+  color: var(--f-markdown);
+}
+.workspace-page .tree-icon[data-kind="json"] {
+  color: var(--f-json);
+}
+.workspace-page .tree-icon[data-kind="config"] {
+  color: var(--f-config);
+}
+.workspace-page .tree-icon[data-kind="python"] {
+  color: var(--f-python);
+}
+.workspace-page .tree-icon[data-kind="javascript"] {
+  color: var(--f-javascript);
+}
+.workspace-page .tree-icon[data-kind="typescript"] {
+  color: var(--f-typescript);
+}
+.workspace-page .tree-icon[data-kind="table"] {
+  color: var(--f-table);
+}
+.workspace-page .tree-icon[data-kind="html"] {
+  color: var(--f-html);
+}
+.workspace-page .tree-icon[data-kind="image"] {
+  color: var(--f-image);
+}
+.workspace-page .tree-icon[data-kind="pdf"] {
+  color: var(--f-pdf);
+}
+.workspace-page .tree-icon[data-kind="text"] {
+  color: var(--f-text);
+}
+.workspace-page .tree-icon[data-kind="other"] {
+  color: var(--f-other);
+}
+.workspace-page .caret-space {
+  flex: none;
+  width: 16px;
+}
+/* A line about File Explorer's filter: how many files match, or why none are drawn yet. */
+.workspace-page .tree-note {
+  padding: 2px 6px 6px;
+  font-size: 11.5px;
+}
+.workspace-page .tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-page .commit-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  padding: 5px 6px;
+}
+.workspace-page .commit-line {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.workspace-page .commit-line .sha {
+  flex: none;
+  color: var(--accent);
+  font-size: 11.5px;
+}
+.workspace-page .commit-line .subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A timeline row: the lanes, then the commit's text. Rows touch, so the lanes' lines run on. */
+.workspace-page .history:has(.timeline-row) {
+  display: flex;
+  flex-direction: column;
+}
+.workspace-page .commit-row.timeline-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 6px 0 2px;
+}
+.workspace-page .commit-row.timeline-row.tip {
+  border-color: var(--accent);
+}
+.workspace-page .lanes {
+  flex: none;
+  stroke-width: 1.5;
+}
+.workspace-page .commit-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.workspace-page .ref-pill {
+  flex: none;
+  max-width: 9em;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+.workspace-page .ref-pill.head {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.workspace-page .branch-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.workspace-page .branch-pick select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+}
+.workspace-page .commit-meta {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-page .sidebar-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.workspace-page .explorer-body .sidebar-section:last-child {
+  border-bottom: 0;
+}
+/* In Record Explorer, Collections takes at most 40% of the height and scrolls beyond that, so
+   Items, which the reader works in more, keeps the rest and room for a few rows. */
+.workspace-page .explorer-body .sidebar-section:not(.grow) {
+  flex: 0 1 auto;
+  max-height: 40%;
+  min-height: 72px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.workspace-page .explorer-body .sidebar-section.grow {
+  flex: 1 1 0;
+  min-height: 120px;
+}
+.workspace-page .sidebar-section.grow {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding-bottom: 6px;
+}
+.workspace-page .section-label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.workspace-page .section-label .count {
+  color: var(--text-faint);
+}
+.workspace-page .section-label .label-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.workspace-page .pane-path {
+  font-size: 11px;
+  margin: -4px 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-page .type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.workspace-page .type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: none;
+  border: 1px solid transparent;
+  width: 100%;
+  text-align: left;
+}
+.workspace-page .type-row:hover {
+  background: var(--panel-2);
+}
+.workspace-page .type-row.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.workspace-page .type-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+  background: var(--text-faint);
+}
+.workspace-page .type-row .tname {
+  flex: 1 1 auto;
+  font-size: 12.5px;
+}
+
+.workspace-page .res-list {
+  display: flex;
+  flex-direction: column;
+}
+/* The open row's box: it slides between rows unfilled, and fills when it arrives. The rows are
+   drawn over it, so the row under the pointer still shows its own background. */
+.workspace-page .active-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  border-radius: 6px;
+  pointer-events: none;
+  transition:
+    transform 220ms ease,
+    height 220ms ease,
+    background-color 150ms ease;
+}
+.workspace-page .active-box.placed {
+  transition: background-color 150ms ease;
+}
+.workspace-page .active-box.fill.filled {
+  background: var(--accent-dim);
+}
+.workspace-page .active-box.outline {
+  z-index: 2;
+  border: 1px solid var(--accent);
+}
+/* Every list the box marks: Collections, Items, File Explorer and Source Explorer. The list holds
+   the box, which the rows are drawn over; the open row shows no fill or border of its own, except
+   its hover background until the box arrives, and the outline of an open branch tip. */
+.workspace-page :is(.file-tree, .type-list, .res-list, .history) {
+  position: relative;
+}
+.workspace-page
+  :is(.file-tree .tree-row, .type-list .type-row, .res-list .res-item, .history .commit-row) {
+  position: relative;
+}
+.workspace-page
+  :is(
+    .file-tree .tree-row,
+    .type-list .type-row,
+    .res-list .res-item,
+    .history .commit-row
+  ).active {
+  background: none;
+  border-color: transparent;
+}
+.workspace-page .history .commit-row.active.tip {
+  border-color: var(--accent);
+}
+.workspace-page
+  :is(.file-tree, .type-list, .res-list, .history)
+  .active-box.fill:not(.filled)
+  ~ :is(.tree-row, .type-row, .res-item, .commit-row).active {
+  background: var(--panel-2);
+}
+.workspace-page .res-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: none;
+  border: 1px solid transparent;
+  width: 100%;
+  text-align: left;
+}
+.workspace-page .res-item:hover {
+  background: var(--panel-2);
+}
+/* The box marks the open row in the Items pane; until the box arrives, the row shows the hover
+   background. Elsewhere, the open row is marked by its own fill and border. */
+.workspace-page .res-item.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.workspace-page .res-item .badge {
+  margin-top: 1px;
+}
+.workspace-page .res-item .rtext {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.workspace-page .res-item .rid {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A skim of what the item is about: two lines, and the centre view has the rest. */
+.workspace-page .res-item .rlabel {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.workspace-page .res-item.unresolved .rlabel {
+  font-style: italic;
+}
+.workspace-page .res-item.unresolved .badge {
+  opacity: 0.55;
+}
+.workspace-page .empty-note {
+  color: var(--text-faint);
+  font-size: 12.5px;
+  padding: 10px 4px;
+}
+.workspace-page .load-more {
+  margin-top: 6px;
+  width: 100%;
+}
+
+/* ---------- main / detail ---------- */
+/* The scrollbar is always shown, so a short resource and a long one leave the same width for the
+   cards and their text, and stepping from one to the other does not reflow it. */
+.workspace-page .main {
+  display: block;
+  flex: 1 1 auto;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  min-width: 0;
+}
+.workspace-page .detail {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 28px 28px 80px;
+}
+
+.workspace-page .detail-header {
+  margin-bottom: 22px;
+}
+/* The chip, handle, type and pills share one line, on the handle's baseline. */
+.workspace-page .header-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.workspace-page .header-id {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+}
+.workspace-page .header-type {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.workspace-page .header-top .pill {
+  align-self: center;
+}
+/* The view tabs and Reload sit at the right of the header's line, quietly: no border, and no
+   background but the chosen tab's and the one under the pointer. */
+.workspace-page .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  margin-left: auto;
+}
+.workspace-page .view-tabs {
+  display: flex;
+  gap: 2px;
+}
+.workspace-page .view-tab,
+.workspace-page .view-action {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.workspace-page .view-tab:hover,
+.workspace-page .view-action:hover {
+  color: var(--text);
+  background: var(--panel-2);
+}
+.workspace-page .view-tab.on {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.workspace-page .view-action {
+  padding: 0 8px;
+}
+
+.workspace-page .skeleton .bar {
+  display: block;
+  height: 10px;
+  margin: 3px 0;
+  border-radius: 4px;
+  background: var(--panel-2);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.workspace-page .tbtn {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 11px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.workspace-page .tbtn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.workspace-page .tbtn.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.workspace-page .tbtn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+.workspace-page .tbtn.primary:hover {
+  filter: brightness(1.08);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.workspace-page .panel {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.workspace-page .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.workspace-page .panel-body {
+  padding: 4px 14px;
+}
+.workspace-page .toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-dim);
+}
+.workspace-page .toggle-btn:hover {
+  color: var(--text);
+}
+/* A caret never shrinks, so a row whose name is cut keeps its icon in line with the rows around it. */
+.workspace-page .caret {
+  flex: none;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.workspace-page .caret.open {
+  transform: rotate(90deg);
+}
+
+.workspace-page .kv {
+  display: flex;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  gap: 16px;
+}
+.workspace-page .kv:last-child {
+  border-bottom: none;
+}
+.workspace-page .kv .k {
+  flex: 0 0 168px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  padding-top: 1px;
+}
+.workspace-page .kv .v {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  word-break: break-word;
+}
+.workspace-page .kv .v.mono {
+  font-size: 12.5px;
+}
+.workspace-page .tscroll {
+  overflow-x: auto;
+}
+.workspace-page .ntable {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.workspace-page .ntable .mention {
+  white-space: nowrap;
+}
+.workspace-page .ntable td > .tscroll {
+  min-width: 260px;
+}
+.workspace-page .ntable th,
+.workspace-page .ntable td {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+}
+.workspace-page .ntable th {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+.workspace-page .ntable td.idx {
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+}
+.workspace-page .ntable .ntable {
+  font-size: 11.5px;
+}
+.workspace-page .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.workspace-page .chip {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.workspace-page .nest > div + div {
+  margin-top: 4px;
+}
+
+.workspace-page .rel-arrow {
+  color: var(--text-faint);
+}
+.workspace-page .rel-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel-2);
+  text-align: left;
+  width: 100%;
+}
+.workspace-page .rel-chip:hover {
+  border-color: var(--accent);
+}
+.workspace-page .rel-chip .cid {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.workspace-page .rel-chip .clabel {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-page .rel-chip.unresolved {
+  border-style: dashed;
+}
+.workspace-page .rel-chip.unresolved .clabel {
+  font-style: italic;
+  color: var(--text-faint);
+}
+.workspace-page .rel-chip.unresolved .badge {
+  opacity: 0.6;
+}
+
+.workspace-page .fetchbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.workspace-page .spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: trace-spin 0.8s linear infinite;
+}
+@keyframes trace-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.workspace-page .empty-panel {
+  padding: 16px 0;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.workspace-page .empty-panel.first {
+  padding-top: 8px;
+}
+
+.workspace-page .fetch-error {
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.workspace-page .fetch-error .title {
+  color: var(--danger);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.workspace-page .fetch-error .requested {
+  margin-top: 8px;
+}
+
+.workspace-page .scrim {
+  display: none;
+  position: fixed;
+  inset: 52px 0 0 0;
+  background: rgba(0, 0, 0, 0.4);
+  border: none;
+  padding: 0;
+  z-index: 19;
+}
+.workspace-page .rel-heading {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin: 22px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.workspace-page .ev {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.workspace-page .ev:last-child {
+  border-bottom: none;
+}
+.workspace-page .ev-seq {
+  flex: 0 0 70px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+.workspace-page .ev-op {
+  flex: 0 0 120px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-page .ev-what {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.workspace-page .ev-kind {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
+}
+.workspace-page .ev-what b {
+  color: var(--text);
+  font-weight: 600;
+}
+.workspace-page .ev-label {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+/* The open record, in an event that names it: filled with its colour rather than linked. */
+.workspace-page .mention.current {
+  background: color-mix(in srgb, var(--mention) 22%, transparent);
+}
+/* A commit the acts ran against: its chip, then its acts. */
+.workspace-page .ev.ran-against {
+  align-items: center;
+}
+.workspace-page .events-more {
+  margin: 8px 0;
+}
+.workspace-page .panel-head a {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  text-decoration: none;
+}
+.workspace-page .panel-head a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- graph tab ---------- */
+.workspace-page .graph-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.workspace-page .graph-controls .tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+.workspace-page .graph-card {
+  margin-bottom: 22px;
+}
+.workspace-page .graph-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+}
+.workspace-page .graph-foot .tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+/* The act's name takes the rest of the bar and is cut with an ellipsis, so it never wraps. */
+.workspace-page .playback-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.workspace-page .graph-stage {
+  display: flex;
+  height: min(48vh, 460px);
+}
+.workspace-page .graph-stage .hint {
+  color: var(--text-dim);
+}
+/* The card lets the graph behind it show through, blurred, so it covers less of the graph. */
+.workspace-page .graph-stage .popover {
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  backdrop-filter: blur(6px);
+  border-color: var(--line);
+  padding: 0;
+  width: 340px;
+  max-width: calc(100% - 8px);
+  max-height: 320px;
+  overflow: hidden;
+}
+/* The card is cut off at the popover's height and fades out there; the open resource has the rest. */
+.workspace-page .graph-stage .popover .panel-body {
+  padding: 0 12px 8px;
+  mask-image: linear-gradient(to bottom, black 85%, transparent);
+}
+.workspace-page .graph-stage .popover .kv {
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+.workspace-page .graph-stage .popover .kv .k {
+  flex: none;
+}
+.workspace-page .graph-stage .popover .kv .v {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+}
+.workspace-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- the agent's chat, at the right ---------- */
+/* It slides shut to nothing and then leaves the tab order, as the left sidebar does. Its contents
+   keep their width, so they are cut off at its edge rather than squeezed. */
+.workspace-page .chat-sidebar {
+  flex: 0 0 auto;
+  width: var(--chat-width, 400px);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  transition:
+    width 220ms ease,
+    visibility 0s;
+}
+/* While its border is dragged, the chat follows the pointer at once. */
+.workspace-page .chat-sidebar.resizing {
+  transition: none;
+}
+.workspace-page .chat-sidebar > * {
+  min-width: var(--chat-width, 400px);
+}
+.workspace-page .chat-sidebar.collapsed {
+  width: 0;
+  border-left-width: 0;
+  visibility: hidden;
+  transition:
+    width 220ms ease,
+    visibility 0s 220ms;
+}
+
+/* ---------- full width: the sidebar is shown or hidden ---------- */
+@media (min-width: 861px) {
+  /* The sidebar slides shut to nothing and then leaves the tab order. Its contents keep their width,
+     so they are cut off at its edge rather than squeezed. */
+  .workspace-page .sidebar {
+    transition:
+      flex-basis 220ms ease,
+      width 220ms ease,
+      min-width 220ms ease,
+      visibility 0s;
+  }
+  .workspace-page .sidebar > * {
+    min-width: 287px;
+  }
+  .workspace-page .sidebar.collapsed {
+    flex-basis: 0;
+    width: 0;
+    min-width: 0;
+    border-right-width: 0;
+    visibility: hidden;
+    transition:
+      flex-basis 220ms ease,
+      width 220ms ease,
+      min-width 220ms ease,
+      visibility 0s 220ms;
+  }
+}
+
+/* ---------- narrow windows: the side column becomes a drawer ---------- */
+@media (max-width: 860px) {
+  .workspace-page .scrim.open {
+    display: block;
+  }
+  .workspace-page .sidebar {
+    position: fixed;
+    z-index: 20;
+    top: 52px;
+    left: 44px;
+    bottom: 0;
+    width: 288px;
+    transform: translateX(calc(-100% - 44px));
+    transition: transform 0.18s ease;
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.35);
+  }
+  .workspace-page .sidebar.open {
+    transform: translateX(0);
+  }
+  /* The agent's chat is a drawer from the right, over the page, at most as wide as the window. Its
+     button is in the top bar, and there is no rail or border to drag. */
+  .workspace-page .chat-sidebar,
+  .workspace-page .chat-sidebar.collapsed {
+    position: fixed;
+    z-index: 20;
+    top: 52px;
+    right: 0;
+    bottom: 0;
+    width: min(100vw, var(--chat-width, 400px));
+    border-left-width: 1px;
+    transform: translateX(100%);
+    transition:
+      transform 0.18s ease,
+      visibility 0s 0.18s;
+    box-shadow: -2px 0 16px rgba(0, 0, 0, 0.35);
+  }
+  .workspace-page .chat-sidebar.collapsed {
+    visibility: hidden;
+  }
+  .workspace-page .chat-sidebar.open {
+    transform: translateX(0);
+    transition: transform 0.18s ease;
+  }
+  .workspace-page .chat-sidebar > * {
+    min-width: 0;
+  }
+  .workspace-page .detail {
+    padding: 20px 16px 60px;
+  }
+  .workspace-page .kv {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .workspace-page .kv .k {
+    flex: none;
+  }
+}
+
+/* ---------- the landing view: the workspaces ---------- */
+.workspace-page .workspace-picker {
+  max-width: 640px;
+}
+.workspace-page .workspace-picker h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.workspace-page .workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.workspace-page .workspace-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: left;
+}
+.workspace-page .workspace-card:hover {
+  border-color: var(--accent);
+}
+.workspace-page .workspace-card .workspace-icon {
+  grid-row: span 2;
+  font-size: 22px;
+  color: var(--text-dim);
+}
+.workspace-page .workspace-card .workspace-name {
+  font-weight: 600;
+}
+.workspace-page .workspace-card .mono {
+  font-size: 11.5px;
+}

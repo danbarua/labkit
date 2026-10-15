@@ -3,8 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ToolCall } from "@agentclientprotocol/sdk";
 import { renderToStaticMarkup } from "react-dom/server";
-import { languageOf, previewLength } from "../code";
-import { ToolCard } from "../tool";
+import { languageOf, previewLength } from "../content/code";
+import { ToolCard } from "../tool/tool";
 
 const done = (name: string, rawInput: unknown, output: unknown): ToolCall =>
   ({

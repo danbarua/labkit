@@ -3,8 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import { initialState, reduce, type TranscriptState, type ViewEvent } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { activityMood, afterPause, currentActivity, sameActivity } from "../activity";
-import { Conversation } from "../conversation";
+import { activityMood, afterPause, currentActivity, sameActivity } from "../conversation/activity";
+import { Conversation } from "../conversation/conversation";
 
 const started: ViewEvent = { type: "prompt_started", content: [{ type: "text", text: "Go" }] };
 const call = (id: string, status: string, rawInput?: unknown): ViewEvent => ({

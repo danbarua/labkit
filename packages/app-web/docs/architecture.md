@@ -92,23 +92,23 @@ link beside it has the rest:
 
 ## Pages and their chrome
 
-Every page of the app, the Trace Console and the development pages (the gallery, the sessions list,
+Every page of the app, the workspace page and the development pages (the gallery, the sessions list,
 session replays and the agent), shares one frame: `src/ui/chrome/Frame.tsx` and `chrome.css`. The
 frame gives a page the palette, the top bar and the resizable border. The theme is one setting
 (`useSavedTheme`) that every component reads, so the button in the top bar and the content agree.
-The development pages have no link in the Trace Console, except `agent`, and are reached by their
+The development pages have no link on the workspace page, except `agent`, and are reached by their
 addresses.
 
-## Trace Console
+## The workspace page
 
 The browser app's page for the graph, at `/app/<API path>`: `/app/workspace/overlap_bench/Q_1` opens
 `/workspace/overlap_bench/Q_1`. The page fetches that path and shows a resource or a collection
-according to what the API answers, never by the shape of the path. Its code is `src/ui/trace/`.
+according to what the API answers, never by the shape of the path. Its code is `src/ui/workspace/`.
 
 Content of unknown length is drawn with the views the chat uses, from `@labkit/ui`, whose styles
 are `@labkit/ui/content.css`:
 
-| View | Draws | In the Trace Console |
+| View | Draws | On the workspace page |
 | --- | --- | --- |
 | `ContentCard` | A card that folds under its header, with controls beside the title. | The graph, the Debug response, a file's text, a commit's message, changed files and each file's diff. |
 | `CodeView` | Text numbered by line and highlighted by its language, showing its first lines until the rest is asked for. | A file's text, its first 40 lines. |
@@ -255,7 +255,7 @@ corner shows the current act's subject. With the pointer on the canvas, the card
 node under the pointer.
 
 Playback stops at the last act, on Pause, and when the reader opens anything else. The code is
-`src/ui/trace/playback.ts`.
+`src/ui/workspace/playback.ts`.
 
 ## Parent project
 

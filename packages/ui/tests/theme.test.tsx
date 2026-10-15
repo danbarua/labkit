@@ -3,8 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import { initialState } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Conversation } from "../conversation";
-import { ThemeToggle } from "../theme";
+import { Conversation } from "../conversation/conversation";
+import { ThemeToggle } from "../base/theme";
 
 describe("the theme button", () => {
   test("names the current setting and the next one", () => {

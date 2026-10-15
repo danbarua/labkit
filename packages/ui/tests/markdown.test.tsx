@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MarkdownText } from "../markdown";
+import { MarkdownText } from "../content/markdown";
 
 const draw = (text: string, streaming = false) =>
   renderToStaticMarkup(<MarkdownText text={text} streaming={streaming} />);

@@ -4,8 +4,8 @@ import { describe, expect, test } from "bun:test";
 import type { ToolCall, ToolCallContent } from "@agentclientprotocol/sdk";
 import type { PermissionEntry } from "@labkit/view-model";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PermissionPrompt } from "../permission";
-import { ToolCard } from "../tool";
+import { PermissionPrompt } from "../requests/permission";
+import { ToolCard } from "../tool/tool";
 
 const COMMAND = "sed -i '' -e 's/alpha/ALPHA/' -e '/^$/d' notes.txt";
 
