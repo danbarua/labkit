@@ -8,6 +8,7 @@ import {
   SignOutIcon,
   TimerIcon,
 } from "@phosphor-icons/react";
+import { compactCount, shortDuration } from "../base/format";
 
 /**
  * What one model request in a turn cost and how fast it ran, as the agent reports it. Every
@@ -24,21 +25,6 @@ export interface StepFigures {
   readonly cacheReadTokens?: number;
   /** From sending the request to its first token. */
   readonly firstTokenMs?: number;
-}
-
-/** A count as people read it: 179, 2.2K, 485K, 11M. */
-export function compactCount(n: number): string {
-  if (n < 1000) return String(n);
-  const [divisor, suffix] = n < 1_000_000 ? [1000, "K"] : [1_000_000, "M"];
-  const scaled = n / divisor;
-  return `${scaled < 10 ? scaled.toFixed(1).replace(/\.0$/, "") : Math.round(scaled)}${suffix}`;
-}
-
-/** A duration as people read it: 0.4s, 58.2s, 1m1s. */
-export function shortDuration(ms: number): string {
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const seconds = Math.round(ms / 1000);
-  return `${Math.floor(seconds / 60)}m${seconds % 60}s`;
 }
 
 /**

@@ -1,6 +1,7 @@
 import type { ContentBlock } from "@agentclientprotocol/sdk";
 import { FileIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
+import { formatBytes } from "../base/format";
 import { useLink } from "../content/links";
 
 /** What a composer accepts as attachments. Without these a composer takes no files. */
@@ -9,13 +10,6 @@ export interface AttachLimits {
   readonly accept?: readonly string[];
   readonly maxFiles?: number;
   readonly maxBytes?: number;
-}
-
-/** A size in the unit a person reads it in. */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, "")} MB`;
 }
 
 const accepts = (file: { name: string; type: string }, accept: readonly string[]): boolean =>

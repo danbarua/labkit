@@ -17,6 +17,7 @@ import {
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
+import { formatBytes } from "../base/format";
 import { CodeView } from "../content/code";
 import { TextDiff } from "../content/diff";
 import { toolTally } from "../conversation/grouping";
@@ -83,17 +84,10 @@ function ResourceLinkView({ block }: { block: Kind<"resource_link"> }) {
         <a href={href} target="_blank" rel="noopener noreferrer" download={name}>
           {name}
         </a>
-        {block.size == null ? null : ` · ${compactBytes(Number(block.size))}`}
+        {block.size == null ? null : ` · ${formatBytes(Number(block.size))}`}
       </figcaption>
     </figure>
   );
-}
-
-/** A size as people read it: 512 B, 3.4 KB, 12 MB. */
-function compactBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  const [value, unit] = n < 1024 ** 2 ? [n / 1024, "KB"] : [n / 1024 ** 2, "MB"];
-  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${unit}`;
 }
 
 /** Binary content embedded by link only: a link to open or save once the host resolves it. */
