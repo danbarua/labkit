@@ -14,6 +14,7 @@ import {
   tickPhysics,
   yawToward,
   rimToRim,
+  sceneOf,
 } from "../src/ui/GraphView";
 
 describe("the graph's depth fade", () => {
@@ -377,7 +378,7 @@ describe("label placement", () => {
       sim: ReturnType<typeof createSim>,
       projected: Map<string, ReturnType<typeof at>>,
     ) =>
-      labelCandidates(sim, projected, measure)
+      labelCandidates(sim, sceneOf(sim, projected), measure)
         .boxes.map((b) => b.key.replace(/\0/g, " "))
         .sort();
 
