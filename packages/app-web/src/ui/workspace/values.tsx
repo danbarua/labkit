@@ -1,5 +1,5 @@
 /**
- * Property values, JSON and event rows as the Trace Console draws them. Prose in a value goes
+ * Property values, JSON and event rows as the workspace page draws them. Prose in a value goes
  * through `prose`, which the page supplies, so handles in it can become links.
  */
 

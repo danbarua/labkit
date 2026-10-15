@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { lanesOf, widthOf } from "../src/ui/trace/lanes";
+import { lanesOf, widthOf } from "../src/ui/workspace/lanes";
 
 const c = (id: string, ...parents: string[]) => ({ id, parents });
 

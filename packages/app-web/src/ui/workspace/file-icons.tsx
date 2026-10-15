@@ -1,8 +1,8 @@
 /**
  * How File Explorer draws a listed file: an icon, and a kind its colour is chosen by
- * (`--f-<kind>` in trace.css), by the media type the listing names. The page never reads a file's
- * extension; a listed file whose extension the API's table does not name has no media type and
- * gets the plain file icon.
+ * (`--f-<kind>` in workspace.css), by the media type the listing names. The page never reads a
+ * file's extension; a listed file whose extension the API's table does not name has no media type
+ * and gets the plain file icon.
  */
 
 import {

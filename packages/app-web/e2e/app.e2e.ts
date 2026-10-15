@@ -122,7 +122,6 @@ test.describe("getting around", () => {
     await expect(bar.getByRole("button", { name: "Forward" })).toHaveCount(0);
     await expect(bar.getByRole("button", { name: "Entry point" })).toHaveCount(0);
     await expect(bar.getByRole("textbox")).toHaveCount(0);
-    await expect(bar).not.toContainText("Trace Console");
     await expect(bar).not.toContainText("live");
   });
 
@@ -144,7 +143,7 @@ test.describe("getting around", () => {
     await page.waitForTimeout(1500);
   });
 
-  test("the sessions page has the same top bar as the Trace Console, with the theme button at its right", async ({
+  test("the sessions page has the same top bar as the workspace page, with the theme button at its right", async ({
     page,
   }, info) => {
     test.skip(info.project.name !== "dev", "the sessions page exists only in development");
@@ -1461,7 +1460,7 @@ test.describe("the agent", () => {
   });
 });
 
-test.describe("the agent's chat in the Trace Console", () => {
+test.describe("the agent's chat on the workspace page", () => {
   const rail = (page: import("@playwright/test").Page) =>
     page.getByRole("navigation", { name: "Agent sidebar" });
   const chatToggle = (page: import("@playwright/test").Page) =>

@@ -1,5 +1,5 @@
 /**
- * The HAL documents the Trace Console has fetched, kept as they arrived, by request path. What the
+ * The HAL documents the workspace page has fetched, kept as they arrived, by request path. What the
  * page draws is computed from them: nothing here merges one response into another.
  */
 
@@ -109,7 +109,7 @@ export class HalStore {
       (err: unknown) => {
         if (this.requests.get(path) !== id) return;
         const error = err instanceof Error ? err.message : String(err);
-        console.warn("trace console: a request failed", { path, error });
+        console.warn("workspace page: a request failed", { path, error });
         this.set(path, { status: "failed", error });
       },
     );

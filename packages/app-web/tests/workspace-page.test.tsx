@@ -1,5 +1,5 @@
 /**
- * The Trace Console's reading of HAL documents and its drawing of values. A value from the API
+ * The workspace page's reading of HAL documents and its drawing of values. A value from the API
  * reaches the page as text, so what these hold down first is that nothing arrives as markup.
  */
 
@@ -15,10 +15,10 @@ import {
   itemView,
   labelFor,
   relGroups,
-} from "../src/ui/trace/hal";
-import { docOf, HalStore } from "../src/ui/trace/hal-store";
-import { findMathSpans, proseSegments } from "../src/ui/trace/prose";
-import { EventRow, PropRows, Value } from "../src/ui/trace/values";
+} from "../src/ui/workspace/hal";
+import { docOf, HalStore } from "../src/ui/workspace/hal-store";
+import { findMathSpans, proseSegments } from "../src/ui/workspace/prose";
+import { EventRow, PropRows, Value } from "../src/ui/workspace/values";
 
 const asText = (text: string) => text;
 const html = (v: unknown, k = "k") =>
@@ -505,16 +505,18 @@ describe("what the graph draws for an opened resource", () => {
 });
 
 describe("the sidebar's narrow-window query", () => {
-  test("matches the media query of trace.css's narrow-window rules", async () => {
-    const { NARROW } = await import("../src/ui/trace/TraceConsole");
-    const css = await Bun.file(new URL("../src/ui/trace/trace.css", import.meta.url)).text();
+  test("matches the media query of workspace.css's narrow-window rules", async () => {
+    const { NARROW } = await import("../src/ui/workspace/WorkspacePage");
+    const css = await Bun.file(
+      new URL("../src/ui/workspace/workspace.css", import.meta.url),
+    ).text();
     expect(css).toContain(`@media ${NARROW} {`);
   });
 });
 
 describe("the file and history types", () => {
   test("the page names them as the server serves them", async () => {
-    const page = await import("../src/ui/trace/hal");
+    const page = await import("../src/ui/workspace/hal");
     const server = await import("../src/server/collection-paths");
     expect([page.FILE_TYPE, page.DIRECTORY_TYPE, page.COMMIT_TYPE, page.DIFF_TYPE]).toEqual([
       server.FILE_TYPE,

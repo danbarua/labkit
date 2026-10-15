@@ -109,7 +109,7 @@ export function usePlayback(
         const subject = hrefOf(act, "subject");
         const key = frames ? self : subject;
         if (key === undefined)
-          console.warn("trace console: an act names no subject; playback skips it", { act: self });
+          console.warn("workspace page: an act names no subject; playback skips it", { act: self });
         else {
           setPlayback({ state: "playing", act: String(act.name ?? act.id) });
           opened.current = keyOf(key);
@@ -128,8 +128,8 @@ export function usePlayback(
       if (!live()) return;
       const reason = err instanceof Error ? err.message : String(err);
       if (err instanceof Stop)
-        console.warn("trace console: playback stopped", { from: start, reason });
-      else console.error("trace console: playback failed", { from: start, err });
+        console.warn("workspace page: playback stopped", { from: start, reason });
+      else console.error("workspace page: playback failed", { from: start, err });
       pause(reason);
     }
   };

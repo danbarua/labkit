@@ -259,7 +259,7 @@ export function ChatSidebar({
   narrow: boolean;
   onToggle: () => void;
 }) {
-  const [width, setWidth] = useSavedNumber("labkit.trace.chat.width", CHAT_WIDTH);
+  const [width, setWidth] = useSavedNumber("labkit.workspace.chat.width", CHAT_WIDTH);
   const [resizing, setResizing] = useState(false);
   const { folder, shown } = chat;
   const paths = useWorkspacePaths(chat.slug, chat.connected, "chat mentions")?.paths;

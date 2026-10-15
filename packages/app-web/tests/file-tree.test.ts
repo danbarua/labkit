@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { foldersAbove } from "../src/ui/trace/explorers";
+import { foldersAbove } from "../src/ui/workspace/explorers";
 
 describe("the folders File Explorer opens above an open file", () => {
   test("are each directory between the tree's top and the file, top first", () => {

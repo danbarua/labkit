@@ -1,5 +1,5 @@
 /**
- * The Trace Console's reading of the API's HAL documents: pure functions from the documents the
+ * The workspace page's reading of the API's HAL documents: pure functions from the documents the
  * page has received to what it draws. Nothing here fetches or reads the page.
  */
 

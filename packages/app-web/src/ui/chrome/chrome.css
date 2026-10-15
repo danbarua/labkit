@@ -1,7 +1,7 @@
 /*
  * The chrome the app's pages share: the palette's short names, the top bar, the rail and the
  * resizable border. A page's root carries `.lk-root` for the palette and `.lk-frame` for these
- * rules; the Trace Console adds `.trace` for its own.
+ * rules; the workspace page adds `.workspace-page` for its own.
  */
 /* Two classes, so these win over `.lk-root`'s own rules in `@labkit/ui/ui.css`, which the agent's
    chat loads into the same page. */
@@ -242,7 +242,7 @@
   height: auto;
 }
 
-/* ---------- pages other than the Trace Console: gallery, sessions, replays, errors ---------- */
+/* ---------- pages other than the workspace page: gallery, sessions, replays, errors ---------- */
 .lk-frame .crumb {
   color: var(--text-dim);
   font-size: 13px;
@@ -319,7 +319,8 @@
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
-/* ---------- the agent's chat: on its own page, or in the Trace Console's right-hand sidebar ---------- */
+/* ---------- the agent's chat ---------- */
+/* On its own page, or in the workspace page's right-hand sidebar. */
 .lk-frame .agent-chat {
   flex: 1 1 auto;
   display: flex;

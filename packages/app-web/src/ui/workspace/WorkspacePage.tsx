@@ -1,5 +1,5 @@
 /**
- * The Trace Console: the API's HAL documents, followed by link. The left column lists collections.
+ * The workspace page: the API's HAL documents, followed by link. The left column lists collections.
  * The centre shows the graph of what the reader has opened, then the open resource with the
  * resources it relates to. The page's address is the API path of what is open, so a reload or a
  * pasted link opens it again.
@@ -90,7 +90,7 @@ import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views"
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
 import { Badge, EventRow, PropRows, type Prose } from "./values";
-import "./trace.css";
+import "./workspace.css";
 
 /** Where the left column starts: the list of workspaces. */
 /** The API's list of workspaces: the page's landing view lists it, and nothing else. */
@@ -135,7 +135,10 @@ function useExplored(path: string) {
 /** The workspace directory a key sits in, `/workspace/<slug>/`, or undefined outside one. */
 const workspaceOf = (key: string) => /^\/workspace\/[^/]+\//.exec(key)?.[0];
 
-/** The windows in which the sidebar is a drawer over the page: trace.css's narrow-window rules. */
+/**
+ * The windows in which the sidebar is a drawer over the page: workspace.css's narrow-window
+ * rules.
+ */
 export const NARROW = "(max-width: 860px)";
 
 /** Whether the window matches the media query `query`, kept current as the window changes. */
@@ -151,7 +154,7 @@ function useMediaQuery(query: string): boolean {
   return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches);
 }
 
-export interface TraceConsoleProps {
+export interface WorkspacePageProps {
   /** The API path of what is open, or "" when nothing is. */
   path: string;
   /** The API path of the collection the left column lists, when one was picked. */
@@ -161,17 +164,17 @@ export interface TraceConsoleProps {
   session: string | undefined;
 }
 
-export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
+export function WorkspacePage({ path, list, tab, session }: WorkspacePageProps) {
   const navigate = useNavigate();
   const [theme] = useSavedTheme();
   // In a narrow window, the drawer open over the page: the sidebar's, or the agent's chat.
   const [drawer, setDrawer] = useState<"items" | "chat" | undefined>();
   // At full width the sidebar is shown or hidden, as this browser last left it; in a narrow
   // window it is a drawer over the page, closed until opened.
-  const [sidebarShown, setSidebarShown] = useSavedFlag("labkit.trace.sidebar", true);
+  const [sidebarShown, setSidebarShown] = useSavedFlag("labkit.workspace.sidebar", true);
   const narrow = useMediaQuery(NARROW);
   // At full width the agent's chat is expanded or minimised, as this browser last left it.
-  const [chatShown, setChatShown] = useSavedFlag("labkit.trace.chat", false);
+  const [chatShown, setChatShown] = useSavedFlag("labkit.workspace.chat", false);
   const setSession = useCallback(
     (next: string | undefined) =>
       void navigate({ to: ".", search: (s) => ({ ...s, session: next }), replace: true }),
@@ -265,7 +268,10 @@ export function TraceConsole({ path, list, tab, session }: TraceConsoleProps) {
 
   return (
     <IconContext.Provider value={ICONS}>
-      <div className="lk-root lk-frame trace" data-theme={theme === "system" ? undefined : theme}>
+      <div
+        className="lk-root lk-frame workspace-page"
+        data-theme={theme === "system" ? undefined : theme}
+      >
         <TopBar
           onHome={home}
           end={
@@ -504,12 +510,18 @@ function Lists({
     if (behind) loadMore();
   }, [behind, loadMore]);
 
-  const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.trace.records", true);
-  const [filesOpen, setFilesOpen] = useSavedFlag("labkit.trace.files", false);
-  const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.trace.history", false);
-  const [filesGrow, setFilesGrow] = useSavedNumber("labkit.trace.files.grow", FILES_SHARE);
-  const [historyGrow, setHistoryGrow] = useSavedNumber("labkit.trace.history.grow", HISTORY_SHARE);
-  const [recordsGrow, setRecordsGrow] = useSavedNumber("labkit.trace.records.grow", RECORDS_SHARE);
+  const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.workspace.records", true);
+  const [filesOpen, setFilesOpen] = useSavedFlag("labkit.workspace.files", false);
+  const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.workspace.history", false);
+  const [filesGrow, setFilesGrow] = useSavedNumber("labkit.workspace.files.grow", FILES_SHARE);
+  const [historyGrow, setHistoryGrow] = useSavedNumber(
+    "labkit.workspace.history.grow",
+    HISTORY_SHARE,
+  );
+  const [recordsGrow, setRecordsGrow] = useSavedNumber(
+    "labkit.workspace.records.grow",
+    RECORDS_SHARE,
+  );
   const filesSection = useRef<HTMLElement>(null);
   const historySection = useRef<HTMLElement>(null);
   const recordsSection = useRef<HTMLElement>(null);
@@ -787,7 +799,10 @@ function Lists({
   );
 }
 
-/** How long a section takes to open or fold, in milliseconds: trace.css's `.explorer` transition. */
+/**
+ * How long a section takes to open or fold, in milliseconds: workspace.css's `.explorer`
+ * transition.
+ */
 const SECTION_MOTION_MS = 220;
 
 /**
