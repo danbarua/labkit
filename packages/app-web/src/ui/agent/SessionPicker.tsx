@@ -1,18 +1,5 @@
-import type { SessionInfo } from "@agentclientprotocol/sdk";
-import { listSessions } from "@labkit/acp-client";
 import { CommandPalette, type PickItem } from "@labkit/ui";
-import { useEffect, useState } from "react";
-import { messageOf } from "../../message-of";
-
-type Listed =
-  | { kind: "loading" }
-  | { kind: "not_listed" }
-  | { kind: "failed"; message: string }
-  | { kind: "listed"; sessions: readonly SessionInfo[] };
-
-/** Newest first; a session the agent gave no time for goes last. */
-const newestFirst = (a: SessionInfo, b: SessionInfo): number =>
-  (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "");
+import { sessionsNote, useAgentSessions } from "./sessions";
 
 /**
  * The sessions the agent keeps for the folder `cwd`, in a palette to pick one from: `/sessions` in
@@ -34,33 +21,11 @@ export function SessionPicker({
   onClose: () => void;
   onPick: (sessionId: string) => void;
 }) {
-  const [listed, setListed] = useState<Listed>({ kind: "loading" });
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setListed({ kind: "loading" });
-    listSessions({ url, ...(cwd === undefined ? {} : { cwd }) }).then(
-      (sessions) => {
-        if (cancelled) return;
-        setListed(
-          sessions === undefined
-            ? { kind: "not_listed" }
-            : { kind: "listed", sessions: [...sessions].sort(newestFirst) },
-        );
-      },
-      (err: unknown) => {
-        if (cancelled) return;
-        setListed({ kind: "failed", message: messageOf(err) });
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [open, url, cwd]);
+  const listed = useAgentSessions({ url, cwd, enabled: open });
 
   const items: PickItem[] =
-    listed.kind === "listed"
-      ? listed.sessions.map((session) => ({
+    listed.kind === "loaded"
+      ? (listed.value ?? []).map((session) => ({
           id: session.sessionId,
           label: session.title || "Untitled",
           detail: [
@@ -73,14 +38,7 @@ export function SessionPicker({
           ...(session.sessionId === current ? { current: true } : {}),
         }))
       : [];
-  const empty =
-    listed.kind === "loading"
-      ? "Asking the agent for its sessions…"
-      : listed.kind === "not_listed"
-        ? "This agent does not list its sessions."
-        : listed.kind === "failed"
-          ? `The sessions could not be listed: ${listed.message}`
-          : `The agent has no sessions${cwd === undefined ? "" : ` in ${cwd}`}.`;
+  const note = sessionsNote(listed, cwd);
   return (
     <CommandPalette
       open={open}
@@ -89,7 +47,7 @@ export function SessionPicker({
       placeholder="Search sessions"
       search
       items={items}
-      empty={empty}
+      {...(note === undefined ? {} : { empty: note })}
       onPick={(item) => onPick(item.id)}
     />
   );

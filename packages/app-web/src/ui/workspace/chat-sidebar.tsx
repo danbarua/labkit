@@ -11,10 +11,10 @@ import {
   useState,
 } from "react";
 import { mentionItems } from "../agent/mentions";
+import { useLoaded } from "../loaded";
 import { useWorkspacePaths } from "./file-paths";
 import { Separator } from "./separator";
 import { useSavedNumber } from "../saved-flag";
-import { messageOf } from "../../message-of";
 
 // The agent exists only in the dev server, so the chat is dev-only: in a production build
 // `import.meta.env.DEV` is false, the import is dropped, and there is no chat to show.
@@ -95,31 +95,30 @@ export type Folder =
  * scope has no folder to find.
  */
 function useWorkspaceFolder(slug: string | undefined): Folder {
-  const [folder, setFolder] = useState<Folder>({ kind: "loading" });
-  useEffect(() => {
-    if (slug === undefined) return;
-    const controller = new AbortController();
-    setFolder({ kind: "loading" });
-    fetch(`/agent-workspace/${encodeURIComponent(slug)}`, { signal: controller.signal })
-      .then(async (res) => {
-        const body = (await res.json()) as { cwd?: string | null; reason?: string; error?: string };
-        if (res.ok && typeof body.cwd === "string") setFolder({ kind: "mapped", cwd: body.cwd });
-        else
-          setFolder({
-            kind: "unmapped",
-            reason: `The agent cannot open a session in ${slug}: ${body.reason ?? body.error ?? `the dev server answered ${res.status}`}.`,
-          });
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        setFolder({
-          kind: "unmapped",
-          reason: `The agent cannot open a session in ${slug}: its folder was not found (${messageOf(err)}).`,
-        });
-      });
-    return () => controller.abort();
-  }, [slug]);
-  return folder;
+  const loaded = useLoaded(
+    async (signal): Promise<Folder> => {
+      const res = await fetch(`/agent-workspace/${encodeURIComponent(slug ?? "")}`, { signal });
+      const body = (await res.json()) as { cwd?: string | null; reason?: string; error?: string };
+      if (res.ok && typeof body.cwd === "string") return { kind: "mapped", cwd: body.cwd };
+      return {
+        kind: "unmapped",
+        reason: `The agent cannot open a session in ${slug}: ${body.reason ?? body.error ?? `the dev server answered ${res.status}`}.`,
+      };
+    },
+    slug ?? "",
+    { enabled: slug !== undefined },
+  );
+  switch (loaded.kind) {
+    case "loading":
+      return loaded;
+    case "loaded":
+      return loaded.value;
+    case "failed":
+      return {
+        kind: "unmapped",
+        reason: `The agent cannot open a session in ${slug}: its folder was not found (${loaded.message}).`,
+      };
+  }
 }
 
 /** The agent's chat in the workspace in scope, as the page drives it. */
