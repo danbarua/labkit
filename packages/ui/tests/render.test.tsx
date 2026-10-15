@@ -11,7 +11,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { SessionConfigOption } from "@agentclientprotocol/sdk";
 import { commandsMatching } from "../composer/composer";
 import type { PickItem } from "../overlay/list";
-import { pickedSetting, settingItems } from "../composer/session-controls";
+import { pickedSetting, settingEntries, settingItems } from "../composer/session-controls";
 import { Conversation, type RecordsConfig } from "../index";
 
 async function draw(id: string, handlers = false): Promise<string> {
@@ -299,10 +299,11 @@ describe("session configuration", () => {
     expect(html).toContain('<span class="lk-chip-value">Second</span>');
   });
 
-  test("the other settings sit behind one settings control, not a control each", async () => {
+  test("the other settings sit behind one row of the composer's menu, not a control each", async () => {
     const html = await shown([model, thinking], { onSend: () => {}, onSetConfig: () => {} });
-    expect(html).toContain('aria-label="Session settings"');
     expect(html).not.toContain("lk-chip-value");
+    const rows = settingEntries([model, thinking], false, { onOpen: () => {} });
+    expect(rows.map((row) => row.label)).toEqual(["Session settings"]);
   });
 
   test("without a handler the values are shown and cannot be changed", async () => {

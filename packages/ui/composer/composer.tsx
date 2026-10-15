@@ -1,7 +1,8 @@
 import type { AvailableCommand, SessionConfigOption } from "@agentclientprotocol/sdk";
 import { ArrowUpIcon, AtIcon, PaperclipIcon, StopIcon } from "@phosphor-icons/react";
-import { IconButton } from "../base/icon-button";
+import { useNarrowerThan } from "../base/media";
 import { type AttachLimits, AttachmentChips, useAttachments } from "./attachments";
+import { ComposerMenu, type MenuEntry } from "./composer-menu";
 import { Loader, type LoaderMood } from "../base/loader";
 import {
   type KeyboardEvent,
@@ -22,7 +23,13 @@ import {
 } from "../overlay/list";
 import type { Place } from "../overlay/modal";
 import { CommandPalette } from "../overlay/palette";
-import { arrange, pickedSetting, SessionControls, settingItems } from "./session-controls";
+import {
+  arrange,
+  pickedSetting,
+  SessionControls,
+  settingEntries,
+  settingItems,
+} from "./session-controls";
 
 /** The commands whose name starts what has been typed after a leading slash, before any argument. */
 export function commandsMatching(
@@ -52,7 +59,52 @@ const commandItem = (command: AvailableCommand): PickItem => ({
   detail: command.description,
 });
 
-type Overlay = { optionId: string } | "settings" | "commands" | "mentions" | null;
+type Overlay = { optionId: string } | "settings" | "commands" | "mentions" | "menu" | null;
+
+/**
+ * Below this width of the composer's box, in CSS pixels, its bar has no room for the setting chips
+ * beside the menu and send buttons: the chips move into the menu, and the placeholder is shortened.
+ */
+const NARROW = 480;
+
+/**
+ * The first group of the composer's menu: attaching files, and the pickers for commands and
+ * mentions. Each row is there only when the composer offers it, and disabled while it takes no input.
+ */
+export function actionEntries(
+  offers: { attach: boolean; commands: boolean; mentions: boolean; available: boolean },
+  choose: { attach: () => void; commands: () => void; mentions: () => void },
+): MenuEntry[] {
+  const disabled = !offers.available;
+  const rows: MenuEntry[] = [];
+  if (offers.attach)
+    rows.push({
+      id: "attach",
+      label: "Attach files",
+      icon: <PaperclipIcon />,
+      disabled,
+      onChoose: choose.attach,
+    });
+  if (offers.commands)
+    rows.push({
+      id: "commands",
+      label: "Commands",
+      icon: <span className="lk-glyph">/</span>,
+      opensPicker: true,
+      disabled,
+      onChoose: choose.commands,
+    });
+  if (offers.mentions)
+    rows.push({
+      id: "mentions",
+      label: "Mention",
+      icon: <AtIcon />,
+      opensPicker: true,
+      disabled,
+      onChoose: choose.mentions,
+    });
+  return rows;
+}
 
 export interface ComposerProps {
   running: boolean;
@@ -87,9 +139,10 @@ export interface ComposerProps {
 /**
  * Where a person writes to the agent. Enter sends and Shift+Enter starts a new line. A `/` at the
  * start offers the agent's commands and an `@` offers what can be mentioned, each in a list the
- * arrows move through and Enter or Tab picks from. Below the box, small controls show the model,
- * mode and thinking level and open a picker for each; the same pickers are reachable from buttons
- * for anyone not typing the trigger characters.
+ * arrows move through and Enter or Tab picks from. Below the box, a menu at the left attaches files,
+ * opens the same lists for anyone not typing the trigger characters, and opens the other session
+ * settings. Chips beside it show the model, mode and thinking level and open a picker for each;
+ * in a box narrower than NARROW they are rows in the menu instead.
  */
 export function Composer({
   running,
@@ -113,6 +166,7 @@ export function Composer({
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const shell = useRef<HTMLDivElement>(null);
+  const narrow = useNarrowerThan(shell, NARROW);
   const [placed, setPlaced] = useState<Place | undefined>(undefined);
   const box = useRef<HTMLTextAreaElement>(null);
   const listId = useId();
@@ -273,7 +327,7 @@ export function Composer({
         onPick: setting,
       };
     }
-    if (overlay !== null) {
+    if (overlay !== null && overlay !== "menu") {
       const option = configOptions.find((o) => o.id === overlay.optionId);
       if (option !== undefined) {
         const items = settingItems(option, false);
@@ -377,9 +431,11 @@ export function Composer({
           }
           placeholder={
             unavailable ??
-            (mentions === undefined
-              ? "Message the agent · / for commands"
-              : "Message the agent · / for commands · @ to mention")
+            (narrow
+              ? "Message the agent"
+              : mentions === undefined
+                ? "Message the agent · / for commands"
+                : "Message the agent · / for commands · @ to mention")
           }
           disabled={!available}
           rows={1}
@@ -402,54 +458,49 @@ export function Composer({
             : ""}
         </div>
         <div className="lk-composer-bar">
+          <ComposerMenu
+            groups={[
+              actionEntries(
+                {
+                  attach: attach !== undefined,
+                  commands: commands.length > 0,
+                  mentions: mentions !== undefined,
+                  available,
+                },
+                {
+                  attach: () => picker.current?.click(),
+                  commands: () => setOverlay("commands"),
+                  mentions: () => setOverlay("mentions"),
+                },
+              ),
+              settingEntries(configOptions, narrow, {
+                onOpen: onSetConfig && setOverlay,
+                onToggle: onSetConfig,
+              }),
+            ]}
+            open={overlay === "menu"}
+            onOpenChange={(open) => setOverlay(open ? "menu" : null)}
+          />
           {attach === undefined ? null : (
-            <>
-              <IconButton
-                label="Attach files"
-                icon={PaperclipIcon}
-                disabled={!available}
-                onClick={() => picker.current?.click()}
-              />
-              <input
-                ref={picker}
-                type="file"
-                multiple
-                hidden
-                {...(attach.accept ? { accept: attach.accept.join(",") } : {})}
-                onChange={(event) => {
-                  attachments.add([...(event.target.files ?? [])]);
-                  event.target.value = "";
-                }}
-              />
-            </>
-          )}
-          {commands.length === 0 ? null : (
-            <button
-              type="button"
-              className="lk-icon-btn lk-glyph"
-              aria-haspopup="dialog"
-              aria-label="Commands"
-              title="Commands"
-              disabled={!available}
-              onClick={() => setOverlay("commands")}
-            >
-              /
-            </button>
-          )}
-          {mentions === undefined ? null : (
-            <IconButton
-              label="Mention"
-              icon={AtIcon}
-              aria-haspopup="dialog"
-              disabled={!available}
-              onClick={() => setOverlay("mentions")}
+            <input
+              ref={picker}
+              type="file"
+              multiple
+              hidden
+              {...(attach.accept ? { accept: attach.accept.join(",") } : {})}
+              onChange={(event) => {
+                attachments.add([...(event.target.files ?? [])]);
+                event.target.value = "";
+              }}
             />
           )}
-          <SessionControls
-            options={configOptions}
-            onOpen={onSetConfig && setOverlay}
-            onToggle={onSetConfig}
-          />
+          {narrow ? null : (
+            <SessionControls
+              options={configOptions}
+              onOpen={onSetConfig && setOverlay}
+              onToggle={onSetConfig}
+            />
+          )}
           <span className="lk-composer-end">
             {running ? (
               <button

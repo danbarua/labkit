@@ -1,10 +1,7 @@
 import type { Icon } from "@phosphor-icons/react";
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentProps } from "react";
 
-type ButtonProps = Omit<
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  "type" | "title" | "aria-label" | "children"
->;
+type ButtonProps = Omit<ComponentProps<"button">, "type" | "title" | "aria-label" | "children">;
 
 /**
  * A button drawn as an icon alone. `label` is its accessible name and its hover text. The icon is

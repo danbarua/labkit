@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Composer } from "../composer/composer";
+import { actionEntries, Composer } from "../composer/composer";
 
 const COMMANDS = [{ name: "compact", description: "Compact the conversation" }];
 
@@ -30,17 +30,26 @@ describe("a composer given a reason it takes no input", () => {
     expect(box).toContain('disabled=""');
   });
 
-  test("disables the send button, though the box holds text, and the buttons that add files, commands or mentions", () => {
-    const html = draw("Connecting to the agent…");
-    for (const label of ["Send", "Attach files", "Commands", "Mention"])
-      expect(tagOf(html, label)).toContain('disabled=""');
+  test("disables the send button, though the box holds text", () => {
+    expect(tagOf(draw("Connecting to the agent…"), "Send")).toContain('disabled=""');
+  });
+
+  test("disables its menu's rows that add files, commands or mentions", () => {
+    const offers = { attach: true, commands: true, mentions: true, available: false };
+    const noop = () => {};
+    const rows = actionEntries(offers, { attach: noop, commands: noop, mentions: noop });
+    expect(rows.map((row) => [row.label, row.disabled])).toEqual([
+      ["Attach files", true],
+      ["Commands", true],
+      ["Mention", true],
+    ]);
   });
 });
 
 describe("a composer given no such reason", () => {
   test("takes input, with its own placeholder", () => {
     const html = draw(undefined);
-    for (const label of ["Message", "Send", "Attach files", "Commands", "Mention"])
+    for (const label of ["Message", "Send", "Composer menu"])
       expect(tagOf(html, label)).not.toContain("disabled");
     expect(tagOf(html, "Message")).toContain('placeholder="Message the agent');
   });

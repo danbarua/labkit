@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AvailableCommand } from "@agentclientprotocol/sdk";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Composer, mentionAt } from "../composer/composer";
+import { actionEntries, Composer, mentionAt } from "../composer/composer";
 import { filterItems, inDrawnOrder, type PickItem, stepIndex } from "../overlay/list";
 import { Modal } from "../overlay/modal";
 import { PalettePanel } from "../overlay/palette";
@@ -197,9 +197,9 @@ describe("the composer", () => {
     expect(running).toContain('aria-label="Stop"');
   });
 
-  test("without mentions there is no @ control", () => {
-    const html = renderToStaticMarkup(<Composer running={false} onSend={() => {}} />);
-    expect(html).not.toContain('aria-label="Mention"');
-    expect(html).not.toContain('aria-label="Commands"');
+  test("without mentions or commands, its menu has no row for either", () => {
+    const noop = () => {};
+    const offers = { attach: false, commands: false, mentions: false, available: true };
+    expect(actionEntries(offers, { attach: noop, commands: noop, mentions: noop })).toEqual([]);
   });
 });

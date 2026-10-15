@@ -1253,15 +1253,96 @@ button.lk-handle:hover {
   color: var(--lk-accent-text);
   font-family: var(--lk-font-mono);
 }
+/* One row: in a box too narrow for the chips at their full width, their values shorten. */
 .lk-composer-bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   padding: 4px 8px 8px;
 }
 .lk-composer-end {
   margin-left: auto;
+}
+/* the composer's menu, opening upward from its button at the bar's left */
+.lk-composer-menu {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.lk-icon-btn.on {
+  background: var(--lk-surface-2);
+  color: var(--lk-text);
+}
+.lk-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 4px;
+  border: 1px solid var(--lk-line);
+  border-radius: 10px;
+  background: var(--lk-panel);
+  box-shadow: 0 8px 24px rgba(11, 18, 32, 0.14);
+}
+.lk-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--lk-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.lk-menu-item:hover,
+.lk-menu-item:focus-visible {
+  background: var(--lk-accent-soft);
+  outline: none;
+}
+.lk-menu-item[aria-disabled="true"] {
+  color: var(--lk-faint);
+  cursor: default;
+}
+.lk-menu-icon {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  width: 16px;
+  color: var(--lk-muted);
+}
+.lk-menu-label {
+  flex: none;
+}
+.lk-menu-value {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--lk-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lk-menu-more {
+  flex: none;
+  color: var(--lk-muted);
+}
+.lk-menu-label + .lk-menu-more {
+  margin-left: auto;
+}
+.lk-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  border: 0;
+  background: var(--lk-line);
 }
 .lk-send {
   display: inline-flex;
@@ -1288,6 +1369,7 @@ button.lk-handle:hover {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
   max-width: 220px;
   height: 28px;
   padding: 0 8px;
@@ -1297,6 +1379,9 @@ button.lk-handle:hover {
   color: var(--lk-muted);
   font: inherit;
   font-size: 12px;
+}
+.lk-chip-icon {
+  flex: none;
 }
 .lk-chip-value {
   overflow: hidden;

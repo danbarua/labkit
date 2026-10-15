@@ -7,8 +7,8 @@ import {
   type Icon,
   ShieldIcon,
 } from "@phosphor-icons/react";
-import { IconButton } from "../base/icon-button";
 import type { PickItem } from "../overlay/list";
+import type { MenuEntry } from "./composer-menu";
 
 type Select = Extract<SessionConfigOption, { type: "select" }>;
 type Choice = {
@@ -94,9 +94,54 @@ export function arrange(options: readonly SessionConfigOption[]) {
 }
 
 /**
- * The session's configuration as small controls: one per featured option showing its current
- * value, and one for everything else. Each opens a picker through `onOpen`; a boolean featured
- * option flips in place. Without `onOpen` the values are shown and cannot be changed.
+ * The settings group of the composer's menu.
+ * - While the composer is `narrow`, its bar has no room for the featured options' chips, so each
+ *   featured option is a row showing its value. A boolean one flips when chosen; any other opens
+ *   its picker. Without `onOpen` the settings cannot be changed, and these rows are disabled.
+ * - The options without a chip of their own sit behind one "Session settings" row, which opens a
+ *   picker for them all. It is there only when they can be changed.
+ */
+export function settingEntries(
+  options: readonly SessionConfigOption[],
+  narrow: boolean,
+  handlers: {
+    onOpen?: ((target: { optionId: string } | "settings") => void) | undefined;
+    onToggle?: ((configId: string, value: boolean) => void) | undefined;
+  },
+): MenuEntry[] {
+  const { onOpen, onToggle } = handlers;
+  const { featured, rest } = arrange(options);
+  const rows: MenuEntry[] = narrow
+    ? featured.map(([option, IconOf]) => ({
+        id: `option:${option.id}`,
+        label: option.name,
+        icon: <IconOf />,
+        value: currentLabel(option),
+        disabled: onOpen === undefined,
+        ...(option.type === "boolean"
+          ? {
+              checked: option.currentValue,
+              onChoose: () => onToggle?.(option.id, !option.currentValue),
+            }
+          : { opensPicker: true, onChoose: () => onOpen?.({ optionId: option.id }) }),
+      }))
+    : [];
+  if (rest.length > 0 && onOpen !== undefined) {
+    rows.push({
+      id: "settings",
+      label: "Session settings",
+      icon: <GearSixIcon />,
+      opensPicker: true,
+      onChoose: () => onOpen("settings"),
+    });
+  }
+  return rows;
+}
+
+/**
+ * The session's featured options as small controls, each showing its current value. Each opens
+ * a picker through `onOpen`; a boolean one flips in place. Without `onOpen` the values are shown
+ * and cannot be changed. The other options are reached through the composer's menu.
  */
 export function SessionControls({
   options,
@@ -104,10 +149,10 @@ export function SessionControls({
   onToggle,
 }: {
   options: readonly SessionConfigOption[];
-  onOpen?: ((target: { optionId: string } | "settings") => void) | undefined;
+  onOpen?: ((target: { optionId: string }) => void) | undefined;
   onToggle?: ((configId: string, value: boolean) => void) | undefined;
 }) {
-  const { featured, rest } = arrange(options);
+  const { featured } = arrange(options);
   const readOnly = onOpen === undefined;
   return (
     <>
@@ -115,7 +160,7 @@ export function SessionControls({
         const value = currentLabel(option);
         const chip = (
           <>
-            <IconOf aria-hidden="true" />
+            <IconOf className="lk-chip-icon" aria-hidden="true" />
             <span className="lk-chip-value">{value}</span>
           </>
         );
@@ -157,14 +202,6 @@ export function SessionControls({
           </button>
         );
       })}
-      {rest.length === 0 || readOnly ? null : (
-        <IconButton
-          label="Session settings"
-          icon={GearSixIcon}
-          aria-haspopup="dialog"
-          onClick={() => onOpen("settings")}
-        />
-      )}
     </>
   );
 }
