@@ -1,5 +1,6 @@
 import { sessionHistory } from "@labkit/acp-client";
 import { useLoaded } from "./loaded";
+import type { Recording } from "./playback";
 import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
 import { Page, Replay } from "./Replay";
 
@@ -14,13 +15,13 @@ export default function SessionReplay({ sessionId }: { sessionId: string }) {
         url: AGENT_URL,
         sessionId,
         ...(AGENT_CWD === undefined ? {} : { cwd: AGENT_CWD }),
-      }),
+      }).then((events): Recording => ({ events })),
     sessionId,
     // Reopening a session opens an ACP connection: see `useLoaded` for why it waits a tick.
     { deferred: true },
   );
   if (loaded.kind === "loaded")
-    return <Replay key={sessionId} crumb={sessionId} recording={{ events: loaded.value }} />;
+    return <Replay key={sessionId} crumb={sessionId} recording={loaded.value} />;
   return (
     <Page crumb={sessionId} controls={null}>
       <div className="page">
