@@ -55,7 +55,18 @@ type Camera = { yaw: number; pitch: number; distance: number };
 /** A point in the graph's space: the plane of the force layout, and depth by order first seen. */
 type Point3 = { x: number; y: number; z: number };
 
-type Drag = { x: number; y: number; yaw: number; pitch: number };
+/** A position in the window, in CSS pixels. */
+type Point2 = { x: number; y: number };
+
+/**
+ * What the pointers pressed on the canvas do to the camera, measured from where they were when a
+ * pointer was last pressed or released. One pointer orbits: it turns the camera from `yaw` and
+ * `pitch` as it moves from `from`. Two pinch: the camera's distance scales with how much nearer or
+ * further apart they are than `gap`, from `distance`.
+ */
+type Gesture =
+  | { kind: "orbit"; from: Point2; yaw: number; pitch: number }
+  | { kind: "pinch"; gap: number; distance: number };
 
 type Sim = {
   nodes: Map<string, SimNode>;
@@ -72,7 +83,7 @@ type Sim = {
   pivot: Point3 | null;
   /** Scales every force, and falls each tick; below HEAT_MIN the layout is not computed. */
   heat: number;
-  /** Whether the camera frames the open node by itself: set when a node opens, cleared by a drag or a scroll. */
+  /** Whether the camera frames the open node by itself: set when a node opens, cleared by a drag, a pinch or a scroll. */
   follow: boolean;
   /** The yaw the framing chose, which the sway swings about; null until it chooses after following starts. */
   aim: number | null;
@@ -82,7 +93,14 @@ type Sim = {
   pointerOn: boolean;
   /** Whether the reader's system asks for reduced motion. The camera does not sway when it does. */
   reducedMotion: boolean;
-  drag: Drag | null;
+  /** The pointers pressed on the canvas and not yet released, by pointer id, where each is now. */
+  pointers: Map<number, Point2>;
+  /** What the pressed pointers do to the camera; null while none is pressed. */
+  gesture: Gesture | null;
+  /**
+   * Whether the pointers pressed since the canvas last had none have moved the camera or pinched.
+   * The click that ends such a press opens no node.
+   */
   dragged: boolean;
 };
 
@@ -117,8 +135,17 @@ const FOCAL = 640;
  */
 const ANCHOR = { x: 0.35, y: 0.45 };
 
-/** The colours the canvas draws in, read from the page's stylesheet on each frame so a theme change shows. */
-type Palette = { css: CSSStyleDeclaration; text: string; dim: string; accent: string };
+/**
+ * The colours the canvas draws in, read from the page's stylesheet on each frame so a theme change
+ * shows. `kinds` holds each record type's colour once the frame has looked it up.
+ */
+type Palette = {
+  css: CSSStyleDeclaration;
+  text: string;
+  dim: string;
+  accent: string;
+  kinds: Map<string, string>;
+};
 
 function paletteOf(canvas: HTMLCanvasElement): Palette {
   const css = getComputedStyle(canvas);
@@ -128,12 +155,12 @@ function paletteOf(canvas: HTMLCanvasElement): Palette {
     text: read("--text", "#ffffff"),
     dim: read("--text-dim", "#c8cedb"),
     accent: read("--accent", "#5ad1c9"),
+    kinds: new Map(),
   };
 }
 
-function colorFor(kind: string, palette: Palette): string {
-  const styled = palette.css.getPropertyValue(`--c-${kind.toLowerCase()}`).trim();
-  if (styled) return styled;
+/** The colour KIND_COLOR hands a record type the stylesheet gives none. */
+function assignedColor(kind: string): string {
   const existing = KIND_COLOR[kind];
   if (existing) return existing;
   const n = Object.keys(KIND_COLOR).length;
@@ -143,20 +170,42 @@ function colorFor(kind: string, palette: Palette): string {
   return color;
 }
 
-function colorForNode(sim: Sim, node: SimNode, palette: Palette): string {
+function colorFor(kind: string, palette: Palette): string {
+  const known = palette.kinds.get(kind);
+  if (known !== undefined) return known;
+  const styled = palette.css.getPropertyValue(`--c-${kind.toLowerCase()}`).trim();
+  const color = styled || assignedColor(kind);
+  palette.kinds.set(kind, color);
+  return color;
+}
+
+function colorForNode(
+  sim: Sim,
+  node: SimNode,
+  palette: Palette,
+  neighbours: ReadonlySet<string>,
+): string {
   if (sim.overlay === "temporal") {
     if (node.id === sim.selectedId) return TEMPORAL_CREATED;
-    for (const edge of sim.edges) {
-      if (
-        (edge.from === sim.selectedId && edge.to === node.id) ||
-        (edge.to === sim.selectedId && edge.from === node.id)
-      ) {
-        return TEMPORAL_TOUCHED;
-      }
-    }
-    return TEMPORAL_HISTORICAL;
+    return neighbours.has(node.id) ? TEMPORAL_TOUCHED : TEMPORAL_HISTORICAL;
   }
   return colorFor(node.type, palette);
+}
+
+/** The ids of the nodes an edge joins to the node `id`; none when `id` is null. */
+function neighboursOf(edges: readonly GraphEdgeSeed[], id: string | null): Set<string> {
+  const near = new Set<string>();
+  if (id === null) return near;
+  for (const edge of edges) {
+    if (edge.from === id) near.add(edge.to);
+    else if (edge.to === id) near.add(edge.from);
+  }
+  return near;
+}
+
+/** An edge's identity on the canvas: its two ends and its label. */
+function edgeKey(edge: GraphEdgeSeed): string {
+  return `${edge.from}\0${edge.label}\0${edge.to}`;
 }
 
 function springiness(n: number): number {
@@ -187,7 +236,6 @@ export function mergeSeeds(
       ? seeds
       : [...seeds.filter((s) => s.id === selectedId), ...seeds.filter((s) => s.id !== selectedId)];
 
-  const parent = selectedId ? sim.nodes.get(selectedId) : undefined;
   const [cx, cy] = centroid(sim);
 
   for (const seed of ordered) {
@@ -196,11 +244,8 @@ export function mergeSeeds(
       existing.type = seed.type;
       continue;
     }
-    const near =
-      parent ??
-      (sim.nodes.size === 0
-        ? { x: cx, y: cy }
-        : (sim.nodes.get(selectedId ?? "") ?? { x: cx, y: cy }));
+    // Beside the open resource's node, which `ordered` adds first; else at the centroid before.
+    const near = (selectedId === null ? undefined : sim.nodes.get(selectedId)) ?? { x: cx, y: cy };
     sim.nodes.set(seed.id, {
       ...seed,
       x: near.x + (Math.random() - 0.5) * 40,
@@ -214,7 +259,7 @@ export function mergeSeeds(
   }
 
   for (const edge of edges) {
-    const key = `${edge.from}\0${edge.label}\0${edge.to}`;
+    const key = edgeKey(edge);
     if (sim.edgeKeys.has(key)) continue;
     sim.edgeKeys.add(key);
     sim.edges.push({ ...edge, born: sim.labels.frame });
@@ -277,23 +322,22 @@ export function tickPhysics(sim: Sim): boolean {
   return true;
 }
 
-function zOf(sim: Sim, node: SimNode): number {
-  const total = Math.max(1, sim.nextStep - 1);
-  return (node.createdStep / total) * TOTAL_DEPTH;
+/** The depth of the node created at `step`: the first node at 0, the newest at TOTAL_DEPTH. */
+function depthAt(sim: Sim, step: number): number {
+  return (step / Math.max(1, sim.nextStep - 1)) * TOTAL_DEPTH;
 }
 
-function maxCreatedZ(sim: Sim): number {
-  let max = 0;
-  for (const n of sim.nodes.values()) max = Math.max(max, zOf(sim, n));
-  return max;
+function zOf(sim: Sim, node: SimNode): number {
+  return depthAt(sim, node.createdStep);
 }
 
 /**
  * Where the camera faces before it has faced any node: the middle of the graph's depth at the
- * plane's origin, which the layout is pulled towards.
+ * plane's origin, which the layout is pulled towards. The canvas never removes a node, so the
+ * newest node, created at step `nextStep - 1`, is the deepest.
  */
 function startingPivot(sim: Sim): Point3 {
-  return { x: 0, y: 0, z: maxCreatedZ(sim) / 2 };
+  return { x: 0, y: 0, z: depthAt(sim, Math.max(0, sim.nextStep - 1)) / 2 };
 }
 
 /**
@@ -344,19 +388,28 @@ const TURN_MAX = (0.75 * Math.PI) / 180;
  */
 const FRAME_DISTANCE = { min: 300, max: 900 };
 
-/** Where `v`, a point relative to the pivot, is drawn relative to the pivot, ignoring perspective. */
-function onScreen(v: Point3, camera: Pick<Camera, "yaw" | "pitch">) {
-  const x1 = v.x * Math.cos(camera.yaw) - v.z * Math.sin(camera.yaw);
-  const z1 = v.x * Math.sin(camera.yaw) + v.z * Math.cos(camera.yaw);
-  const y1 = v.y * Math.cos(camera.pitch) - z1 * Math.sin(camera.pitch);
-  const z2 = v.y * Math.sin(camera.pitch) + z1 * Math.cos(camera.pitch);
-  return { x1, y1, z2 };
+/** A camera's turn and tilt as the cosines and sines of its yaw and pitch. */
+type Rotation = { cosY: number; sinY: number; cosX: number; sinX: number };
+
+function rotationOf(camera: Pick<Camera, "yaw" | "pitch">): Rotation {
+  return {
+    cosY: Math.cos(camera.yaw),
+    sinY: Math.sin(camera.yaw),
+    cosX: Math.cos(camera.pitch),
+    sinX: Math.sin(camera.pitch),
+  };
 }
 
-/** How far toward the canvas's bottom-right corner `v` is drawn, at the given yaw. */
-function towardCorner(v: Point3, yaw: number, pitch: number): number {
-  const { x1, y1 } = onScreen(v, { yaw, pitch });
-  return (x1 + y1) / Math.SQRT2;
+/**
+ * Where `v`, a point relative to the pivot, is drawn relative to the pivot, ignoring perspective:
+ * `x1` right, `y1` down, and `z2` its depth away from the viewer.
+ */
+function onScreen(v: Point3, r: Rotation) {
+  const x1 = v.x * r.cosY - v.z * r.sinY;
+  const z1 = v.x * r.sinY + v.z * r.cosY;
+  const y1 = v.y * r.cosX - z1 * r.sinX;
+  const z2 = v.y * r.sinX + z1 * r.cosX;
+  return { x1, y1, z2 };
 }
 
 /** The signed turn, between -π and π, from angle `from` to angle `to`. */
@@ -369,13 +422,13 @@ function turnBetween(from: number, to: number): number {
  * points of each one's drawn distance divided by its distance in the graph's space. 1 when every
  * point is drawn at its full distance; lower when the camera looks along their directions.
  */
-function spreadOf(points: Point3[], camera: Pick<Camera, "yaw" | "pitch">): number {
+function spreadOf(points: Point3[], rotation: Rotation): number {
   let sum = 0;
   let count = 0;
   for (const v of points) {
     const length = Math.hypot(v.x, v.y, v.z);
     if (length === 0) continue;
-    const { x1, y1 } = onScreen(v, camera);
+    const { x1, y1 } = onScreen(v, rotation);
     sum += Math.hypot(x1, y1) / length;
     count++;
   }
@@ -392,20 +445,28 @@ function spreadOf(points: Point3[], camera: Pick<Camera, "yaw" | "pitch">): numb
  */
 export function yawToward(view: { rest: Point3; near: Point3[]; pitch: number; yaw: number }) {
   const { rest, near, pitch, yaw } = view;
-  const candidates = [yaw, ...Array.from({ length: 72 }, (_, i) => -Math.PI + (i * Math.PI) / 36)];
-  const spread = candidates.map((c) => spreadOf(near, { yaw: c, pitch }));
-  const most = Math.max(...spread);
-  const shows = candidates.filter((_, i) => (spread[i] ?? 0) >= SPREAD_KEEP * most);
-  const behind = shows.filter((c) => onScreen(rest, { yaw: c, pitch }).z2 >= 0);
+  const yaws = [yaw, ...Array.from({ length: 72 }, (_, i) => -Math.PI + (i * Math.PI) / 36)];
+  const candidates = yaws.map((c) => {
+    const rotation = rotationOf({ yaw: c, pitch });
+    const drawn = onScreen(rest, rotation);
+    return {
+      yaw: c,
+      spread: spreadOf(near, rotation),
+      behind: drawn.z2 >= 0,
+      // How far toward the canvas's bottom-right corner `rest` is drawn.
+      corner: (drawn.x1 + drawn.y1) / Math.SQRT2,
+      turn: Math.abs(turnBetween(yaw, c)),
+    };
+  });
+  const most = Math.max(...candidates.map((c) => c.spread));
+  const shows = candidates.filter((c) => c.spread >= SPREAD_KEEP * most);
+  const behind = shows.filter((c) => c.behind);
   // `shows` always holds the yaw with the best spread, so the pool is never empty.
   const pool = behind.length > 0 ? behind : shows;
-  const score = (c: number) => towardCorner(rest, c, pitch);
-  const best = Math.max(...pool.map(score));
+  const best = Math.max(...pool.map((c) => c.corner));
   const margin = 0.1 * Math.hypot(rest.x, rest.y, rest.z);
-  const turn = (c: number) => Math.abs(turnBetween(yaw, c));
-  return pool
-    .filter((c) => score(c) >= best - margin)
-    .reduce((a, c) => (turn(c) < turn(a) ? c : a));
+  const qualify = pool.filter((c) => c.corner >= best - margin);
+  return qualify.reduce((a, c) => (c.turn < a.turn ? c : a)).yaw;
 }
 
 /**
@@ -417,9 +478,10 @@ export function distanceToFit(
   camera: Pick<Camera, "yaw" | "pitch">,
   radius: number,
 ): number | undefined {
+  const rotation = rotationOf(camera);
   let distance: number | undefined;
   for (const point of points) {
-    const { x1, y1, z2 } = onScreen(point, camera);
+    const { x1, y1, z2 } = onScreen(point, rotation);
     const offset = Math.hypot(x1, y1);
     if (offset === 0) continue;
     const needed = (offset * FOCAL) / radius - z2;
@@ -443,11 +505,7 @@ export function frameCamera(sim: Sim, width: number, height: number): void {
   camera.pitch += turnBetween(camera.pitch, pitch) * FRAME_EASE;
   const at = zOf(sim, open);
   const rel = (n: SimNode): Point3 => ({ x: n.x - open.x, y: n.y - open.y, z: zOf(sim, n) - at });
-  const near = new Set<string>();
-  for (const edge of sim.edges) {
-    if (edge.from === open.id) near.add(edge.to);
-    else if (edge.to === open.id) near.add(edge.from);
-  }
+  const near = neighboursOf(sim.edges, open.id);
   const rest = { x: 0, y: 0, z: 0 };
   let count = 0;
   for (const n of sim.nodes.values()) {
@@ -481,46 +539,48 @@ export function frameCamera(sim: Sim, width: number, height: number): void {
   }
 }
 
-export function project(sim: Sim, node: SimNode, width: number, height: number): Projected {
-  const { yaw, pitch, distance } = sim.camera;
+/**
+ * Where each node is drawn on a canvas `width` by `height` pixels, in perspective from the camera.
+ * A node at or behind the camera has scale 0 and is drawn nowhere.
+ */
+function projectNodes(sim: Sim, width: number, height: number): Map<string, Projected> {
+  const rotation = rotationOf(sim.camera);
   const pivot = sim.pivot ?? startingPivot(sim);
-  const x0 = node.x - pivot.x;
-  const y0 = node.y - pivot.y;
-  const zc = zOf(sim, node) - pivot.z;
-  const cosY = Math.cos(yaw);
-  const sinY = Math.sin(yaw);
-  const x1 = x0 * cosY - zc * sinY;
-  const z1 = x0 * sinY + zc * cosY;
-  const cosX = Math.cos(pitch);
-  const sinX = Math.sin(pitch);
-  const y1 = y0 * cosX - z1 * sinX;
-  const z2 = y0 * sinX + z1 * cosX;
-  const viewZ = z2 + distance;
-  if (viewZ <= 1) return { sx: -9999, sy: -9999, scale: 0, depth: viewZ };
-  const scale = FOCAL / viewZ;
-  return {
-    sx: width * ANCHOR.x + x1 * scale,
-    sy: height * ANCHOR.y + y1 * scale,
-    scale,
-    depth: viewZ,
-  };
+  const projected = new Map<string, Projected>();
+  for (const node of sim.nodes.values()) {
+    const v = { x: node.x - pivot.x, y: node.y - pivot.y, z: zOf(sim, node) - pivot.z };
+    const { x1, y1, z2 } = onScreen(v, rotation);
+    const depth = z2 + sim.camera.distance;
+    if (depth <= 1) {
+      projected.set(node.id, { sx: -9999, sy: -9999, scale: 0, depth });
+      continue;
+    }
+    const scale = FOCAL / depth;
+    projected.set(node.id, {
+      sx: width * ANCHOR.x + x1 * scale,
+      sy: height * ANCHOR.y + y1 * scale,
+      scale,
+      depth,
+    });
+  }
+  return projected;
 }
+
+/** The compass's arms: the graph's unit axes. The third is the time axis. */
+const AXES: { unit: Point3; color: string; label: string | null }[] = [
+  { unit: { x: 1, y: 0, z: 0 }, color: "#e0687a", label: null },
+  { unit: { x: 0, y: 1, z: 0 }, color: "#5ad1c9", label: null },
+  { unit: { x: 0, y: 0, z: 1 }, color: "#e0b25a", label: "time" },
+];
 
 /**
  * The graph's three axes as the camera sees them: each unit axis's screen direction (`x1` right,
- * `y1` down) and its depth away from the viewer (`z2`). The third is the time axis: a node seen
- * later lies further along it.
+ * `y1` down) and its depth away from the viewer (`z2`). A node seen later lies further along the
+ * time axis.
  */
 export function screenAxes(camera: Pick<Camera, "yaw" | "pitch">) {
-  const cosY = Math.cos(camera.yaw);
-  const sinY = Math.sin(camera.yaw);
-  const cosX = Math.cos(camera.pitch);
-  const sinX = Math.sin(camera.pitch);
-  return [
-    { x1: cosY, y1: -sinY * sinX, z2: sinY * cosX, color: "#e0687a", label: null as string | null },
-    { x1: 0, y1: cosX, z2: sinX, color: "#5ad1c9", label: null as string | null },
-    { x1: -sinY, y1: -cosY * sinX, z2: cosY * cosX, color: "#e0b25a", label: "time" },
-  ];
+  const rotation = rotationOf(camera);
+  return AXES.map(({ unit, color, label }) => ({ ...onScreen(unit, rotation), color, label }));
 }
 
 // Seen from here, the time axis points up, to the right and away from the viewer.
@@ -724,6 +784,37 @@ type EdgeLabel = {
   width: number;
 } & ReturnType<typeof labelAngle>;
 
+/** An edge whose two nodes are both in front of the camera, and where its nodes are drawn. */
+type SceneEdge = {
+  edge: SimEdge;
+  a: Projected;
+  b: Projected;
+  /** Whether the edge joins the open node or the node under the pointer. */
+  hot: boolean;
+};
+
+/**
+ * What one frame draws: where each node is drawn, the open node's neighbours, and the edges whose
+ * two nodes are both in front of the camera.
+ */
+export type Scene = {
+  projected: Map<string, Projected>;
+  neighbours: Set<string>;
+  edges: SceneEdge[];
+};
+
+export function sceneOf(sim: Sim, projected: Map<string, Projected>): Scene {
+  const focus = [sim.selectedId, sim.hoverId].filter((id) => id !== null);
+  const edges: SceneEdge[] = [];
+  for (const edge of sim.edges) {
+    const a = projected.get(edge.from);
+    const b = projected.get(edge.to);
+    if (!a || !b || a.scale === 0 || b.scale === 0) continue;
+    edges.push({ edge, a, b, hot: focus.some((id) => edge.from === id || edge.to === id) });
+  }
+  return { projected, neighbours: neighboursOf(sim.edges, sim.selectedId), edges };
+}
+
 /**
  * The labels the canvas may draw in this frame, before overlaps are resolved, and their boxes.
  * `measure` returns a text's width in pixels in a font. An edge's label is not a candidate until
@@ -732,16 +823,12 @@ type EdgeLabel = {
  */
 export function labelCandidates(
   sim: Sim,
-  projected: Map<string, Projected>,
+  scene: Scene,
   measure: (text: string, font: string) => number,
 ): { boxes: LabelBox[]; edgeLabels: EdgeLabel[] } {
   const boxes: LabelBox[] = [];
   const edgeLabels: EdgeLabel[] = [];
-  const neighbours = new Set<string>();
-  for (const edge of sim.edges) {
-    if (edge.from === sim.selectedId) neighbours.add(edge.to);
-    else if (edge.to === sim.selectedId) neighbours.add(edge.from);
-  }
+  const { projected, neighbours } = scene;
   // A label drawn in the last frame stays a candidate a little past the size at which it appears,
   // so one at that size does not flicker as the camera moves.
   const big = (scale: number, key: string) => scale > (sim.labels.shown.has(key) ? 0.5 : 0.55);
@@ -761,15 +848,9 @@ export function labelCandidates(
       angle: 0,
     });
   }
-  for (const edge of sim.edges) {
-    const a = projected.get(edge.from);
-    const b = projected.get(edge.to);
-    if (!a || !b || a.scale === 0 || b.scale === 0) continue;
-    const hot = [sim.selectedId, sim.hoverId].some(
-      (id) => id !== null && (edge.from === id || edge.to === id),
-    );
-    const key = `e\0${edge.from}\0${edge.label}\0${edge.to}`;
+  for (const { edge, a, b, hot } of scene.edges) {
     if (sim.labels.frame - edge.born < EDGE_LABEL_DELAY) continue;
+    const key = `e\0${edgeKey(edge)}`;
     if (!hot && !big(Math.min(a.scale, b.scale), key)) continue;
     const font = hot ? "600 10px ui-monospace, monospace" : "9px ui-monospace, monospace";
     const width = measure(edge.label, font) + LABEL_MARKER;
@@ -806,13 +887,18 @@ export function labelCandidates(
 function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, height: number): void {
   ctx.clearRect(0, 0, width, height);
   const palette = paletteOf(ctx.canvas);
-  const nodes = [...sim.nodes.values()];
-  const projected = new Map<string, Projected>();
-  for (const n of nodes) projected.set(n.id, project(sim, n, width, height));
+  const projected = projectNodes(sim, width, height);
   sim.screenPos = projected;
+  const scene = sceneOf(sim, projected);
 
-  const order = [...projected.entries()].sort((a, b) => b[1].depth - a[1].depth);
-  const visible = order.filter(([, p]) => p.scale > 0).map(([, p]) => p.depth);
+  // The nodes in front of the camera, farthest first, so nearer nodes are drawn over them.
+  const order = [...sim.nodes.values()]
+    .flatMap((node) => {
+      const p = projected.get(node.id);
+      return p === undefined || p.scale === 0 ? [] : [{ node, p }];
+    })
+    .sort((m, n) => n.p.depth - m.p.depth);
+  const visible = order.map(({ p }) => p.depth);
   const near = Math.min(...visible);
   const far = Math.max(...visible);
   const opacity = (depth: number) => depthOpacity(depth, near, far);
@@ -822,15 +908,9 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   // colour and twice as wide, unfaded, so they stand out from the rest. Each edge is drawn from
   // the rim of one node to the rim of the other, so a node drawn see-through has no line inside it.
   const hotEdges: Segment[] = [];
-  for (const edge of sim.edges) {
-    const a = projected.get(edge.from);
-    const b = projected.get(edge.to);
-    if (!a || !b || a.scale === 0 || b.scale === 0) continue;
+  for (const { a, b, hot } of scene.edges) {
     const segment = rimToRim(a, nodeRadius(a), b, nodeRadius(b));
     if (segment === undefined) continue;
-    const hot = [sim.selectedId, sim.hoverId].some(
-      (id) => id !== null && (edge.from === id || edge.to === id),
-    );
     if (hot) hotEdges.push(segment);
     else {
       ctx.globalAlpha = opacity((a.depth + b.depth) / 2);
@@ -852,7 +932,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   }
   ctx.lineWidth = 1;
 
-  const { boxes, edgeLabels } = labelCandidates(sim, projected, (text, font) => {
+  const { boxes, edgeLabels } = labelCandidates(sim, scene, (text, font) => {
     ctx.font = font;
     return ctx.measureText(text).width;
   });
@@ -860,17 +940,15 @@ function renderFrame(ctx: CanvasRenderingContext2D, sim: Sim, width: number, hei
   // The share of its opacity a label is drawn at as it fades in or out; 0 for one not drawn.
   const fade = (key: string) => (sim.labels.faded.get(key) ?? 0) / LABEL_FADE;
 
-  for (const [id] of order) {
-    const node = sim.nodes.get(id);
-    const p = projected.get(id);
-    if (!node || !p || p.scale === 0) continue;
+  for (const { node, p } of order) {
+    const id = node.id;
     const r = nodeRadius(p);
     const isHover = id === sim.hoverId;
     const isSelected = id === sim.selectedId;
     const alpha = node.alpha * (isHover || isSelected ? 1 : opacity(p.depth));
 
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = colorForNode(sim, node, palette);
+    ctx.fillStyle = colorForNode(sim, node, palette, scene.neighbours);
     ctx.beginPath();
     ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
     ctx.fill();
@@ -1011,9 +1089,104 @@ export function createSim(): Sim {
     swayPhase: 0,
     pointerOn: false,
     reducedMotion: false,
-    drag: null,
+    pointers: new Map(),
+    gesture: null,
     dragged: false,
   };
+}
+
+/** How far the camera can be from the pivot, as a scroll or a pinch zooms it. */
+const ZOOM = { min: 120, max: 2200 };
+/**
+ * How far, in pixels, a pressed pointer must move, or a pinch's two pointers must close or part,
+ * before the gesture takes the camera from the framing.
+ */
+const DRAG_SLOP = 4;
+/** How far the camera turns, in radians, for each pixel an orbiting pointer moves. */
+const ORBIT_RATE = 0.006;
+
+/** Stops the camera framing the open node, as a drag, a pinch or a scroll takes it. */
+function takeCamera(sim: Sim): void {
+  sim.follow = false;
+  sim.aim = null;
+}
+
+function zoomTo(sim: Sim, distance: number): void {
+  sim.camera.distance = Math.max(ZOOM.min, Math.min(ZOOM.max, distance));
+}
+
+/**
+ * The gesture the pressed pointers make from where they are now: none, an orbit by the one
+ * pointer, or a pinch by the first two pressed. A third pointer moves nothing.
+ */
+function gestureOf(sim: Sim): Gesture | null {
+  const [first, second] = sim.pointers.values();
+  if (first === undefined) return null;
+  if (second === undefined)
+    return { kind: "orbit", from: first, yaw: sim.camera.yaw, pitch: sim.camera.pitch };
+  return { kind: "pinch", gap: gapBetween(first, second), distance: sim.camera.distance };
+}
+
+/** The distance between two pointers, at least 1 pixel, so a pinch never divides by 0. */
+function gapBetween(a: Point2, b: Point2): number {
+  return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+}
+
+/**
+ * Records a pointer pressed on the canvas at `at`. The gesture starts again from the pointers'
+ * positions, so the camera does not jump when a second pointer joins or one is lifted. A second
+ * pointer makes the press a pinch, whose click opens no node.
+ */
+export function pressPointer(sim: Sim, id: number, at: Point2): void {
+  const stale = sim.pointers.get(id);
+  if (stale !== undefined) {
+    console.warn(
+      `graph view: pointer ${id}, pressed at (${stale.x}, ${stale.y}), is pressed again at (${at.x}, ${at.y}) with no release between; the earlier press is dropped`,
+    );
+    sim.pointers.delete(id);
+  }
+  if (sim.pointers.size === 0) sim.dragged = false;
+  sim.pointers.set(id, at);
+  if (sim.pointers.size > 1) sim.dragged = true;
+  sim.gesture = gestureOf(sim);
+}
+
+/** Records a pointer lifted or cancelled. One pressed elsewhere changes nothing. */
+export function releasePointer(sim: Sim, id: number): void {
+  if (!sim.pointers.delete(id)) return;
+  sim.gesture = gestureOf(sim);
+}
+
+/**
+ * Moves a pressed pointer to `at`, and turns or zooms the camera. Returns false for a pointer not
+ * pressed on the canvas, such as a mouse passing over it.
+ */
+export function movePointer(sim: Sim, id: number, at: Point2): boolean {
+  const gesture = sim.gesture;
+  if (gesture === null || !sim.pointers.has(id)) return false;
+  sim.pointers.set(id, at);
+  switch (gesture.kind) {
+    case "orbit": {
+      const dx = at.x - gesture.from.x;
+      const dy = at.y - gesture.from.y;
+      if (Math.hypot(dx, dy) > DRAG_SLOP) {
+        sim.dragged = true;
+        takeCamera(sim);
+      }
+      sim.camera.yaw = gesture.yaw + dx * ORBIT_RATE;
+      sim.camera.pitch = gesture.pitch - dy * ORBIT_RATE;
+      return true;
+    }
+    case "pinch": {
+      const [first, second] = sim.pointers.values();
+      if (first === undefined || second === undefined) return true;
+      const gap = gapBetween(first, second);
+      if (Math.abs(gap - gesture.gap) > DRAG_SLOP) takeCamera(sim);
+      // Pointers moving apart bring the camera nearer.
+      zoomTo(sim, (gesture.distance * gesture.gap) / gap);
+      return true;
+    }
+  }
 }
 
 function resizeCanvas(
@@ -1051,6 +1224,8 @@ export function GraphView({
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const simRef = useRef<Sim>(createSim());
   const reducedMotion = useMediaQuery(REDUCED_MOTION);
+  // A device whose main pointer cannot hover, such as a phone or a tablet, zooms by pinching.
+  const touch = useMediaQuery("(hover: none)");
   const sizeRef = useRef({ width: 0, height: 0 });
   const navigateRef = useRef(onNavigate);
   navigateRef.current = onNavigate;
@@ -1084,27 +1259,15 @@ export function GraphView({
     const wrap = canvas.parentElement;
     if (wrap) ro.observe(wrap);
 
+    const at = (event: PointerEvent): Point2 => ({ x: event.clientX, y: event.clientY });
     const onPointerDown = (event: PointerEvent) => {
-      const s = simRef.current;
-      s.dragged = false;
-      s.drag = { x: event.clientX, y: event.clientY, yaw: s.camera.yaw, pitch: s.camera.pitch };
+      pressPointer(simRef.current, event.pointerId, at(event));
       canvas.classList.add("dragging");
     };
     const onPointerMove = (event: PointerEvent) => {
       const s = simRef.current;
+      if (movePointer(s, event.pointerId, at(event))) return;
       const rect = canvas.getBoundingClientRect();
-      if (s.drag) {
-        const dx = event.clientX - s.drag.x;
-        const dy = event.clientY - s.drag.y;
-        if (Math.hypot(dx, dy) > 4) {
-          s.dragged = true;
-          s.follow = false;
-          s.aim = null;
-        }
-        s.camera.yaw = s.drag.yaw + dx * 0.006;
-        s.camera.pitch = s.drag.pitch - dy * 0.006;
-        return;
-      }
       const mx = event.clientX - rect.left;
       const my = event.clientY - rect.top;
       const inside = mx >= 0 && my >= 0 && mx <= rect.width && my <= rect.height;
@@ -1114,10 +1277,12 @@ export function GraphView({
       setHoverId(s.hoverId);
       setPointerOn(inside);
     };
-    const onPointerUp = () => {
+    // The browser fires pointercancel instead of pointerup when it stops reporting a pointer, for
+    // example when the operating system uses a touch for its own gesture. Either releases it.
+    const onPointerUp = (event: PointerEvent) => {
       const s = simRef.current;
-      s.drag = null;
-      canvas.classList.remove("dragging");
+      releasePointer(s, event.pointerId);
+      if (s.pointers.size === 0) canvas.classList.remove("dragging");
     };
     const onClick = (event: MouseEvent) => {
       const s = simRef.current;
@@ -1129,10 +1294,9 @@ export function GraphView({
     };
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
-      simRef.current.follow = false;
-      simRef.current.aim = null;
-      const cam = simRef.current.camera;
-      cam.distance = Math.max(120, Math.min(2200, cam.distance + event.deltaY * 0.6));
+      const s = simRef.current;
+      takeCamera(s);
+      zoomTo(s, s.camera.distance + event.deltaY * 0.6);
     };
     const onLeave = () => {
       simRef.current.hoverId = null;
@@ -1144,6 +1308,7 @@ export function GraphView({
     canvas.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("click", onClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("pointerleave", onLeave);
@@ -1153,6 +1318,7 @@ export function GraphView({
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
       canvas.removeEventListener("click", onClick);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("pointerleave", onLeave);
@@ -1178,7 +1344,7 @@ export function GraphView({
   return (
     <div id="stage-wrap">
       <canvas id="stage" ref={canvasRef} className="orbit" />
-      <div className="hint">drag to orbit · scroll to zoom</div>
+      <div className="hint">drag to orbit · {touch ? "pinch" : "scroll"} to zoom</div>
       <div id="popover" className={carded === null ? "popover hidden" : "popover"}>
         {carded === null ? null : summary(carded)}
       </div>

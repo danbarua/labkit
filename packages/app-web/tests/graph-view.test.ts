@@ -8,12 +8,16 @@ import {
   INITIAL_CAMERA,
   labelAngle,
   mergeSeeds,
+  movePointer,
   labelCandidates,
   placeLabels,
+  pressPointer,
+  releasePointer,
   screenAxes,
   tickPhysics,
   yawToward,
   rimToRim,
+  sceneOf,
 } from "../src/ui/GraphView";
 
 describe("the graph's depth fade", () => {
@@ -377,7 +381,7 @@ describe("label placement", () => {
       sim: ReturnType<typeof createSim>,
       projected: Map<string, ReturnType<typeof at>>,
     ) =>
-      labelCandidates(sim, projected, measure)
+      labelCandidates(sim, sceneOf(sim, projected), measure)
         .boxes.map((b) => b.key.replace(/\0/g, " "))
         .sort();
 
@@ -439,6 +443,99 @@ describe("the camera's pivot", () => {
     const held = { ...sim.pivot! };
     followPivot(sim);
     expect(sim.pivot).toEqual(held);
+  });
+});
+
+describe("pointers on the canvas", () => {
+  // A followed camera at distance 600.
+  const followed = () => {
+    const sim = createSim();
+    sim.camera.distance = 600;
+    return sim;
+  };
+
+  test("one pointer orbits the camera and takes it from the framing; its click opens nothing", () => {
+    const sim = followed();
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    expect(movePointer(sim, 1, { x: 200, y: 150 })).toBe(true);
+    expect(sim.camera.yaw).toBeCloseTo(INITIAL_CAMERA.yaw + 0.6);
+    expect(sim.camera.pitch).toBeCloseTo(INITIAL_CAMERA.pitch - 0.3);
+    expect(sim.follow).toBe(false);
+    expect(sim.dragged).toBe(true);
+  });
+
+  test("a press that moves 4 pixels or less leaves the framing, and its click opens the node", () => {
+    const sim = followed();
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    movePointer(sim, 1, { x: 103, y: 102 });
+    releasePointer(sim, 1);
+    expect(sim.follow).toBe(true);
+    expect(sim.dragged).toBe(false);
+  });
+
+  test("two pointers moving apart bring the camera nearer, and together take it further", () => {
+    const sim = followed();
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    pressPointer(sim, 2, { x: 140, y: 100 });
+    movePointer(sim, 2, { x: 180, y: 100 });
+    expect(sim.camera.distance).toBeCloseTo(300);
+    expect(sim.follow).toBe(false);
+    movePointer(sim, 2, { x: 120, y: 100 });
+    expect(sim.camera.distance).toBeCloseTo(1200);
+  });
+
+  test("a pinch zooms no nearer than 120 and no further than 2200", () => {
+    const sim = followed();
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    pressPointer(sim, 2, { x: 140, y: 100 });
+    movePointer(sim, 2, { x: 900, y: 100 });
+    expect(sim.camera.distance).toBe(120);
+    movePointer(sim, 2, { x: 101, y: 100 });
+    expect(sim.camera.distance).toBe(2200);
+  });
+
+  test("a pinch does not turn the camera, and its click opens nothing even when it did not zoom", () => {
+    const sim = followed();
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    pressPointer(sim, 2, { x: 140, y: 100 });
+    movePointer(sim, 1, { x: 90, y: 100 });
+    expect(sim.camera.yaw).toBe(INITIAL_CAMERA.yaw);
+    expect(sim.camera.pitch).toBe(INITIAL_CAMERA.pitch);
+    releasePointer(sim, 1);
+    releasePointer(sim, 2);
+    expect(sim.dragged).toBe(true);
+  });
+
+  test("when one of two pointers is lifted, the other orbits from where it is, so the camera does not jump", () => {
+    const sim = followed();
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    pressPointer(sim, 2, { x: 140, y: 100 });
+    movePointer(sim, 1, { x: 60, y: 100 });
+    releasePointer(sim, 2);
+    const yaw = sim.camera.yaw;
+    movePointer(sim, 1, { x: 60, y: 100 });
+    expect(sim.camera.yaw).toBe(yaw);
+    movePointer(sim, 1, { x: 110, y: 100 });
+    expect(sim.camera.yaw).toBeCloseTo(yaw + 0.3);
+  });
+
+  test("a pointer not pressed on the canvas moves nothing; a cancelled one ends its gesture", () => {
+    const sim = followed();
+    expect(movePointer(sim, 7, { x: 500, y: 500 })).toBe(false);
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    releasePointer(sim, 1);
+    expect(sim.gesture).toBeNull();
+    expect(movePointer(sim, 1, { x: 300, y: 100 })).toBe(false);
+    expect(sim.camera.yaw).toBe(INITIAL_CAMERA.yaw);
+  });
+
+  test("the next press after a drag starts with nothing dragged, so its click opens the node", () => {
+    const sim = followed();
+    pressPointer(sim, 1, { x: 100, y: 100 });
+    movePointer(sim, 1, { x: 200, y: 100 });
+    releasePointer(sim, 1);
+    pressPointer(sim, 1, { x: 300, y: 100 });
+    expect(sim.dragged).toBe(false);
   });
 });
 
