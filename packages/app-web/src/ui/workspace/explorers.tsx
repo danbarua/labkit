@@ -9,6 +9,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { DIRECTORY_TYPE, fmtDate, hrefOf } from "./hal";
 import { classNames, filterItems } from "@labkit/ui";
 import { ActiveBox } from "./active-box";
+import { PagesTail } from "./pages-tail";
 import { fileLook } from "./file-icons";
 import { usePathsOf } from "./file-paths";
 import { docOf, requestPath, useCollectionPages, useDocument } from "./hal-store";
@@ -17,30 +18,7 @@ import { type LaneRow, lanesOf, widthOf } from "./lanes";
 /** How many entries of a directory, or commits of the history, one request asks for. */
 const PAGE = 200;
 
-/** A note, a spinner line, or a button for the next page, under a list. */
-function Tail({
-  loading,
-  error,
-  next,
-  empty,
-  onMore,
-}: {
-  loading: boolean;
-  error: string | undefined;
-  next: string | undefined;
-  empty: boolean;
-  onMore: () => void;
-}) {
-  if (error !== undefined) return <div className="empty-note">Fetch failed: {error}</div>;
-  if (loading) return <div className="empty-note">Loading…</div>;
-  if (empty) return <div className="empty-note">Nothing here.</div>;
-  if (next === undefined) return null;
-  return (
-    <button type="button" className="tbtn primary load-more" onClick={onMore}>
-      Load more
-    </button>
-  );
-}
+const LOADING = <div className="empty-note">Loading…</div>;
 
 /** The keys of the directories above `key` in the tree at `rootKey`, top first; none outside it. */
 export function foldersAbove(rootKey: string, key: string): string[] {
@@ -224,12 +202,10 @@ function Directory({
         );
       })}
       <div style={indent}>
-        <Tail
-          loading={pages.loading}
-          error={pages.error}
-          next={pages.next}
-          empty={!pages.loading && pages.error === undefined && pages.items.length === 0}
-          onMore={pages.more}
+        <PagesTail
+          pages={pages}
+          loading={LOADING}
+          empty={pages.items.length === 0 ? "Nothing here." : undefined}
         />
       </div>
     </>
@@ -423,12 +399,10 @@ export function History({
           </button>
         );
       })}
-      <Tail
-        loading={timeline.loading}
-        error={timeline.error}
-        next={timeline.next}
-        empty={!timeline.loading && timeline.error === undefined && timeline.items.length === 0}
-        onMore={timeline.more}
+      <PagesTail
+        pages={timeline}
+        loading={LOADING}
+        empty={timeline.items.length === 0 ? "Nothing here." : undefined}
       />
     </div>
   );

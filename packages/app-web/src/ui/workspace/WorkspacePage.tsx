@@ -88,6 +88,7 @@ import {
 } from "./hal-store";
 import { FileTree, History } from "./explorers";
 import { ActiveBox } from "./active-box";
+import { PagesTail } from "./pages-tail";
 import { ChatButton, ChatSidebar, useChat } from "./chat-sidebar";
 import { FilterBox, FilterButton, useFilter } from "./filter";
 import { WorkspacePicker } from "./workspace-picker";
@@ -596,7 +597,7 @@ function Lists({
               )}
               <Pane
                 pages={upper}
-                empty={`Loading ${upperKey ?? ""}…`}
+                firstLoad={`Loading ${upperKey ?? ""}…`}
                 {...{ held, openKey, onOpen, onList }}
                 term=""
                 lowerKey={lowerRow}
@@ -629,7 +630,6 @@ function Lists({
                   />
                   <Pane
                     pages={lower}
-                    empty=""
                     {...{ held, term, openKey, onOpen, onList }}
                     lowerKey={lowerRow}
                     pageable
@@ -866,7 +866,7 @@ const IN_OTHER_EXPLORERS: ReadonlySet<string> = new Set([FILE_TYPE, COMMIT_TYPE]
 
 function Pane({
   pages,
-  empty,
+  firstLoad,
   held,
   term,
   openKey,
@@ -877,7 +877,8 @@ function Pane({
   hidden,
 }: {
   pages: Pages<CollectionItem>;
-  empty: string;
+  /** What the pane says while its first page loads, in place of the spinner. */
+  firstLoad?: string;
   held: HeldIndex;
   term: string;
   openKey: string;
@@ -936,24 +937,24 @@ function Pane({
           </button>
         ),
       )}
-      {pages.error !== undefined ? (
-        <div className="empty-note">Fetch failed: {pages.error}</div>
-      ) : pages.loading ? (
-        pages.items.length === 0 && empty ? (
-          <div className="empty-note">{empty}</div>
-        ) : (
-          <Spinner>loading…</Spinner>
-        )
-      ) : pages.items.length === 0 ? (
-        <div className="empty-note">Nothing in this collection.</div>
-      ) : rows.length === 0 ? (
-        <div className="empty-note">No matching item.</div>
-      ) : null}
-      {pageable && pages.next !== undefined && !pages.loading ? (
-        <button type="button" className="tbtn primary load-more" onClick={pages.more}>
-          Load more
-        </button>
-      ) : null}
+      <PagesTail
+        pages={pages}
+        loading={
+          pages.items.length === 0 && firstLoad !== undefined ? (
+            <div className="empty-note">{firstLoad}</div>
+          ) : (
+            <Spinner>loading…</Spinner>
+          )
+        }
+        empty={
+          pages.items.length === 0
+            ? "Nothing in this collection."
+            : rows.length === 0
+              ? "No matching item."
+              : undefined
+        }
+        more={pageable && "Load more"}
+      />
     </>
   );
 }
@@ -1349,18 +1350,14 @@ function Events({
               onOpen={onOpen}
             />
           ))}
-          {events.error !== undefined ? (
-            <div className="empty-panel">Fetch failed: {events.error}</div>
-          ) : events.loading ? (
-            <Spinner>loading events…</Spinner>
-          ) : events.items.length === 0 ? (
-            <div className="empty-panel">No event names this record.</div>
-          ) : null}
-          {!events.loading && events.next !== undefined ? (
-            <button type="button" className="tbtn primary events-more" onClick={events.more}>
-              Load more acts
-            </button>
-          ) : null}
+          <PagesTail
+            pages={events}
+            note="empty-panel"
+            loading={<Spinner>loading events…</Spinner>}
+            empty={events.items.length === 0 ? "No event names this record." : undefined}
+            more="Load more acts"
+            moreClass="events-more"
+          />
         </div>
       </div>
       {commits.length === 0 ? null : (

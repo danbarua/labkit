@@ -8,6 +8,7 @@ import { type MouseEvent, type ReactNode, useState } from "react";
 import { APP_BASE } from "../../app-base";
 import { type HalDocument, hrefOf, keyOf, linksOf } from "./hal";
 import { requestPath, useCollectionPages } from "./hal-store";
+import { PagesTail } from "./pages-tail";
 
 /** The properties a file or a commit shows in its own card rather than as a property row. */
 export const SHOWN_APART: Readonly<Record<string, readonly string[]>> = {
@@ -248,14 +249,7 @@ function ChangedFiles({ href, onOpen }: { href: string; onOpen: (key: string) =>
           </div>
         </div>
       ))}
-      {pages.error !== undefined ? (
-        <div className="card-note">Fetch failed: {pages.error}</div>
-      ) : null}
-      {pages.next !== undefined && !pages.loading ? (
-        <button type="button" className="tbtn primary load-more" onClick={pages.more}>
-          Load more
-        </button>
-      ) : null}
+      <PagesTail pages={pages} note="card-note" />
     </>
   );
 }
@@ -352,14 +346,7 @@ function Diffs({ href }: { href: string }) {
           </ContentCard>
         );
       })}
-      {pages.error !== undefined ? (
-        <div className="card-note">Fetch failed: {pages.error}</div>
-      ) : null}
-      {pages.next !== undefined && !pages.loading ? (
-        <button type="button" className="tbtn primary load-more" onClick={pages.more}>
-          Load more files
-        </button>
-      ) : null}
+      <PagesTail pages={pages} note="card-note" more="Load more files" />
     </>
   );
 }
