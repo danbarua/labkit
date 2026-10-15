@@ -14,6 +14,7 @@ import { mentionItems } from "../agent/mentions";
 import { useWorkspacePaths } from "./file-paths";
 import { Separator } from "./separator";
 import { useSavedNumber } from "../saved-flag";
+import { messageOf } from "../../message-of";
 
 // The agent exists only in the dev server, so the chat is dev-only: in a production build
 // `import.meta.env.DEV` is false, the import is dropped, and there is no chat to show.
@@ -113,7 +114,7 @@ function useWorkspaceFolder(slug: string | undefined): Folder {
         if (controller.signal.aborted) return;
         setFolder({
           kind: "unmapped",
-          reason: `The agent cannot open a session in ${slug}: its folder was not found (${err instanceof Error ? err.message : String(err)}).`,
+          reason: `The agent cannot open a session in ${slug}: its folder was not found (${messageOf(err)}).`,
         });
       });
     return () => controller.abort();

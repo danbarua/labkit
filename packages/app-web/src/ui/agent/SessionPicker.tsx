@@ -2,6 +2,7 @@ import type { SessionInfo } from "@agentclientprotocol/sdk";
 import { listSessions } from "@labkit/acp-client";
 import { CommandPalette, type PickItem } from "@labkit/ui";
 import { useEffect, useState } from "react";
+import { messageOf } from "../../message-of";
 
 type Listed =
   | { kind: "loading" }
@@ -49,7 +50,7 @@ export function SessionPicker({
       },
       (err: unknown) => {
         if (cancelled) return;
-        setListed({ kind: "failed", message: err instanceof Error ? err.message : String(err) });
+        setListed({ kind: "failed", message: messageOf(err) });
       },
     );
     return () => {

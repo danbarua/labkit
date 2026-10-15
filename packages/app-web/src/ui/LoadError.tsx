@@ -1,5 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { Frame } from "./chrome/Frame";
+import { messageOf } from "../message-of";
 
 /**
  * A page whose data could not be loaded: the header, what went wrong, and ways on from here, so a
@@ -10,7 +11,7 @@ export function LoadError({ error }: { error: unknown }) {
   return (
     <Frame>
       <div className="page">
-        <p className="load-error">{error instanceof Error ? error.message : String(error)}</p>
+        <p className="load-error">{messageOf(error)}</p>
         <p>
           <button type="button" onClick={() => void router.invalidate()}>
             Try again

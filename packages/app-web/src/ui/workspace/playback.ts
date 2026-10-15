@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { collectionOf, type HalDocument, hrefOf, keyOf, shortId } from "./hal";
 import { requestPath, resourcePath, store } from "./hal-store";
+import { messageOf } from "../../message-of";
 
 /** How long each opened resource stays open before the next act's resource is opened. */
 const STEP_MS = 1200;
@@ -126,7 +127,7 @@ export function usePlayback(
       }
     } catch (err) {
       if (!live()) return;
-      const reason = err instanceof Error ? err.message : String(err);
+      const reason = messageOf(err);
       if (err instanceof Stop)
         console.warn("workspace page: playback stopped", { from: start, reason });
       else console.error("workspace page: playback failed", { from: start, err });

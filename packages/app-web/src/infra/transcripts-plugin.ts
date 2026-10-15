@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { Plugin } from "vite";
+import { messageOf } from "../message-of";
 
 interface TranscriptFile {
   readonly id: string;
@@ -61,7 +62,7 @@ export async function transcriptsRoute(dataDir: string, requested: string): Prom
       status: 500,
       body: {
         title: "Application Error",
-        detail: error instanceof Error ? error.message : String(error),
+        detail: messageOf(error),
       },
     };
   }

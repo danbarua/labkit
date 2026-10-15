@@ -7,6 +7,7 @@ import { connectSession, type PromptLink, type SessionClient } from "@labkit/acp
 import type { AttachLimits, ResolveLink } from "@labkit/ui";
 import { initialState, reduce } from "@labkit/view-model";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { messageOf } from "../../message-of";
 
 /** The command the chat carries out itself rather than sending: start a new session in place. */
 export const NEW = { name: "new", description: "Start a new session" } as const;
@@ -116,7 +117,7 @@ export function useAgentSession({
         },
         (err: unknown) => {
           if (cancelled) return;
-          const reason = err instanceof Error ? err.message : String(err);
+          const reason = messageOf(err);
           dispatch({ type: "failed", message: `${reason} ${TRY_NEW}` });
           setStatus("failed");
         },

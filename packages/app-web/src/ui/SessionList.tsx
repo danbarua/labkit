@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
 import { Frame } from "./chrome/Frame";
+import { messageOf } from "../message-of";
 
 type Listed =
   | { kind: "loading" }
@@ -41,7 +42,7 @@ export default function SessionList() {
         },
         (err: unknown) => {
           if (cancelled) return;
-          setListed({ kind: "failed", message: err instanceof Error ? err.message : String(err) });
+          setListed({ kind: "failed", message: messageOf(err) });
         },
       );
     }, 0);

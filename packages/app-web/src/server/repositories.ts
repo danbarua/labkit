@@ -1,5 +1,6 @@
 import { openRepository, type Repository } from "es-git";
 import type { WorkspaceDirectories } from "./workspace-directories";
+import { messageOf } from "../message-of";
 
 /** The git repository each workspace serves its files and history from, by workspace slug. */
 export type Repositories = ReadonlyMap<string, Repository>;
@@ -17,7 +18,7 @@ export async function openRepositories(
       repositories.set(slug, await openRepository(folder, { noSearch: true }));
       console.info("workspace repositories: mapped", { slug, folder });
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
+      const reason = messageOf(err);
       console.warn("workspace repositories: skipped, not a git repository", {
         slug,
         folder,

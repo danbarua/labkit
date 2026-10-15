@@ -12,6 +12,7 @@ import {
   indexOf,
   keyOf,
 } from "./hal";
+import { messageOf } from "../../message-of";
 
 /** A request's state. A document fetched again stays readable, as `previous`, until the new one arrives. */
 export type Entry =
@@ -115,7 +116,7 @@ export class HalStore {
       },
       (err: unknown) => {
         if (this.requests.get(path) !== id) return;
-        const error = err instanceof Error ? err.message : String(err);
+        const error = messageOf(err);
         console.warn("workspace page: a request failed", { path, error });
         this.set(path, { status: "failed", error });
       },

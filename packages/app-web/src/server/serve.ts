@@ -1,5 +1,6 @@
 import { handle } from "./handler";
 import type { Runtime } from "./runtime";
+import { messageOf } from "../message-of";
 
 /** The API on `port` (0 picks a free one), answering with `handle` and logging each request. */
 export function serve(runtime: Runtime, port: number) {
@@ -16,7 +17,7 @@ export function serve(runtime: Runtime, port: number) {
         return res;
       } catch (err) {
         console.error(err);
-        const message = err instanceof Error ? err.message : String(err);
+        const message = messageOf(err);
         return new Response(JSON.stringify({ title: "Application Error", detail: message }), {
           status: 500,
           headers: { "content-type": "application/problem+json" },

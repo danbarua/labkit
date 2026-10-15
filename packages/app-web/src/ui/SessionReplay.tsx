@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AGENT_CWD, AGENT_URL } from "./agent-endpoint";
 import type { Recording } from "./playback";
 import { Page, Replay } from "./Replay";
+import { messageOf } from "../message-of";
 
 type Loaded = { kind: "loading" } | { kind: "failed"; message: string } | Recording;
 
@@ -29,7 +30,7 @@ export default function SessionReplay({ sessionId }: { sessionId: string }) {
         },
         (err: unknown) => {
           if (cancelled) return;
-          setLoaded({ kind: "failed", message: err instanceof Error ? err.message : String(err) });
+          setLoaded({ kind: "failed", message: messageOf(err) });
         },
       );
     }, 0);

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { Recording } from "./playback";
 import { Page, Replay } from "./Replay";
 import { transcriptRecording } from "./transcripts-api";
+import { messageOf } from "../message-of";
 
 type Loaded = { kind: "loading" } | { kind: "missing" } | { kind: "failed"; message: string };
 
@@ -23,7 +24,7 @@ export default function TranscriptMockup({ slug }: { slug: string }) {
       },
       (err: unknown) => {
         if (controller.signal.aborted) return;
-        setLoaded({ kind: "failed", message: err instanceof Error ? err.message : String(err) });
+        setLoaded({ kind: "failed", message: messageOf(err) });
       },
     );
     return () => controller.abort();
