@@ -12,6 +12,7 @@ import {
 } from "react";
 import { mentionItems } from "../agent/mentions";
 import { useWorkspacePaths } from "./file-paths";
+import { Separator } from "./separator";
 import { useSavedNumber } from "../saved-flag";
 
 // The agent exists only in the dev server, so the chat is dev-only: in a production build
@@ -45,55 +46,35 @@ function ChatBorder({
   setWidth: (next: number) => void;
   onDragging: (dragging: boolean) => void;
 }) {
-  const drag = useRef<{ x: number; width: number } | undefined>(undefined);
-  const [dragging, setDragging] = useState(false);
   const place = (next: number) =>
     setWidth(Math.round(Math.min(Math.max(next, MIN_CHAT), widest())));
-  const stop = () => {
-    drag.current = undefined;
-    setDragging(false);
-    onDragging(false);
-  };
   return (
-    // biome-ignore lint/a11y/useSemanticElements: an <hr> takes no focus or drag; this is the ARIA window splitter pattern.
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize the agent"
-      aria-valuemin={MIN_CHAT}
-      aria-valuemax={widest()}
-      aria-valuenow={width}
-      tabIndex={0}
-      className={dragging ? "splitter vertical dragging" : "splitter vertical"}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { x: e.clientX, width };
-        setDragging(true);
-        onDragging(true);
-      }}
-      onPointerMove={(e) => {
-        const start = drag.current;
-        // The chat is at the right, so dragging the border left widens it.
-        if (start !== undefined) place(start.width + start.x - e.clientX);
-      }}
-      onPointerUp={stop}
-      onPointerCancel={stop}
-      onDoubleClick={() => place(CHAT_WIDTH)}
-      onKeyDown={(e) => {
+    <Separator
+      orientation="vertical"
+      label="Resize the agent"
+      min={MIN_CHAT}
+      max={widest()}
+      now={width}
+      className="splitter vertical"
+      begin={() => width}
+      // The chat is at the right, so dragging the border left widens it.
+      onDrag={(from, pixels) => place(from - pixels)}
+      onDragging={onDragging}
+      onReset={() => place(CHAT_WIDTH)}
+      onKey={(key) => {
         const next =
-          e.key === "ArrowLeft"
+          key === "ArrowLeft"
             ? width + BORDER_STEP
-            : e.key === "ArrowRight"
+            : key === "ArrowRight"
               ? width - BORDER_STEP
-              : e.key === "Home"
+              : key === "Home"
                 ? MIN_CHAT
-                : e.key === "End"
+                : key === "End"
                   ? widest()
                   : undefined;
-        if (next === undefined) return;
-        e.preventDefault();
+        if (next === undefined) return false;
         place(next);
+        return true;
       }}
     />
   );

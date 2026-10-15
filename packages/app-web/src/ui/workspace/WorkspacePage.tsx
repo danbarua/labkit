@@ -89,6 +89,7 @@ import {
 import { FileTree, History } from "./explorers";
 import { ActiveBox } from "./active-box";
 import { PagesTail } from "./pages-tail";
+import { Separator } from "./separator";
 import { ChatButton, ChatSidebar, useChat } from "./chat-sidebar";
 import { FilterBox, FilterButton, useFilter } from "./filter";
 import { WorkspacePicker } from "./workspace-picker";
@@ -792,8 +793,6 @@ const SPLITTER_STEP = 16;
  * the two sections to their initial proportion of the height they share, so no other border moves.
  */
 function Splitter({ above, below }: { above: Section; below: Section }) {
-  const drag = useRef<{ y: number; a: number; b: number } | undefined>(undefined);
-  const [dragging, setDragging] = useState(false);
   const sizes = () => ({
     a: above.element.current?.getBoundingClientRect().height ?? 0,
     b: below.element.current?.getBoundingClientRect().height ?? 0,
@@ -813,49 +812,32 @@ function Splitter({ above, below }: { above: Section; below: Section }) {
     above.setGrow((grow * above.initial) / initial);
     below.setGrow((grow * below.initial) / initial);
   };
-  const stop = () => {
-    drag.current = undefined;
-    setDragging(false);
-  };
   return (
-    // biome-ignore lint/a11y/useSemanticElements: an <hr> takes no focus or drag; this is the ARIA window splitter pattern.
-    <div
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label={`Resize ${above.name} and ${below.name}`}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round((100 * above.grow) / (above.grow + below.grow))}
-      tabIndex={0}
-      className={dragging ? "splitter dragging" : "splitter"}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        drag.current = { y: e.clientY, ...sizes() };
-        setDragging(true);
-      }}
-      onPointerMove={(e) => {
-        const start = drag.current;
-        if (start !== undefined) move(start, e.clientY - start.y);
-      }}
-      onPointerUp={stop}
-      onPointerCancel={stop}
-      onDoubleClick={reset}
-      onKeyDown={(e) => {
+    <Separator
+      orientation="horizontal"
+      label={`Resize ${above.name} and ${below.name}`}
+      min={0}
+      max={100}
+      now={Math.round((100 * above.grow) / (above.grow + below.grow))}
+      className="splitter"
+      begin={sizes}
+      onDrag={move}
+      onReset={reset}
+      onKey={(key) => {
         const from = sizes();
         const delta =
-          e.key === "ArrowUp"
+          key === "ArrowUp"
             ? -SPLITTER_STEP
-            : e.key === "ArrowDown"
+            : key === "ArrowDown"
               ? SPLITTER_STEP
-              : e.key === "Home"
+              : key === "Home"
                 ? MIN_SECTION - from.a
-                : e.key === "End"
+                : key === "End"
                   ? from.b - MIN_SECTION
                   : undefined;
-        if (delta === undefined) return;
-        e.preventDefault();
+        if (delta === undefined) return false;
         move(from, delta);
+        return true;
       }}
     />
   );
