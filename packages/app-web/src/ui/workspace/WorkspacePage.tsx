@@ -5,7 +5,14 @@
  * pasted link opens it again.
  */
 
-import { ContentCard, ICONS, IconButton, JsonView } from "@labkit/ui";
+import {
+  ContentCard,
+  ICONS,
+  IconButton,
+  JsonView,
+  prefersReducedMotion,
+  useMediaQuery,
+} from "@labkit/ui";
 import "@labkit/ui/content.css";
 import {
   ArrowClockwiseIcon,
@@ -44,7 +51,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { TopBar } from "../chrome/Frame";
 import { useSavedFlag, useSavedNumber } from "../saved-flag";
@@ -140,19 +146,6 @@ const workspaceOf = (key: string) => /^\/workspace\/[^/]+\//.exec(key)?.[0];
  * rules.
  */
 export const NARROW = "(max-width: 860px)";
-
-/** Whether the window matches the media query `query`, kept current as the window changes. */
-function useMediaQuery(query: string): boolean {
-  const subscribe = useCallback(
-    (onChange: () => void) => {
-      const media = window.matchMedia(query);
-      media.addEventListener("change", onChange);
-      return () => media.removeEventListener("change", onChange);
-    },
-    [query],
-  );
-  return useSyncExternalStore(subscribe, () => window.matchMedia(query).matches);
-}
 
 export interface WorkspacePageProps {
   /** The API path of what is open, or "" when nothing is. */
@@ -841,7 +834,7 @@ function Explorer({
     was.current = shown;
     if (shown) setMounted(true);
     if (!changed) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (prefersReducedMotion()) {
       setMounted(shown);
       return;
     }

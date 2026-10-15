@@ -1,3 +1,4 @@
+import { REDUCED_MOTION, useMediaQuery } from "@labkit/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import "./graph.css";
 
@@ -1049,6 +1050,7 @@ export function GraphView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const simRef = useRef<Sim>(createSim());
+  const reducedMotion = useMediaQuery(REDUCED_MOTION);
   const sizeRef = useRef({ width: 0, height: 0 });
   const navigateRef = useRef(onNavigate);
   navigateRef.current = onNavigate;
@@ -1059,6 +1061,7 @@ export function GraphView({
 
   const sim = simRef.current;
   sim.overlay = overlay;
+  sim.reducedMotion = reducedMotion;
   // Opening a node hands the camera back to the framing, after a drag or a scroll took it.
   if (sim.selectedId !== selectedId) sim.follow = true;
   sim.selectedId = selectedId;
@@ -1080,12 +1083,6 @@ export function GraphView({
     });
     const wrap = canvas.parentElement;
     if (wrap) ro.observe(wrap);
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onMotion = () => {
-      simRef.current.reducedMotion = motion.matches;
-    };
-    onMotion();
-    motion.addEventListener("change", onMotion);
 
     const onPointerDown = (event: PointerEvent) => {
       const s = simRef.current;
@@ -1153,7 +1150,6 @@ export function GraphView({
 
     return () => {
       ro.disconnect();
-      motion.removeEventListener("change", onMotion);
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);

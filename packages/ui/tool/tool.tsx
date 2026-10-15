@@ -16,6 +16,7 @@ import {
   ProhibitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
+import { prefersReducedMotion } from "../base/media";
 import { CodeView } from "../content/code";
 import { TextDiff } from "../content/diff";
 import { toolTally } from "../conversation/grouping";
@@ -228,8 +229,7 @@ function StatusIcon({
  * the contents are taller than the view.
  */
 function revealBody(row: HTMLElement): void {
-  const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  row.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "auto" });
+  row.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
 }
 
 /** A text block of a call's content. */

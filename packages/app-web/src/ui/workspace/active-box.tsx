@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from "@labkit/ui";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 /** How long the open row's box takes to slide from one row to another, in milliseconds. */
@@ -48,7 +49,7 @@ export function ActiveBox({
       setBox(undefined);
       return;
     }
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = prefersReducedMotion();
     const top = row.offsetTop;
     const was = last.current;
     const slide = was !== undefined && was.key !== activeKey && was.top !== top && !reduced;

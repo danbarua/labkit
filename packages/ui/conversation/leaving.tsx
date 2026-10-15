@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useReducer, useRef } from "react";
+import { prefersReducedMotion } from "../base/media";
 
 /** An item to draw: one that is present, or one that has gone and is drawn while it leaves. */
 export interface Shown<T> {
@@ -36,9 +37,6 @@ export function withLeaving<T extends { readonly key: string }>(
   ];
 }
 
-const reducedMotion = (): boolean =>
-  typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
 /**
  * `current`, and each item that has just gone from it until it has finished leaving. Where motion
  * is reduced an item goes at once.
@@ -48,7 +46,7 @@ export function useLeaving<T extends { readonly key: string }>(
 ): { readonly shown: readonly Shown<T>[]; readonly left: (key: string) => void } {
   const shown = useRef<readonly Shown<T>[]>([]);
   const [, redraw] = useReducer((n: number) => n + 1, 0);
-  shown.current = reducedMotion()
+  shown.current = prefersReducedMotion()
     ? current.map((value) => ({ key: value.key, value, leaving: false }))
     : withLeaving(shown.current, current);
   const left = useCallback((key: string) => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { REDUCED_MOTION } from "./media";
 
 /**
  * What the loader shows, by pace and colour: waiting for the first token (slow, and slower still
@@ -66,7 +67,7 @@ export function Loader({
     const element = grid.current;
     if (element === null) return;
     const dots = [...element.children] as HTMLElement[];
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const reduce = window.matchMedia(REDUCED_MOTION);
     let shown: LoaderMood | undefined;
     let period = PACE[current.current].start ?? 2;
     let phase = 0;

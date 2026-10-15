@@ -11,6 +11,7 @@ export type { ResolveLink } from "./content/links";
 export { isRecord } from "./content/value";
 export { IconButton } from "./base/icon-button";
 export { Loader, type LoaderMood } from "./base/loader";
+export { prefersReducedMotion, REDUCED_MOTION, useMediaQuery } from "./base/media";
 export { type StepFigures, StepStats } from "./conversation/step-stats";
 export { ElicitationForm, problemsWith } from "./requests/elicitation";
 export { MarkdownText } from "./content/markdown";
