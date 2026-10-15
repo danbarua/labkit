@@ -492,21 +492,6 @@ function Lists({
     if (behind) loadMore();
   }, [behind, loadMore]);
 
-  const [recordsOpen, setRecordsOpen] = useSavedFlag("labkit.workspace.records", true);
-  const [filesOpen, setFilesOpen] = useSavedFlag("labkit.workspace.files", false);
-  const [historyOpen, setHistoryOpen] = useSavedFlag("labkit.workspace.history", false);
-  const [filesGrow, setFilesGrow] = useSavedNumber("labkit.workspace.files.grow", FILES_SHARE);
-  const [historyGrow, setHistoryGrow] = useSavedNumber(
-    "labkit.workspace.history.grow",
-    HISTORY_SHARE,
-  );
-  const [recordsGrow, setRecordsGrow] = useSavedNumber(
-    "labkit.workspace.records.grow",
-    RECORDS_SHARE,
-  );
-  const filesSection = useRef<HTMLElement>(null);
-  const historySection = useRef<HTMLElement>(null);
-  const recordsSection = useRef<HTMLElement>(null);
   // The open workspace's index says whether it serves files and history, and where.
   const indexKey = workspace?.replace(/\/$/, "");
   const indexEntry = useDocument(indexKey === undefined ? undefined : requestPath(indexKey));
@@ -528,72 +513,21 @@ function Lists({
           : key === undefined
             ? `${slug} serves no ${what}.`
             : undefined;
-  const filesUnavailable = unavailable(filesKey, "files");
-  const recordsUnavailable =
-    listKey === undefined ? "Pick a workspace to browse its records." : undefined;
-  const historyUnavailable = unavailable(historyKey, "history");
+  const files = useSection("files", unavailable(filesKey, "files"));
+  const history = useSection("history", unavailable(historyKey, "history"));
+  const records = useSection(
+    "records",
+    listKey === undefined ? "Pick a workspace to browse its records." : undefined,
+  );
+  const sections = [files, history, records];
   // The open sections, in order. A border that can be dragged sits after each but the last.
-  const shares: Share[] = [
-    filesOpen && filesUnavailable === undefined
-      ? {
-          name: "File Explorer",
-          initial: FILES_SHARE,
-          grow: filesGrow,
-          setGrow: setFilesGrow,
-          element: filesSection,
-        }
-      : undefined,
-    historyOpen && historyUnavailable === undefined
-      ? {
-          name: "Source Explorer",
-          initial: HISTORY_SHARE,
-          grow: historyGrow,
-          setGrow: setHistoryGrow,
-          element: historySection,
-        }
-      : undefined,
-    recordsOpen && recordsUnavailable === undefined
-      ? {
-          name: "Record Explorer",
-          initial: RECORDS_SHARE,
-          grow: recordsGrow,
-          setGrow: setRecordsGrow,
-          element: recordsSection,
-        }
-      : undefined,
-  ].filter((share) => share !== undefined);
-  const splitterAfter = (element: RefObject<HTMLElement | null>) => {
-    const at = shares.findIndex((share) => share.element === element);
+  const shares = sections.filter((section) => section.open && section.unavailable === undefined);
+  const splitterAfter = (section: Section) => {
+    const at = shares.indexOf(section);
     const above = shares[at];
     const below = shares[at + 1];
     return above === undefined || below === undefined ? null : (
       <Splitter above={above} below={below} />
-    );
-  };
-  // A section's button in the rail folds the section when it is showing, and otherwise opens it
-  // and shows the sidebar.
-  const railButton = (
-    title: string,
-    icon: Icon,
-    open: boolean,
-    setOpen: (next: boolean) => void,
-    unavailable: string | undefined,
-  ) => {
-    const showing = expanded && open && unavailable === undefined;
-    return (
-      <IconButton
-        className="rail-btn"
-        on={showing}
-        label={`Open ${title}`}
-        title={title}
-        icon={icon}
-        aria-pressed={showing}
-        unavailable={unavailable}
-        onClick={() => {
-          setOpen(!showing);
-          if (!showing) onShow();
-        }}
-      />
     );
   };
   return (
@@ -606,44 +540,35 @@ function Lists({
           aria-expanded={expanded}
           onClick={onToggle}
         />
-        {railButton("File Explorer", FolderIcon, filesOpen, setFilesOpen, filesUnavailable)}
-        {railButton(
-          "Source Explorer",
-          GitCommitIcon,
-          historyOpen,
-          setHistoryOpen,
-          historyUnavailable,
-        )}
-        {railButton(
-          "Record Explorer",
-          DatabaseIcon,
-          recordsOpen,
-          setRecordsOpen,
-          recordsUnavailable,
-        )}
+        {sections.map((section) => {
+          // A section's button folds the section when it is showing, and otherwise opens it and
+          // shows the sidebar.
+          const showing = expanded && section.open && section.unavailable === undefined;
+          return (
+            <IconButton
+              key={section.name}
+              className="rail-btn"
+              on={showing}
+              label={`Open ${section.name}`}
+              title={section.name}
+              icon={section.icon}
+              aria-pressed={showing}
+              unavailable={section.unavailable}
+              onClick={() => {
+                section.setOpen(!showing);
+                if (!showing) onShow();
+              }}
+            />
+          );
+        })}
       </nav>
       <aside className={className}>
         <Explorer
-          title="File Explorer"
-          icon={<FolderIcon aria-hidden="true" />}
-          unavailable={filesUnavailable}
-          open={filesOpen}
-          onToggle={() => setFilesOpen(!filesOpen)}
-          grow={filesGrow}
-          sectionRef={filesSection}
+          section={files}
           scrolls
-          actions={
-            <FilterButton what="files" shown={filesFilter.shown} onToggle={filesFilter.toggle} />
-          }
+          actions={<FilterButton what="files" filter={filesFilter} />}
         >
-          {filesFilter.shown ? (
-            <FilterBox
-              what="files"
-              term={filesFilter.term}
-              setTerm={filesFilter.setTerm}
-              onHide={filesFilter.hide}
-            />
-          ) : null}
+          <FilterBox what="files" filter={filesFilter} />
           {filesKey === undefined ? null : (
             <FileTree
               rootKey={filesKey}
@@ -653,32 +578,13 @@ function Lists({
             />
           )}
         </Explorer>
-        {splitterAfter(filesSection)}
+        {splitterAfter(files)}
         <Explorer
-          title="Source Explorer"
-          icon={<GitCommitIcon aria-hidden="true" />}
-          unavailable={historyUnavailable}
-          open={historyOpen}
-          onToggle={() => setHistoryOpen(!historyOpen)}
-          grow={historyGrow}
-          sectionRef={historySection}
+          section={history}
           scrolls
-          actions={
-            <FilterButton
-              what="commits"
-              shown={commitsFilter.shown}
-              onToggle={commitsFilter.toggle}
-            />
-          }
+          actions={<FilterButton what="commits" filter={commitsFilter} />}
         >
-          {commitsFilter.shown ? (
-            <FilterBox
-              what="commits"
-              term={commitsFilter.term}
-              setTerm={commitsFilter.setTerm}
-              onHide={commitsFilter.hide}
-            />
-          ) : null}
+          <FilterBox what="commits" filter={commitsFilter} />
           {historyKey === undefined ? null : (
             <History
               historyKey={historyKey}
@@ -688,16 +594,8 @@ function Lists({
             />
           )}
         </Explorer>
-        {splitterAfter(historySection)}
-        <Explorer
-          title="Record Explorer"
-          icon={<DatabaseIcon aria-hidden="true" />}
-          unavailable={recordsUnavailable}
-          grow={recordsGrow}
-          sectionRef={recordsSection}
-          open={recordsOpen}
-          onToggle={() => setRecordsOpen(!recordsOpen)}
-        >
+        {splitterAfter(history)}
+        <Explorer section={records}>
           <div className="sidebar-section">
             <div className="section-label">
               Collections
@@ -726,23 +624,10 @@ function Lists({
                 <span className="count">
                   {lower.items.length > 0 ? `${lower.items.length}${lower.next ? "+" : ""}` : ""}
                 </span>
-                {lowerKey === undefined ? null : (
-                  <FilterButton
-                    what="items"
-                    shown={itemsFilter.shown}
-                    onToggle={itemsFilter.toggle}
-                  />
-                )}
+                {lowerKey === undefined ? null : <FilterButton what="items" filter={itemsFilter} />}
               </span>
             </div>
-            {itemsFilter.shown && lowerKey !== undefined ? (
-              <FilterBox
-                what="items"
-                term={itemsFilter.term}
-                setTerm={itemsFilter.setTerm}
-                onHide={itemsFilter.hide}
-              />
-            ) : null}
+            {lowerKey === undefined ? null : <FilterBox what="items" filter={itemsFilter} />}
             <div className="faint mono pane-path">{lowerKey ?? ""}</div>
             <div className="res-list" ref={lowerList}>
               {lowerKey === undefined ? (
@@ -778,35 +663,23 @@ function Lists({
 const SECTION_MOTION_MS = 220;
 
 /**
- * A section of the sidebar that folds under its header. While `unavailable` is set, the header is
- * disabled and says why, and the section stays folded.
+ * A section of the sidebar that folds under its header. While the section is unavailable, the
+ * header is disabled and says why, and the section stays folded.
  */
 function Explorer({
-  title,
-  icon,
-  open = false,
-  unavailable,
-  onToggle,
+  section,
   scrolls = false,
-  grow,
-  sectionRef,
   actions,
   children,
 }: {
-  title: string;
-  icon: ReactNode;
-  open?: boolean;
-  unavailable?: string;
-  onToggle?: () => void;
+  section: Section;
   /** Whether the section's body scrolls as a whole, rather than a list inside it. */
   scrolls?: boolean;
-  /** How many shares of the height the open sections divide this one takes. */
-  grow: number;
-  sectionRef: RefObject<HTMLElement | null>;
   /** Controls at the right of the header while the section is open, such as its filter's button. */
   actions?: ReactNode;
   children?: ReactNode;
 }) {
+  const { name: title, icon: Glyph, open, unavailable, grow } = section;
   const shown = open && unavailable === undefined;
   const why = useId();
   // The body stays drawn while the section shrinks to its header, so it does not vanish first.
@@ -840,7 +713,7 @@ function Explorer({
   const closing = mounted && !shown;
   return (
     <section
-      ref={sectionRef}
+      ref={section.element}
       className={classNames("explorer", shown && "open", closing && "closing", moving && "moving")}
       style={{
         flexGrow: shown ? grow : 0,
@@ -856,10 +729,10 @@ function Explorer({
             aria-expanded={shown}
             disabled={unavailable !== undefined}
             aria-describedby={unavailable === undefined ? undefined : why}
-            onClick={onToggle}
+            onClick={() => section.setOpen(!open)}
           >
             <CaretRightIcon className={shown ? "caret open" : "caret"} aria-hidden="true" />
-            {icon}
+            <Glyph aria-hidden="true" />
             <span className="explorer-title">{title}</span>
           </button>
           {shown && actions !== undefined ? (
@@ -880,21 +753,42 @@ function Explorer({
 }
 
 /**
- * Each section's share of the height the open sections divide, until a border is moved. Record
- * Explorer holds two panes, Collections and Items, so it starts with twice the share of the others.
+ * The sidebar's sections: each one's name and icon, whether it starts open, and its share of the
+ * height the open sections divide until a border is moved. Record Explorer holds two panes,
+ * Collections and Items, so it starts with twice the share of the others.
  */
-const FILES_SHARE = 1;
-const HISTORY_SHARE = 1;
-const RECORDS_SHARE = 2;
+const SECTIONS = {
+  files: { name: "File Explorer", icon: FolderIcon, open: false, share: 1 },
+  history: { name: "Source Explorer", icon: GitCommitIcon, open: false, share: 1 },
+  records: { name: "Record Explorer", icon: DatabaseIcon, open: true, share: 2 },
+} as const;
 
-/** An open sidebar section, as the border below or above it sees it. */
-interface Share {
-  name: string;
+/** A sidebar section: what it is called, and its state as this browser last left it. */
+interface Section {
+  readonly name: string;
+  readonly icon: Icon;
+  /** Why the section cannot be opened now, such as no workspace being open. */
+  readonly unavailable: string | undefined;
+  readonly open: boolean;
+  readonly setOpen: (next: boolean) => void;
   /** The section's share before any border is moved. */
-  initial: number;
-  grow: number;
-  setGrow: (next: number) => void;
-  element: RefObject<HTMLElement | null>;
+  readonly initial: number;
+  /** How many shares of the height the open sections divide this one takes. */
+  readonly grow: number;
+  readonly setGrow: (next: number) => void;
+  readonly element: RefObject<HTMLElement | null>;
+}
+
+/**
+ * Sidebar section `id`, kept open or folded, and at the share of the height it was given, under
+ * the browser keys `labkit.workspace.<id>` and `labkit.workspace.<id>.grow`.
+ */
+function useSection(id: keyof typeof SECTIONS, unavailable: string | undefined): Section {
+  const { name, icon, open: openAtFirst, share } = SECTIONS[id];
+  const [open, setOpen] = useSavedFlag(`labkit.workspace.${id}`, openAtFirst);
+  const [grow, setGrow] = useSavedNumber(`labkit.workspace.${id}.grow`, share);
+  const element = useRef<HTMLElement>(null);
+  return { name, icon, unavailable, open, setOpen, initial: share, grow, setGrow, element };
 }
 
 /** The fewest pixels a drag leaves an open section: its header and a row or two. */
@@ -909,7 +803,7 @@ const SPLITTER_STEP = 16;
  * MIN_SECTION pixels. A folded section between them moves with the border. A double-click returns
  * the two sections to their initial proportion of the height they share, so no other border moves.
  */
-function Splitter({ above, below }: { above: Share; below: Share }) {
+function Splitter({ above, below }: { above: Section; below: Section }) {
   const drag = useRef<{ y: number; a: number; b: number } | undefined>(undefined);
   const [dragging, setDragging] = useState(false);
   const sizes = () => ({
