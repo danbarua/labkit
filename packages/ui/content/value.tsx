@@ -9,7 +9,8 @@ type Json = Scalar | readonly Json[] | { readonly [key: string]: Json };
 const isScalar = (value: unknown): value is Scalar =>
   value === null || ["string", "number", "boolean"].includes(typeof value);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+/** An object that is not an array: a JSON object, or a record of fields. */
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**

@@ -29,6 +29,7 @@ import {
   decode,
   inlineArguments,
   inputPreview,
+  isRecord,
   sameValue,
   ValueView,
 } from "../content/value";
@@ -245,9 +246,6 @@ function decisionOf(call: ToolCall, entry: PermissionEntry | undefined): Decisio
     (entry === undefined || given === undefined ? undefined : outcomeOf(entry, given));
   return outcome === undefined ? undefined : receiptOf(outcome);
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 type Diff = Extract<ToolCallContent, { type: "diff" }>;
 

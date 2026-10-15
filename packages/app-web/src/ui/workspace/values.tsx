@@ -3,6 +3,7 @@
  * through `prose`, which the page supplies, so handles in it can become links.
  */
 
+import { isRecord } from "@labkit/ui";
 import { FileTextIcon, GitCommitIcon, type Icon } from "@phosphor-icons/react";
 import type { CSSProperties, ReactNode } from "react";
 import {
@@ -43,8 +44,6 @@ export function Badge({ type, text }: { type: string | undefined; text?: string 
 }
 
 const isScalar = (v: unknown) => v === null || typeof v !== "object";
-const isPlain = (v: unknown): v is Record<string, unknown> =>
-  v !== null && typeof v === "object" && !Array.isArray(v);
 
 /** Deeper than this, a value is compact JSON: a table of tables of tables is no easier to read. */
 const MAX_TABLE_DEPTH = 3;
@@ -103,7 +102,7 @@ export function Value({
 }
 
 function ArrayTable({ rows, depth, prose }: { rows: unknown[]; depth: number; prose: Prose }) {
-  if (!rows.every(isPlain))
+  if (!rows.every(isRecord))
     return (
       <div className="nest">
         {rows.map((x, i) => (

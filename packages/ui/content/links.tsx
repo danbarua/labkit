@@ -9,11 +9,14 @@ export type ResolveLink = (uri: string) => string | undefined;
 
 export const LinksContext = createContext<ResolveLink | undefined>(undefined);
 
-/** Only a page address over HTTP(S) is fetched or opened; anything else stays text. */
-function fetchable(address: string): string | undefined {
+/**
+ * `address` as a URL when it is an HTTP(S) address, read against `base` when it is relative, else
+ * `undefined`. Only such an address is fetched or opened; anything else stays text.
+ */
+export function httpUrl(address: string, base?: string): URL | undefined {
   try {
-    const url = new URL(address, globalThis.location?.href ?? "http://localhost/");
-    return url.protocol === "http:" || url.protocol === "https:" ? address : undefined;
+    const url = new URL(address, base);
+    return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
   } catch {
     return undefined;
   }
@@ -27,5 +30,8 @@ export function useLink(uri: string | null | undefined): string | undefined {
   const resolve = useContext(LinksContext);
   if (!uri) return undefined;
   const resolved = resolve?.(uri) ?? (/^https?:\/\//i.test(uri) ? uri : undefined);
-  return resolved === undefined ? undefined : fetchable(resolved);
+  if (resolved === undefined) return undefined;
+  return httpUrl(resolved, globalThis.location?.href ?? "http://localhost/") === undefined
+    ? undefined
+    : resolved;
 }

@@ -5,6 +5,7 @@ import {
   type ElicitationSchema,
 } from "@agentclientprotocol/sdk";
 import { useId, useState } from "react";
+import { httpUrl } from "../content/links";
 
 type Value = string | number | boolean | string[];
 type Choice = { value: string; title: string; description?: string | null | undefined };
@@ -357,16 +358,6 @@ function Field({
   );
 }
 
-/** The address to open, if it is an http or https URL; nothing else is opened. */
-function webAddress(raw: string): URL | undefined {
-  try {
-    const url = new URL(raw);
-    return url.protocol === "https:" || url.protocol === "http:" ? url : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * The full address either side of its host, so the host can be marked. The host is the end of
  * the authority, which for http ends at the first `/` of the path; anything before it, such as
@@ -488,7 +479,8 @@ export function ElicitationForm({
   );
 
   if (CreateElicitationRequest.isUrl(request)) {
-    const url = webAddress(request.url);
+    // Only an absolute HTTP(S) address is opened.
+    const url = httpUrl(request.url);
     if (opened || completed)
       return (
         <section className="lk-elicitation" aria-label="The agent asks">
