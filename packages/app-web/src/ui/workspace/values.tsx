@@ -202,8 +202,45 @@ const EVENT_COLUMNS = new Set(["seq", "index", "operation", "subject", "dir", "c
 const ENDS = ["id", "from", "to"] as const;
 
 /**
- * A record a change names, as a chip on its type's colour that opens it. The open record,
- * `current`, is marked rather than linked; a handle the event links no record for is drawn dashed.
+ * A chip naming a record, in the colour of its `type`, with the type as its hover text. Pressed, it
+ * opens `itemKey`. With `current` it marks the open record and opens nothing. Without `itemKey`, a
+ * handle no record is known for, it is drawn dashed and opens nothing.
+ */
+export function Mention({
+  type,
+  itemKey,
+  current = false,
+  onOpen,
+  children,
+}: {
+  type: string | undefined;
+  itemKey: string | undefined;
+  current?: boolean;
+  onOpen: (key: string) => void;
+  children: ReactNode;
+}) {
+  if (itemKey === undefined) return <span className="mention unknown">{children}</span>;
+  const style = { "--mention": typeColour(type) } as CSSProperties;
+  return current ? (
+    <span className="mention current" style={style} aria-current="true" title={type}>
+      {children}
+    </span>
+  ) : (
+    <button
+      type="button"
+      className="mention"
+      style={style}
+      title={type}
+      onClick={() => onOpen(itemKey)}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * A record a change names, as a chip that opens it. The open record, `current`, is marked rather
+ * than linked; a handle the event links no record for is drawn dashed.
  */
 function EndChip({
   event,
@@ -216,25 +253,17 @@ function EndChip({
   current: string | undefined;
   onOpen: (key: string) => void;
 }) {
-  const handle = String(event[field]);
   const link = linksOf(event, field)[0];
-  if (link === undefined) return <span className="mention unknown">{handle}</span>;
-  const key = keyOf(link.href);
-  const style = { "--mention": typeColour(link.type) } as CSSProperties;
-  return key === current ? (
-    <span className="mention current" style={style} aria-current="true" title={link.type}>
-      {handle}
-    </span>
-  ) : (
-    <button
-      type="button"
-      className="mention"
-      style={style}
-      title={link.type}
-      onClick={() => onOpen(key)}
+  const key = link === undefined ? undefined : keyOf(link.href);
+  return (
+    <Mention
+      type={link?.type}
+      itemKey={key}
+      current={key !== undefined && key === current}
+      onOpen={onOpen}
     >
-      {handle}
-    </button>
+      {String(event[field])}
+    </Mention>
   );
 }
 

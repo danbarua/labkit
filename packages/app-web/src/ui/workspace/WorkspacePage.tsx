@@ -40,7 +40,6 @@ import {
 } from "@phosphor-icons/react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  type CSSProperties,
   type ReactNode,
   type RefObject,
   useCallback,
@@ -96,7 +95,7 @@ import { WorkspacePicker } from "./workspace-picker";
 import { CommitView, FileView, RELATIONS_APART, SHOWN_APART } from "./git-views";
 import { type Playback, usePlayback } from "./playback";
 import { proseSegments } from "./prose";
-import { Badge, EventRow, PropRows, type Prose } from "./values";
+import { Badge, EventRow, Mention, PropRows, type Prose } from "./values";
 import "./workspace.css";
 
 /** Where the left column starts: the list of workspaces. */
@@ -354,23 +353,19 @@ function proseFor(held: HeldIndex, path: string, onOpen: (key: string) => void):
           );
         case "mention":
           return (
-            <button
-              key={i}
-              type="button"
-              className="mention"
-              style={{ "--mention": typeColour(s.type) } as CSSProperties}
-              title={s.type ?? ""}
-              onClick={() => onOpen(s.key)}
-            >
+            <Mention key={i} type={s.type} itemKey={s.key} onOpen={onOpen}>
               {s.text}
-            </button>
+            </Mention>
           );
+        case "unknown":
+          return (
+            <Mention key={i} type={undefined} itemKey={undefined} onOpen={onOpen}>
+              {s.text}
+            </Mention>
+          );
+        default:
+          return s satisfies never;
       }
-      return (
-        <span key={i} className="mention unknown">
-          {s.text}
-        </span>
-      );
     });
 }
 
@@ -1350,15 +1345,9 @@ function Events({
           <div className="panel-body">
             {commits.map(({ commit, acts }) => (
               <div key={commit} className="ev ran-against">
-                <button
-                  type="button"
-                  className="mention"
-                  style={{ "--mention": typeColour(COMMIT_TYPE) } as CSSProperties}
-                  title={COMMIT_TYPE}
-                  onClick={() => onOpen(commit)}
-                >
+                <Mention type={COMMIT_TYPE} itemKey={commit} onOpen={onOpen}>
                   {nameOf(commit, COMMIT_TYPE)}
-                </button>
+                </Mention>
                 <span>
                   {acts.map((act) => (
                     <button
